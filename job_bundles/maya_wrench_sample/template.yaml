@@ -1,0 +1,87 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: '{{Param.JobName}}'
+description: |
+  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+  This job bundle is provided as part of the AWS Deadline Cloud samples.
+
+  The wrench comes from FuzzyPixel's short, Spanner.
+parameterDefinitions:
+- name: JobName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Job Name
+  default: Wrench In the Gears
+- name: Frames
+  type: STRING
+  default: "117"
+- name: ImageWidth
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Width
+  default: 960
+- name: ImageHeight
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Height
+  default: 540
+- name: ProjectPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: INOUT
+  default: "."
+- name: SceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: wrench.ma
+- name: ImageOutputPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: wrench_output/
+- name: CondaPackages
+  type: STRING
+  description: | 
+    Choose which Conda packages to install for the render. Requires a Conda Queue Environment to process the value.
+    Example usage:
+    
+    $ deadline bundle submit maya_wrench_sample -p "CondaPackages=maya=2024.* maya-mtoa" --name "Wrench (Conda Packages)"
+  default: maya=2023 maya-mtoa
+steps:
+- name: Wrench
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    embeddedFiles:
+    - name: Render
+      filename: render.sh
+      type: TEXT
+      data: |
+        set -x
+        echo 'Scene file is {{Param.SceneFile}}'
+        cd '{{Param.ProjectPath}}'
+        Render -r arnold \
+            -proj '{{Param.ProjectPath}}' \
+            -rd '{{Param.ImageOutputPath}}' \
+            -s {{Task.Param.Frame}} \
+            -e {{Task.Param.Frame}} \
+            -pad 4 \
+            -fnc "name.#.ext" \
+            -cam persp \
+            -x {{Param.ImageWidth}} \
+            -y {{Param.ImageHeight}} \
+            -ai:lve 3 \
+            '{{Param.SceneFile}}'
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Render}}"]
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
