@@ -1,11 +1,6 @@
-## My Project
+## Deadline Cloud Samples
 
-TODO: Fill this README out!
-
-Be sure to:
-
-* Change the title in this README
-* Edit your repository description on GitHub
+The purpose of this repository is to provide functioning samples for AWS Deadline Cloud that can be used for testing renders.
 
 ## Security
 
