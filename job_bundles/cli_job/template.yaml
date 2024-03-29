@@ -39,11 +39,14 @@ steps:
       runnable: true
       data: |
         #!/usr/bin/env bash
+
+        # Configure the script to fail if any individual command fails.
         set -euo pipefail
 
         echo 'Data Dir is {{Param.DataDir}}'
         cd '{{Param.DataDir}}'
 
+        # Echo each command before running it.
         set -x
 
         {{Param.BashScript}}

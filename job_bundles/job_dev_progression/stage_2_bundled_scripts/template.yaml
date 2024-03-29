@@ -1,0 +1,68 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: Bundled Scripts - 2 - Job Development Progression
+description: |
+  When your self-contained job template starts to become too unwieldy, you
+  can extract your scripts out of the template and into separate files
+  of your job bundle.
+
+  In this style, all your script code is in a subdirectory of the job bundle
+  that is connected to an input PATH job parameter. This means you can no longer
+  use the "{{Param.InputCsvFile}}" style of job parameter value substitution in your
+  scripts. You will instead use command line arguments to pass them from
+  the job template to your scripts.
+
+  As your scripts get more complex, they will likely start sharing some
+  functionality that you want to place in a shared folder. Stage 3 of
+  the job development progression includes a simple way to do that for Python.
+
+parameterDefinitions:
+
+- name: InputCsvFile
+  description: Select the render_times.csv input data.
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: sample_dataset/render_times.csv
+- name: WorkspacePath
+  description: Select a directory for the job to use as scratch space and for the output data.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: workspace
+
+- name: CondaPackages
+  description: A list of conda packages to install. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: polars pyarrow seaborn
+- name: CondaChannels
+  description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: conda-forge
+
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
+steps:
+
+- name: InitializeWithBash
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Param.JobScriptDir}}/initialize.sh', '{{Param.InputCsvFile}}', '{{Param.WorkspacePath}}']
+
+- name: ProcessWithPython
+  dependencies:
+  - dependsOn: InitializeWithBash
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ['{{Param.JobScriptDir}}/process.py', '{{Param.WorkspacePath}}']

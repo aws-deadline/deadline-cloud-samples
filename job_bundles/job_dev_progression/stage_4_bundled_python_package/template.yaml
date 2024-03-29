@@ -1,0 +1,83 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: Bundled Python Package - 4 - Job Development Progression
+description: |
+  As the shared library code in your job gets more complex, using
+  a non-standard directory structure slows down development. In
+  this stage, you switch to a bundled Python package that can include
+  a test suite and other standard Python features.
+
+  You can also define your entry points as binaries and call them
+  directly from your template instead of calling Python. Local development
+  becomes easier by iteratively developing the test suite in isolation,
+  then submitting test jobs to your farm.
+
+parameterDefinitions:
+
+- name: InputCsvFile
+  description: Select the render_times.csv input data.
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: sample_dataset/render_times.csv
+- name: WorkspacePath
+  description: Select a directory for the job to use as scratch space and for the output data.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: workspace
+
+- name: CondaPackages
+  description: A list of conda packages to install. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: polars pyarrow seaborn
+- name: CondaChannels
+  description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: conda-forge
+
+- name: BundledPythonPackage
+  description: Directory containing the bundled Python package.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: progression_4_lib
+
+jobEnvironments:
+
+- name: Progression 4 Library
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      data: |
+        # Configure the action to fail if any individual command fails.
+        set -euo pipefail
+
+        # Remove and then install the bundled progression_4_lib
+        pip uninstall --yes progression_4_lib
+        pip install '{{Param.BundledPythonPackage}}'
+
+steps:
+
+- name: Initialize
+  script:
+    actions:
+      onRun:
+        command: prog4-initialize
+        args: ['{{Param.InputCsvFile}}', '{{Param.WorkspacePath}}', '--debug']
+
+- name: Process
+  dependencies:
+  - dependsOn: Initialize
+  script:
+    actions:
+      onRun:
+        command: prog4-process
+        args: ['{{Param.WorkspacePath}}']

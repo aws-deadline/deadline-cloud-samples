@@ -1,0 +1,47 @@
+[project]
+name = "progression_4_lib"
+description = "Example library for stage 4 of the job development progression."
+readme = "README.md"
+requires-python = ">=3.11"
+version = "0.1.0"
+# authors = [
+#     { name = "Your Name", email = "your-email" }
+# ]
+dependencies = [
+    "polars",
+]
+
+[project.scripts]
+prog4-initialize = "progression_4_lib:initialize.main"
+prog4-process = "progression_4_lib:process.main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/progression_4_lib"]
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.black]
+line-length = 100
+
+[tool.pytest.ini_options]
+xfail_strict = false
+addopts = [
+    "-rfEx",
+    "--cov=src/progression_4_lib",
+    "--color=yes",
+    "--cov-report=html:build/coverage",
+    "--cov-report=xml:build/coverage/coverage.xml",
+    "--cov-report=term-missing",
+]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+show_missing = true

@@ -1,0 +1,78 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: Bundled Scripts with Shared Library - 3 - Job Development Progression
+description: |
+  When you find that a set of independent scripts isn't working well, and
+  you need some shared library code, a quick way to accomplish this is with
+  a job environment that configures access to a shared folder of code.
+
+  In this style, all your script code is in a subdirectory of the job bundle
+  that is connected to an input PATH job parameter. Additionally, shared
+  library code sits in a subdirectory of that.
+
+  To facilitate demonstrating shared Python code, we've switched the first
+  step from using Bash into Python.
+
+  As your shared library code gets more complex, it will benefit from
+  standard development process like unit tests. Stage 4 of the job
+  development progression switches the shared Python code to a Python
+  package that integrates linting and testing in the usual way.
+
+parameterDefinitions:
+
+- name: InputCsvFile
+  description: Select the render_times.csv input data.
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: sample_dataset/render_times.csv
+- name: WorkspacePath
+  description: Select a directory for the job to use as scratch space and for the output data.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: workspace
+
+- name: CondaPackages
+  description: A list of conda packages to install. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: polars pyarrow seaborn
+- name: CondaChannels
+  description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: conda-forge
+
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
+jobEnvironments:
+
+- name: Environment Variables
+  variables:
+    # Put the shared library code in the PYTHONPATH so that `import <module>` works
+    # to import modules from the directory.
+    PYTHONPATH: "{{Param.JobScriptDir}}/shared"
+
+steps:
+
+- name: InitializeWithPython
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ['{{Param.JobScriptDir}}/initialize.py', '{{Param.InputCsvFile}}', '{{Param.WorkspacePath}}', "--debug"]
+
+- name: ProcessWithPython
+  dependencies:
+  - dependsOn: InitializeWithPython
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ['{{Param.JobScriptDir}}/process.py', '{{Param.WorkspacePath}}']
