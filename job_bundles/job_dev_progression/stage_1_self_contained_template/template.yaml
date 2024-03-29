@@ -1,0 +1,91 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: Self-Contained Template - 1 - Job Development Progression
+description: |
+  This stage is a great place to start when you're taking an application
+  workload you want to run and building it into a job bundle.
+
+  In this style, all your script code is embedded into the job template yaml.
+  This means you can use the {{Param.InputCsvFile}} style of parameter value substitution
+  anywhere in your scripts.
+
+  As you develop your job to have more features and to run better in parallel, you
+  will often find that the scripts grow larger until editing them inside the
+  yaml file is unwieldy. At that point, you can benefit from moving to stage 2 of
+  this job development progression.
+
+parameterDefinitions:
+
+- name: InputCsvFile
+  description: Select the render_times.csv input data.
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: sample_dataset/render_times.csv
+- name: WorkspacePath
+  description: Select a directory for the job to use as scratch space and for the output data.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: workspace
+
+- name: CondaPackages
+  description: A list of conda packages to install. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: polars
+- name: CondaChannels
+  description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
+  type: STRING
+  default: conda-forge
+
+steps:
+
+- name: InitializeWithBash
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        # Configure the task to fail if any individual command fails.
+        set -euo pipefail
+
+        # Initialize the workspace
+        mkdir -p '{{Param.WorkspacePath}}'
+        cd '{{Param.WorkspacePath}}'
+
+        # Copy the input CSV files
+        mkdir csv
+        cp '{{Param.InputCsvFile}}' csv/dataset.csv
+
+- name: ProcessWithPython
+  dependencies:
+  - dependsOn: InitializeWithBash
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        import os
+        import polars as pl
+
+        os.chdir(r"{{Param.WorkspacePath}}")
+        os.makedirs("output", exist_ok=True)
+
+        q = (
+            pl.scan_csv("csv/dataset.csv")
+            .group_by("Action Type")
+            .agg(pl.all().sum())
+            .select("Action Type", "Duration (Seconds)")
+        )
+
+        df = q.collect()
+
+        df.write_csv("output/time_per_action_type.csv")

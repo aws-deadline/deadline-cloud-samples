@@ -90,6 +90,7 @@ steps:
       - name: Run
         type: TEXT
         data: |
+          # Configure the task to fail if any individual command fails.
           set -xeuo pipefail
 
           mkdir -p '{{Param.OutputDir}}'

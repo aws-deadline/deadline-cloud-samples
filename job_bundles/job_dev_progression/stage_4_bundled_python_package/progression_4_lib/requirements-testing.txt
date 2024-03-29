@@ -1,0 +1,5 @@
+coverage[toml]
+pytest
+pytest-cov
+black
+ruff

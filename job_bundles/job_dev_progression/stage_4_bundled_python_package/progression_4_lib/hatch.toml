@@ -1,0 +1,23 @@
+[envs.default]
+pre-install-commands = [
+  "pip install -r requirements-testing.txt"
+]
+
+[envs.default.scripts]
+sync = "pip install -r requirements-testing.txt"
+test = "pytest --cov-config pyproject.toml {args:test}"
+style = [
+  "ruff check {args:.}",
+  "black --check --diff {args:.}",
+]
+fmt = [
+  "ruff format {args:.}",
+  "black {args:.}",
+  "style",
+]
+lint = [
+  "style",
+]
+
+[[envs.all.matrix]]
+python = ["3.12"]
