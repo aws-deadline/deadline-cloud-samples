@@ -1,0 +1,147 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: Copy {{Param.S3CopySource}} to Job Attachments
+description: |
+  This job copies all the objects that have a particular prefix in the S3CopySource bucket
+  prefix to the job attachments bucket of youar AWS Deadline Cloud queue. See README.md
+  in this job bundle for details about the permissions your queue's IAM role will need.
+
+parameterDefinitions:
+# S3 Copy Parameters
+- name: S3CopySource
+  description: The input data prefix, as 's3://<BUCKET_NAME>/prefix'.
+  userInterface:
+    control: LINE_EDIT
+    groupLabel: S3 Copy Parameters
+  type: STRING
+- name: Parallelism
+  description: How many tasks to spread the copy across.
+  userInterface:
+    control: SPIN_BOX
+    groupLabel: S3 Copy Parameters
+  type: INT
+  minValue: 1
+  default: 3
+# Software
+- name: CondaPackages
+  description: A list of conda packages to install. The job expects a Queue Environment to handle this.
+  userInterface:
+    control: LINE_EDIT
+    groupLabel: Software
+  type: STRING
+  default: python boto3 python-xxhash
+- name: CondaChannels
+  description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
+  userInterface:
+    control: LINE_EDIT
+    groupLabel: Software
+  type: STRING
+  default: conda-forge
+# Hidden
+- name: WorkspacePath
+  description: A temporary directory for the job to use.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: workspace
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    # Turn off buffering of Python's output
+    PYTHONUNBUFFERED: "True"
+
+steps:
+- name: CollectObjects
+  description: |
+    This step lists all the objects in the bucket under the specified prefix, and divides them up evenly
+    to process as different tasks. Each object is collected along with its etag and other metadata.
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/collect_objects.py'
+        - '{{Param.WorkspacePath}}'
+        - '--parallelism'
+        - '{{Param.Parallelism}}'
+        - '--copy-source'
+        - '{{Param.S3CopySource}}'
+
+- name: HashObjects
+  description: |
+    This step gets the xxh128 hash of each object, either from the "B64DeadlineJobAttachmentsXXH128"
+    object tag, or by calculating it. If it calculates the hash, it saves the tag. The etag is used
+    to ensure that the object being hashed is the exact same one that was listed in the CollectObjects
+    step.
+  dependencies:
+  - dependsOn: CollectObjects
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Index
+      type: INT
+      range: "1-{{Param.Parallelism}}"
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/hash_objects.py'
+        - '{{Param.WorkspacePath}}'
+        - '--index'
+        - '{{Task.Param.Index}}'
+        - '--copy-source'
+        - '{{Param.S3CopySource}}'
+
+- name: CopyObjects
+  description: |
+    This step copies all the objects into the job attachments content addressable storage,
+    using the hashes calculated in HashObjects as the keys.
+  dependencies:
+  - dependsOn: CollectObjects
+  - dependsOn: HashObjects
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Index
+      type: INT
+      range: "1-{{Param.Parallelism}}"
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/copy_objects.py'
+        - '{{Param.WorkspacePath}}'
+        - '--index'
+        - '{{Task.Param.Index}}'
+        - '--copy-source'
+        - '{{Param.S3CopySource}}'
+
+- name: SaveManifest
+  description: |
+    This step saves a manifest file of all the files that were processed.
+  dependencies:
+  - dependsOn: CollectObjects
+  - dependsOn: HashObjects
+  - dependsOn: CopyObjects
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/save_manifest.py'
+        - '{{Param.WorkspacePath}}'
+        - '--parallelism'
+        - '{{Param.Parallelism}}'
+        - '--copy-source'
+        - '{{Param.S3CopySource}}'
