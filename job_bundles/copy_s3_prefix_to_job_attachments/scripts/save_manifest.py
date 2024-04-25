@@ -61,7 +61,7 @@ manifest = AssetManifest(
 )
 
 now_timestamp = (
-    datetime.datetime.now(tz=datetime.UTC)
+    datetime.datetime.now(tz=datetime.timezone.utc)
     .isoformat(timespec="minutes")
     .replace("+00:00", "Z")
 )
