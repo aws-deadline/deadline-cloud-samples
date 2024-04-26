@@ -34,6 +34,7 @@ parameterDefinitions:
     control: CHOOSE_DIRECTORY
     label: Output Directory
     groupLabel: Render Parameters
+  default: "./output"
   description: Choose the render output directory.
 - name: OutputPattern
   type: STRING
