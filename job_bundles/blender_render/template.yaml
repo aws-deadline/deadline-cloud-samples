@@ -2,6 +2,7 @@ specificationVersion: 'jobtemplate-2023-09'
 name: Blender Render
 
 parameterDefinitions:
+
 # Render Parameters
 - name: BlenderSceneFile
   type: PATH
@@ -53,6 +54,7 @@ parameterDefinitions:
   description: Choose the file format to render as.
   default: JPEG
   allowedValues: [TGA, RAWTGA, JPEG, IRIS, IRIZ, PNG, HDR, TIFF, OPEN_EXR, OPEN_EXR_MULTILAYER, CINEON, DPX, DDS, JP2, WEBP]
+
 # Software Environment
 - name: CondaPackages
   type: STRING
@@ -99,5 +101,5 @@ steps:
           blender --background '{{Param.BlenderSceneFile}}' \
                   --render-output '{{Param.OutputDir}}/{{Param.OutputPattern}}' \
                   --render-format {{Param.Format}} \
-                  --use-extension true \
+                  --use-extension 1 \
                   --render-frame {{Task.Param.Frame}}
