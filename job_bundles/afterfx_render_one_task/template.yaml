@@ -1,0 +1,87 @@
+specificationVersion: jobtemplate-2023-09
+name: After Effects Render - one task
+description: >
+  A simple job bundle that allows a user to select
+  a project and comp to render with aerender.
+parameterDefinitions:
+- name: ProjectFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Project file
+    groupLabel: Project settings
+    fileFilters:
+    - label: After Effects project files
+      patterns:
+      - "*.aep"
+      - "*.aepx"
+    - label: All Files
+      patterns:
+      - "*"
+  description: The After Effects project file to render.
+- name: CompName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Comp name
+    groupLabel: Project settings
+  description: Selected composition to render.
+- name: InputDirectory
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Input directory
+    groupLabel: Inputs/outputs
+  description: >
+    This is the directory for your input files. Any input
+    files that are required to render must be included in
+    this directory. Generally, the project file should be
+    within this directory to ensure relative paths are
+    preserved.
+- name: OutputDirectory
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output directory
+    groupLabel: Inputs/outputs
+  description: The render output directory
+- name: StartFrame
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Start Frame
+    groupLabel: Frame range
+  default: 0
+  description: The first frame to render.
+- name: EndFrame
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: End Frame
+    groupLabel: Frame range
+  default: 50
+  description: The last frame to render.
+
+steps:
+- name: "{{Param.CompName}}"
+  script:
+    actions:
+      onRun:
+        command: aerender
+        args:
+        - "-project"
+        - "{{Param.ProjectFile}}"
+        - "-comp"
+        - "{{Param.CompName}}"
+        - "-output"
+        - "{{Param.OutputDirectory}}"
+        - "-s"
+        - "{{Param.StartFrame}}"
+        - "-e"
+        - "{{Param.EndFrame}}"
