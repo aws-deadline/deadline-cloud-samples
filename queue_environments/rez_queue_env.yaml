@@ -1,0 +1,111 @@
+specificationVersion: 'environment-2023-09'
+parameterDefinitions:
+  - name: RezPackages
+    type: STRING
+    description: >
+      This is a space-separated list of Rez packages to install for the job.
+      E.g. "blender-3.6" for a job that renders frames in Blender 3.6.
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Packages
+  - name: RezRepositories
+    type: STRING
+    description: >
+      This is a ':'-separated list of Rez repositories from which to install
+      packages.
+    # Edit the script code below to set the Linux, Windows, and MacOS repository path,
+    # it will search/replace the token REZ_REPOSITORY_PATH in the default to that.
+    default: "REZ_REPOSITORY_PATH"
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Repositories
+
+environment:
+  name: Rez
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: rez-queue-env-enter.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        if [ -z '{{Param.RezPackages}}' ]; then
+            echo "Skipping Rez env as RezPackages parameter was empty."
+            exit 0
+        fi
+
+        # Edit these paths for your farm
+        LINUX_REZ_REPOSITORY_PATH="/mnt/REZ_REPOSITORY"
+        WINDOWS_REZ_REPOSITORY_PATH="R:/REZ_REPOSITORY"
+        MACOS_REZ_REPOSITORY_PATH="/Volumes/REZ_REPOSITORY"
+
+        REZ_PACKAGES='{{Param.RezPackages}}'
+        REZ_REPOSITORIES='{{Param.RezRepositories}}'
+
+        if [[ "$(uname -s)" == MINGW* ]]; then
+            REZ_REPOSITORY_PATH="$WINDOWS_REZ_REPOSITORY_PATH"
+        elif [[ "$(uname)" == Darwin ]]; then
+            REZ_REPOSITORY_PATH="$MACOS_REZ_REPOSITORY_PATH"
+        else
+            REZ_REPOSITORY_PATH="$LINUX_REZ_REPOSITORY_PATH"
+        fi
+        echo "DEBUG: Rez repository contents:"
+        ls -al $REZ_REPOSITORY_PATH
+        REZ_REPOSITORIES="${REZ_REPOSITORIES//REZ_REPOSITORY_PATH/$REZ_REPOSITORY_PATH}"
+
+        echo "Rez Package List:"
+        echo "   $REZ_PACKAGES"
+
+        # Activate the Rez environment, capturing the environment variables for the session to use
+        python '{{Env.File.OpenJDVarsStart}}' .vars
+        rez env \
+            --paths "$REZ_REPOSITORIES" \
+            -c "python '{{Env.File.OpenJDVarsCapture}}' .vars" \
+            $REZ_PACKAGES
+    - name: OpenJDVarsStart
+      filename: openjd-vars-start.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Exclude the env var "_" as it has special meaning to shells
+        before = dict(os.environ)
+        if "_" in before:
+            del before["_"]
+
+        with open(sys.argv[1], "w", encoding="utf8") as f:
+            json.dump(before, f)
+    - name: OpenJDVarsCapture
+      filename: openjd-vars-capture.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+        with open(sys.argv[1], "r", encoding="utf8") as f:
+            before = json.load(f)
+        after = dict(os.environ)
+        # Exclude the env var "_" as it has special meaning to shells
+        if "_" in after:
+            del after["_"]
+
+        # Identify the modified and deleted environment variables
+        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+        vars_to_delete = {k for k in before if k not in after}
+
+        # Print the env var changes following the Open Job Description specification
+        for k, v in vars_to_put.items():
+            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+            print(f"openjd_env: {kv}")
+        for k in vars_to_delete:
+            print(f"openjd_unset_env: {k}")

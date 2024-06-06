@@ -1,0 +1,117 @@
+specificationVersion: "environment-2023-09"
+parameterDefinitions:
+- name: CondaPackages
+  type: STRING
+  description: >
+    This is a space-separated list of Conda package match specifications to
+    install for the job. E.g. "blender=3.6" for a job that renders frames in
+    Blender 3.6.
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+- name: CondaChannels
+  type: STRING
+  description: >
+    This is a space-separated list of Conda channels from which to install
+    packages. Deadline Cloud SMF packages are installed from the
+    "deadline-cloud" channel that is configured by Deadline Cloud.
+
+    Add "conda-forge" to get packages from the https://conda-forge.org/
+    community, and "defaults" to get packages from Anaconda Inc (make sure
+    your usage complies with https://legal.anaconda.com/policies).
+  default: "deadline-cloud"
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+
+environment:
+  name: Conda
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: conda-queue-env-enter.sh
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+
+        if [ -z '{{Param.CondaPackages}}' ]; then
+            echo "Skipping Conda env as CondaPackages parameter was empty."
+            exit 0
+        fi
+
+        # Install an error handler to clean the cache if there is an error creating the virtual environment
+        function conda_clean_on_error {
+            if [ ! "$1" = "0" ]; then
+              echo "Error detected, cleaning the Conda cache."
+              conda clean --yes --all
+            fi
+        }
+        trap 'conda_clean_on_error $?' EXIT
+
+        # Convert the space-separated list of channels into consecutive '-c' channel options
+        CHANNEL_OPTS="$(echo '{{Param.CondaChannels}}' | sed -r 's/(\s+|^)(\S)/ -c \2/g')"
+        # Put the conda packages list in a variable, as package specs can have characters like '|' in them
+        CONDA_PACKAGES='{{Param.CondaPackages}}'
+
+        echo "Creating a Conda environment in the session directory..."
+
+        # Create the virtual environment
+        conda create --yes \
+            -p '{{Session.WorkingDirectory}}/.env' \
+            $CONDA_PACKAGES \
+            $CHANNEL_OPTS
+
+        # Activate the Conda environment, capturing the environment variables for the session to use
+        python '{{Env.File.OpenJDVarsStart}}' .vars
+        conda activate '{{Session.WorkingDirectory}}/.env'
+        python '{{Env.File.OpenJDVarsCapture}}' .vars
+
+        # Print information about the activated Conda environment
+        conda info
+    - name: OpenJDVarsStart
+      filename: openjd-vars-start.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Exclude the env var "_" as it has special meaning to shells
+        before = dict(os.environ)
+        if "_" in before:
+            del before["_"]
+
+        with open(sys.argv[1], "w", encoding="utf8") as f:
+            json.dump(before, f)
+    - name: OpenJDVarsCapture
+      filename: openjd-vars-capture.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+        with open(sys.argv[1], "r", encoding="utf8") as f:
+            before = json.load(f)
+        after = dict(os.environ)
+        # Exclude the env var "_" as it has special meaning to shells
+        if "_" in after:
+            del after["_"]
+
+        # Identify the modified and deleted environment variables
+        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+        vars_to_delete = {k for k in before if k not in after}
+
+        # Print the env var changes following the Open Job Description specification
+        for k, v in vars_to_put.items():
+            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+            print(f"openjd_env: {kv}")
+        for k in vars_to_delete:
+            print(f"openjd_unset_env: {k}")
