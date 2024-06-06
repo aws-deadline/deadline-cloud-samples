@@ -1,0 +1,311 @@
+specificationVersion: "environment-2023-09"
+parameterDefinitions:
+# CondaPackages and CondaChannels are compatible with the other Conda queue environment templates
+- name: CondaPackages
+  type: STRING
+  description: >
+    This is a space-separated list of Conda package match specifications to
+    install for the job. E.g. "blender=3.6" for a job that renders frames in
+    Blender 3.6.
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+- name: CondaChannels
+  type: STRING
+  description: >
+    This is a space-separated list of Conda channels from which to install
+    packages. Deadline Cloud SMF packages are installed from the
+    "deadline-cloud" channel that is configured by Deadline Cloud.
+
+    Add "conda-forge" to get packages from the https://conda-forge.org/
+    community, and "defaults" to get packages from Anaconda Inc (make sure
+    your usage complies with https://legal.anaconda.com/policies).
+  default: "deadline-cloud"
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+
+- name: NamedCondaEnv
+  description: |
+    If empty, the Conda environment is created only for the session. If provided,
+    a named Conda environment is reused across any jobs/sessions that run on the worker host.
+    When reusing an environment, the parameter NamedCondaEnvUpdateAfterMinutes controls
+    how long it will use the environment without checking for package updates.
+
+    If the name is "AUTOMATIC", the environment name is determined by taking the hash of the
+    CondaPackages and CondaChannels parameters, so that jobs providing identical values for
+    these parameters will share the same named Conda environment. Automatically-named environments
+    are deleted by the onExit action if they haven't been updated in more than 96 hours.
+
+    If you select a name explicitly, take care to use the environment names consistently, because
+    different jobs can define the same named environment in a different way.
+
+    When creating or updating this environment, it prints information about the operations
+    to the log file "$CONDA_PREFIX/var/log/conda_queue_env.log".
+  type: STRING
+  default: "AUTOMATIC"
+  userInterface:
+    control: LINE_EDIT
+    label: Named Conda Environment
+
+- name: NamedCondaEnvAction
+  description: |
+    When a NamedCondaEnv is selected, controls how to treat it.
+      1. ACTIVATE activates the existing named environment, or creates one if it
+         doesn't exist. If it's been NamedCondaEnvUpdateAfterMinutes since creation
+         or the last update, it updates the environment.
+      2. REMOVE_AND_CREATE always removes the existing named environment, and creates
+         a new one from scratch.
+  type: STRING
+  default: "ACTIVATE"
+  allowedValues: ["ACTIVATE", "REMOVE_AND_CREATE"]
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Named Conda Environment Action
+
+- name: NamedCondaEnvUpdateAfterMinutes
+  description: |
+    When NamedCondaEnvAction is ACTIVATE, this controls how long it will use the named
+    Conda environment before doing another update.
+  type: INT
+  default: 600
+  userInterface:
+    control: SPIN_BOX
+    label: Named Conda Environment Update After (Minutes)
+
+- name: RunCondaClean
+  description: |
+    If set to True, runs the command 'conda clean --yes --all' before creating the Conda environment.
+    This removes Conda caches for the package index, package files, and package directories.
+  type: STRING
+  default: "False"
+  allowedValues: ["True", "False"]
+  userInterface:
+    control: CHECK_BOX
+    label: Clean the Conda Cache
+
+environment:
+  name: Conda
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+      onExit:
+        command: "bash"
+        args: ["{{Env.File.Exit}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: conda-queue-env-enter.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        if [ -z '{{Param.CondaPackages}}' ]; then
+            echo "Skipping Conda env as CondaPackages parameter was empty."
+            exit 0
+        fi
+
+        # Install an error handler to clean the cache if there is an error creating the virtual environment
+        function conda_clean_on_error {
+            if [ ! "$1" = "0" ]; then
+              echo "Error detected, cleaning the Conda cache."
+              conda clean --yes --all
+            fi
+        }
+        trap 'conda_clean_on_error $?' EXIT
+
+        NAMED_CONDA_ENV='{{Param.NamedCondaEnv}}'
+
+        # If the special name 'AUTOMATIC' is provided, use the hash of the CondaChannels and CondaPackages
+        # parameters to generate the actual name.
+        if [ -n "$NAMED_CONDA_ENV" ] && [ "$NAMED_CONDA_ENV" = 'AUTOMATIC' ]; then
+            echo 'Using an automatic name for the Conda environment, based on the hash of these values:'
+            echo '  CondaChannels: {{Param.CondaChannels}}'
+            echo '  CondaPackages: {{Param.CondaPackages}}'
+
+            NAMED_CONDA_ENV="hashname_$(echo 'Channels/{{Param.CondaChannels}} -- Packages/{{Param.CondaPackages}}' | sha256sum | cut -d " " -f 1 | head -c 24)"
+            echo "Automatic name is $NAMED_CONDA_ENV"
+        fi
+
+        # If we're not reusing the Conda env, clean up any prior ones
+        if [ '{{Param.NamedCondaEnvAction}}' = 'REMOVE_AND_CREATE' ] && [ -n "$NAMED_CONDA_ENV" ]; then
+            echo "NamedCondaEnvAction parameter is set to REMOVE_AND_CREATE, removing the virtual environment..."
+            conda remove --yes --name "$NAMED_CONDA_ENV" --all
+        fi
+
+        # If requested, clean the Conda package cache
+        if [ '{{Param.RunCondaClean}}' = 'True' ]; then
+            echo "RunCondaClean parameter is True, cleaning the Conda cache..."
+            conda clean --yes --all
+        fi
+
+        # Convert the space-separated list of channels into consecutive '-c' channel options
+        CHANNEL_OPTS="$(echo '{{Param.CondaChannels}}' | sed -r 's/(\s+|^)(\S)/ -c \2/g')"
+        # Put the conda packages list in a variable, as package specs can have characters like '|' in them
+        CONDA_PACKAGES='{{Param.CondaPackages}}'
+
+        # Initialize/activate the Conda virtual environment
+        if [ -n "$NAMED_CONDA_ENV" ] && conda env list | grep -q "^$NAMED_CONDA_ENV "; then
+            echo "Reusing the existing named Conda environment $NAMED_CONDA_ENV."
+
+            # Activate the Conda environment, capturing the environment variables for the session to use
+            python '{{Env.File.OpenJDVarsStart}}' .vars
+            conda activate "$NAMED_CONDA_ENV"
+            python '{{Env.File.OpenJDVarsCapture}}' .vars
+
+            CURRENT_TIMESTAMP="$(date +%s)"
+            PREVIOUS_UPDATE_TIMESTAMP="$(cat "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp")"
+            MINUTES_SINCE_UPDATE="$(( ( $CURRENT_TIMESTAMP - $PREVIOUS_UPDATE_TIMESTAMP ) / 60 ))"
+            echo "Minutes elapsed since last update of this named Conda environment: $MINUTES_SINCE_UPDATE"
+
+            if [ $MINUTES_SINCE_UPDATE -ge {{Param.NamedCondaEnvUpdateAfterMinutes}} ]; then
+                echo "Elapsed time greater than or equal to {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, updating the environment packages to the latest"
+                conda install --yes \
+                    --update-all \
+                    $CONDA_PACKAGES \
+                    $CHANNEL_OPTS
+
+                # Save the channels and packages used in the environment, to help out debugging
+                LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                echo "Updated $NAMED_CONDA_ENV env at $(date --iso-8601=minutes)" >> "$LOGFILE"
+                echo '  CondaChannels: {{Param.CondaChannels}}' >> "$LOGFILE"
+                echo '  CondaPackages: {{Param.CondaPackages}}' >> "$LOGFILE"
+
+                # Save a timestamp of when we updated
+                echo "$CURRENT_TIMESTAMP" > "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+            else
+                echo "Elapsed time less than {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, skipping updates"
+            fi
+        elif [ -n "$NAMED_CONDA_ENV" ]; then
+            echo "Named Conda environment $NAMED_CONDA_ENV not found, creating it."
+
+            # Create the virtual environment
+            conda create --yes \
+                --name "$NAMED_CONDA_ENV" \
+                $CONDA_PACKAGES \
+                $CHANNEL_OPTS
+
+            # Activate the Conda environment, capturing the environment variables for the session to use
+            python '{{Env.File.OpenJDVarsStart}}' .vars
+            conda activate "$NAMED_CONDA_ENV"
+            python '{{Env.File.OpenJDVarsCapture}}' .vars
+
+            # Save the channels and packages used in the environment, to help out debugging
+            LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+            mkdir -p "$(dirname $LOGFILE)"
+            echo "Created $NAMED_CONDA_ENV env at $(date --iso-8601=minutes)" >> "$LOGFILE"
+            echo '  CondaChannels: {{Param.CondaChannels}}' >> "$LOGFILE"
+            echo '  CondaPackages: {{Param.CondaPackages}}' >> "$LOGFILE"
+
+            # Save a timestamp of when we updated
+            date +%s > "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+        else
+            echo "Creating temporary Conda environment in the session directory..."
+
+            # Create the virtual environment
+            conda create --yes \
+                -p '{{Session.WorkingDirectory}}/.env' \
+                $CONDA_PACKAGES \
+                $CHANNEL_OPTS
+
+            # Activate the Conda environment, capturing the environment variables for the session to use
+            python '{{Env.File.OpenJDVarsStart}}' .vars
+            conda activate '{{Session.WorkingDirectory}}/.env'
+            python '{{Env.File.OpenJDVarsCapture}}' .vars
+        fi
+
+        # Print information about the environment
+        conda info
+    - name: Exit
+      filename: conda-queue-env-exit.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        # When using this queue environment on long-lived worker hosts, such as on premises, the
+        # automatically named conda environments can accumulate. This code cleans up these environments
+        # after they haven't been used for 96 hours, a length of time chosen so that when a farm is idle
+        # for a long weekend it doesn't clear all these environment caches.
+
+        ENV_DELETE_AFTER_HOURS=96
+
+        echo "Cleaning up any automatically-named conda environments that weren't updated within $ENV_DELETE_AFTER_HOURS hours."
+
+        AUTO_CONDA_ENVS="$(conda env list | grep "^hashname_" | cut -d " " -f 1)"
+        REMOVED_ENV=0
+
+        CURRENT_TIMESTAMP="$(date +%s)"
+        for ENV_NAME in $AUTO_CONDA_ENVS; do
+            echo "Checking environment $ENV_NAME"
+
+            conda activate $ENV_NAME
+
+            LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+            if [ -f "$LOGFILE" ]; then
+                # Creation and each update outputs 3 lines to the log, so print the last 3
+                tail -3 "$LOGFILE"
+            fi
+
+            PREVIOUS_UPDATE_TIMESTAMP="$(cat "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp")"
+            HOURS_SINCE_UPDATE="$(( ( $CURRENT_TIMESTAMP - $PREVIOUS_UPDATE_TIMESTAMP ) / 1440 ))"
+            echo "Environment was last updated $HOURS_SINCE_UPDATE hours ago."
+
+            conda deactivate
+
+            if [ $HOURS_SINCE_UPDATE -gt $ENV_DELETE_AFTER_HOURS ]; then
+                echo "Elapsed time $HOURS_SINCE_UPDATE is greater than $ENV_DELETE_AFTER_HOURS hours, removing the environment."
+                conda env remove --yes -q -n $ENV_NAME
+                REMOVED_ENV=1
+            fi
+        done
+
+        if [ "$REMOVED_ENV" = "1" ]; then
+            echo "Cleaning the conda cache to reclaim disk space."
+            conda clean --yes --all
+        else
+            echo "Nothing to clean up."
+        fi
+
+    - name: OpenJDVarsStart
+      filename: openjd-vars-start.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Exclude the env var "_" as it has special meaning to shells
+        before = dict(os.environ)
+        if "_" in before:
+            del before["_"]
+
+        with open(sys.argv[1], "w", encoding="utf8") as f:
+            json.dump(before, f)
+    - name: OpenJDVarsCapture
+      filename: openjd-vars-capture.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+        with open(sys.argv[1], "r", encoding="utf8") as f:
+            before = json.load(f)
+        after = dict(os.environ)
+        # Exclude the env var "_" as it has special meaning to shells
+        if "_" in after:
+            del after["_"]
+
+        # Identify the modified and deleted environment variables
+        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+        vars_to_delete = {k for k in before if k not in after}
+
+        # Print the env var changes following the Open Job Description specification
+        for k, v in vars_to_put.items():
+            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+            print(f"openjd_env: {kv}")
+        for k in vars_to_delete:
+            print(f"openjd_unset_env: {k}")

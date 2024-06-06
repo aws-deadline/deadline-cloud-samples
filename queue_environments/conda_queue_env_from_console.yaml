@@ -1,0 +1,41 @@
+specificationVersion: "environment-2023-09"
+parameterDefinitions:
+- name: CondaPackages
+  type: STRING
+  description: >
+    This is a space-separated list of Conda package match specifications to
+    install for the job. E.g. "blender=3.6" for a job that renders frames in
+    Blender 3.6.
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+- name: CondaChannels
+  type: STRING
+  description: >
+    This is a space-separated list of Conda channels from which to install
+    packages. Deadline Cloud service-managed fleet packages are installed from the
+    "deadline-cloud" channel that is configured by Deadline Cloud.
+
+    Add "conda-forge" to get packages from the https://conda-forge.org/
+    community, and "defaults" to get packages from Anaconda Inc (make sure
+    your usage complies with https://legal.anaconda.com/policies).
+  default: "deadline-cloud"
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+
+environment:
+  name: Conda
+  script:
+    actions:
+      onEnter:
+        command: "conda-queue-env-enter"
+        args:
+        - "{{Session.WorkingDirectory}}/.env"
+        - "--packages"
+        - "{{Param.CondaPackages}}"
+        - "--channels"
+        - "{{Param.CondaChannels}}"
+      onExit:
+        command: "conda-queue-env-exit"
