@@ -2,6 +2,9 @@
 
 This repository contains a set of samples to use with [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
 
+### Open Job Description Samples
+The [Open Job Description Specifications](https://github.com/OpenJobDescription/openjd-specifications) repository has additional samples that can be used with [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
+
 ## Job bundle samples
 
 The [job_bundles](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles)
