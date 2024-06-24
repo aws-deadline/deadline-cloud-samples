@@ -20,9 +20,13 @@ where the contents of the Job-specific settings panel are automatically generate
 your Job Bundle, and the [Queue Environments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
 defined on the Queue that you are submitting to.
 
+If you prefer a non-interactive submission workflow for your Job Bundles, then you can submit this Job Bundle with the command
+`deadline bundle submit --yes --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
+or use the `deadline.client.api.create_job_from_job_bundle` function in the [`deadline` Python package](https://github.com/aws-deadline/deadline-cloud).
+
 All of the Job submitter plugins that have been developed by the AWS Deadline Cloud team, such as the 
 [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya), are simply generating a Job Bundle for your
-Job submission then using the [Deadline Cloud Python package](https://github.com/aws-deadline/deadline-cloud) 
+Job submission and then using the [Deadline Cloud Python package](https://github.com/aws-deadline/deadline-cloud) to
 submit your Job to Deadline Cloud. You can see the Job Bundles that are
 submitted by looking in the job history directory on your workstation after submitting a Job using a submitter plugin or the Deadline
 Cloud CLI. You can find your job history directory by running the command: `deadline config get settings.job_history_dir`.
@@ -34,18 +38,18 @@ A Job Bundle is a directory structure that contains at least an
 other files as follows:
 
 ```
-/template.json (or template.yaml)
-/asset_references.json (or asset_references.yaml)
-/parameter_values.json (or parameter_values.yaml)
+/template.yaml (or template.json)
+/asset_references.yaml (or asset_references.json)
+/parameter_values.yaml (or parameter_values.json)
 <plus any other Job-specific files that you'd like>
 ```
 
-The only required file is the Job Template (`template.json`/`template.yaml`) file that describes the structure and behaviour
-of your Job. The remaining files are optional, and are described in the following subsections.
+The only required file is the Job Template (`template.yaml`/`template.json`) file that describes the structure and behaviour
+of your Job. The other files are optional, and are described in the following subsections.
 
 ### Elements - Job Template
 
-The `template.json`/`template.yaml` file defines the runtime environment and all the processes that will run
+The `template.yaml`/`template.json` file defines the runtime environment and all the processes that will run
 as part of an Amazon Deadline Cloud Job. It can be parameterized so that the same template can be used to
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
 langauge. 
@@ -72,16 +76,19 @@ defines input parameters like `BlenderSceneFile` which is a file path:
     to add textures and other files that the job needs.
 ```
 
-The Job Parameter properties `userInterface`, `objectType`, and `dataFlow` are used by the Deadline Cloud CLI when
+`userInterface`, `objectType`, and `dataFlow` are optional Job Parameter properties used by the Deadline Cloud CLI when
 present in a Job Template within a Job Bundle. 
 
-The `userInterface` properties control the behaviour of automatically generated Job submission UIs; both via 
+The `userInterface` property control the behaviour of automatically generated Job submission UIs; both via 
 the `deadline bundle gui-submit` command line, and within Job submittion plugins for applications
 such as the [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya). 
 In this example, the UI widget for inputting a value for `BlenderSceneFile` will be a file-selection dialog that
 allows filtering to see only Blender's `.blend` files or all files, and within a widget group called "Render Parameters":
 
 ![BlenderSceneFile UI Widget](../.images/blender_submit_scene_file_widget.png)
+
+See the [gui_control_showcase sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/gui_control_showcase)
+for additional example uses of the `userInterface` property.
 
 The `objectType` and `dataFlow` properties control the behaviour of Deadline Cloud's 
 [Job Attachments feature](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html) when submitting
@@ -102,7 +109,10 @@ will be treated as an input file for Job Attachments. Contrast that with the def
   description: Choose the render output directory.
 ```
 
-The value of `OutputDir` is treated by Job Attachments as a directory where the Job is expected to write output files.
+The value of `OutputDir` is treated by Job Attachments as a directory where the Job is expected to write output files. For additional information
+about the `objectType` and `dataFlow` properties, please see the
+[`JobPathParameterDefinition` structure](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#22-jobpathparameterdefinition)
+in the Open Job Description specification.
 
 The remainder of the `blender_render` sample's Job Template defines the workflow as a single Step with each frame of the animation
 being rendered as a separate Task:
@@ -138,6 +148,20 @@ steps:
                   --render-frame {{Task.Param.Frame}}
 ```
 
+If, say, the value of the `Frames` Job Parameter were `1-10` then this defines 10 Tasks where each has a different value of the
+`Frame` Task Parameter (1, 2, ... and so on, to 10). To run a Task, the contents of the `data` property of the
+[embedded file](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#6-embeddedfile) will
+first have all its variable references expanded (changing `--render-frame {{Task.Param.Frame}}` to `--render-frame 1`, for instance)
+and then written to a temporary file within the Session Working Directory 
+(see: [Sessions](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#sessions)) on disk.
+Note that the `BlenderSceneFile` and `OutputDir` Job Parameters are both defined with `type: PATH`, so `{{Param.BlenderSceneFile}}` and
+`{{Param.OutputDir}}` will resolve to the [path-mapped location](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#path-mapping)
+on the Worker where the file and directory are located.
+After the embedded file has been written
+to disk, the Task's `onRun` command is resolved to `bash <location-of-embeded-file>` and then run.
+
+Please see the Open Job Description specification for additional details on [how Jobs are run](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run).
+
 Additional samples of Job Templates can be found in all of the Job Bundles in this repository as well as in the 
 [samples provided](https://github.com/OpenJobDescription/openjd-specifications/tree/mainline/samples)
 by Open Job Description. Please see https://github.com/OpenJobDescription/openjd-specifications/wiki
@@ -145,10 +169,10 @@ for more information on Job Templates.
 
 ### Elements - Parameter Values
 
-The `parameter_values.json`/`parameter_values.yaml` file in a Job Bundle gives you a place to "bake"
+The `parameter_values.yaml`/`parameter_values.json` file in a Job Bundle gives you a place to "bake"
 the values of some of the Job Parameters, and/or [deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html)
 request arguments into the Job Bundle so that the values do not have to be given when submitting a Job using the
-Job Bundle. The Job Bundle submission UI that is created will still allow values for these parameters to be input.
+Job Bundle. The Job Bundle submission UI that is created will still allow values for these parameters to be modified.
 
 The format of the file, in YAML, is:
 
@@ -161,10 +185,10 @@ parameterValues:
 ... repeating as necessary
 ```
 
-Each element of the `parameterValues` list in the file must be either: 
+Each element of the `parameterValues` list in the file must be one of the following: 
 
 1. A Job Parameter defined in the Job Bundle's Job Template; 
-2. A Job Parameter defined in a Queue Environment on the Queue that you are submitting the Job to; or 
+2. A Job Parameter defined in a Queue Environment on the Queue that you are submitting the Job to;
 3. A special parameter that is passed to the [deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html)
    when creating a Job with the Job Bundle:
     * `deadline:priority` - The value must be an integer, and is passed as the `priority` request parameter to the API.
@@ -178,9 +202,9 @@ if all Job Parameters have values.
 
 For example, the [`blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/blender_render)
 has no parameter values file, and its Job Template defines Job Parameters, like `BlenderSceneFile` and `OutputDir`, that
-have no default values, so it must be used as a template from which Jobs are created. When we create a Job using this Job Bundle, with
-`deadline bundle gui-submit blender_render/`, a new Job Bundle is written to the job history directory and that Job Bundle has
-a `parameter_values.yaml` file that contains the values of all parameters defined for the Job submission:
+have no default values, so it must be used as a template from which Jobs are created. After we create a Job using this Job Bundle (with
+`deadline bundle gui-submit blender_render/` for example) a new Job Bundle is written to the job history directory and that Job Bundle has
+a `parameter_values.yaml` file that contains the values of all parameters we specified:
 
 ```bash
 % cat ~/.deadline/job_history/\(default\)/2024-06/2024-06-20-01-JobBundle-Demo/parameter_values.yaml
@@ -220,8 +244,9 @@ can be found by running `deadline config get settings.job_history_dir`.
 
 ### Elements - Asset References
 
-The `asset_references.json`/`asset_references.yaml` file in a Job Bundle is an interface for Deadline Cloud's
-Job Attachments feature that lists input files and directories, as well as output directories for the Jobs that you
+The `asset_references.yaml`/`asset_references.json` file in a Job Bundle is an interface for Deadline Cloud's
+[Job Attachments feature](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html)
+that lists input files and directories, as well as output directories for the Jobs that you
 submit. If you do not have all of your inputs and outputs for Job Attachments listed in this file
 then you can still select them for your Job during submission with the `deadline bundle gui-submit` CLI command.
 This file has no effect if you are not using Deadline Cloud's Job Attachments feature.
@@ -253,6 +278,12 @@ assetReferences:
     referencedPaths:
     - <list of directory paths>
 ```
+
+When selecting which input or output files to upload to [Amazon S3](https://aws.amazon.com/s3/), the Job Attachments
+feature compares the file path against the paths listed in your
+[Storage Profiles](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-shared.html). Each Storage Profile
+abstracts a network fileshare on your network that is mounted on your workstations and worker hosts, so Job Attachments
+only uploads files to S3 if the file is not contained on one of these file shares.
 
 Using the [`blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/blender_render) as
 an example again, we create a Job with `deadline bundle gui-submit blender_render/` and provide some additional files on the Job Attachments
