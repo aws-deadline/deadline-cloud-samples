@@ -1,0 +1,34 @@
+{% set version = "4.0.2" %}
+
+{% set hash = "5583a5588736da8858c522ef17fff5d73be59c47a6fe91ad29c6f3263e22086a" %}
+
+package:
+  name: blender
+  version: {{ version }}
+
+source:
+  url:
+  sha256: {{ hash }}
+  folder: blender
+
+build:
+  number: 0
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  overlinking_ignore_patterns:
+  - "**"
+  # Blender is built to be relocatable, so can ignore the warnings about DSOs.
+  missing_dso_whitelist:
+  - "**"
+
+test:
+  commands:
+    - blender -h
+
+about:
+  home: https://www.blender.org/
+  license: GPL3
+  summary: >
+    Blender is the free and open source 3D creation suite. It supports the entirety of
+    the 3D pipeline—modeling, rigging, animation, simulation, rendering, compositing
+    and motion tracking, even video editing and game creation.
