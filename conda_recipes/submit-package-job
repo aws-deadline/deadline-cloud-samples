@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RECIPE_NAME=
+S3_CHANNEL=
+
+# Parse the CLI arguments
+while [ $# -gt 0 ]; do
+    case "${1}" in
+    --recipe) RECIPE_NAME="$2" ; shift 2 ;;
+    --s3-channel) S3_CHANNEL="$2" ; shift 2 ;;
+    *) echo "Unexpected option: $1" ; exit 1 ;;
+  esac
+done
+
+# Trim the trailing '/' from the recipe name and/or the S3 channel URL if necessary
+RECIPE_NAME=${RECIPE_NAME%/}
+S3_CHANNEL=${S3_CHANNEL%/}
+
+if [ -z "$RECIPE_NAME" ]; then
+    echo "ERROR: --recipe is a required argument"
+    echo "   e.g. $ ./submit-package-job --recipe blender-4.0"
+    exit 1
+fi
+
+if ! [ -d $RECIPE_NAME ]; then
+    echo "ERROR: There is no directory for recipe named $RECIPE_NAME."
+    exit 1
+fi
+
+if [ -z "$S3_CHANNEL" ]; then
+    echo "No S3 channel provided, using job attachments bucket default"
+    S3_CHANNEL_BUCKET=$(deadline queue get | grep -e "^  s3BucketName:" | sed 's/^  s3BucketName: //')
+    S3_CHANNEL_PREFIX="Conda/Default"
+    S3_CHANNEL="s3://$S3_CHANNEL_BUCKET/$S3_CHANNEL_PREFIX"
+elif ! [[ $S3_CHANNEL == s3://* ]]; then
+    echo "Only the channel name provided, using the job attachments bucket with 'Conda' prefix"
+    S3_CHANNEL_BUCKET=$(deadline queue get | grep -e "^  s3BucketName:" | sed 's/^  s3BucketName: //')
+    S3_CHANNEL_PREFIX="Conda/$S3_CHANNEL"
+    S3_CHANNEL="s3://$S3_CHANNEL_BUCKET/$S3_CHANNEL_PREFIX"
+fi
+
+# Some recipe sanity checks
+for REQUIRED_FILE in recipe_vars.sh $RECIPE_NAME/meta.yaml; do
+    if ! [ -f $RECIPE_NAME/$REQUIRED_FILE ]; then
+        echo "ERROR: The recipe does not contain required file $RECIPE_NAME/$REQUIRED_FILE."
+        exit 1
+    fi
+done
+
+SOURCE_ARCHIVE_FILENAME=
+SOURCE_DOWNLOAD_INSTRUCTIONS=
+EXTRA_SUBMIT_OPTIONS=
+JOB_BUNDLE=build_linux_package
+ADDITIONAL_CONDA_CHANNELS=
+
+# This provides:
+#   SOURCE_ARCHIVE_FILENAME (optional) - The filename of the source archive, e.g. myapp-3.14.tar.gz
+#   SOURCE_DOWNLOAD_INSTRUCTIONS (optional) - Instructions to download the source archive, e.g. "Download from https://<my-website>.com/downloads"
+#   EXTRA_SUBMIT_OPTIONS (optional) - Additional options to provide to the "deadline bundle submit" command.
+#   JOB_BUNDLE (optional) - If provided, specifies the job bundle directory. Default is build_linux_package.
+#   ADDITIONAL_CONDA_CHANNELS (optional) - If provided, is a list of additional Conda channels to get dependencies from.
+source $RECIPE_NAME/recipe_vars.sh
+
+if ! [ -z "$SOURCE_ARCHIVE_FILENAME" ]; then
+    SOURCE_ARCHIVE="$RECIPE_NAME/$SOURCE_ARCHIVE_FILENAME"
+    if ! [ -f $SOURCE_ARCHIVE ]; then
+        echo "ERROR: File $SOURCE_ARCHIVE not found."
+        echo "To submit the $RECIPE_NAME package build, you need the archive $SOURCE_ARCHIVE_FILENAME"
+        echo "To acquire this archive, ensure your usage complies with the license, follow these instructions, and then place it in the $RECIPE_NAME directory:"
+        echo "    $SOURCE_DOWNLOAD_INSTRUCTIONS"
+        exit 1
+    fi
+else
+    SOURCE_ARCHIVE=""
+fi
+
+echo "Building package into conda channel $S3_CHANNEL"
+echo ""
+
+set -x
+deadline bundle submit $JOB_BUNDLE \
+    -p "RecipeName=$RECIPE_NAME" \
+    -p "OverrideSourceArchive=$SOURCE_ARCHIVE" \
+    -p "RecipeDir=$RECIPE_NAME/$RECIPE_NAME" \
+    -p "S3CondaChannel=$S3_CHANNEL" \
+    -p "CondaChannels=$ADDITIONAL_CONDA_CHANNELS" \
+    $EXTRA_SUBMIT_OPTIONS

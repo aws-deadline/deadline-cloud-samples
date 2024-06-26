@@ -1,0 +1,206 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: "CondaBuild: {{Param.RecipeName}}"
+description: |
+  This job uses conda-build to build a Conda package for
+  the attached source archive and build recipe.
+
+  Use the submit-package-job script in the parent
+  directory as follows:
+
+  $ ./submit-package-job blender-4.0
+
+parameterDefinitions:
+
+# Group: Conda Package Recipe
+- name: RecipeName
+  description: |
+    The name of the recipe being built.
+  userInterface:
+    control: LINE_EDIT
+    label: Recipe Name
+    groupLabel: Conda Package Recipe
+  type: STRING
+- name: RecipeDir
+  description: |
+    The directory containing the conda-build recipe.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Conda-build Recipe Dir
+    groupLabel: Conda Package Recipe
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+- name: OverrideSourceArchive
+  description: |
+    This replaces the recipe's source URL with this archive file. Use "" or leave the
+    parameter out to use the recipe's source URL.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Override Source Archive File
+    groupLabel: Conda Package Recipe
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ""
+- name: OverridePackageName
+  description: If provided, overrides the package name in the recipe's meta.yaml file.
+  type: STRING
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Override Package Name
+    groupLabel: Conda Package Recipe
+- name: OverridePrefixLength
+  description: |
+    The --prefix-length to override in the package build.
+
+    This is needed packages built with conda-ception, where they create
+    a conda environment *inside* the conda build environment, so must subtract
+    the extre interior path length from the default prefix length. For
+    example, if using the interior path "/opt/nerfstudio/", set this to
+    239 = 255 - len("/opt/nerfstudio/")
+  type: INT
+  default: 0
+  minValue: 0
+  maxValue: 255
+  userInterface:
+    control: SPIN_BOX
+    label: Override Prefix Length
+    groupLabel: Conda Package Recipe
+
+# Group: Conda Channel
+- name: CondaChannelName
+  description: |
+    The name of the Conda channel to update.
+  userInterface:
+    control: LINE_EDIT
+    label: Channel Name
+    groupLabel: Conda Channel
+  type: STRING
+  default: User Conda Channel
+- name: S3CondaChannel
+  description: |
+    The S3 URL of the destination conda channel. E.g. s3://<s3-bucket-name>/channel/prefix
+  userInterface:
+    control: LINE_EDIT
+    label: S3 Conda Channel
+    groupLabel: Conda Channel
+  type: STRING
+- name: CondaPlatform
+  description: |
+    The Conda platform we're building the package for, e.g.
+    linux-64, win-64.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Platform
+    groupLabel: Conda Channel
+  type: STRING
+  default: linux-64
+- name: CondaChannels
+  description: |
+    A space-separated list of conda channels to read packages from.
+  userInterface:
+    control: LINE_EDIT
+    label: Additional Channels
+    groupLabel: Conda Channel
+  type: STRING
+  default: ""
+
+# Hidden Controls
+- name: JobScriptDir
+  description: Directory containing embedded scripts
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
+jobEnvironments:
+- name: CondaBuild Env
+  variables:
+    # Tell Qt applications to run off-screen.
+    QT_QPA_PLATFORM: offscreen
+    # Turn off buffering in Python
+    PYTHONUNBUFFERED: "True"
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args:
+        - '{{Param.JobScriptDir}}/enter-conda-build-env.sh'
+        - '--env-dir'
+        - '{{Session.WorkingDirectory}}/.conda-build-env'
+        - '--conda-bld-dir'
+        - '{{Session.WorkingDirectory}}/conda-bld'
+
+steps:
+
+- name: PackageBuild
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/build-package.sh'
+        - '--conda-bld-dir'
+        - '{{Session.WorkingDirectory}}/conda-bld'
+        - '--conda-platform'
+        - '{{Param.CondaPlatform}}'
+        - '--conda-channels'
+        - '{{Param.CondaChannels}}'
+        - '--s3-conda-channel'
+        - '{{Param.S3CondaChannel}}'
+        - '--override-prefix-length'
+        - '{{Param.OverridePrefixLength}}'
+        - '--recipe-dir'
+        - '{{Param.RecipeDir}}'
+        - '--override-package-name'
+        - '{{Param.OverridePackageName}}'
+        - '--override-source-archive'
+        - '{{Param.OverrideSourceArchive}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      # TODO: This should be a transformation of {{Param.CondaPlatform}}, but
+      #       OpenJobDescription does not support that.
+      anyOf: ["linux"]
+
+- name: ReindexCondaChannel
+  dependencies:
+  - dependsOn: PackageBuild
+  stepEnvironments:
+  - name: ReindexingMutex
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - '{{Param.JobScriptDir}}/s3-object-mutex.py'
+          - 'enter'
+          - '{{Param.S3CondaChannel}}/'
+        onExit:
+          command: python
+          args:
+          - '{{Param.JobScriptDir}}/s3-object-mutex.py'
+          - 'exit'
+          - '{{Param.S3CondaChannel}}/'
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/reindex-conda-channel.sh'
+        - '--reindexing-dir'
+        - '{{Session.WorkingDirectory}}/reindex'
+        - '--s3-conda-channel'
+        - '{{Param.S3CondaChannel}}'
+        - '--conda-channel-name'
+        - '{{Param.CondaChannelName}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      # This should always be "linux", because reindexing uses the Linux-only mountpoint-s3.
+      - linux
