@@ -1,6 +1,6 @@
 # AWS Deadline Cloud Job Bundles
 
-Job Bundles are one of the tools that you can use to define your Jobs for Amazon Deadline Cloud. They encapsulate
+Job Bundles are one of the tools that you can use to define your Jobs for AWS Deadline Cloud. They encapsulate
 an [Open Job Description Job Template](https://github.com/OpenJobDescription/openjd-specifications/wiki) into a directory
 with additional information such the files and directories that your Jobs need for
 Deadline Cloud's [Job Attachments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html)
@@ -50,7 +50,7 @@ of your Job. The other files are optional, and are described in the following su
 ### Elements - Job Template
 
 The `template.yaml`/`template.json` file defines the runtime environment and all the processes that will run
-as part of an Amazon Deadline Cloud Job. It can be parameterized so that the same template can be used to
+as part of an AWS Deadline Cloud Job. It can be parameterized so that the same template can be used to
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
 langauge. 
 
