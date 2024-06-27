@@ -7,7 +7,9 @@ Deadline Cloud's [Job Attachments](https://docs.aws.amazon.com/deadline-cloud/la
 feature. The [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) provides ways for you to use a Job Bundle
 to submit Jobs to your Deadline Cloud Queues to be run.
 
-We recommend developing your own Job Bundle(s), either by-hand or programatically, for your custom Job submission needs. 
+We recommend developing your own Job Bundle(s), either by-hand or programatically, for your custom Job submission needs
+rather than the alternative of developing solely an Open Job Description Job Template and using the 
+[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) API directly. 
 By using a Job Bundle with the Deadline Cloud CLI you can easily make use of Deadline Cloud's Job Attachments feature,
 and an intuitive graphical Job submission interface. For example, after 
 [configuring the Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud/blob/mainline/README.md#configuration) 
