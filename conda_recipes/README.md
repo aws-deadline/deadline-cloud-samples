@@ -13,6 +13,10 @@ For example, to build a Blender 4.1 Conda package:
 $ ./submit-package-job blender-4.1
 ```
 
+See [this blog post](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/)
+for instructions on how to set up your AWS Deadline Cloud farm for building 
+packages into an Amazon S3 conda channel.
+
 ## Tasks
 
 ### Create a new recipe from PyPI

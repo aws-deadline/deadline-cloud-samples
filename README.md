@@ -11,6 +11,15 @@ The [job_bundles](https://github.com/aws-deadline/deadline-cloud-samples/tree/ma
 directory contains sample jobs that you can submit to your Deadline Cloud queue. You can use the
 [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) to submit these jobs to your queues.
 
+## Conda recipes
+
+The [conda_recipes](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes)
+directory contains samples and tooling for building conda packages for your
+Deadline Cloud queues. You can use the `submit-package-job` tool to submit
+build jobs to your queue. See [this blog post](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/)
+for instructions on how to configure your Deadline Cloud farm for building and
+using an Amazon S3 conda channel.
+
 ### CLI job submission
 
 ```
