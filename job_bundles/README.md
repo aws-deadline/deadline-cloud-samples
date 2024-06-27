@@ -9,7 +9,7 @@ to submit Jobs to your Deadline Cloud Queues to be run.
 
 We recommend developing your own Job Bundle(s), either by-hand or programatically, for your custom Job submission needs
 rather than the alternative of developing solely an Open Job Description Job Template and using the 
-[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) API directly. 
+[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly. 
 By using a Job Bundle with the Deadline Cloud CLI you can easily make use of Deadline Cloud's Job Attachments feature,
 and an intuitive graphical Job submission interface. For example, after 
 [configuring the Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud/blob/mainline/README.md#configuration) 
@@ -22,8 +22,8 @@ where the contents of the Job-specific settings panel are automatically generate
 your Job Bundle, and the [Queue Environments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
 defined on the Queue that you are submitting to.
 
-If you prefer a non-interactive submission workflow for your Job Bundles, then you can submit this Job Bundle with the command
-`deadline bundle submit --yes --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
+If you prefer an alternative to a UI-based workflow for your Job Bundles, then you can submit this Job Bundle with the command
+`deadline bundle submit --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
 or use the `deadline.client.api.create_job_from_job_bundle` function in the [`deadline` Python package](https://github.com/aws-deadline/deadline-cloud).
 
 All of the Job submitter plugins that have been developed by the AWS Deadline Cloud team, such as the 
@@ -37,7 +37,7 @@ Cloud CLI. You can find your job history directory by running the command: `dead
 
 A Job Bundle is a directory structure that contains at least an
 [Open Job Description Job Template](https://github.com/OpenJobDescription/openjd-specifications/wiki) file, but may contain
-other files as follows:
+other files such as:
 
 ```
 /template.yaml (or template.json)
@@ -51,7 +51,7 @@ of your Job. The other files are optional, and are described in the following su
 
 ### Elements - Job Template
 
-The `template.yaml`/`template.json` file defines the runtime environment and all the processes that will run
+The Job Template file defines the runtime environment and all the processes that will run
 as part of an AWS Deadline Cloud Job. It can be parameterized so that the same template can be used to
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
 langauge. 
@@ -78,10 +78,10 @@ defines input parameters like `BlenderSceneFile` which is a file path:
     to add textures and other files that the job needs.
 ```
 
-`userInterface`, `objectType`, and `dataFlow` are optional Job Parameter properties used by the Deadline Cloud CLI when
-present in a Job Template within a Job Bundle. 
+`userInterface`, `objectType`, and `dataFlow` are optional Job Parameter properties that the Deadline Cloud CLI 
+understands when present in a Job Template within a Job Bundle. 
 
-The `userInterface` property control the behaviour of automatically generated Job submission UIs; both via 
+`userInterface` properties control the behaviour and appearance of fields in automatically generated Job submission UIs; both via 
 the `deadline bundle gui-submit` command line, and within Job submittion plugins for applications
 such as the [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya). 
 In this example, the UI widget for inputting a value for `BlenderSceneFile` will be a file-selection dialog that
