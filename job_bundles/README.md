@@ -275,8 +275,7 @@ assetReferences:
 
     # Paths that are referenced by the job, but not necessarily input or output.
     # Use this if your job uses the name of a path in some way, but does not explicitly need
-    # the contents of that path. Any directories that are not within a Storage Profile's
-    # directory will have 
+    # the contents of that path.
     referencedPaths:
     - <list of directory paths>
 ```
