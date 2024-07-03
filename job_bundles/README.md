@@ -26,12 +26,11 @@ If you prefer an alternative to a UI-based workflow for your Job Bundles, then y
 `deadline bundle submit --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
 or use the `deadline.client.api.create_job_from_job_bundle` function in the [`deadline` Python package](https://github.com/aws-deadline/deadline-cloud).
 
-All of the Job submitter plugins that have been developed by the AWS Deadline Cloud team, such as the 
+All of the Deadline Cloud submitters that have been developed by the AWS Deadline Cloud team, such as the 
 [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya), are simply generating a Job Bundle for your
 Job submission and then using the [Deadline Cloud Python package](https://github.com/aws-deadline/deadline-cloud) to
-submit your Job to Deadline Cloud. You can see the Job Bundles that are
-submitted by looking in the job history directory on your workstation after submitting a Job using a submitter plugin or the Deadline
-Cloud CLI. You can find your job history directory by running the command: `deadline config get settings.job_history_dir`.
+submit your Job to Deadline Cloud. You can inspect the job bundles created for previously submitted jobs by looking in the job history directory.
+You can find your job history directory by running the command: `deadline config get settings.job_history_dir`.
 
 ## Elements of a Job Bundle
 
@@ -40,14 +39,15 @@ A Job Bundle is a directory structure that contains at least an
 other files such as:
 
 ```
-/template.yaml (or template.json)
-/asset_references.yaml (or asset_references.json)
-/parameter_values.yaml (or parameter_values.json)
-<plus any other Job-specific files that you'd like>
+<BUNDLE_DIR>/
+├── asset_references.yaml (or asset_references.json)
+├── parameter_values.yaml (or parameter_values.json)
+├── template.yaml (or template.json)
+└── <other Job-specific files that you'd like>
 ```
 
 The only required file is the Job Template (`template.yaml`/`template.json`) file that describes the structure and behaviour
-of your Job. The other files are optional, and are described in the following subsections.
+of your Job. The files are described in the following subsections.
 
 ### Elements - Job Template
 
@@ -82,7 +82,7 @@ defines input parameters like `BlenderSceneFile` which is a file path:
 understands when present in a Job Template within a Job Bundle. 
 
 `userInterface` properties control the behaviour and appearance of fields in automatically generated Job submission UIs; both via 
-the `deadline bundle gui-submit` command line, and within Job submittion plugins for applications
+the `deadline bundle gui-submit` command line, and within Deadline Cloud submitters for applications
 such as the [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya). 
 In this example, the UI widget for inputting a value for `BlenderSceneFile` will be a file-selection dialog that
 allows filtering to see only Blender's `.blend` files or all files, and within a widget group called "Render Parameters":
@@ -187,7 +187,7 @@ parameterValues:
 ... repeating as necessary
 ```
 
-Each element of the `parameterValues` list in the file must be one of the following: 
+Each element of the `parameterValues` list in the file can be one of the following: 
 
 1. A Job Parameter defined in the Job Bundle's Job Template; 
 2. A Job Parameter defined in a Queue Environment on the Queue that you are submitting the Job to;
