@@ -208,10 +208,6 @@ While a standalone Job Template is viewed as a template from which Jobs can be c
 a template from which to create Jobs and a representation of a specific Job. It represents a specific Job when the Job Bundle's parameter
 values file contains all of the Job's Parameter values that the Job is submitted with.
 
-While a Job Template is always a template rather than a specific Job to run, the parameter values file allows
-a Job Bundle to act as a template if some Job Parameters do not have values defined in this file, or as a specific job submission
-if all Job Parameters have values.
-
 For example, the [`blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/blender_render)
 has no parameter values file, and its Job Template defines Job Parameters, like `BlenderSceneFile` and `OutputDir`, that
 have no default values, so it must be used as a template from which Jobs are created. After we create a Job using this Job Bundle (with
