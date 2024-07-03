@@ -7,11 +7,8 @@ Deadline Cloud's [Job Attachments](https://docs.aws.amazon.com/deadline-cloud/la
 feature. The [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) provides ways for you to use a Job Bundle
 to submit Jobs to your Deadline Cloud Queues to be run.
 
-We recommend developing your own Job Bundle(s), either by-hand or programatically, for your custom Job submission needs
-rather than the alternative of developing solely an Open Job Description Job Template and using the 
-[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly. 
-By using a Job Bundle with the Deadline Cloud CLI you can easily make use of Deadline Cloud's Job Attachments feature,
-and an intuitive graphical Job submission interface. For example, after 
+We recommend developing your own Job Bundle(s), either by-hand or programatically, to benefit from their
+integration with Job Attachments and an intuitive graphical Job submission interface. For example, after 
 [configuring the Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud/blob/mainline/README.md#configuration) 
 you can run it with the Blender sample in this samples directory (`deadline bundle gui-submit blender_render/`) to see:
 
@@ -25,6 +22,9 @@ defined on the Queue that you are submitting to.
 If you prefer an alternative to a UI-based workflow for your Job Bundles, then you can submit this Job Bundle with the command
 `deadline bundle submit --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
 or use the `deadline.client.api.create_job_from_job_bundle` function in the [`deadline` Python package](https://github.com/aws-deadline/deadline-cloud).
+You can also develop your Job as a Job Template and use the
+[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly if you do not need
+to make use of a Job Bundle's integration with the Job Attachments feature.
 
 All of the Deadline Cloud submitters that have been developed by the AWS Deadline Cloud team, such as the 
 [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya), are simply generating a Job Bundle for your
