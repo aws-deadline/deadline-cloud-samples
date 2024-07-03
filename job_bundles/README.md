@@ -56,11 +56,11 @@ as part of an AWS Deadline Cloud Job. It can be parameterized so that the same t
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
 langauge. 
 
----
-**NOTE:** You can also setup [Open Job Description external environments](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template)
+
+> **NOTE:** You can also setup [Open Job Description external environments](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template)
 to Amazon Deadline Cloud Queues (see [Creating a queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
 in the Amazon Deadline Cloud user guide). Queue environments combine with the job template to define the job processes.
----
+
 
 For example, the [Job Template for the `blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/job_bundles/blender_render/template.yaml)
 defines input parameters like `BlenderSceneFile` which is a file path:
