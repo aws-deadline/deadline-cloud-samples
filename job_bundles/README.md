@@ -204,6 +204,10 @@ Each element of the `parameterValues` list in the file can be one of the followi
     * `deadline:maxFailedTasksCount` - Value must be an integer, and is passed as the `maxFailedTasksCount` request parameter to the API.
     * `deadline:maxRetriesPerTask` - Value must be an integer, and is passed as the `maxRetriesPerTask` request parameter to the API.
 
+While a standalone Job Template is viewed as a template from which Jobs can be created, a Job Bundle can be viewed as both
+a template from which to create Jobs and a representation of a specific Job. It represents a specific Job when the Job Bundle's paramter
+values file contains all of the Job's Parameter values that the Job is submitted with.
+
 While a Job Template is always a template rather than a specific Job to run, the parameter values file allows
 a Job Bundle to act as a template if some Job Parameters do not have values defined in this file, or as a specific job submission
 if all Job Parameters have values.
