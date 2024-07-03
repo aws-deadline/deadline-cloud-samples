@@ -27,7 +27,7 @@ You can also develop your Job as a Job Template and use the
 to make use of a Job Bundle's integration with the Job Attachments feature.
 
 All of the Deadline Cloud submitters that have been developed by the AWS Deadline Cloud team, such as the 
-[Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya), are simply generating a Job Bundle for your
+[Autodesk Maya submitter](https://github.com/aws-deadline/deadline-cloud-for-maya), are simply generating a Job Bundle for your
 Job submission and then using the [Deadline Cloud Python package](https://github.com/aws-deadline/deadline-cloud) to
 submit your Job to Deadline Cloud. You can inspect the job bundles created for previously submitted jobs by looking in the job history directory.
 You can find your job history directory by running the command: `deadline config get settings.job_history_dir`.
@@ -51,10 +51,16 @@ of your Job. The files are described in the following subsections.
 
 ### Elements - Job Template
 
-The Job Template file defines the runtime environment and all the processes that will run
+The Job Template file defines the runtime environment and the processes that will run
 as part of an AWS Deadline Cloud Job. It can be parameterized so that the same template can be used to
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
 langauge. 
+
+---
+**NOTE:** You can also setup [Open Job Description external environments](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template)
+to Amazon Deadline Cloud Queues (see [Creating a queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
+in the Amazon Deadline Cloud user guide). Queue environments combine with the job template to define the job processes.
+---
 
 For example, the [Job Template for the `blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/job_bundles/blender_render/template.yaml)
 defines input parameters like `BlenderSceneFile` which is a file path:
@@ -83,7 +89,7 @@ understands when present in a Job Template within a Job Bundle.
 
 `userInterface` properties control the behaviour and appearance of fields in automatically generated Job submission UIs; both via 
 the `deadline bundle gui-submit` command line, and within Deadline Cloud submitters for applications
-such as the [Autodesk Maya plugin](https://github.com/aws-deadline/deadline-cloud-for-maya). 
+such as the [Autodesk Maya submitter](https://github.com/aws-deadline/deadline-cloud-for-maya). 
 In this example, the UI widget for inputting a value for `BlenderSceneFile` will be a file-selection dialog that
 allows filtering to see only Blender's `.blend` files or all files, and within a widget group called "Render Parameters":
 
