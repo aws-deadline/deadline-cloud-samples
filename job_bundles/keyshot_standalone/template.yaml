@@ -1,0 +1,111 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: KeyShot Standalone
+description: |
+  A simple job bundle that allows the user to select a KeyShot scene file, the
+  frames to render, the output file path and render via the keyshot_headless
+  command on Windows.
+parameterDefinitions:
+- name: KeyShotFile
+  description: The KeyShot scene file to render.
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: KeyShot Scene File
+    groupLabel: KeyShot Scene Settings
+    fileFilters:
+    - label: KeyShot Scene Files
+      patterns:
+      - '*.bip'
+    - label: All Files
+      patterns:
+      - '*'
+- name: Frames
+  description: The frames to render. E.g. 1-3,8,11-15
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: KeyShot Scene Settings
+  minLength: 1
+- name: OutputName
+  description: The file name prefix to save out each frame with
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Name
+    groupLabel: KeyShot Output Settings
+  default: KeyShotOutput
+- name: OutputDirectoryPath
+  description: The render output directory
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory Path
+    groupLabel: KeyShot Output Settings
+- name: OutputFormat
+  description: The render output format
+  type: STRING
+  allowedValues: 
+    [
+      "PNG",
+      "JPEG",
+      "EXR",
+      "TIFF8",
+      "TIFF32",
+      "PSD8",
+      "PSD16",
+      "PSD32"
+    ]
+  default: PNG
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Output Format
+    groupLabel: KeyShot Output Settings
+steps:
+- name: Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    actions:
+      onRun:
+        command: keyshot_headless
+        args: 
+        - -progress
+        - -floating_feature
+        - keyshot2
+        - '{{Param.KeyShotFile}}'
+        - -script
+        - '{{Task.File.KeyShotScript}}'
+    embeddedFiles:
+      - name: KeyShotScript
+        filename: KeyShotScript.py
+        type: TEXT
+        data: |
+          match "{{Param.OutputFormat}}":
+            case "JPEG":
+              extension = ".jpg"
+            case "EXR":
+              extension = ".exr"
+            case "TIFF8" | "TIFF32":
+              extension = ".tif"
+            case "PSD8" | "PSD16" | "PSD32":
+              extension = ".psd"
+            case _:
+              extension = ".png"
+
+          opts = lux.getRenderOptions()
+          opts.setAddToQueue(False)
+          lux.setAnimationFrame(int("{{Task.Param.Frame}}"))
+          output_path = os.path.join(r"{{Param.OutputDirectoryPath}}", "{{Param.OutputName}}.{{Task.Param.Frame}}" + extension)
+          output_format_code = lux.RENDER_OUTPUT_{{Param.OutputFormat}}
+          print(f"Output Path: {output_path}")
+          print(f"Output Format: {output_format_code}")
+          lux.renderImage(path=output_path, opts=opts, format=output_format_code)
+          print("Finished Rendering")
