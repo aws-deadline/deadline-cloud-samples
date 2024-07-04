@@ -1,14 +1,14 @@
 # AWS Deadline Cloud Job Bundles
 
-Job Bundles are one of the tools that you can use to define your Jobs for AWS Deadline Cloud. They encapsulate
+Job Bundles are the easiest way to define your jobs for AWS Deadline Cloud. They encapsulate
 an [Open Job Description Job Template](https://github.com/OpenJobDescription/openjd-specifications/wiki) into a directory
 with additional information such the files and directories that your Jobs need for
 Deadline Cloud's [Job Attachments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html)
 feature. The [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) provides ways for you to use a Job Bundle
 to submit Jobs to your Deadline Cloud Queues to be run.
 
-We recommend developing your own Job Bundle(s), either by-hand or programatically, to benefit from their
-integration with Job Attachments and an intuitive graphical Job submission interface. For example, after 
+We recommend developing your own Job Bundle(s), either by-hand or programatically, to benefit from an intuitive graphical
+Job submission interface. For example, after 
 [configuring the Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud/blob/mainline/README.md#configuration) 
 you can run it with the Blender sample in this samples directory (`deadline bundle gui-submit blender_render/`) to see:
 
@@ -16,8 +16,8 @@ you can run it with the Blender sample in this samples directory (`deadline bund
 
 where the contents of the Job-specific settings panel are automatically generated using the `userInterface` properties of Job Parameters
 [defined in the Job Template](https://github.com/aws-deadline/deadline-cloud-samples/blob/bdd5ff5ea29eb7457c9a78ba39166b891b79151e/job_bundles/blender_render/template.yaml#L11-L19) within 
-your Job Bundle, and the [Queue Environments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
-defined on the Queue that you are submitting to.
+your Job Bundle. If you also have [Queue Environments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html) 
+defined on the Queue that you are submitting to, then UI elements to input those are generated on the "Shared job settings" tab.
 
 If you prefer an alternative to a UI-based workflow for your Job Bundles, then you can submit this Job Bundle with the command
 `deadline bundle submit --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
@@ -43,7 +43,7 @@ other files such as:
 ├── asset_references.yaml (or asset_references.json)
 ├── parameter_values.yaml (or parameter_values.json)
 ├── template.yaml (or template.json)
-└── <other Job-specific files that you'd like>
+└── <other Job-specific files and directories that you'd like>
 ```
 
 The only required file is the Job Template (`template.yaml`/`template.json`) file that describes the structure and behaviour
@@ -54,13 +54,8 @@ of your Job. The files are described in the following subsections.
 The Job Template file defines the runtime environment and the processes that will run
 as part of an AWS Deadline Cloud Job. It can be parameterized so that the same template can be used to
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
-langauge. 
-
-
-> **NOTE:** You can also setup [Open Job Description external environments](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template)
-to Amazon Deadline Cloud Queues (see [Creating a queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
-in the Amazon Deadline Cloud user guide). Queue environments combine with the job template to define the job processes.
-
+language. When you submit a job to Deadline Cloud, it gets run within any queue environments that are applied to the queue.
+Queue environments use the [Open Job Description external environments specification](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template).
 
 For example, the [Job Template for the `blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/job_bundles/blender_render/template.yaml)
 defines input parameters like `BlenderSceneFile` which is a file path:
@@ -98,7 +93,11 @@ allows filtering to see only Blender's `.blend` files or all files, and within a
 See the [gui_control_showcase sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/gui_control_showcase)
 for additional example uses of the `userInterface` property.
 
-The `objectType` and `dataFlow` properties control the behaviour of Deadline Cloud's 
+`objectType` and `dataFlow` are optional properties for `PATH` typed Job Parameters that describe how to interpret the parameter's value.
+The value of `objectType` says that the value is either a `FILE` or `DIRECTORY`. The value of `dataFlow` indicates whether the
+file/directory that the value references should be treated as a job input (`IN` value), output (`OUT` value), both input and output (`INOUT` value),
+or neither input nor output (`NONE` value).
+Deadline Cloud uses these two properties to control the behaviour of its
 [Job Attachments feature](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html) when submitting
 a Job from the Job Bundle. In this case, `objectType: FILE` and `dataFlow: IN` mean that the value of `BlenderSceneFile`
 will be treated as an input file for Job Attachments. Contrast that with the definition of the `OutputDir` which has
@@ -204,7 +203,7 @@ Each element of the `parameterValues` list in the file can be one of the followi
     * `deadline:maxFailedTasksCount` - Value must be an integer, and is passed as the `maxFailedTasksCount` request parameter to the API.
     * `deadline:maxRetriesPerTask` - Value must be an integer, and is passed as the `maxRetriesPerTask` request parameter to the API.
 
-While a standalone Job Template is viewed as a template from which Jobs can be created, a Job Bundle can be viewed as both
+A Job Bundle can be viewed as both
 a template from which to create Jobs and a representation of a specific Job. It represents a specific Job when the Job Bundle's parameter
 values file contains all of the Job's Parameter values that the Job is submitted with.
 
@@ -252,12 +251,11 @@ can be found by running `deadline config get settings.job_history_dir`.
 
 ### Elements - Asset References
 
-The `asset_references.yaml`/`asset_references.json` file in a Job Bundle is an interface for Deadline Cloud's
-[Job Attachments feature](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html)
-that lists input files and directories, as well as output directories for the Jobs that you
-submit. If you do not have all of your inputs and outputs for Job Attachments listed in this file
+The `asset_references.yaml`/`asset_references.json` file defines the input and output files that the Job will access
+when it runs. Deadline Cloud uses this as an interface for its
+[Job Attachments feature](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-job-attachments.html).
+If you do not have all of your inputs and outputs for Job Attachments listed in this file
 then you can still select them for your Job during submission with the `deadline bundle gui-submit` CLI command.
-This file has no effect if you are not using Deadline Cloud's Job Attachments feature.
 
 The format of the file and the purpose of each element is as follows:
 
