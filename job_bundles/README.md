@@ -32,6 +32,20 @@ Job submission and then using the [Deadline Cloud Python package](https://github
 submit your Job to Deadline Cloud. You can inspect the job bundles created for previously submitted jobs by looking in the job history directory.
 You can find your job history directory by running the command: `deadline config get settings.job_history_dir`.
 
+Finally, when your Job is running on a Deadline Cloud worker, then it has environment variables available to it that provide information
+about the Job that is running. These environment variables are:
+
+|      Variable Name        |   Available  |
+| ------------------------- | ------------ |
+| DEADLINE_FARM_ID          | All Actions  |
+| DEADLINE_FLEET_ID         | All Actions  |
+| DEADLINE_WORKER_ID        | All Actions  |
+| DEADLINE_QUEUE_ID         | All Actions  |
+| DEADLINE_JOB_ID           | All Actions  |
+| DEADLINE_SESSION_ID       | All Actions  |
+| DEADLINE_SESSIONACTION_ID | All Actions  |
+| DEADLINE_TASK_ID          | Task Actions |
+
 ## Elements of a Job Bundle
 
 A Job Bundle is a directory structure that contains at least an
@@ -55,7 +69,14 @@ The Job Template file defines the runtime environment and the processes that wil
 as part of an AWS Deadline Cloud Job. It can be parameterized so that the same template can be used to
 create Jobs that differ only in their input values; much like a function or template in your favourite programming
 language. When you submit a job to Deadline Cloud, it gets run within any queue environments that are applied to the queue.
-Queue environments use the [Open Job Description external environments specification](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template).
+Queue environments use the
+[Open Job Description external environments specification](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#12-environment-template).
+
+We recommend the [Introduction to Creating a Job](https://github.com/OpenJobDescription/openjd-specifications/wiki/Introduction-to-Creating-a-Job) on
+the Open Job Description wiki for a good guide to getting started with Job Templates, and the guide on
+[How Jobs are Run](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run) for additional details. Samples of Job Templates can be
+found in all of the Job Bundles in this repository as well as in the [samples provided](https://github.com/OpenJobDescription/openjd-specifications/tree/mainline/samples)
+by Open Job Description.
 
 For example, the [Job Template for the `blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/job_bundles/blender_render/template.yaml)
 defines input parameters like `BlenderSceneFile` which is a file path:
@@ -166,13 +187,6 @@ Note that the `BlenderSceneFile` and `OutputDir` Job Parameters are both defined
 on the Worker where the file and directory are located.
 After the embedded file has been written
 to disk, the Task's `onRun` command is resolved to `bash <location-of-embeded-file>` and then run.
-
-Please see the Open Job Description specification for additional details on [how Jobs are run](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run).
-
-Additional samples of Job Templates can be found in all of the Job Bundles in this repository as well as in the 
-[samples provided](https://github.com/OpenJobDescription/openjd-specifications/tree/mainline/samples)
-by Open Job Description. Please see https://github.com/OpenJobDescription/openjd-specifications/wiki
-for more information on Job Templates.
 
 ### Elements - Parameter Values
 
@@ -286,8 +300,8 @@ assetReferences:
 
 When selecting which input or output files to upload to [Amazon S3](https://aws.amazon.com/s3/), the Job Attachments
 feature compares the file path against the paths listed in your
-[Storage Profiles](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-shared.html). Each Storage Profile
-abstracts a network fileshare on your network that is mounted on your workstations and worker hosts, so Job Attachments
+[Storage Profiles](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-shared.html). Each `SHARED`-type
+Storage Profile abstracts a network fileshare on your network that is mounted on your workstations and worker hosts, so Job Attachments
 only uploads files to S3 if the file is not contained on one of these file shares.
 
 Using the [`blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/blender_render) as
