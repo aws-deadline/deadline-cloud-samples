@@ -1,0 +1,26 @@
+specificationVersion: jobtemplate-2023-09
+name: "Job Attachments Explorer: Input"
+description: |
+  This bundle serves as the starting point for the exploration of job attachments
+  contained in job_bundles/Using_Files_In_Jobs.md.
+  It has a single step with one task that runs a bash shell script whose filesystem
+  location is passed as a job parameter.
+parameterDefinitions:
+- name: ScriptFile
+  type: PATH
+  default: script.sh
+  dataFlow: IN
+  objectType: FILE
+steps:
+- name: Step
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+  script:
+    actions:
+      onRun:
+        command: /bin/bash
+        args:
+        - "{{Param.ScriptFile}}"
