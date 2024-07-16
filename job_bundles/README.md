@@ -301,8 +301,8 @@ assetReferences:
 When selecting which input or output files to upload to [Amazon S3](https://aws.amazon.com/s3/), the Job Attachments
 feature compares the file path against the paths listed in your
 [Storage Profiles](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-shared.html). Each `SHARED`-type
-Storage Profile abstracts a network fileshare on your network that is mounted on your workstations and worker hosts, so Job Attachments
-only uploads files to S3 if the file is not contained on one of these file shares.
+filesystem location in a storage profile abstracts a network fileshare on your network that is mounted on your workstations and worker
+hosts, so Job Attachments only uploads files to S3 if the file is not contained on one of these file shares.
 
 Using the [`blender_render` sample](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/blender_render) as
 an example again, we create a Job with `deadline bundle gui-submit blender_render/` and provide some additional files on the Job Attachments
