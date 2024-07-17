@@ -1,0 +1,84 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Job sample with a new command in the PATH
+description: |
+  A job template can define Open Job Description environments that create new command
+  scripts and add them to the PATH environment variable for all steps of the job to use.
+
+jobEnvironments:
+- name: RandomSleepCommand
+  description: Adds a command 'random-sleep' to the environment.
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args:
+        - "{{Env.File.Enter}}"
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+
+        # Make a bin directory inside the session's working directory for providing new commands
+        mkdir -p '{{Session.WorkingDirectory}}/bin'
+
+        # If this bin directory is not already in the PATH, then add it
+        if ! [[ ":$PATH:" == *':{{Session.WorkingDirectory}}/bin:'* ]]; then
+          export "PATH={{Session.WorkingDirectory}}/bin:$PATH"
+
+          # This message to Open Job Description exports the new PATH value to the environment
+          echo "openjd_env: PATH=$PATH"
+        fi
+
+        # Copy the SleepScript embedded file into the bin directory
+        cp '{{Env.File.SleepScript}}' '{{Session.WorkingDirectory}}/bin/random-sleep'
+        chmod u+x '{{Session.WorkingDirectory}}/bin/random-sleep'
+    - name: SleepScript
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env python
+
+        """
+        Usage: random-sleep MIN MAX
+
+        Sleeps for a random number of seconds, between the MIN and MAX values.
+        """
+
+        import argparse
+        import random
+        import time
+
+        random.seed()
+
+        parser = argparse.ArgumentParser(prog='random-sleep')
+        parser.add_argument('min', type=float)
+        parser.add_argument('max', type=float)
+        args = parser.parse_args()
+
+        duration = random.uniform(args.min, args.max)
+        print(f"Sleeping for duration {duration:.2f}")
+        time.sleep(duration)
+
+steps:
+- name: EnvWithCommand
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Task.File.Run}}'
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        # Run the script installed into PATH by the job environment
+        random-sleep 12.5 27.5
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

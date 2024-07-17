@@ -1,0 +1,251 @@
+specificationVersion: jobtemplate-2023-09
+name: Job sample with a daemon process
+description: |
+  A job template can define and consume environments that run background
+  daemon processes shared with multiple tasks of a step. In many rendering
+  use cases, loading the application and scene data can take a significant
+  amount of time relative to the render of a frame, and this pattern amortizes
+  the loading time across all frames scheduled in a session.
+
+  This sample implements that pattern using self-contained Python and bash code.
+  See https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python
+  for a Python library that can assist to embed this pattern in application
+  scripting systems.
+
+parameterDefinitions:
+- name: Frames
+  description: The range of frames to process as separate tasks.
+  type: STRING
+  default: 1-50
+- name: FailureRate
+  description: The probability that a task should fail.
+  type: FLOAT
+  default: 0.1
+  minValue: 0
+  maxValue: 1
+
+steps:
+- name: EnvWithDaemonProcess
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+
+  stepEnvironments:
+  - name: DaemonProcess
+    description: Runs a daemon process for the step's tasks to share.
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args:
+          - "{{Env.File.Enter}}"
+        onExit:
+          command: bash
+          args:
+          - "{{Env.File.Exit}}"
+      embeddedFiles:
+      - name: Enter
+        filename: enter-daemon-process-env.sh
+        type: TEXT
+        data: |
+          #!/bin/env bash
+          set -euo pipefail
+
+          DAEMON_LOG='{{Session.WorkingDirectory}}/daemon.log'
+          echo "openjd_env: DAEMON_LOG=$DAEMON_LOG"
+          nohup python {{Env.File.DaemonScript}} > $DAEMON_LOG 2>&1 &
+          echo "openjd_env: DAEMON_PID=$!"
+          echo "openjd_env: DAEMON_BASH_HELPER_SCRIPT={{Env.File.DaemonHelperFunctions}}"
+
+          echo 0 > 'daemon_log_cursor.txt'
+      - name: Exit
+        filename: exit-daemon-process-env.sh
+        type: TEXT
+        data: |
+          #!/bin/env bash
+          set -euo pipefail
+
+          # Stop the daemon process
+          kill -9 "$DAEMON_PID"
+
+          # Get the byte range to print within the log
+          DAEMON_LOG_CURSOR=$(( $(cat daemon_log_cursor.txt) + 1 ))
+          stat --format %s "$DAEMON_LOG" > 'daemon_log_cursor.txt'
+          DAEMON_LOG_CURSOR_END=$(cat daemon_log_cursor.txt)
+
+          # Print the selected byte range
+          echo ""
+          echo "=== Last output from daemon"
+          if [ "$DAEMON_LOG_CURSOR_END" -gt "$DAEMON_LOG_CURSOR" ]; then
+            cut -z -b "$DAEMON_LOG_CURSOR-$DAEMON_LOG_CURSOR_END" "$DAEMON_LOG"
+          fi
+          echo "==="
+          echo ""
+      - name: DaemonScript
+        filename: daemon-script.py
+        type: TEXT
+        data: |
+          """
+          This Python script runs as a daemon process in the background and listens for
+          SIGUSR1 signals. When it receives such a signal, it runs a single task by
+          reading its details from a JSON file, performing a simulated task run,
+          and then writing an output result JSON file.
+          """
+
+          import signal
+          import threading
+          import json
+          from pathlib import Path
+          import random
+
+          random.seed()
+
+          # File paths for communicating with the tasks
+          workdir = Path(r'{{Session.WorkingDirectory}}')
+          details_file = workdir / 'task_details.json'
+          task_result_partial_file = workdir / 'task_result.json.partial'
+          task_result_file = workdir / 'task_result.json'
+
+          # To coordinate from the signal handler to the processing thread
+          sigusr1_sema = threading.Semaphore(0)
+
+          # Release the thread once each time the USR1 signal is received
+          signal.signal(signal.SIGUSR1, lambda signum, frame: sigusr1_sema.release())
+
+          processed_task_count = 0
+
+          def process_task(task_details):
+              print(f"Processing frame number {task_details['frame']}")
+              random_value = random.random()
+              failure_rate = {{Param.FailureRate}}
+              result = "SUCCESS" if (random_value > failure_rate) else "FAILURE"
+              return {
+                  "result": result,
+                  "processedTaskCount": processed_task_count,
+                  "randomValue": random_value,
+                  "failureRate": failure_rate,
+              }
+
+          def task_processing_loop():
+              global processed_task_count
+              while True:
+                  print("Waiting until a USR1 signal is sent...", flush=True)
+                  sigusr1_sema.acquire()
+
+                  print("Loading the task details file", flush=True)
+                  task_details = json.loads(details_file.read_text())
+                  details_file.unlink()
+
+                  print("Received task details:", flush=True)
+                  print(json.dumps(task_details, indent=1), flush=True)
+
+                  task_result = process_task(task_details)
+                  processed_task_count += 1
+
+                  print("Writing result", flush=True)
+                  task_result_partial_file.write_text(json.dumps(task_result))
+                  # Rename into the result file, so the task sees its contents atomically
+                  task_result_partial_file.replace(task_result_file)
+
+          # Process the tasks in a separate thread
+          processing_thread = threading.Thread(target=task_processing_loop)
+          processing_thread.start()
+          processing_thread.join()
+      - name: DaemonHelperFunctions
+        filename: daemon-helper-functions.sh
+        type: TEXT
+        data: |
+          # This bash script contains helper functions for sending tasks
+          # to the background daemon process.
+
+          print_daemon_log () {
+            # Get the byte range to print within the log
+            DAEMON_LOG_CURSOR=$(( $(cat daemon_log_cursor.txt) + 1 ))
+            stat --format %s "$DAEMON_LOG" > 'daemon_log_cursor.txt'
+            DAEMON_LOG_CURSOR_END=$(cat daemon_log_cursor.txt)
+
+            # Print the selected byte range
+            echo ""
+            echo "=== $1"
+            if [ "$DAEMON_LOG_CURSOR_END" -gt "$DAEMON_LOG_CURSOR" ]; then
+              cut -z -b "$DAEMON_LOG_CURSOR-$DAEMON_LOG_CURSOR_END" "$DAEMON_LOG"
+            fi
+            echo "==="
+            echo ""
+          }
+
+          send_task_to_daemon () {
+            echo "Sending command to daemon"
+            echo "$1" > task_details.json
+            # This sends SIGUSR1 to the daemon, so it knows to process the command
+            kill -USR1 "$DAEMON_PID"
+          }
+
+          wait_for_daemon_task_result () {
+            local EXITCODE=2
+            while [ $EXITCODE = 2 ];
+              do sleep 0.3
+
+              if [ -f task_result.json ]; then
+                TASK_RESULT=$(cat task_result.json)
+                if [ $(jq '.result == "SUCCESS"' task_result.json) = true ]; then
+                  EXITCODE=0
+                else
+                  EXITCODE=1
+                  echo "Task failed:"
+                  echo "$TASK_RESULT" | jq .
+                fi
+                rm task_result.json
+              fi
+
+              if ! (ps -p "$DAEMON_PID" > /dev/null); then
+                echo "Daemon process exited unexpectedly."
+                break
+              fi
+            done
+
+            if ! [ "$EXITCODE" = 0 ]; then
+              print_daemon_log "Daemon log from running the task"
+              exit "$EXITCODE"
+            fi
+          }
+
+  script:
+    actions:
+      onRun:
+        timeout: 60
+        command: bash
+        args:
+        - '{{Task.File.Run}}'
+    embeddedFiles:
+    - name: Run
+      filename: run-task.sh
+      type: TEXT
+      data: |
+        # This bash script sends a task to the background daemon process,
+        # then waits for it to respond with the output result.
+
+        set -euo pipefail
+
+        source "$DAEMON_BASH_HELPER_SCRIPT"
+
+        echo "Daemon PID is $DAEMON_PID"
+        echo "Daemon log file is $DAEMON_LOG"
+
+        print_daemon_log "Previous output from daemon"
+
+        send_task_to_daemon "{\"pid\": $$, \"frame\": {{Task.Param.Frame}} }"
+        wait_for_daemon_task_result
+
+        echo Received task result:
+        echo "$TASK_RESULT" | jq .
+
+        print_daemon_log "Daemon log from running the task"
+
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
