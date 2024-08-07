@@ -1,2 +1,3 @@
 # Set shell scripts to always have 'lf' line endings
 *.sh text eol=lf
+*.ma text eol=lf
