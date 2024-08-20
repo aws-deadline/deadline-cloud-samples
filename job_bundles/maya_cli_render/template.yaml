@@ -1,0 +1,134 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Maya CLI Render
+description: |
+  This job bundle renders a Maya software renderer scene with the Maya CLI `Render` command.
+
+  To run it, you will need a Maya installation available in the PATH in one of the following ways:
+    * As a conda package when your queue has a conda queue environment set up to
+      provide virtual environments for jobs.
+    * Installed on the worker hosts that run the job. You can customize your Deadline Cloud
+      queue, fleets, and this job to fit your own production pipeline.
+
+  See the embedded README.md for more information about this job and its default scene file.
+
+parameterDefinitions:
+
+# Render Parameters
+- name: MayaSceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Maya Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: Maya Scene Files
+      patterns: ["*.ma", "*.mb"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the Maya scene file you want to render.
+
+    Use the 'Job Attachments' tab of the submitter GUI to add textures
+    and other files that the job needs.
+  default: fallinggears.ma
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  default: 1-60
+- name: CameraName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Camera Name
+    groupLabel: Render Parameters
+  default: persp
+- name: ImageWidth
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Width
+    groupLabel: Render Parameters
+  default: 960
+- name: ImageHeight
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Height
+    groupLabel: Render Parameters
+  default: 540
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Choose the render output directory.
+  default: output
+- name: ProjectPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  default: "."
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+  description: Choose which conda packages to install for the render. Requires a conda queue environment to process the value.
+  default: maya
+
+steps:
+
+- name: Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    embeddedFiles:
+    - name: Render
+      filename: render.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        cd '{{Param.ProjectPath}}'
+
+        set -x
+        Render -r sw \
+            -proj '{{Param.ProjectPath}}' \
+            -rd '{{Param.OutputDir}}' \
+            -s {{Task.Param.Frame}} \
+            -e {{Task.Param.Frame}} \
+            -pad 4 \
+            -fnc "name.#.ext" \
+            -cam {{Param.CameraName}} \
+            -x {{Param.ImageWidth}} \
+            -y {{Param.ImageHeight}} \
+            '{{Param.MayaSceneFile}}'
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Render}}"]
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

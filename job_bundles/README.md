@@ -70,8 +70,12 @@ the template is metadata for the job parameters, defining the parameter names, t
 The step definition includes a parameter space to define a task for each frame for a range expression in the Frames job parameter,
 and a short script that substitutes job parameters and the Frame task parameter into a script command for each task.
 
-See also [keyshot_standalone](keyshot_standalone) and [afterfx_render_one_task](afterfx_render_one_task). If you've created a similar
-job for your favorite DCC, see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to add it here.
+* [blender_render](blender_render/template.yaml)
+* [keyshot_standalone](keyshot_standalone)
+* [afterfx_render_one_task](afterfx_render_one_task)
+* [maya_cli_render](maya_cli_render)
+
+If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to add it here.
 
 ### Turntable job with Maya/Arnold
 
