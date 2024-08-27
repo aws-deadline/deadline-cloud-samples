@@ -1,21 +1,229 @@
-# Sample Conda recipes
+# Sample conda build recipes and package build infrastructure for AWS Deadline Cloud
 
-## Basic usage
+## Summary
 
-This directory contains job bundles for building a Conda recipe, and
-a set of Conda recipes to use with them. By default, it will build
-packages and then upload them to your job attachments bucket, into
-a Conda channel at the location `s3://<my-job-attachments-bucket>/Conda/Default`.
+This directory contains sample tools for creating an S3 conda channel and building new packages into it
+on AWS Deadline Cloud.
 
-For example, to build a Blender 4.1 Conda package:
+* The job bundle [conda_build_linux_package](conda_build_linux_package) defines a job that
+  can build packages for Linux.
+* The command `submit-package-job` submits a job for building a provided conda build recipe on
+  a specified set of conda platforms. It takes the job bundle for Linux, and extends it for the set of
+  conda platforms.
+* Conda build recipe samples to submit with `submit-package-job`.
+
+## Infrastructure setup prerequisites
+
+See the Deadline Cloud developer guide documentation
+[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html)
+for instructions on how to set up a Deadline Cloud farm for building packages into an Amazon S3 conda channel.
+Name your package build queue "Package Build Queue" for the job submission command to select it by default.
+
+To submit package build jobs, you will need the
+[Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
+installed on your workstation.
+
+## Submitting package build jobs
+
+The command `submit-package-job` is a CLI command for submitting package job provided in this `conda_recipes`
+directory. It runs the script [submit-package-job-script.py](submit-package-job-script.py) using the Python
+for the Deadline Cloud CLI so it can rely on the `deadline` library dependency being available without additional setup.
+
+By default it will submit the job to a queue whose name starts with "Package", and will
+use the job attachments bucket of that queue to form the conda channel `s3://<my-job-attachments-bucket>/Conda/Default`.
+
+Run the command `submit-package-job --help` to get a listing of available CLI arguments.
+
+### Basic job submission
+
+To submit a package build job for Blender 4.2, enter this `conda_recipes` directory and run the following
+from your POSIX shell:
 
 ```
-$ ./submit-package-job blender-4.1
+$ ./submit-package-job blender-4.2
 ```
 
-See [this blog post](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/)
-for instructions on how to set up your AWS Deadline Cloud farm for building 
-packages into an Amazon S3 conda channel.
+or the following from your Windows cmd shell:
+
+```
+> submit-package-job blender-4.2
+```
+
+### Submitting a job for specific conda platforms
+
+The `submit-package-job` command reads the file `deadline-cloud.yaml` that lives in the recipe's outer directory.
+The file contains a list of conda platforms that the recipe supports along with metadata such as whether to
+build a package for the platform by default.
+
+The queue you submit the job to will need to have an associated fleet with the operating system and cpu architecture
+for each conda platform of the job. If a fleet is missing, your job will enter a status of NOT_COMPATIBLE. To resolve it,
+either submit again with a more restricted list of conda platforms or deploy the additional fleets to your farm.
+
+To submit the Linux x86 64-bit platform:
+
+```
+$ ./submit-package-job blender-4.2 -p linux-64
+```
+
+To submit both Windows and Linux x86 64-bit platforms:
+
+```
+$ ./submit-package-job blender-4.2 -p win-64 -p linux-64
+```
+
+To submit all the platforms specified in `deadline-cloud.yaml`, including the non-default ones:
+
+```
+$ ./submit-package-job blender-4.2 --all-platforms
+```
+
+### Submitting a job to a specific queue
+
+By default, the `submit-package-job` command submits to a queue whose name starts with "Package" in
+the default configured farm. You can pass the `-q` or `--queue` option to select a different queue.
+If you set the default queue of the Deadline Cloud CLI to your production queue, you can
+use `submit-package-job` to submit package jobs and use `deadline bundle submit` to submit test jobs
+without changing configuration in between.
+
+```
+$ ./submit-package-job blender-4.2 -q "Different Package Build Queue"
+```
+
+### Submitting a job for a different S3 channel
+
+The default S3 channel that `submit-package-job` builds to is `s3://<my-job-attachments-bucket>/Conda/Default`,
+where the job attachments bucket comes from the selected queue.
+
+You can provide different names to build to different channels within the same S3 bucket. The following submits
+to `s3://<my-job-attachments-bucket>/Conda/AnotherChannel`:
+
+```
+$ ./submit-package-job blender-4.2 --s3-channel AnotherChannel
+```
+
+Use the following to fully control the S3 channel URL. For this to work, ensure that the
+IAM role of the queue you're submitting to includes permissions for the S3 bucket.
+
+```
+$ ./submit-package-job blender-4.2 --s3-channel s3://<another-s3-bucket>/channel/prefix
+```
+
+## Recipe directory structure for `submit-package-build`
+
+The `submit-package-build` command expects conda build recipes in a specific directory structure. It's inspired by the
+[conda-forge feedstock repository structure](https://conda-forge.org/docs/maintainer/adding_pkgs/#feedstock-repository-structure).
+
+**recipe**
+
+This folder contains the conda build recipe, including `meta.yaml` and package build scripts.
+
+**deadline-cloud.yaml**
+
+This file is used by the `submit-package-build` command to configure how it submits package build jobs
+to Deadline Cloud.
+
+**other files**
+
+You can add more files, like a LICENSE.txt to document the license of the recipe.
+
+### Contents of the `deadline-cloud.yaml` file
+
+The file `deadline-cloud.yaml` file provides metadata for how to submit the package build
+job to Deadline Cloud.
+
+#### The condaPlatforms list
+
+The file's main entry is a list of conda platforms to submit for. Common platforms
+are linux-64 for 64-bit x86 Linux, linux-aarch64 for 64-bit ARM Linux, and win-64
+for 64-bit x86 Windows. A minimal configuration looks like this:
+
+```
+condaPlatforms:
+- platform: linux-64
+  defaultSubmit: true
+```
+
+If the source for the package is not available for download from the internet, you
+can specify a filename and human-readable instructions for where to get it.
+
+```
+condaPlatforms:
+- platform: linux-64
+  defaultSubmit: true
+  sourceArchiveFilename: internal-animation-tool-1.3.tar.gz
+  sourceDownloadInstructions: 'Copy from internal drive /mnt/tools/internal/source'
+```
+
+If you want to build different variants on a platform, for instance with CUDA support
+and without, you can add a variant field along with additional host requirements to append.
+You can also control the value of the `conda_build_config.yaml` file to provide parameter
+values to the [conda build variants](https://docs.conda.io/projects/conda-build/en/latest/resources/variants.html).
+In this example, the conda platforms for `submit-package-job` will be linux-64-cuda and linux-64-cpu-only.
+
+```
+condaPlatforms:
+- platform: linux-64
+  variant: cuda
+  defaultSubmit: true
+  additionalHostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+  condaBuildConfig:
+    cuda_compiler_version:
+    - 12.1
+- platform: linux-64
+  variant: cpu-only
+  defaultSubmit: true
+  additionalHostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      max: 0
+  condaBuildConfig:
+    cuda_compiler_version:
+    - None
+```
+
+#### The jobParameters list
+
+This list lets the recipe provide parameter values to the job bundle that the `submit-package-job` comamnd uses.
+The format is the same as the
+[parameter_values.yaml](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-parameters.html)
+file of a job bundle.
+
+If the conda build recpe depends on packages from conda-forge or defaults, you can
+specify the value of the CondaChannels parameter to include it while building.
+
+```
+jobParameters:
+- name: CondaChannels
+  value: conda-forge
+```
+
+Alternatively, you may require that it build with a shorter prefix path length
+than default.
+
+```
+jobParameters:
+  - name: OverridePrefixLength
+    value: 200
+```
+
+Look through the job parameter definitions in the [conda_build_linux_package](conda_build_linux_package/template.yaml)
+job bundle to see the parameters it defines. If you need to pass another argument to the `conda build`
+command, you can modify the job bundle template with a new job parameter and wire it into the conda build CLI command.
+
+### Contents of the `recipe` directory
+
+The `recipe` directory contains a conda build recipe. You can read the official
+[conda build recipe documentation](https://docs.conda.io/projects/conda-build/en/stable/concepts/recipe.html)
+to learn more.
+
+To find example recipes available licensed under Apache-2.0 or similar, you can search
+the [list of conda-forge packages](https://conda-forge.org/packages/) and follow the
+link to a package's feedstock git repository. You can also use the
+[grayskull conda recipe generator](https://github.com/conda/grayskull) to automatically
+generate starting point recipes for Python packages in PyPI.
 
 ## Tasks
 

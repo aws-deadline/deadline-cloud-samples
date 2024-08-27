@@ -2,4 +2,4 @@ parameterValues:
 - name: deadline:maxFailedTasksCount
   value: 0
 - name: deadline:maxRetriesPerTask
-  value: 1
+  value: 0

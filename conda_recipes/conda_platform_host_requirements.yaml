@@ -1,0 +1,55 @@
+# This file maps the Conda plaforms as they appear in a Conda channel to OpenJD host requirements
+linux-64:
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+    - name: attr.worker.cpu.arch
+      anyOf:
+      - x86_64
+linux-aarch64:
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+    - name: attr.worker.cpu.arch
+      anyOf:
+      - arm64
+win-64:
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - windows
+    - name: attr.worker.cpu.arch
+      anyOf:
+      - x86_64
+win-arm64:
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - windows
+    - name: attr.worker.cpu.arch
+      anyOf:
+      - arm64
+osx-64:
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - macos
+    - name: attr.worker.cpu.arch
+      anyOf:
+      - x86_64
+osx-arm64:
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - macos
+    - name: attr.worker.cpu.arch
+      anyOf:
+      - arm64

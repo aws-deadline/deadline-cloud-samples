@@ -56,14 +56,21 @@ function unmount_channel {
 trap unmount_channel EXIT
 
 echo "Wiring up an indexing view of the channel packages..."
-for CHANNEL_DIR in linux-32 linux-64 win-64 win-32 osx-64 noarch; do
-    if [ -d $CHANNEL_MOUNTPOINT/$CHANNEL_DIR ]; then
-        mkdir -p $CHANNEL_INDEXING_DIR/$CHANNEL_DIR
-        for PACKAGE in $(cd $CHANNEL_MOUNTPOINT/$CHANNEL_DIR; \
-                        shopt -s nullglob; ls *.conda); do
-            ln -r -s $CHANNEL_MOUNTPOINT/$CHANNEL_DIR/$PACKAGE \
-                $CHANNEL_INDEXING_DIR/$CHANNEL_DIR/$PACKAGE
+
+CHANNEL_DIRS=$(shopt -s nullglob; echo $CHANNEL_MOUNTPOINT/linux-* $CHANNEL_MOUNTPOINT/win-* $CHANNEL_MOUNTPOINT/osx-* $CHANNEL_MOUNTPOINT/noarch)
+for CHANNEL_DIR in $CHANNEL_DIRS; do
+    if [ -d $CHANNEL_DIR ]; then
+        echo "Found $(basename $CHANNEL_DIR) in the channel"
+        mkdir -p $CHANNEL_INDEXING_DIR/$(basename $CHANNEL_DIR)
+        for PACKAGE in $(cd $CHANNEL_DIR; \
+                        shopt -s nullglob; echo *.conda); do
+            ln -r -s $CHANNEL_DIR/$PACKAGE \
+                $CHANNEL_INDEXING_DIR/$(basename $CHANNEL_DIR)/$PACKAGE
         done
+        if [ -f "$CHANNEL_DIR/.cache/cache.db" ]; then
+            mkdir -p "$CHANNEL_INDEXING_DIR/$(basename $CHANNEL_DIR)/.cache"
+            cp "$CHANNEL_DIR/.cache/cache.db" "$CHANNEL_INDEXING_DIR/$(basename $CHANNEL_DIR)/.cache/"
+        fi
     fi
 done
 
@@ -72,6 +79,11 @@ python -m conda_index \
     --zst \
     --channel-name "$CONDA_CHANNEL_NAME" \
     $CHANNEL_INDEXING_DIR
+echo ""
+
+echo "Contents of the channel:"
+find $CHANNEL_INDEXING_DIR
+echo ""
 
 echo "Synchronizing the updated index to the S3 bucket..."
 aws s3 sync $CHANNEL_INDEXING_DIR \
@@ -79,6 +91,8 @@ aws s3 sync $CHANNEL_INDEXING_DIR \
     --exclude "*" \
     --include "*/repodata.json" \
     --include "*/repodata.json.zst" \
-    --include "*/index.html"
+    --include "*/index.html" \
+    --include "*/.cache/cache.db"
+echo ""
 
 echo "Reindexing completed."

@@ -84,7 +84,11 @@ def _mutex_get_lock_data(mutex_timeout_seconds=MUTEX_TIMEOUT_SECONDS):
         # It's not locked if the lock object is missing
         return (None, None)
 
-    time_until_expiry = response["LastModified"] + datetime.timedelta(seconds=mutex_timeout_seconds) - datetime.datetime.now(tz=datetime.timezone.utc)
+    time_until_expiry = (
+        response["LastModified"]
+        + datetime.timedelta(seconds=mutex_timeout_seconds)
+        - datetime.datetime.now(tz=datetime.timezone.utc)
+    )
     if time_until_expiry <= datetime.timedelta(seconds=0):
         # If the object hasn't been refreshed within the timeout, it's not locked. This
         # way the mutex can recover from hosts disappearing such as via spot instance interruptions.
@@ -103,7 +107,9 @@ def _mutex_wait_while_locked():
     """
     lock_data, time_until_expiry = _mutex_get_lock_data()
     while lock_data is not None:
-        print(f"Waiting, the lock for mutex s3://{s3_bucket_name}/{s3_lock_object} expires in {time_until_expiry}, info:")
+        print(
+            f"Waiting, the lock for mutex s3://{s3_bucket_name}/{s3_lock_object} expires in {time_until_expiry}, info:"
+        )
         pprint(lock_data)
         time.sleep(MUTEX_WAIT_POLLING_SECONDS)
         lock_data, time_until_expiry = _mutex_get_lock_data()
@@ -117,9 +123,7 @@ def enter():
     # Write the lock acquisition object to get in line for the mutex
     s3_lock_acquisition_object = f"{s3_lock_object}.{os.environ['DEADLINE_SESSION_ID']}"
     print(f"Creating object s3://{s3_bucket_name}/{s3_lock_acquisition_object}")
-    s3_client.put_object(
-        Bucket=s3_bucket_name, Key=s3_lock_acquisition_object, Body=b""
-    )
+    s3_client.put_object(Bucket=s3_bucket_name, Key=s3_lock_acquisition_object, Body=b"")
 
     paginator = s3_client.get_paginator("list_objects_v2")
     while True:
@@ -128,32 +132,22 @@ def enter():
 
         # Get all the lock acquisition objects
         all_s3_objects = []
-        for page in paginator.paginate(
-            Bucket=s3_bucket_name, Prefix=f"{s3_lock_object}."
-        ):
+        for page in paginator.paginate(Bucket=s3_bucket_name, Prefix=f"{s3_lock_object}."):
             all_s3_objects.extend(page.get("Contents", []))
 
         # Check our object for expiry or deletion
-        our_expiry = datetime.datetime.now(
-            tz=datetime.timezone.utc
-        ) - datetime.timedelta(
+        our_expiry = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
             seconds=MUTEX_ACQUISITION_TIMEOUT_SECONDS - MUTEX_WAIT_POLLING_SECONDS
         )
-        our_s3_object = [
-            obj for obj in all_s3_objects if obj["Key"] == s3_lock_acquisition_object
-        ]
+        our_s3_object = [obj for obj in all_s3_objects if obj["Key"] == s3_lock_acquisition_object]
         if len(our_s3_object) == 0 or our_s3_object[0]["LastModified"] < our_expiry:
             # Re-write the lock acquisition object, and restart the loop
             if len(our_s3_object) == 0:
                 print("The lock acquisition object was deleted.")
             else:
                 print("The lock acquisition object expired.")
-            print(
-                f"Re-creating object s3://{s3_bucket_name}/{s3_lock_acquisition_object}"
-            )
-            s3_client.put_object(
-                Bucket=s3_bucket_name, Key=s3_lock_acquisition_object, Body=b""
-            )
+            print(f"Re-creating object s3://{s3_bucket_name}/{s3_lock_acquisition_object}")
+            s3_client.put_object(Bucket=s3_bucket_name, Key=s3_lock_acquisition_object, Body=b"")
             continue
 
         # Filter out expired objects
@@ -183,9 +177,7 @@ def enter():
 
     # Delete our lock acquisition object and any expired ones
     delete_s3_objects = [
-        obj
-        for obj in all_s3_objects
-        if obj["LastModified"] <= expiry or obj["Key"] == s3_lock_acquisition_object
+        obj for obj in all_s3_objects if obj["LastModified"] <= expiry or obj["Key"] == s3_lock_acquisition_object
     ]
     for obj in delete_s3_objects:
         print(f"Deleting object s3://{s3_bucket_name}/{obj['Key']}")
