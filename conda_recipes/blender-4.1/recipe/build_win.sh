@@ -38,7 +38,7 @@ EOF
 cat $PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh
 
 cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
-set "PATH=%PATH:$PREFIX/mayaio2024/bin;=%"
+set "PATH=%PATH:$PREFIX/opt/blender;=%"
 set BLENDER_DATAFILES_PATH=
 set BLENDER_PYTHON_PATH=
 set BLENDER_SCRIPTS_PATH=
@@ -49,7 +49,7 @@ EOF
 cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 
 cat <<EOF > $PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh
-export PATH="\${PATH/\$(cygpath '$PREFIX/mayaio2024/bin'):/}"
+export PATH="\${PATH/\$(cygpath '$PREFIX/opt/blender'):/}"
 unset BLENDER_DATAFILES_PATH
 unset BLENDER_PYTHON_PATH
 unset BLENDER_SCRIPTS_PATH
