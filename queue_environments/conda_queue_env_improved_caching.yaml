@@ -181,6 +181,9 @@ environment:
         elif [ -n "$NAMED_CONDA_ENV" ]; then
             echo "Named Conda environment $NAMED_CONDA_ENV not found, creating it."
 
+            # Make sure there's no incomplete environment hanging around
+            conda remove --yes --name "$NAMED_CONDA_ENV" --all
+
             # Create the virtual environment
             conda create --yes \
                 --name "$NAMED_CONDA_ENV" \
