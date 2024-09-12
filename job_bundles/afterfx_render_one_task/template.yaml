@@ -50,7 +50,16 @@ parameterDefinitions:
     control: CHOOSE_DIRECTORY
     label: Output directory
     groupLabel: Inputs/outputs
+  default: "./output"
   description: The render output directory
+- name: OutputFile
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File
+    groupLabel: Inputs/outputs
+  default: "output.mp4"
+  description: Enter the output filename. Ensure the file extension is the same in the Comp Setting
 - name: StartFrame
   type: INT
   userInterface:
@@ -73,15 +82,13 @@ steps:
   script:
     actions:
       onRun:
-        command: aerender
-        args:
-        - "-project"
-        - "{{Param.ProjectFile}}"
-        - "-comp"
-        - "{{Param.CompName}}"
-        - "-output"
-        - "{{Param.OutputDirectory}}"
-        - "-s"
-        - "{{Param.StartFrame}}"
-        - "-e"
-        - "{{Param.EndFrame}}"
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        mkdir -p '{{Param.OutputDirectory}}'
+
+        aerender -project '{{Param.ProjectFile}}' -comp '{{Param.CompName}}' \
+        -output '{{Param.OutputDirectory}}\{{Param.OutputFile}}' -s {{Param.StartFrame}} -e {{Param.EndFrame}}
