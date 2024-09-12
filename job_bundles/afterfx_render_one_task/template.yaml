@@ -90,5 +90,8 @@ steps:
       data: |
         mkdir -p '{{Param.OutputDirectory}}'
 
-        aerender -project '{{Param.ProjectFile}}' -comp '{{Param.CompName}}' \
-        -output '{{Param.OutputDirectory}}\{{Param.OutputFile}}' -s {{Param.StartFrame}} -e {{Param.EndFrame}}
+        aerender -project '{{Param.ProjectFile}}' \
+            -comp '{{Param.CompName}}' \
+            -output '{{Param.OutputDirectory}}\{{Param.OutputFile}}' \
+            -s {{Param.StartFrame}} \
+            -e {{Param.EndFrame}}
