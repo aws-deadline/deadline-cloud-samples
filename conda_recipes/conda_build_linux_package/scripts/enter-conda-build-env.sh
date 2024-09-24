@@ -43,9 +43,9 @@ if conda env list | grep -q "^$ENV_NAME "; then
     echo "Reusing the existing named Conda environment $ENV_NAME."
 
     # Activate the Conda environment, capturing the environment variables for the session to use
-    python "$(dirname $0)/openjd-vars-start.py" .vars
+    python "$(dirname "$0")/openjd-vars-start.py" .vars
     conda activate "$ENV_NAME"
-    python "$(dirname $0)/openjd-vars-capture.py" .vars
+    python "$(dirname "$0")/openjd-vars-capture.py" .vars
 else
     echo "Creating the named Conda environment $ENV_NAME for running conda-build."
 
@@ -54,9 +54,9 @@ else
         python=3.11 conda conda-build conda-index boto3 pyyaml
 
     # Activate the Conda environment, capturing the environment variables for the session to use
-    python "$(dirname $0)/openjd-vars-start.py" .vars
+    python "$(dirname "$0")/openjd-vars-start.py" .vars
     conda activate "$ENV_NAME"
-    python "$(dirname $0)/openjd-vars-capture.py" .vars
+    python "$(dirname "$0")/openjd-vars-capture.py" .vars
 
     # By default, Conda creates 32-bit .conda packages that are limited to 2GB.
     # We patch the file conda_package_handling/conda_fmt.py to change its constructor

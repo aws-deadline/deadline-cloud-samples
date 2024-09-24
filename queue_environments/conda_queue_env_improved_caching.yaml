@@ -182,7 +182,9 @@ environment:
             echo "Named Conda environment $NAMED_CONDA_ENV not found, creating it."
 
             # Make sure there's no incomplete environment hanging around
-            conda remove --yes --name "$NAMED_CONDA_ENV" --all
+            for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
+                rm -rf $ENVS_DIR/$NAMED_CONDA_ENV
+            done
 
             # Create the virtual environment
             conda create --yes \

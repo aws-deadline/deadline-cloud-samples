@@ -83,6 +83,16 @@ The [turntable_with_maya_arnold](turntable_with_maya_arnold) job bundle is an ex
 stored as an OBJ file, and creating a turntable render video. It demonstrates how someone comfortable with YAML
 and scripting in a digital content creation (DCC) application can create utility jobs that are easy to submit from a GUI.
 
+### Tile render job with Maya/Arnold and FFmpeg
+
+The [tile_render_with_maya_arnold](tile_render_with_maya_arnold) job bundle demonstrates a two-step job that first renders
+all the frames in tiles using a 3-dimensional task parameter space (Frame * TileNumberX * TileNumberY), and then assembles
+all the tiles for each frame using FFmpeg. It includes a simple scene and default parameters to make it simple to try out.
+
+The [tile_render_maya_ffmpeg_for_blogpost](tile_render_maya_ffmpeg_for_blogpost) job bundle goes with the blog post
+[Create a tile rendering job with modifications for AWS Deadline Cloud](https://aws.amazon.com/blogs/media/create-a-tile-rendering-job-with-modifications-for-aws-deadline-cloud/)
+that walks through customizing one of the Deadline Cloud adaptors and writing a tile rendering job template.
+
 ### Copy S3 prefix to job attachments
 
 The [copy_s3_prefix_to_job_attachments](copy_s3_prefix_to_job_attachments) job bundle can help you pre-populate a queue's

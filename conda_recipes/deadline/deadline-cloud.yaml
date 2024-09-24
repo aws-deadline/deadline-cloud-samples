@@ -1,0 +1,12 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+  - platform: linux-aarch64
+    defaultSubmit: false
+  - platform: win-64
+    defaultSubmit: true
+  - platform: osx-64
+    defaultSubmit: false
+jobParameters:
+- name: CondaChannels
+  value: conda-forge

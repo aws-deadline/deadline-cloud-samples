@@ -6,11 +6,14 @@ description: |
   of the geometry without a 3D viewer. You can download just the EncodeVideo step from
   Deadline Cloud Monitor to get the video without the intermediate scene file or images.
 
-  It uses two conda channels to get software. Maya and Arnold is acquired from the
-  deadline-cloud channel accessible from Deadline Cloud service-managed fleets, and FFmpeg
-  is from the conda-forge community channel. To run the job without such a conda virtual
-  environment created by a Deadline Cloud queue environment you must provide mayapy,
-  maya-openjd, and ffmpeg from the PATH environment variable.
+  The job needs Maya, Arnold, and FFmpeg to run. On Deadline Cloud service-managed fleets,
+  you can use "deadline-cloud conda-forge" as the CondaChannels parameter for a conda queue
+  environment. Maya and Arnold is available from the deadline-cloud channel, and FFmpeg
+  is available from the conda-forge community channel.
+
+  To run the job without such a conda virtual environment created by a Deadline Cloud
+  queue environment you must provide the commands mayapy, maya-openjd, and ffmpeg from
+  the PATH environment variable.
 
   The job bundle defines a 3-step pipeline as follows:
 
@@ -189,14 +192,6 @@ parameterDefinitions:
   userInterface:
     control: LINE_EDIT
     label: Conda Packages
-    groupLabel: Software Environment
-- name: CondaChannels
-  type: STRING
-  description: Choose which Conda channels to use for getting the packages. Requires a conda queue environment to process the value.
-  default: deadline-cloud conda-forge
-  userInterface:
-    control: LINE_EDIT
-    label: Conda Channels
     groupLabel: Software Environment
 
 # Hidden

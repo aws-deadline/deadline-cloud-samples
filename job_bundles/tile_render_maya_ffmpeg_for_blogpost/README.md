@@ -1,12 +1,33 @@
 # Tile Render with Maya/Arnold and Ffmpeg
 
 ## Introduction
-This job is designed to submit a tile rendering job using Maya, Arnold, and ffmpeg. A tile render divides an image into evenly sized regions for rendering, then assembles the tiles to get the whole image. 
 
-This job bundle requires a modified Maya Arnold render handler for Deadline Cloud. It uses a bash script to call ffmpeg which requires Linux workers and access to the ffmpeg command from the workers. The template uses job parameter values (NumXTiles and NumYTiles) to specify the number of tiles, which are then used to define task parameter values (TileNumberX and TileNumberY) for the tile numbers, which are all added to the runData for the Maya render step. A second step is defined to have a dependency on the render step, which uses a bash script to call ffmpeg to assemble the tiles. 
+Read the blog post [Create a tile rendering job with modifications for AWS Deadline Cloud](https://aws.amazon.com/blogs/media/create-a-tile-rendering-job-with-modifications-for-aws-deadline-cloud/)
+to learn about how this job was created.
+
+This job is designed to submit a tile rendering job using Maya, Arnold, and ffmpeg. A tile render
+divides an image into evenly sized regions for rendering, then assembles the tiles to get the whole image.
+
+This job bundle requires a modified Maya Arnold render handler for Deadline Cloud. It uses a bash script
+to call ffmpeg which requires Linux workers and access to the ffmpeg command from the workers. The template
+uses job parameter values (NumXTiles and NumYTiles) to specify the number of tiles, which are then used
+to define task parameter values (TileNumberX and TileNumberY) for the tile numbers, which are all added
+to the runData for the Maya render step. A second step is defined to have a dependency on the render step,
+which uses a bash script to call ffmpeg to assemble the tiles.
+
+See also the job bundle [tiled_region_render_with_maya_arnold](tiled_region_render_with_maya_arnold)
+that forms the tile bounds in the job and uses region render parameters when calling the Open Job Description
+application interface for rendering Maya.
 
 ## Arnold Render Handler Modifications
-As on 7/2024, modifications to the Deadline Cloud Maya adaptor are needed to render the tiles for this job. To do this, a local copy of the [deadline-cloud-for-maya](https://github.com/aws-deadline/deadline-cloud-for-maya/tree/mainline) repository can be used to create a development version of the Maya adaptor. The following code can be added to the `start_render` function in [arnold_renderer.py](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/src/deadline/maya_adaptor/MayaClient/render_handlers/arnold_handler.py) after the width and height of the image are confirmed. After making changes, [rebuild the wheels](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/DEVELOPMENT.md#application-interface-adaptor-development-workflow) for the package. 
+
+As on 7/2024, modifications to the Deadline Cloud Maya adaptor are needed to render the tiles for this job.
+To do this, a local copy of the [deadline-cloud-for-maya](https://github.com/aws-deadline/deadline-cloud-for-maya/tree/mainline)
+repository can be used to create a development version of the Maya adaptor. The following code can be added to
+the `start_render` function in [arnold_renderer.py](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/src/deadline/maya_adaptor/MayaClient/render_handlers/arnold_handler.py)
+after the width and height of the image are confirmed. After making changes,
+[rebuild the wheels](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/DEVELOPMENT.md#application-interface-adaptor-development-workflow)
+for the package.
 
 ```
 numXTiles = data.get("numXTiles")
@@ -24,7 +45,7 @@ if (numXTiles is not None) and (numYTiles is not None):
     # Tile num uses 1 based indexing. First tile (top left) is x=1, y=1
     tileNumX = data.get("tileNumX")
     tileNumY = data.get("tileNumY")
-    
+
     # Check that tileNumX and tileNumY are integers
     if (not isinstance(tileNumX, int)) or (not isinstance(tileNumY, int)):
         raise RuntimeError("tileNumX and tileNumY variables from run-data must be integers")
