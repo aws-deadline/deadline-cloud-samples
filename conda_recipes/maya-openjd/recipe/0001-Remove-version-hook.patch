@@ -1,0 +1,35 @@
+From 9e98b5cc9d014bc0fa022b8adb7ffc32c2949bef Mon Sep 17 00:00:00 2001
+From: Mark Wiebe <399551+mwiebe@users.noreply.github.com>
+Date: Wed, 24 Apr 2024 16:00:09 -0700
+Subject: [PATCH] Remove version hook
+
+---
+ pyproject.toml | 13 -------------
+ 1 file changed, 13 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 072e03d..a02178d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -58,19 +58,6 @@ source = "vcs"
+ [tool.hatch.version.raw-options]
+ version_scheme = "post-release"
+
+-[tool.hatch.build.hooks.vcs]
+-version-file = "_version.py"
+-
+-[tool.hatch.build.hooks.custom]
+-path = "hatch_custom_hook.py"
+-
+-[tool.hatch.build.hooks.custom.copy_version_py]
+-destinations = [
+-  "src/deadline/maya_adaptor",
+-  "src/deadline/maya_submitter",
+-]
+-
+ [tool.hatch.build.targets.sdist]
+ include = [
+     "src/*",
+--
+2.39.2.windows.1
+

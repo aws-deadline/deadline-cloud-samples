@@ -1,0 +1,54 @@
+{% set name = "maya-openjd" %}
+{% set version = "0.14.2" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/d/deadline-cloud-for-maya/deadline_cloud_for_maya-{{ version }}.tar.gz
+  sha256: 85f3170876c002686e4a73a0a25f22ba3d13d3d0f990e76014893c1e0b2a111e
+  patches:
+    - 0001-Remove-version-hook.patch
+
+## Here's an alternative source definition to build a package from a development branch on github. Replace
+## the username and git branch as appropriate for your case.
+# source:
+  # git_url: https://github.com/mwiebe/deadline-cloud-for-maya.git
+  # git_rev: region-render
+
+build:
+  entry_points:
+    - maya-openjd = deadline.maya_adaptor.MayaAdaptor:main
+    - MayaAdaptor = deadline.maya_adaptor.MayaAdaptor:main
+  noarch: python
+  script: python -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+
+requirements:
+  host:
+    - python >=3.9
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    - python >=3.9
+    - deadline ==0.48.*
+    - openjd-adaptor-runtime ==0.8.*
+
+test:
+  imports:
+    - deadline.maya_adaptor
+  commands:
+    - pip check
+    - maya-openjd --help
+  requires:
+    - pip
+
+about:
+  summary: AWS Deadline Cloud for Maya
+  dev_url: https://github.com/aws-deadline/deadline-cloud-for-maya
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

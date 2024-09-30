@@ -1,0 +1,65 @@
+From 7557d96119f8da5532e43dc0fb33c5c3fc9e5015 Mon Sep 17 00:00:00 2001
+From: Mark Wiebe <399551+mwiebe@users.noreply.github.com>
+Date: Wed, 24 Apr 2024 16:38:01 -0700
+Subject: [PATCH] Remove version hook
+
+---
+ pyproject.toml | 25 +++++--------------------
+ 1 file changed, 5 insertions(+), 20 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 9ab25c1..4a79463 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -42,7 +42,7 @@ Source = "https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-pytho
+ artifacts = [
+   "*_version.py"
+ ]
+-only-pacakges = true
++only-packages = true
+ 
+ [tool.hatch.version]
+ source = "vcs"
+@@ -50,35 +50,20 @@ source = "vcs"
+ [tool.hatch.version.raw-options]
+ version_scheme = "post-release"
+ 
+-[tool.hatch.build.hooks.vcs]
+-version-file = "_version.py"
+-
+-[tool.hatch.build.hooks.custom]
+-path = "hatch_version_hook.py"
+-
+-[[tool.hatch.build.hooks.custom.copy_map]]
+-sources = [
+-  "_version.py",
+-]
+-destinations = [
+-  "src/openjd/adaptor_runtime",
+-  "src/openjd/adaptor_runtime_client",
+-]
+-
+ [tool.hatch.build.targets.sdist]
+ packages = [
+-  "src/openjd",
++  "openjd",
+ ]
+ only-include = [
+-  "src/openjd",
++  "openjd",
+ ]
+ 
+ [tool.hatch.build.targets.wheel]
+ packages = [
+-  "src/openjd",
++  "openjd",
+ ]
+ only-include = [
+-  "src/openjd",
++  "openjd",
+ ]
+ 
+ [tool.mypy]
+-- 
+2.39.2.windows.1
+

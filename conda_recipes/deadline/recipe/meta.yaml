@@ -1,0 +1,54 @@
+{% set name = "deadline" %}
+{% set version = "0.48.8" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/deadline-{{ version }}.tar.gz
+  sha256: 998962a50d254d0b969f767f55282468949fdb668ddd33e1a30815e5ca9bb74e
+  patches:
+    - 0001-Remove-version-build-hook.patch
+
+build:
+  skip: true  # [py<38]
+  entry_points:
+    - deadline-dev-gui = deadline.client.cli.deadline_dev_gui_main:main
+    - deadline = deadline.client.cli:main
+  script: python -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+
+requirements:
+  host:
+    - python >=3.8
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    - python >=3.8
+    - boto3 >=1.34.75
+    - click >=8.1.7
+    - pyyaml >=6.0
+    - typing-extensions >=4.8
+    - python-xxhash ==3.4.*
+    - jsonschema ==4.17.*
+    - pywin32 ==306  # [win]
+    - qtpy ==2.4.*
+
+test:
+  imports:
+    - deadline
+  commands:
+    - pip check
+    - deadline --help
+  requires:
+    - pip
+
+about:
+  summary: Multi-purpose library and command line tool that implements functionality to support applications using AWS Deadline Cloud.
+  dev_url: https://github.com/aws-deadline/deadline-cloud
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

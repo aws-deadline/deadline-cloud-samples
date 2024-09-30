@@ -391,7 +391,10 @@ def main():
     job_name = (
         f"CondaBuild-{recipe_dir.name}-({', '.join(conda_platform['name'] for conda_platform in conda_platforms)})"
     )
-    job_bundle_dir = Path(create_job_history_bundle_dir("BuildCondaPackage", job_name))
+    # TODO: The job name is shortened to 10 characters for this directory until the job attachments
+    #       implementation on Windows improves support for long filename paths. Restore it to just `job_name`
+    #       when that is fixed.
+    job_bundle_dir = Path(create_job_history_bundle_dir("CondaBuild", job_name[:10]))
 
     create_job_bundle(
         job_bundle_dir=job_bundle_dir,

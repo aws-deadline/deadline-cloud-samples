@@ -1,0 +1,41 @@
+From 38cb61a9d92353d58a87bfd321b9db2069487c79 Mon Sep 17 00:00:00 2001
+From: Mark Wiebe <399551+mwiebe@users.noreply.github.com>
+Date: Wed, 24 Apr 2024 11:59:52 -0700
+Subject: [PATCH] Remove version build hook
+
+---
+ pyproject.toml | 18 ------------------
+ 1 file changed, 18 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 893cbcd..94c0c50 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -71,24 +71,6 @@ artifacts = [
+   "*_version.py",
+ ]
+
+-[tool.hatch.version]
+-source = "vcs"
+-
+-[tool.hatch.version.raw-options]
+-version_scheme = "post-release"
+-
+-[tool.hatch.build.hooks.vcs]
+-version-file = "_version.py"
+-
+-[tool.hatch.build.hooks.custom]
+-path = "hatch_custom_hook.py"
+-
+-[tool.hatch.build.hooks.custom.copy_version_py]
+-destinations = [
+-  "src/deadline/client",
+-  "src/deadline/job_attachments",
+-]
+-
+ [tool.hatch.build.targets.sdist]
+ include = [
+   "src/*",
+--
+2.39.2.windows.1
+
