@@ -1,5 +1,8 @@
 .DS_Store
-job_bundles/blender_render/output/
+# Job bundle samples use directories called 'output' for the job output
+# and 'workspace' for inter-step communication and output.
+**/output/
+**/workspace/
 
 **/*.tar.xz
 **/*.tar.gz
