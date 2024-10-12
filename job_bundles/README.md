@@ -4,25 +4,8 @@ Job bundles are the easiest way to define your jobs for AWS Deadline Cloud. They
 an [Open Job Description job template](https://github.com/OpenJobDescription/openjd-specifications/wiki) into a directory
 with additional information such the files and directories that your Jobs need. Read more about
 how to [build a job bundle](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle.html)
-in the Deadline Cloud developer guide.
-
-## Example Blender job submission
-
-With a job bundle in hand, the [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) provides ways for you
-to submit jobs to run on your Deadline Cloud queues. Read more about
-[how to submit a job](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
-in the Deadline Cloud developer guide.
-
-Here's the submitter GUI you can see after [configuring the Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud/blob/mainline/README.md#configuration)
-and running `deadline bundle gui-submit blender_render/` in this samples directory:
-
-![UI Shared Settings](../.images/blender_submit_shared_settings.png) ![UI Job Settings](../.images/blender_submit_job_settings.png) ![UI Job Attachments](../.images/blender_submit_job_attachments.png)
-
-Alternatively, you can submit this job bundle with the command
-`deadline bundle submit --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
-or use the `deadline.client.api.create_job_from_job_bundle` function in the [`deadline` Python package](https://github.com/aws-deadline/deadline-cloud).
-If you do not want to use the `deadline` Python package's support for features like job attachments, you can also submit the job template by calling the
-[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly.
+in the Deadline Cloud developer guide. See the [example Blender job submission](#example-blender-job-submission) below
+for more about submitting these jobs to your farm.
 
 ## Job bundle index
 
@@ -100,3 +83,22 @@ job attachment S3 bucket with data files by copying them from where they are alr
 S3 prefix, then distributes the hashing and data copies across a number of workers you specify. Because job attachments
 uses content-addressed storage for data files, users that later submit jobs with these files attached will not have to
 upload them.
+
+## Example Blender job submission
+
+With a job bundle in hand, the [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) provides ways for you
+to submit jobs to run on your Deadline Cloud queues. Read more about
+[how to submit a job](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
+in the Deadline Cloud developer guide.
+
+Here's the submitter GUI you can see after [configuring the Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud/blob/mainline/README.md#configuration)
+and running `deadline bundle gui-submit blender_render/` in this samples directory:
+
+![UI Shared Settings](../.images/blender_submit_shared_settings.png) ![UI Job Settings](../.images/blender_submit_job_settings.png) ![UI Job Attachments](../.images/blender_submit_job_attachments.png)
+
+Alternatively, you can submit this job bundle with the command
+`deadline bundle submit --name Demo -p BlenderSceneFile=<location-of-your-scene-file> -p OutputDir=<file-path-for-job-outputs> blender_render/`
+or use the `deadline.client.api.create_job_from_job_bundle` function in the [`deadline` Python package](https://github.com/aws-deadline/deadline-cloud).
+If you do not want to use the `deadline` Python package's support for features like job attachments, you can also submit the job template by calling the
+[deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly.
+
