@@ -1,0 +1,61 @@
+# Before building this recipe, build the conda 
+# packages for "deadline" and "openjd-adaptor-runtime" dependencies. 
+# Find these recipes for building the packages at : 
+# https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes
+
+{% set name = "cinema4d-openjd" %}
+{% set version = "0.4.1" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-{{ version }}.tar.gz
+  sha256: 0404af9f6740a9778ced6f698c096ef52f6e8a0a73f975c4520727578a3dfabb
+  patches:
+    - 0001-Remove-version-hook.patch
+
+# Here's an alternative source definition to build a package from a development branch on github. Replace
+# the username and git branch as appropriate for your case.
+# source:
+#   git_url: https://github.com/aws-deadline/deadline-cloud-for-cinema-4d.git
+#   git_rev: region-render
+
+build:
+  entry_points:
+    - cinema4d-openjd = deadline.cinema4d_adaptor.Cinema4DAdaptor:main
+    - Cinema4DAdaptor = deadline.cinema4d_adaptor.Cinema4DAdaptor:main
+  noarch: python
+  script: python -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+
+requirements:
+  build:
+    # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
+    - python
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
+    - python
+    - deadline ==0.48.*
+    - openjd-adaptor-runtime ==0.8.*
+
+test:
+  imports:
+    - deadline.cinema4d_adaptor
+  commands:
+    - pip check
+    - cinema4d-openjd --help
+  requires:
+    - pip
+
+about:
+  summary: AWS Deadline Cloud for Cinema 4D
+  dev_url: https://github.com/aws-deadline/deadline-cloud-for-cinema-4d
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

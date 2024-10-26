@@ -1,0 +1,42 @@
+From 5e9dc19635af507c60aad76834af68fde0f483b5 Mon Sep 17 00:00:00 2001
+From: Karthik Bekal Pattathana
+ <133984042+karthikbekalp@users.noreply.github.com>
+Date: Wed, 6 Nov 2024 10:52:46 -0600
+Subject: [PATCH] patched
+
+---
+ pyproject.toml | 18 ------------------
+ 1 file changed, 18 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index babdae5..1ea9453 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -46,24 +46,6 @@ artifacts = [
+   "*_version.py",
+ ]
+ 
+-[tool.hatch.version]
+-source = "vcs"
+-
+-[tool.hatch.version.raw-options]
+-version_scheme = "post-release"
+-
+-[tool.hatch.build.hooks.vcs]
+-version-file = "_version.py"
+-
+-[tool.hatch.build.hooks.custom]
+-path = "hatch_custom_hook.py"
+-
+-[tool.hatch.build.hooks.custom.copy_version_py]
+-destinations = [
+-  "src/deadline/cinema4d_adaptor",
+-  "src/deadline/cinema4d_submitter",
+-]
+-
+ [tool.hatch.build.targets.sdist]
+ include = [
+     "src/*",
+-- 
+2.47.0.windows.2
+
