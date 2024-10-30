@@ -1,0 +1,171 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deadline Notification Budget Events Integration with Email and Slack
+
+Parameters:
+  Email:
+    Type: String
+    Default: ''
+    Description: Email address to receive notifications (leave blank to skip email notifications)
+
+  SlackChannelId:
+    Type: String
+    Default: ''
+    Description: Slack channel ID to receive notifications (leave blank to skip Slack notifications)
+
+  SlackWorkspaceId:
+    Type: String
+    Default: ''
+    Description: Slack workspace ID for the channel (leave blank to skip Slack notifications)
+
+  EventRuleSource:
+    Type: String
+    Default: "aws.deadline"
+    Description: Source that events will be coming from
+
+Conditions:
+  SetupEmailNotifications: !Not [!Equals [!Ref Email, '']]
+  SetupSlackNotifications: !And
+    - !Not [!Equals [!Ref SlackChannelId, '']]
+    - !Not [!Equals [!Ref SlackWorkspaceId, '']]
+
+Resources:
+  # SNS Key
+  DeadlineBudgetsSNSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Custom KMS key for encrypting the Deadline Budgets SNS topic
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-policy
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow EventBridge to use the key
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action:
+              - "kms:Decrypt"
+              - "kms:GenerateDataKey"
+            Resource: '*'
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+
+
+  # SNS Topic
+  DeadlineBudgetsSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: DeadlineBudgetsSNSTopic
+      KmsMasterKeyId: !Ref DeadlineBudgetsSNSKey
+      Subscription:
+        - !If
+          - SetupEmailNotifications
+          - Endpoint: !Ref Email
+            Protocol: email
+          - !Ref AWS::NoValue
+
+  # SNS Topic Policy
+  DeadlineBudgetsSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "__default_statement_ID"
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - "SNS:Publish"
+              - "SNS:RemovePermission"
+              - "SNS:SetTopicAttributes"
+              - "SNS:DeleteTopic"
+              - "SNS:ListSubscriptionsByTopic"
+              - "SNS:GetTopicAttributes"
+              - "SNS:AddPermission"
+              - "SNS:Subscribe"
+            Resource: !Ref DeadlineBudgetsSNSTopic
+            Condition:
+              StringEquals:
+                AWS:SourceOwner: !Ref AWS::AccountId
+          - Sid: "__default_statement_ID_2"
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref DeadlineBudgetsSNSTopic
+      Topics:
+        - !Ref DeadlineBudgetsSNSTopic
+
+  # IAM Role for Chatbot
+  ChatbotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - chatbot.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+
+  # Chatbot
+  ChatbotSlack:
+    Type: AWS::Chatbot::SlackChannelConfiguration
+    Condition: SetupSlackNotifications
+    Properties:
+      ConfigurationName: DeadlineBudgetsChatbot
+      SlackChannelId: !Ref SlackChannelId
+      SlackWorkspaceId: !Ref SlackWorkspaceId
+      IamRoleArn: !GetAtt ChatbotRole.Arn
+      SnsTopicArns:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:DeadlineBudgetsSNSTopic'
+
+  # EventBridge Rule
+  DeadlineBudgetsEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Rule to capture aws.deadline budget events
+      EventPattern:
+        detail-type:
+          - "Budget Threshold Reached"
+        source:
+          - !Ref EventRuleSource
+        account:
+          - !Ref AWS::AccountId
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:DeadlineBudgetsSNSTopic'
+          Id: DeadlineBudgetsTopicSNSTarget
+          InputTransformer:
+            InputPathsMap:
+              account: "$.account"
+              budget-id: "$.detail.budgetId"
+              farm-id: "$.detail.farmId"
+              threshold: "$.detail.thresholdInPercent"
+              type: "$.detail-type"
+            InputTemplate: |
+              {
+                "version": "1.0",
+                "source": "custom",
+                "id": "1",
+                "content": {
+                  "title": "Deadline Event: <type>. Budget: <budget-id> reached <threshold>%",
+                  "description": "account: <account>. farm: <farm-id>"
+                }
+              }
+
+Outputs:
+  SNSTopicArn:
+    Description: ARN of the SNS Topic
+    Value: !Ref DeadlineBudgetsSNSTopic
+    Export:
+      Name: DeadlineBudgetsSNSTopicArn
