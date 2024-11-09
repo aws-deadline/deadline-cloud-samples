@@ -1,0 +1,51 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "0.14.3"
+
+package:
+  name: maya-openjd
+  version: ${{ version }}
+
+# This source reference uses the source archive published to PyPI
+source:
+  url: https://pypi.io/packages/source/d/deadline-cloud-for-maya/deadline_cloud_for_maya-${{ version }}.tar.gz
+  sha256: d3789e4a14144b43224bc0657eacdb3e39e333aedc22ad29b8591530a185f845
+  patches:
+    - 0001-Remove-version-hook.patch
+
+build:
+  number: 0
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    - python
+    - deadline 0.48.*
+    - openjd-adaptor-runtime 0.8.*
+
+tests:
+- python:
+    imports:
+      - deadline.maya_adaptor
+- requirements:
+    run:
+      - pip
+  script:
+    - pip check
+    - maya-openjd --help
+
+about:
+  summary: AWS Deadline Cloud for Maya
+  homepage: https://github.com/aws-deadline/deadline-cloud-for-maya
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

@@ -1,20 +1,29 @@
-From 9e98b5cc9d014bc0fa022b8adb7ffc32c2949bef Mon Sep 17 00:00:00 2001
+From 88f9bd0136c786b499a171e196275fc2ba853f3b Mon Sep 17 00:00:00 2001
 From: Mark Wiebe <399551+mwiebe@users.noreply.github.com>
-Date: Wed, 24 Apr 2024 16:00:09 -0700
-Subject: [PATCH] Remove version hook
+Date: Mon, 4 Nov 2024 16:26:56 -0800
+Subject: [PATCH] patched
 
 ---
- pyproject.toml | 13 -------------
- 1 file changed, 13 deletions(-)
+ pyproject.toml | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
 diff --git a/pyproject.toml b/pyproject.toml
-index 072e03d..a02178d 100644
+index dc22099..bb3f888 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
-@@ -58,19 +58,6 @@ source = "vcs"
- [tool.hatch.version.raw-options]
- version_scheme = "post-release"
-
+@@ -49,27 +49,6 @@ artifacts = [
+   "*_version.py",
+ ]
+ 
+-[tool.hatch.build.targets.wheel.force-include]
+-"./maya_submitter_plugin" = "deadline/maya_submitter/maya_submitter_plugin"
+-
+-[tool.hatch.version]
+-source = "vcs"
+-
+-[tool.hatch.version.raw-options]
+-version_scheme = "post-release"
+-
 -[tool.hatch.build.hooks.vcs]
 -version-file = "_version.py"
 -
@@ -30,6 +39,6 @@ index 072e03d..a02178d 100644
  [tool.hatch.build.targets.sdist]
  include = [
      "src/*",
---
-2.39.2.windows.1
+-- 
+2.46.2.windows.1
 
