@@ -1,0 +1,58 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2025.0"
+  major_version: "2025"
+  minor_version: "0"
+
+package:
+  name: maya-mtoa
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: file://archive_files/Autodesk_Maya_${{ major_version }}_Linux_64bit.tgz
+      sha256: 72ac8d1d4aed4fe19b37b995e62ed8507186e5f382fb7bac35fe11f65748bd93
+      target_directory: installer
+  - if: win
+    then:
+      - url: file://archive_files/Autodesk_Maya_${{ major_version }}_Windows_installation.zip
+        sha256: 2a8943ef911ac88faf2342e4feda6ac1a1c38aecbd164ea6441263283696c505
+        target_directory: installer
+      - url: https://download.autodesk.com/us/support/files/maya_batch_cloud/cleanMayaForCloud.py
+        sha256: 8605e6e28ed5d47ee79156a42166e85750b041456679cb7339128113f2328e0a
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  build:
+    - maya ${{ version }}.*
+  run:
+    - maya ${{ version }}.*
+
+tests:
+  - script:
+    # Maya's Python interpreter
+    - mayapy --help
+    # Confirm that the mtoa plugin is available in mayapy
+    # - mayapy -c 'import maya.standalone; maya.standalone.initialize(); import mtoa; from maya.cmds import arnoldRender; print("Hello from mayapy"); print(dir(mtoa)); maya.standalone.uninitialize()'
+    - mayapy -c 'import maya.standalone; maya.standalone.initialize(); import mtoa; print("Hello from mayapy"); print(dir(mtoa)); maya.standalone.uninitialize()'
+    # The maya -batch command
+    - maya -batch -command 'print "Hello from maya -batch"; quit -exitCode 0 -force'
+
+
+about:
+  homepage: https://www.autodesk.com/products/maya/overview
+  license: LicenseRef-AutodeskEULA
+  summary: Maya is professional 3D software for creating realistic characters and blockbuster-worthy effects.

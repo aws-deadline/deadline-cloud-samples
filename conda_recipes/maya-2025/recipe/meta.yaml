@@ -1,0 +1,35 @@
+# Recipe in conda-build format.
+# This recipe is only for Windows, see recipe.yaml for the Linux recipe in rattler-build format.
+
+# See https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html for information
+# about this file.
+
+{% set version = "2025.0" %}
+
+package:
+  name: maya
+  version: "{{ version }}"
+
+source:
+- url: archive_files/Autodesk_Maya_{{ version.replace(".", "_") }}_Windows_installation.zip # [win64]
+  sha256: 57490abc4e1d7c7a8a057a29d718e79172a3ecd17cc04c5863600b11fc437d57 # [win64]
+  folder: installer
+# See https://www.autodesk.com/support/technical/article/caas/tsarticles/ts/75wD5ycdkRVPHQtG4eUwBL.html
+# titled "Deploying Maya Batch on the Cloud" about making Maya for Windows cloud compliant.
+- url: https://download.autodesk.com/us/support/files/maya_batch_cloud/cleanMayaForCloud.py # [win64]
+  sha256: 8605e6e28ed5d47ee79156a42166e85750b041456679cb7339128113f2328e0a # [win64]
+
+build:
+  skip: true  # [not win64]
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+about:
+  home: https://www.autodesk.com/products/maya/overview
+  license: Commercial
+  summary: Maya is professional 3D software for creating realistic characters and blockbuster-worthy effects.
