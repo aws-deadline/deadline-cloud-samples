@@ -29,7 +29,13 @@ function conda_clean_on_error {
     if [ ! "$1" = "0" ]; then
         echo "Error detected, removing the $ENV_NAME environment and cleaning the Conda cache."
         for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
-            rm -rf $ENVS_DIR/$ENV_NAME
+            if [ -d $ENVS_DIR/$ENV_NAME ]; then
+                echo "Removing directory $ENVS_DIR/$ENV_NAME for the environment"
+                rm -rf $ENVS_DIR/$ENV_NAME
+                if [ -d $ENVS_DIR/$ENV_NAME ]; then
+                    echo "WARNING: Could not remove the directory. Possibly a permissions error or a process holding a lock."
+                fi
+            fi
         done
         conda clean --yes --all || true
     fi
@@ -38,7 +44,16 @@ trap 'conda_clean_on_error $?' EXIT
 
 if [ "$REUSE_ENV" == "0" ]; then
     echo "Removing any existing environment called $ENV_NAME"
-    conda env remove --yes -q -n $ENV_NAME
+    for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
+        if [ -d $ENVS_DIR/$ENV_NAME ]; then
+            echo "Removing directory $ENVS_DIR/$ENV_NAME for the environment"
+            rm -rf $ENVS_DIR/$ENV_NAME
+            if [ -d $ENVS_DIR/$ENV_NAME ]; then
+                echo "ERROR: Could not remove the directory. Possibly a permissions error or a process holding a lock."
+                exit 1
+            fi
+        fi
+    done
 fi
 
 if conda env list | grep -q "^$ENV_NAME "; then
