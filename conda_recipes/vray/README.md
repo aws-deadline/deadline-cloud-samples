@@ -1,4 +1,4 @@
-# Maya 2024 conda build recipe
+# V-Ray conda build recipe
 
 ## Decide what version of the archive file to download
 - Download `vraystd_adv_62022_rhel8_clang-gcc-11.2` for **x86**
