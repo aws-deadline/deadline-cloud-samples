@@ -1,5 +1,5 @@
 # V-Ray conda build recipe
-Use this recipe to create a V-Ray conda package to use with AWS Deadline Cloud. Conda packages let you customize the software you can use with your Deadline Cloud deployment. Read more about how to host a conda channel for these custom conda packages below
+Use this recipe to create a V-Ray conda package to use with AWS Deadline Cloud. Conda packages let you customize the software you can use with your Deadline Cloud deployment. Read more about how to host a conda channel for these custom conda packages below.
 
 ## Decide what version of the archive file to download
 - Download `vraystd_adv_62022_rhel8_clang-gcc-11.2` for **x86**
@@ -15,4 +15,4 @@ Use this recipe to create a V-Ray conda package to use with AWS Deadline Cloud. 
 [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for
 submitting package build jobs.
 
-- Follow this [README](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/conda_recipes/README.md) to submit a job building the V-Ray conda package
+- Follow this [README](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/conda_recipes/README.md) to submit a job building the V-Ray conda package.
