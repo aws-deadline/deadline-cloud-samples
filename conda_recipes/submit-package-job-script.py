@@ -30,8 +30,9 @@ def validate_recipe(recipe_dir):
         raise RuntimeError(f"The recipe directory does not exist: {recipe_dir}.")
 
     meta_yaml_file = recipe_dir / "recipe" / "meta.yaml"
-    if not meta_yaml_file.is_file():
-        raise RuntimeError(f"The recipe metadata file does not exist: {meta_yaml_file}.")
+    recipe_yaml_file = recipe_dir / "recipe" / "recipe.yaml"
+    if not meta_yaml_file.is_file() and not recipe_yaml_file.is_file():
+        raise RuntimeError(f"No meta.yaml or recipe.yaml exists in {recipe_dir}.")
 
     submit_yaml_file = recipe_dir / "deadline-cloud.yaml"
     if not submit_yaml_file.is_file():
