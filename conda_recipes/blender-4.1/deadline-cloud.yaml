@@ -3,7 +3,9 @@ condaPlatforms:
     defaultSubmit: true
     sourceArchiveFilename: blender-4.1.1-linux-x64.tar.xz
     sourceDownloadInstructions: 'Run "curl -LO https://download.blender.org/release/Blender4.1/blender-4.1.1-linux-x64.tar.xz"'
+    buildTool: rattler-build
   - platform: win-64
     defaultSubmit: false
     sourceArchiveFilename: blender-4.1.1-windows-x64.zip
     sourceDownloadInstructions: 'Run "curl -LO https://download.blender.org/release/Blender4.1/blender-4.1.1-windows-x64.zip"'
+    buildTool: conda-build

@@ -1,0 +1,50 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "0.8.0"
+
+package:
+  name: openjd-adaptor-runtime
+  version: ${{ version }}
+
+source:
+  url: https://pypi.io/packages/source/o/openjd-adaptor-runtime/openjd_adaptor_runtime-${{ version }}.tar.gz
+  sha256: 58e00c4a08686821df01c736e0781a3736450865cc2cf4e3799e354d324112d8
+  patches:
+    - 0001-Remove-version-hook.patch
+
+build:
+  number: 0
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    - python
+    - pyyaml >=6.0,<7.dev0
+    - jsonschema >=4.17.0,<5.0
+    - ${{ "pywin32 ==306" if win }}
+
+tests:
+- python:
+    imports:
+    - openjd.adaptor_runtime
+    - openjd.adaptor_runtime_client
+- requirements:
+    run:
+      - pip
+  script:
+  - pip check
+
+about:
+  summary: A python library for building adaptors that integrate applications with Open Job Description jobs.
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

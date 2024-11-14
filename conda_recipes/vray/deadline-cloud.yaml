@@ -1,0 +1,12 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: vraystd_adv_62022_rhel8_clang-gcc-11.2
+    sourceDownloadInstructions: 'Download the vraystd_adv_62022_rhel8_clang-gcc-11.2 full download file from Chaos.'
+  - platform: linux-aarch64
+    defaultSubmit: false
+    sourceArchiveFilename: vraystd_adv_62022_rhel8_arm64_clang-gcc-11.2
+    sourceDownloadInstructions: 'Download the vraystd_adv_62022_rhel8_arm64_clang-gcc-11.2 full download file from Chaos.'
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge

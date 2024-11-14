@@ -132,7 +132,16 @@ environment:
         # If we're not reusing the Conda env, clean up any prior ones
         if [ '{{Param.NamedCondaEnvAction}}' = 'REMOVE_AND_CREATE' ] && [ -n "$NAMED_CONDA_ENV" ]; then
             echo "NamedCondaEnvAction parameter is set to REMOVE_AND_CREATE, removing the virtual environment..."
-            conda remove --yes --name "$NAMED_CONDA_ENV" --all
+            for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
+                if [ -d $ENVS_DIR/$NAMED_CONDA_ENV ]; then
+                    echo "Removing directory $ENVS_DIR/$NAMED_CONDA_ENV for the environment"
+                    rm -rf $ENVS_DIR/$NAMED_CONDA_ENV
+                    if [ -d $ENVS_DIR/$NAMED_CONDA_ENV ]; then
+                        echo "ERROR: Could not remove the directory. Possibly a permissions error or a process holding a lock."
+                        exit 1
+                    fi
+                fi
+            done
         fi
 
         # If requested, clean the Conda package cache
@@ -150,14 +159,22 @@ environment:
         if [ -n "$NAMED_CONDA_ENV" ] && conda env list | grep -q "^$NAMED_CONDA_ENV "; then
             echo "Reusing the existing named Conda environment $NAMED_CONDA_ENV."
 
-            # Activate the Conda environment, capturing the environment variables for the session to use
+            # Activate the Conda environment
             python '{{Env.File.OpenJDVarsStart}}' .vars
+            set +u
             conda activate "$NAMED_CONDA_ENV"
+            set -u
             python '{{Env.File.OpenJDVarsCapture}}' .vars
 
             CURRENT_TIMESTAMP="$(date +%s)"
-            PREVIOUS_UPDATE_TIMESTAMP="$(cat "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp")"
-            MINUTES_SINCE_UPDATE="$(( ( $CURRENT_TIMESTAMP - $PREVIOUS_UPDATE_TIMESTAMP ) / 60 ))"
+            TIMESTAMP_FILE="$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+            if [ -f "$TIMESTAMP_FILE" ]; then
+                PREVIOUS_UPDATE_TIMESTAMP="$(cat "$TIMESTAMP_FILE")"
+                MINUTES_SINCE_UPDATE="$(( ( $CURRENT_TIMESTAMP - $PREVIOUS_UPDATE_TIMESTAMP ) / 60 ))"
+            else
+                echo "The file recording the previous timestamp was not found"
+                MINUTES_SINCE_UPDATE=0
+            fi
             echo "Minutes elapsed since last update of this named Conda environment: $MINUTES_SINCE_UPDATE"
 
             if [ $MINUTES_SINCE_UPDATE -ge {{Param.NamedCondaEnvUpdateAfterMinutes}} ]; then
@@ -183,7 +200,14 @@ environment:
 
             # Make sure there's no incomplete environment hanging around
             for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
-                rm -rf $ENVS_DIR/$NAMED_CONDA_ENV
+                if [ -d $ENVS_DIR/$NAMED_CONDA_ENV ]; then
+                    echo "Removing directory $ENVS_DIR/$NAMED_CONDA_ENV for the environment"
+                    rm -rf $ENVS_DIR/$NAMED_CONDA_ENV
+                    if [ -d $ENVS_DIR/$NAMED_CONDA_ENV ]; then
+                        echo "ERROR: Could not remove the directory. Possibly a permissions error or a process holding a lock."
+                        exit 1
+                    fi
+                fi
             done
 
             # Create the virtual environment
@@ -192,9 +216,11 @@ environment:
                 $CONDA_PACKAGES \
                 $CHANNEL_OPTS
 
-            # Activate the Conda environment, capturing the environment variables for the session to use
+            # Activate the Conda environment
             python '{{Env.File.OpenJDVarsStart}}' .vars
+            set +u
             conda activate "$NAMED_CONDA_ENV"
+            set -u
             python '{{Env.File.OpenJDVarsCapture}}' .vars
 
             # Save the channels and packages used in the environment, to help out debugging
@@ -215,9 +241,11 @@ environment:
                 $CONDA_PACKAGES \
                 $CHANNEL_OPTS
 
-            # Activate the Conda environment, capturing the environment variables for the session to use
+            # Activate the Conda environment
             python '{{Env.File.OpenJDVarsStart}}' .vars
+            set +u
             conda activate '{{Session.WorkingDirectory}}/.env'
+            set -u
             python '{{Env.File.OpenJDVarsCapture}}' .vars
         fi
 

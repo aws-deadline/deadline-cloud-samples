@@ -1,38 +1,43 @@
+# Recipe in conda-build format.
+# See recipe.yaml for the recipe in rattler-build format.
+
 {% set name = "maya-openjd" %}
-{% set version = "0.14.2" %}
+{% set version = "0.14.3" %}
 
 package:
   name: {{ name }}
   version: {{ version }}
 
+# This source reference uses the source archive published to PyPI
 source:
-  url: https://pypi.io/packages/source/d/deadline-cloud-for-maya/deadline_cloud_for_maya-{{ version }}.tar.gz
-  sha256: 85f3170876c002686e4a73a0a25f22ba3d13d3d0f990e76014893c1e0b2a111e
-  patches:
-    - 0001-Remove-version-hook.patch
+ url: https://pypi.io/packages/source/d/deadline-cloud-for-maya/deadline_cloud_for_maya-{{ version }}.tar.gz
+ sha256: d3789e4a14144b43224bc0657eacdb3e39e333aedc22ad29b8591530a185f845
+ patches:
+   - 0001-Remove-version-hook.patch
 
-## Here's an alternative source definition to build a package from a development branch on github. Replace
-## the username and git branch as appropriate for your case.
+# # This source reference uses git to retrieve the tag for the specified version. You can modify
+# # the git_url and git_rev to point to a branch in your own fork of the project.
 # source:
-  # git_url: https://github.com/mwiebe/deadline-cloud-for-maya.git
-  # git_rev: region-render
+#   git_url: https://github.com/aws-deadline/deadline-cloud-for-maya.git
+#   git_rev: {{ version }}
 
 build:
   entry_points:
     - maya-openjd = deadline.maya_adaptor.MayaAdaptor:main
     - MayaAdaptor = deadline.maya_adaptor.MayaAdaptor:main
-  noarch: python
   script: python -m pip install . -vv --no-deps --no-build-isolation
   number: 0
 
 requirements:
-  host:
-    - python >=3.9
+  build:
+    # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
+    - python
     - hatchling
     - hatch-vcs
     - pip
   run:
-    - python >=3.9
+    # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
+    - python
     - deadline ==0.48.*
     - openjd-adaptor-runtime ==0.8.*
 

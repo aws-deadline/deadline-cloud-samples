@@ -12,6 +12,15 @@ description: |
 
 parameterDefinitions:
 # Group: Conda Package Recipe
+- name: BuildTool
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Package Build Tool
+    groupLabel: Conda Package Recipe
+  description: Choose the build tool to use for the recipe (conda-build or rattler-build).
+  default: conda-build
+  allowedValues: ["conda-build", "rattler-build"]
 - name: RecipeName
   description: The name of the recipe being built.
   userInterface:
@@ -77,16 +86,16 @@ parameterDefinitions:
     control: SPIN_BOX
     label: Override Prefix Length
     groupLabel: Conda Package Recipe
-- name: CondaBuildConfigFile
+- name: VariantConfigFile
   description: |
-    If provided, this is saved as the conda_build_config.yaml file for the conda package build.
+    If provided, this is used as the variant config for the conda package build.
   type: PATH
   objectType: FILE
   dataFlow: IN
   default: ""
   userInterface:
     control: CHOOSE_INPUT_FILE
-    label: Conda-build config YAML file
+    label: Variant config YAML file
     groupLabel: Conda Package Recipe
 
 # Group: Conda Channel
@@ -124,21 +133,21 @@ parameterDefinitions:
   type: STRING
   default: ""
 
-# Group: Conda-build Env
-- name: CondaBuildEnvName
-  description: The name of the Conda virtual environment with conda-build installed.
+# Group: Package Build Env
+- name: PackageBuildEnvName
+  description: The name of the Conda virtual environment with conda-build and rattler-build installed.
   userInterface:
     control: LINE_EDIT
-    label: Conda-build Env Name
-    groupLabel: Conda-build Env
+    label: Package Build Env Name
+    groupLabel: Package Build Env
   type: STRING
-  default: "CondaBuildEnv"
-- name: ReuseCondaBuildEnv
+  default: "PackageBuildEnv"
+- name: ReusePackageBuildEnv
   description: Whether to reuse the Conda virtual environment for conda-build or not.
   userInterface:
     control: CHECK_BOX
     label: Reuse the named Conda Build environment.
-    groupLabel: Conda-build Env
+    groupLabel: Package Build Env
   type: STRING
   default: "1"
   allowedValues: ["1", "0"]
@@ -155,7 +164,7 @@ parameterDefinitions:
 
 jobEnvironments:
 
-- name: CondaBuild Env
+- name: Package Build Env
   variables:
     # Tell Qt applications to run off-screen.
     QT_QPA_PLATFORM: offscreen
@@ -166,11 +175,13 @@ jobEnvironments:
       onEnter:
         command: "bash"
         args:
-        - '{{Param.JobScriptDir}}/enter-conda-build-env.sh'
+        - '{{Param.JobScriptDir}}/enter-package-build-env.sh'
         - '--env-name'
-        - '{{Param.CondaBuildEnvName}}'
+        - '{{Param.PackageBuildEnvName}}'
         - '--conda-bld-dir'
         - '{{Session.WorkingDirectory}}/conda-bld'
+        - '--reuse-env'
+        - '{{Param.ReusePackageBuildEnv}}'
 
 steps:
 
@@ -183,37 +194,56 @@ steps:
 
     meta:
       perStepParameters:
+      - BuildTool
       - OverrideSourceArchive1
       - OverrideSourceArchive2
       - CondaPlatform
-      - CondaBuildConfigFile
+      - VariantConfigFile
+
+  stepEnvironments:
+  - name: S3 Conda Channels
+    script:
+      actions:
+        onEnter:
+          command: "bash"
+          args:
+          - '{{Param.JobScriptDir}}/enter-proxy-s3-conda-channels.sh'
+          - '--build-tool'
+          - '{{Param.BuildTool}}'
+          - '--conda-channels'
+          - '{{Param.CondaChannels}}'
+          - '--s3-conda-channel'
+          - '{{Param.S3CondaChannel}}'
+        onExit:
+          command: "bash"
+          args:
+          - '{{Param.JobScriptDir}}/exit-proxy-s3-conda-channels.sh'
 
   script:
     actions:
       onRun:
-        command: python
-        args:
-        - '{{Param.JobScriptDir}}/build-package.py'
-        - '--conda-bld-dir'
-        - '{{Session.WorkingDirectory}}/conda-bld'
-        - '--conda-platform'
-        - '{{Param.CondaPlatform}}'
-        - '--conda-channels'
-        - '{{Param.CondaChannels}}'
-        - '--s3-conda-channel'
-        - '{{Param.S3CondaChannel}}'
-        - '--override-prefix-length'
-        - '{{Param.OverridePrefixLength}}'
-        - '--recipe-dir'
-        - '{{Param.RecipeDir}}'
-        - '--override-package-name'
-        - '{{Param.OverridePackageName}}'
-        - '--override-source-archive1'
-        - '{{Param.OverrideSourceArchive1}}'
-        - '--override-source-archive2'
-        - '{{Param.OverrideSourceArchive2}}'
-        - '--conda-build-config-file'
-        - '{{Param.CondaBuildConfigFile}}'
+        command: "bash"
+        args: ["{{Task.File.Run}}"]
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -xeuo pipefail
+
+        python '{{Param.JobScriptDir}}/build-package.py' \
+            --build-tool '{{Param.BuildTool}}' \
+            --conda-bld-dir '{{Session.WorkingDirectory}}/conda-bld' \
+            --conda-platform '{{Param.CondaPlatform}}' \
+            --conda-channels "$CONDA_CHANNELS" \
+            --s3-conda-channel '{{Param.S3CondaChannel}}' \
+            --proxy-s3-conda-channel "$S3_CONDA_CHANNEL" \
+            --override-prefix-length '{{Param.OverridePrefixLength}}' \
+            --recipe-dir '{{Param.RecipeDir}}' \
+            --override-package-name '{{Param.OverridePackageName}}' \
+            --override-source-archive1 '{{Param.OverrideSourceArchive1}}' \
+            --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
+            --variant-config-file '{{Param.VariantConfigFile}}'
 
   hostRequirements:
     # Host requirements for the linux-64 conda platform
