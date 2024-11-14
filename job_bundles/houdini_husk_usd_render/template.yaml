@@ -1,0 +1,128 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Husk USD Render
+
+parameterDefinitions:
+# Render Parameters
+- name: USDSceneFile
+  type: PATH
+  default: "sample.usda"
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: USD Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: USD Scene Files
+      patterns: ["*.usd", "*.usdc", "*.usda", "*.usdz"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the USD scene file you want to render. Use the 'Job Attachments' tab
+    to add textures and other files that the job needs.
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  default: "1"
+- name: OutputDir
+  type: PATH
+  default: output/
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Choose the render output directory.
+- name: OutputPattern
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Pattern
+    groupLabel: Render Parameters
+  default: "output_$F4"
+  # Husk Documentation: https://www.sidefx.com/docs/houdini/ref/utils/husk.html#:~:text=Current%20frame%20number%20with%20fixed%20number%20of
+  description: Enter the output filename pattern (without extension). Please see the Husk documentation for formatting
+- name: Format
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Output File Format
+    groupLabel: Render Parameters
+  description: Choose the file format for the output render.
+  default: exr
+  allowedValues: ["exr"]
+- name: ResolutionX
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Resolution Width
+    groupLabel: Render Parameters
+  default: "1024"
+  description: >
+    Enter the resolution width in pixels. The default is 1024.
+- name: ResolutionY
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Resolution Height
+    groupLabel: Render Parameters
+  default: "768"
+  description: >
+    Enter the resolution height in pixels. The default is 768.
+- name: Renderer
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Husk Render Delegate
+    groupLabel: Render Parameters
+  description: Choose the renderer you wish to use. BRAY_HdKarma uses the CPU while BRAY_HdKarmaXPU requires a GPU fleet. If you select BRAY_HdKarmaXPU your queue must be associated with a GPU fleet. 
+  default: BRAY_HdKarma
+  allowedValues: [BRAY_HdKarma, BRAY_HdKarmaXPU]
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+  default: "houdini=20.5"
+  description: >
+    This parameter assumes the presence of the default Conda environment. By default, Houdini 20.5 is installed to provide the husk executable.
+steps:
+- name: HuskRender
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          set -xeuo pipefail
+          mkdir -p '{{Param.OutputDir}}'
+          # The 'husk' executable exists on the path when using a Deadline Cloud-provided Houdini conda package
+          husk -r {{Param.ResolutionX}} {{Param.ResolutionY}} \
+          -R {{Param.Renderer}} \
+          -f {{Task.Param.Frame}} \
+          '{{Param.USDSceneFile}}' \
+          -o '{{Param.OutputDir}}/{{Param.OutputPattern}}.{{Param.Format}}'
+  hostRequirements:
+    # Add this requirement when rendering with the GPU to ensure the job is only scheduled on GPU-enabled fleets.
+    # amounts:
+    # - name: amount.worker.gpu
+    #   min: 1
+    attributes:
+    # The Houdini package is currently only availabling on Linux in Deadline Cloud SMF
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+

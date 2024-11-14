@@ -57,6 +57,7 @@ and a short script that substitutes job parameters and the Frame task parameter 
 * [keyshot_standalone](keyshot_standalone)
 * [afterfx_render_one_task](afterfx_render_one_task)
 * [maya_cli_render](maya_cli_render)
+* [houdini_husk_usd_render](houdini_husk_usd_render)
 
 If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to add it here.
 
