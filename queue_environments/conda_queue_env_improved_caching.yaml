@@ -179,10 +179,12 @@ environment:
 
             if [ $MINUTES_SINCE_UPDATE -ge {{Param.NamedCondaEnvUpdateAfterMinutes}} ]; then
                 echo "Elapsed time greater than or equal to {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, updating the environment packages to the latest"
+                set +u
                 conda install --yes \
                     --update-all \
                     $CONDA_PACKAGES \
                     $CHANNEL_OPTS
+                set -u
 
                 # Save the channels and packages used in the environment, to help out debugging
                 LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
@@ -273,7 +275,9 @@ environment:
         for ENV_NAME in $AUTO_CONDA_ENVS; do
             echo "Checking environment $ENV_NAME"
 
+            set +u
             conda activate $ENV_NAME
+            set -u
 
             LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
             if [ -f "$LOGFILE" ]; then
@@ -285,7 +289,9 @@ environment:
             HOURS_SINCE_UPDATE="$(( ( $CURRENT_TIMESTAMP - $PREVIOUS_UPDATE_TIMESTAMP ) / 1440 ))"
             echo "Environment was last updated $HOURS_SINCE_UPDATE hours ago."
 
+            set +u
             conda deactivate
+            set -u
 
             if [ $HOURS_SINCE_UPDATE -gt $ENV_DELETE_AFTER_HOURS ]; then
                 echo "Elapsed time $HOURS_SINCE_UPDATE is greater than $ENV_DELETE_AFTER_HOURS hours, removing the environment."
