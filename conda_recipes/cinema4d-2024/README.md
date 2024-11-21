@@ -34,8 +34,8 @@ for use by the conda build recipe.
         1. Computer: `localhost:33389`
         2. User name: `Administrator`
     5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
-3. Install Cinema 4D 2025 on the instance.
-    1. Download the Cinema 4D 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2025-downloads). For example, the files `Cinema4D_2024_2024.5.1_Win.exe`.
+3. Install Cinema 4D 2024 on the instance.
+    1. Download the Cinema 4D 2024 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2024-downloads). For example, the files `Cinema4D_2024_2024.5.1_Win.exe`.
        If you have placed them on S3, you can use a PowerShell command like `Read-S3Object -BucketName MY_BUCKET_NAME -Key MY_UPLOADED_KEY_NAME -File MY_FILE_NAME`.
     2. Run the installer. Accept the prompts to continue.
     3. The Cinema 4D installer will launch. Proceed to install as normal with the components you want included.
@@ -48,4 +48,4 @@ for use by the conda build recipe.
     6. Record the file sha256 hash, and upload the archive to your private S3 bucket. You can use a PowerShell command like
        `Write-S3Object -BucketName MY_BUCKET_NAME -Key Cinema4D_2024_2024.5.1_Win.zip -File Cinema4D_2024_2024.5.1_Win.zip`.
 4. From the AWS EC2 management console, select the instance you used and terminate it.
-5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the Cinema 4D-2025 conda build recipe meta.yaml.
+5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the Cinema 4D-2024 conda build recipe meta.yaml.
