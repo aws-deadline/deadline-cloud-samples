@@ -1,0 +1,59 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "0.48.9"
+
+package:
+  name: deadline
+  version: ${{ version }}
+
+source:
+  url: https://pypi.io/packages/source/d/deadline/deadline-${{ version }}.tar.gz
+  sha256: ad4256b6b80325598e3ae3660f43ea0b037958c9bb7081c96ce737395ebf5a00
+  patches:
+    - 0001-Remove-version-build-hook.patch
+
+build:
+  number: 0
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    - python
+    - boto3 >=1.34.75
+    - click >=8.1.7
+    - pyyaml >=6.0
+    - typing-extensions >=4.8
+    - python-xxhash >=3.4,<3.6
+    - jsonschema 4.17
+    - qtpy 2.4
+    - ${{ "pywin32 ==306" if win }}
+
+tests:
+- python:
+    imports:
+      - deadline
+      - deadline.client
+      - deadline.job_attachments
+- requirements:
+    run:
+      - pip
+  script:
+  - pip check
+  - deadline --help
+  - python -m deadline --help
+
+about:
+  summary: Multi-purpose library and command line tool that implements functionality to support applications using AWS Deadline Cloud.
+  homepage: https://github.com/aws-deadline/deadline-cloud
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

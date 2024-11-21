@@ -1,0 +1,55 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+# Before building this recipe, build the conda 
+# packages for "deadline" and "openjd-adaptor-runtime" dependencies. 
+# Find these recipes for building the packages at : 
+# https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes
+
+context:
+  version: "0.4.1"
+
+package:
+  name: cinema4d-openjd
+  version: ${{ version }}
+
+# This source reference uses the source archive published to PyPI
+source:
+  url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-${{ version }}.tar.gz
+  sha256: 0404af9f6740a9778ced6f698c096ef52f6e8a0a73f975c4520727578a3dfabb
+  patches:
+    - 0001-Remove-version-hook.patch
+
+build:
+  number: 0
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python
+    - hatchling
+    - hatch-vcs
+    - pip
+  run:
+    - python
+    - deadline 0.48.*
+    - openjd-adaptor-runtime 0.8.*
+
+tests:
+- python:
+    imports:
+      - deadline.cinema4d_adaptor
+- requirements:
+    run:
+      - pip
+  script:
+    - pip check
+    - cinema4d-openjd --help
+
+about:
+  summary: AWS Deadline Cloud for Cinema 4D
+  homepage: https://github.com/aws-deadline/deadline-cloud-for-cinema-4d
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE

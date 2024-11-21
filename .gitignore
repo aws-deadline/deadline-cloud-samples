@@ -4,6 +4,9 @@
 **/output/
 **/workspace/
 
+# The V-Ray source files do not have an extension to distinguish them
+conda_recipes/archive_files/vraystd_*
+
 **/*.tar.xz
 **/*.tar.gz
 **/*.tgz

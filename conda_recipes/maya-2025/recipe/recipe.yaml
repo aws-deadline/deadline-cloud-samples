@@ -1,0 +1,60 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2025.0"
+  major_version: "2025"
+  minor_version: "0"
+
+package:
+  name: maya
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: file://archive_files/Autodesk_Maya_${{ major_version }}_Linux_64bit.tgz
+      sha256: 72ac8d1d4aed4fe19b37b995e62ed8507186e5f382fb7bac35fe11f65748bd93
+      target_directory: installer
+  - if: win
+    then:
+      - url: file://archive_files/Autodesk_Maya_${{ major_version }}_${{ minor_version }}_Windows_installation.zip
+        sha256: 2a8943ef911ac88faf2342e4feda6ac1a1c38aecbd164ea6441263283696c505
+        target_directory: installer
+      # See https://www.autodesk.com/support/technical/article/caas/tsarticles/ts/75wD5ycdkRVPHQtG4eUwBL.html
+      # titled "Deploying Maya Batch on the Cloud" about making Maya for Windows cloud compliant.
+      - url: https://download.autodesk.com/us/support/files/maya_batch_cloud/cleanMayaForCloud.py
+        sha256: 8605e6e28ed5d47ee79156a42166e85750b041456679cb7339128113f2328e0a
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  build:
+    - if: linux
+      then:
+      - patchelf
+
+tests:
+  - script:
+    # Maya's Python interpreter
+    - mayapy --help
+    # Confirm that mayapy can initialize maya.standalone, and that both OpenMaya 1.0 and 2.0 are available
+    - mayapy -c 'import maya; import maya.standalone; import maya.OpenMaya as om1; import maya.api.OpenMaya as om2; maya.standalone.initialize(); print("Hello from mayapy"); maya.standalone.uninitialize()'
+    # The maya -batch command
+    - maya -batch -command 'print "Hello from maya -batch"; quit -exitCode 0 -force'
+
+
+about:
+  homepage: https://www.autodesk.com/products/maya/overview
+  license: LicenseRef-AutodeskEULA
+  summary: Maya is professional 3D software for creating realistic characters and blockbuster-worthy effects.

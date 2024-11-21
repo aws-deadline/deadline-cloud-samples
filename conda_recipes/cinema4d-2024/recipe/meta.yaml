@@ -1,0 +1,35 @@
+{% set name = "cinema4d" %}
+{% set display_name = "Cinema4D" %}
+{% set version_major = "2024" %}
+{% set version_minor = "5" %}
+{% set version_patch = "1" %}
+{% set version = version_major + "." + version_minor + "." + version_patch %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: archive_files/{{ display_name }}_{{ version_major }}_{{ version }}_Win.zip # [win64]
+  sha256: 688cc0f087c3b54c633e5743baf30f5649d7d46e19538ce1fab88322b64d7fd3
+  folder: cinema4d
+
+build:
+  number: 0
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  # The binary is built to be relocatable, so can ignore the warnings about DSOs.
+  missing_dso_whitelist:
+  - "**"
+
+test:
+ commands:
+   # Turning off the test because Cinema4D tries to pull a license even when
+   # just printing the help text
+   # - Commandline -help
+
+about:
+  home: https://www.maxon.net/en/cinema-4d
+  license: Commercial
+  summary: >
+    3D computer animation, modeling, simulation, and rendering software

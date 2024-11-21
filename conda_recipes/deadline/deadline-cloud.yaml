@@ -1,12 +1,46 @@
 condaPlatforms:
   - platform: linux-64
+    variant: py311
     defaultSubmit: true
-  - platform: linux-aarch64
-    defaultSubmit: false
+    buildTool: rattler-build
+    variantConfig:
+      python:
+      - 3.11
+  - platform: linux-64
+    variant: py312
+    defaultSubmit: true
+    buildTool: rattler-build
+    variantConfig:
+      python:
+      - 3.12
   - platform: win-64
+    variant: py311
     defaultSubmit: true
-  - platform: osx-64
+    buildTool: conda-build
+    variantConfig:
+      python:
+      - 3.11
+  - platform: win-64
+    variant: py312
+    defaultSubmit: true
+    buildTool: conda-build
+    variantConfig:
+      python:
+      - 3.12
+  - platform: linux-aarch64
+    variant: py312
     defaultSubmit: false
+    buildTool: rattler-build
+    variantConfig:
+      python:
+      - 3.12
+  - platform: osx-64
+    variant: py312
+    defaultSubmit: false
+    buildTool: conda-build
+    variantConfig:
+      python:
+      - 3.12
 jobParameters:
 - name: CondaChannels
   value: conda-forge

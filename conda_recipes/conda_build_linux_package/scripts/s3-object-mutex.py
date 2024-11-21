@@ -85,9 +85,7 @@ def _mutex_get_lock_data(mutex_timeout_seconds=MUTEX_TIMEOUT_SECONDS):
         return (None, None)
 
     time_until_expiry = (
-        response["LastModified"]
-        + datetime.timedelta(seconds=mutex_timeout_seconds)
-        - datetime.datetime.now(tz=datetime.timezone.utc)
+        response["LastModified"] + datetime.timedelta(seconds=mutex_timeout_seconds) - datetime.datetime.now(tz=datetime.timezone.utc)
     )
     if time_until_expiry <= datetime.timedelta(seconds=0):
         # If the object hasn't been refreshed within the timeout, it's not locked. This
@@ -107,9 +105,7 @@ def _mutex_wait_while_locked():
     """
     lock_data, time_until_expiry = _mutex_get_lock_data()
     while lock_data is not None:
-        print(
-            f"Waiting, the lock for mutex s3://{s3_bucket_name}/{s3_lock_object} expires in {time_until_expiry}, info:"
-        )
+        print(f"Waiting, the lock for mutex s3://{s3_bucket_name}/{s3_lock_object} expires in {time_until_expiry}, info:")
         pprint(lock_data)
         time.sleep(MUTEX_WAIT_POLLING_SECONDS)
         lock_data, time_until_expiry = _mutex_get_lock_data()
@@ -151,9 +147,7 @@ def enter():
             continue
 
         # Filter out expired objects
-        expiry = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
-            seconds=MUTEX_ACQUISITION_TIMEOUT_SECONDS
-        )
+        expiry = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=MUTEX_ACQUISITION_TIMEOUT_SECONDS)
         s3_objects = [obj for obj in all_s3_objects if obj["LastModified"] > expiry]
 
         # Sort the objects oldest first, then by key
@@ -176,9 +170,7 @@ def enter():
     s3_client.put_object(Bucket=s3_bucket_name, Key=s3_lock_object, Body=body)
 
     # Delete our lock acquisition object and any expired ones
-    delete_s3_objects = [
-        obj for obj in all_s3_objects if obj["LastModified"] <= expiry or obj["Key"] == s3_lock_acquisition_object
-    ]
+    delete_s3_objects = [obj for obj in all_s3_objects if obj["LastModified"] <= expiry or obj["Key"] == s3_lock_acquisition_object]
     for obj in delete_s3_objects:
         print(f"Deleting object s3://{s3_bucket_name}/{obj['Key']}")
         s3_client.delete_object(Bucket=s3_bucket_name, Key=obj["Key"])

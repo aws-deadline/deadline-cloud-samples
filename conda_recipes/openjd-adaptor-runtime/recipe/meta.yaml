@@ -1,3 +1,6 @@
+# Recipe in conda-build format.
+# See recipe.yaml for the recipe in rattler-build format.
+
 {% set name = "openjd-adaptor-runtime" %}
 {% set version = "0.8.0" %}
 
@@ -5,11 +8,18 @@ package:
   name: {{ name }}
   version: {{ version }}
 
+# # This source reference uses the source archive published to PyPI
+# source:
+#   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/openjd_adaptor_runtime-{{ version }}.tar.gz
+#   sha256: 58e00c4a08686821df01c736e0781a3736450865cc2cf4e3799e354d324112d8
+#   patches:
+#     - 0001-Remove-version-hook.patch
+
+# This source reference uses git to retrieve the tag for the specified version. You can modify
+# the git_url and git_rev to point to a branch in your own fork of the project.
 source:
-  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/openjd_adaptor_runtime-{{ version }}.tar.gz
-  sha256: 58e00c4a08686821df01c736e0781a3736450865cc2cf4e3799e354d324112d8
-  patches:
-    - 0001-Remove-version-hook.patch
+  git_url: https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python.git
+  git_rev: "{{ version }}"
 
 build:
   skip: true  # [py<39]
@@ -17,13 +27,15 @@ build:
   number: 0
 
 requirements:
-  host:
-    - python >=3.9
+  build:
+    # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
+    - python
     - hatchling
     - hatch-vcs
     - pip
   run:
-    - python >=3.9
+    # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
+    - python
     - pyyaml >=6.0,<7.dev0
     - jsonschema >=4.17.0,<5.0
     - pywin32 ==306  # [win]

@@ -57,6 +57,7 @@ and a short script that substitutes job parameters and the Frame task parameter 
 * [keyshot_standalone](keyshot_standalone)
 * [afterfx_render_one_task](afterfx_render_one_task)
 * [maya_cli_render](maya_cli_render)
+* [houdini_husk_usd_render](houdini_husk_usd_render)
 
 If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to add it here.
 
@@ -102,3 +103,9 @@ or use the `deadline.client.api.create_job_from_job_bundle` function in the [`de
 If you do not want to use the `deadline` Python package's support for features like job attachments, you can also submit the job template by calling the
 [deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly.
 
+
+## Example Husk USD Render with Asset Introspection 
+
+The [houdini_husk_usd_render](houdini_husk_usd_render) sample shows how to use the Houdini Husk CLI USD renderer using a short job template and service-provided Conda packages.
+Additionally, this sample shows how to write a custom asset introspection tool for job attachments, ensuring that only the required data is uploaded when using job attachments 
+while removing manual steps of the artists having to attach the required files.

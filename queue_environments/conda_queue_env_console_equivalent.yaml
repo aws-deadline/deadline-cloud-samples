@@ -69,7 +69,9 @@ environment:
 
         # Activate the Conda environment, capturing the environment variables for the session to use
         python '{{Env.File.OpenJDVarsStart}}' .vars
+        set +u
         conda activate '{{Session.WorkingDirectory}}/.env'
+        set -u
         python '{{Env.File.OpenJDVarsCapture}}' .vars
 
         # Print information about the activated Conda environment

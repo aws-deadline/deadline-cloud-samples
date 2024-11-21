@@ -1,5 +1,8 @@
+# Recipe in conda-build format.
+# See recipe.yaml for the recipe in rattler-build format.
+
 {% set name = "deadline" %}
-{% set version = "0.48.8" %}
+{% set version = "0.48.9" %}
 
 package:
   name: {{ name }}
@@ -7,7 +10,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/deadline-{{ version }}.tar.gz
-  sha256: 998962a50d254d0b969f767f55282468949fdb668ddd33e1a30815e5ca9bb74e
+  sha256: ad4256b6b80325598e3ae3660f43ea0b037958c9bb7081c96ce737395ebf5a00
   patches:
     - 0001-Remove-version-build-hook.patch
 
@@ -21,17 +24,17 @@ build:
 
 requirements:
   host:
-    - python >=3.8
+    - python
     - hatchling
     - hatch-vcs
     - pip
   run:
-    - python >=3.8
+    - python
     - boto3 >=1.34.75
     - click >=8.1.7
     - pyyaml >=6.0
     - typing-extensions >=4.8
-    - python-xxhash ==3.4.*
+    - python-xxhash >=3.4,<3.6
     - jsonschema ==4.17.*
     - pywin32 ==306  # [win]
     - qtpy ==2.4.*
@@ -42,6 +45,7 @@ test:
   commands:
     - pip check
     - deadline --help
+    - python -m deadline --help
   requires:
     - pip
 
