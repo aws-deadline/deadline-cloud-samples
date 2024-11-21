@@ -30,23 +30,22 @@ parameterDefinitions:
     groupLabel: Render Parameters
   default: "./output"
   description: Choose the render output directory.
-- name: OutputPattern
+- name: OutputFilename
   type: STRING
   userInterface:
     control: LINE_EDIT
-    label: Output File Pattern
+    label: Output File Name
     groupLabel: Render Parameters
-  default: "output_####"
-  description: Enter the output filename pattern (without extension).
+  default: "output"
+  description: Enter the output filename (without extension).
 - name: Format
   type: STRING
   userInterface:
-    control: DROPDOWN_LIST
+    control: LINE_EDIT
     label: Output File Format
     groupLabel: Render Parameters
-  description: Choose the file format to render as.
-  default: JPEG
-  allowedValues: [TGA, RAWTGA, JPEG, IRIS, IRIZ, PNG, HDR, TIFF, OPEN_EXR, OPEN_EXR_MULTILAYER, CINEON, DPX, DDS, JP2, WEBP]
+  default: png
+  description: Enter the file format to render as.
 
 # Software Environment
 - name: CondaPackages
@@ -76,7 +75,7 @@ steps:
           # Configure the task to fail if any individual command fails.
           set -xeuo pipefail
           vray -sceneFile='{{Param.VraySceneFile}}' \
-               -imgFile='{{Param.OutputDir}}/{{Param.OutputPattern}}.{{Param.Format}}' \
+               -imgFile='{{Param.OutputDir}}/{{Param.OutputFilename}}.{{Param.Format}}' \
                -display=0
   hostRequirements:
     attributes:
