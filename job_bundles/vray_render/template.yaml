@@ -36,16 +36,8 @@ parameterDefinitions:
     control: LINE_EDIT
     label: Output File Name
     groupLabel: Render Parameters
-  default: "output"
-  description: Enter the output filename (without extension).
-- name: Format
-  type: STRING
-  userInterface:
-    control: LINE_EDIT
-    label: Output File Format
-    groupLabel: Render Parameters
-  default: png
-  description: Enter the file format to render as.
+  default: "output.png"
+  description: Enter the output filename (with extension of choice).
 
 # Software Environment
 - name: CondaPackages
@@ -75,7 +67,7 @@ steps:
           # Configure the task to fail if any individual command fails.
           set -xeuo pipefail
           vray -sceneFile='{{Param.VraySceneFile}}' \
-               -imgFile='{{Param.OutputDir}}/{{Param.OutputFilename}}.{{Param.Format}}' \
+               -imgFile='{{Param.OutputDir}}/{{Param.OutputFilename}}' \
                -display=0
   hostRequirements:
     attributes:
