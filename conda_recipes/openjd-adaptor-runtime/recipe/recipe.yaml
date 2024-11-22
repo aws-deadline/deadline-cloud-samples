@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "0.8.0"
+  version: "0.8.2"
 
 package:
   name: openjd-adaptor-runtime
@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/o/openjd-adaptor-runtime/openjd_adaptor_runtime-${{ version }}.tar.gz
-  sha256: 58e00c4a08686821df01c736e0781a3736450865cc2cf4e3799e354d324112d8
+  sha256: 9402ab555ad60ca81c4669fb634c569abaca794e2eefafac1dada89fdb300c2a
   patches:
     - 0001-Remove-version-hook.patch
 
@@ -29,7 +29,7 @@ requirements:
     - python
     - pyyaml >=6.0,<7.dev0
     - jsonschema >=4.17.0,<5.0
-    - ${{ "pywin32 ==306" if win }}
+    - ${{ "pywin32 >=307" if win }}
 
 tests:
 - python:

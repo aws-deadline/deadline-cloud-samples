@@ -2,7 +2,7 @@
 # See recipe.yaml for the recipe in rattler-build format.
 
 {% set name = "openjd-adaptor-runtime" %}
-{% set version = "0.8.0" %}
+{% set version = "0.8.2" %}
 
 package:
   name: {{ name }}
@@ -11,7 +11,7 @@ package:
 # # This source reference uses the source archive published to PyPI
 # source:
 #   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/openjd_adaptor_runtime-{{ version }}.tar.gz
-#   sha256: 58e00c4a08686821df01c736e0781a3736450865cc2cf4e3799e354d324112d8
+#   sha256: 9230002d9d73e5120d211535bb9fff7fe1d9fea0c6e0f301ff0fe731cbd62747
 #   patches:
 #     - 0001-Remove-version-hook.patch
 
@@ -38,7 +38,7 @@ requirements:
     - python
     - pyyaml >=6.0,<7.dev0
     - jsonschema >=4.17.0,<5.0
-    - pywin32 ==306  # [win]
+    - pywin32 >=307  # [win]
 
 test:
   imports:
