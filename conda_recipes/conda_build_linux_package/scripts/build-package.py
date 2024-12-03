@@ -1,15 +1,36 @@
-import sys
 import argparse
+import glob
+import json
+import os
+import shlex
 import shutil
 import subprocess
-import yaml
-import json
-import boto3
-import glob
-import shlex
+import sys
 from pathlib import Path
-from botocore.exceptions import ClientError
 from urllib.parse import urlparse
+
+import boto3
+import yaml
+from botocore.exceptions import ClientError
+
+
+def print_command(command):
+    """Print a command with shlex, splitting each option to a separate line."""
+
+    # Split the command, starting a new list for each option starting with "-"
+    split_commands = [[command[0]]]
+    for entry in command[1:]:
+        if entry.startswith("-"):
+            split_commands.append([])
+        split_commands[-1].append(entry)
+
+    # Print the command on multiple lines
+    suffix = " \\" if len(split_commands) > 1 else ""
+    print(f"+ {shlex.join(split_commands[0])}{suffix}")
+    for index in range(1, len(split_commands)):
+        if index == len(split_commands) - 1:
+            suffix = ""
+        print(f"+     {shlex.join(split_commands[index])}{suffix}")
 
 
 def parse_s3_channel_url(s3_url):
@@ -31,14 +52,10 @@ def get_next_build_number(package_name, package_version, conda_platform, channel
         "--spec",
         f"{package_name}=={package_version}",
     ]
-    print(f"+ {shlex.join(command)}")
-    package_search_result = subprocess.run(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    print_command(command)
+    package_search_result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    print(package_search_result.stdout.decode(errors="replace").replace("\r\n", "\n"))
     package_search_result_json = json.loads(package_search_result.stdout)
-    print(json.dumps(package_search_result_json, indent=1))
 
     if package_search_result.returncode == 0 and package_name in package_search_result_json:
         build_number = max(package["build_number"] for package in package_search_result_json[package_name]) + 1
@@ -53,14 +70,20 @@ def get_next_build_number(package_name, package_version, conda_platform, channel
     return build_number
 
 
-def get_channel_options(s3_channel_bucket, s3_channel_prefix, conda_channels, s3_client):
+def get_channel_options(
+    s3_channel_bucket,
+    s3_channel_prefix,
+    proxy_s3_conda_channel,
+    conda_channels,
+    s3_client,
+):
     channel_options = []
     try:
         repodata_key = f"{s3_channel_prefix}/noarch/repodata.json.zst"
         print(f"Checking whether the S3 channel already has an index by looking for s3://{s3_channel_bucket}/{repodata_key}")
         s3_client.head_object(Bucket=s3_channel_bucket, Key=repodata_key)
-        print(f"Found an index, adding s3://{s3_channel_bucket}/{s3_channel_prefix} to the input channel list")
-        channel_options.extend(["-c", f"s3://{s3_channel_bucket}/{s3_channel_prefix}"])
+        print(f"Found an index, adding {proxy_s3_conda_channel} to the input channel list")
+        channel_options.extend(["-c", proxy_s3_conda_channel])
     except ClientError as exc:
         print(exc)
         error_code = int(exc.response["ResponseMetadata"]["HTTPStatusCode"])
@@ -74,87 +97,205 @@ def get_channel_options(s3_channel_bucket, s3_channel_prefix, conda_channels, s3
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--recipe-dir", required=True)
+    parser.add_argument("--build-tool", required=True, choices=("conda-build", "rattler-build"))
     parser.add_argument("--conda-platform", required=True)
     parser.add_argument("--override-package-name")
     parser.add_argument("--conda-channels", default="")
     parser.add_argument("--conda-bld-dir", required=True)
     parser.add_argument("--s3-conda-channel", required=True)
+    parser.add_argument("--proxy-s3-conda-channel", required=True)
     parser.add_argument("--override-prefix-length")
     parser.add_argument("--override-source-archive1")
     parser.add_argument("--override-source-archive2")
-    parser.add_argument("--conda-build-config-file")
+    parser.add_argument("--variant-config-file")
     args = parser.parse_args()
 
     session = boto3.Session()
     s3_client = session.client("s3")
 
-    if args.conda_build_config_file:
-        shutil.copy(args.conda_build_config_file, Path(args.recipe_dir) / "conda_build_config.yaml")
+    if args.variant_config_file:
+        print("Using the following additional variant config:")
+        print(Path(args.variant_config_file).read_text())
+        print()
 
     s3_channel_bucket, s3_channel_prefix = parse_s3_channel_url(args.s3_conda_channel)
 
     # Make sure the package build starts with a clean conda-bld directory
     command = ["conda", "build", "purge"]
-    print(f"+ {shlex.join(command)}")
+    print_command(command)
     subprocess.check_call(command)
+    if os.path.isdir(args.conda_bld_dir):
+        shutil.rmtree(args.conda_bld_dir)
 
-    channel_options = get_channel_options(s3_channel_bucket, s3_channel_prefix, args.conda_channels, s3_client)
+    # Create the "-c CHANNEL_NAME" options
+    channel_options = get_channel_options(
+        s3_channel_bucket,
+        s3_channel_prefix,
+        args.proxy_s3_conda_channel,
+        args.conda_channels,
+        s3_client,
+    )
+    variant_config_option = []
+    if args.variant_config_file:
+        variant_config_option = ["-m", args.variant_config_file]
 
-    command = ["conda", "render", "--no-source", "-f", "rendered_meta.yaml", *channel_options, args.recipe_dir]
-    print(f"+ {shlex.join(command)}")
-    subprocess.check_call(command)
+    # Render the recipe, to substitute any jinja templating. We can take and modify literal
+    # values from the rendered recipe to apply the customizations specified by job parameters.
+    if args.build_tool == "conda-build":
+        recipe_file = f"{args.recipe_dir}/meta.yaml"
+        command = [
+            "conda",
+            "render",
+            *variant_config_option,
+            "--no-source",
+            "-f",
+            "rendered_meta.yaml",
+            *channel_options,
+            "--override-channels",
+            args.recipe_dir,
+        ]
+        print_command(command)
+        subprocess.check_call(command)
 
-    rendered_meta_text = Path("rendered_meta.yaml").read_text()
-    print(rendered_meta_text)
-    rendered_meta = yaml.safe_load(rendered_meta_text)
+        rendered_meta_text = Path("rendered_meta.yaml").read_text()
+        print(rendered_meta_text)
+        rendered_recipe = yaml.safe_load(rendered_meta_text)
+    elif args.build_tool == "rattler-build":
+        recipe_file = f"{args.recipe_dir}/recipe.yaml"
+        updated_recipe_file = f"{args.recipe_dir}/updated_recipe.yaml"
+        command = [
+            "rattler-build",
+            "build",
+            "--render-only",
+            "--recipe",
+            recipe_file,
+            *variant_config_option,
+            "--output-dir",
+            args.conda_bld_dir,
+            "--verbose",
+            *channel_options,
+        ]
+        print_command(command)
+        recipe_render_result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(recipe_render_result.stdout.decode(errors="replace").replace("\r\n", "\n"))
+        if recipe_render_result.returncode != 0:
+            print("stderr:")
+            print(recipe_render_result.stderr.decode(errors="replace").replace("\r\n", "\n"))
+            print(f"ERROR: Process exited with return code {recipe_render_result.returncode}")
+            sys.exit(1)
+        recipe_list = json.loads(recipe_render_result.stdout)
+        if len(recipe_list) != 1:
+            print(f"ERROR: The options selected resulted in more than one rendered recipe, ensure only one variant is specified.")
+            sys.exit(1)
+        rendered_recipe = recipe_list[0]["recipe"]
+    else:
+        print(f"ERROR: Unsupported build tool {args.build_tool}")
+        sys.exit(1)
 
-    package_name = rendered_meta["package"]["name"]
+    # Replace values in the rendered recipe
     if args.override_package_name:
-        package_name = args.override_package_name
+        rendered_recipe["package"]["name"] = args.override_package_name
+    package_name = rendered_recipe["package"]["name"]
 
-    package_version = rendered_meta["package"]["version"]
+    package_version = rendered_recipe["package"]["version"]
 
-    build_number = get_next_build_number(package_name, package_version, args.conda_platform, channel_options)
+    rendered_recipe["build"]["number"] = get_next_build_number(package_name, package_version, args.conda_platform, channel_options)
+    build_number = rendered_recipe["build"]["number"]
     print(f"openjd_status: Selected build number {build_number}")
 
-    recipe_clobber = {"build": {"number": build_number}}
-    if args.override_package_name:
-        recipe_clobber["package"] = {}
-        recipe_clobber["package"]["name"] = args.override_package_name
-    if isinstance(rendered_meta["source"], dict):
+    # Validate that the provided input source archive files exist
+    if args.override_source_archive1:
+        if not os.path.isfile(args.override_source_archive1):
+            print(f"ERROR: Override source archive 1 does not exist: {args.override_source_archive1}")
+            sys.exit(1)
+    if args.override_source_archive2:
+        if not os.path.isfile(args.override_source_archive2):
+            print(f"ERROR: Override source archive 2 does not exist: {args.override_source_archive2}")
+            sys.exit(1)
+
+    # Substitute the override archives into the recipe
+    if isinstance(rendered_recipe["source"], dict):
         if args.override_source_archive1:
-            recipe_clobber["source"] = {}
-            recipe_clobber["source"]["url"] = args.override_source_archive1
-    elif isinstance(rendered_meta["source"], list):
-        rendered_source = rendered_meta["source"]
+            rendered_recipe["source"] = {}
+            if args.build_tool == "conda-build":
+                rendered_recipe["source"]["url"] = args.override_source_archive1
+            else:
+                del rendered_recipe["source"]["url"]
+                rendered_recipe["source"]["path"] = args.override_source_archive1
+    elif isinstance(rendered_recipe["source"], list):
+        rendered_source = rendered_recipe["source"]
         if args.override_source_archive1 or args.override_source_archive2:
             if args.override_source_archive1:
-                rendered_source[0]["url"] = args.override_source_archive1
+                if args.build_tool == "conda-build":
+                    rendered_source[0]["url"] = args.override_source_archive1
+                else:
+                    del rendered_source[0]["url"]
+                    rendered_source[0]["path"] = args.override_source_archive1
             if args.override_source_archive2:
-                rendered_source[1]["url"] = args.override_source_archive2
-            recipe_clobber["source"] = rendered_source
+                if args.build_tool == "conda-build":
+                    rendered_source[1]["url"] = args.override_source_archive2
+                else:
+                    del rendered_source[1]["url"]
+                    rendered_source[1]["path"] = args.override_source_archive2
+            rendered_recipe["source"] = rendered_source
     else:
-        raise RuntimeError("The rendered meta.yaml's source field was not a string or a list.")
+        raise RuntimeError("The rendered recipe's source field was not a string or a list.")
 
-    Path("recipe_clobber.yaml").write_text(yaml.safe_dump(recipe_clobber))
+    # Save the rendered recipe with modifications
+    if args.build_tool == "conda-build":
+        recipe_clobber = {
+            "package": {"name": rendered_recipe["package"]["name"]},
+            "build": {"number": rendered_recipe["build"]["number"]},
+            "source": rendered_recipe["source"],
+        }
+        print("Clobber file:")
+        print(json.dumps(recipe_clobber, indent=1))
+        Path("recipe_clobber.yaml").write_text(json.dumps(recipe_clobber))
+    else:
+        with open(updated_recipe_file, "w") as fh:
+            json.dump(rendered_recipe, fh)
 
     prefix_length_option = []
-    if args.override_prefix_length:
+    if args.override_prefix_length and args.override_prefix_length != "0":
+        if args.build_tool == "rattler-build":
+            print("ERROR: The rattler-build package build tool does not support overriding the prefix length.")
+            sys.exit(1)
         prefix_length_option = ["--prefix-length", f"{args.override_prefix_length}"]
 
-    command = [
-        "conda",
-        "build",
-        "--no-anaconda-upload",
-        *prefix_length_option,
-        *channel_options,
-        "--clobber-file",
-        "recipe_clobber.yaml",
-        args.recipe_dir,
-    ]
-    print(f"+ {shlex.join(command)}")
+    # Run the package build tool
+    if args.build_tool == "conda-build":
+        command = [
+            "conda",
+            "build",
+            "--no-anaconda-upload",
+            *prefix_length_option,
+            *variant_config_option,
+            *channel_options,
+            "--clobber-file",
+            "recipe_clobber.yaml",
+            args.recipe_dir,
+        ]
+    else:
+        command = [
+            "rattler-build",
+            "build",
+            "--recipe",
+            updated_recipe_file,
+            *variant_config_option,
+            "--output-dir",
+            args.conda_bld_dir,
+            "--verbose",
+            *prefix_length_option,
+            *channel_options,
+        ]
+    print_command(command)
     subprocess.check_call(command)
 
+    if args.build_tool == "rattler-build":
+        # Remove the recipe file created with modifications
+        os.unlink(updated_recipe_file)
+
+    # Upload all the built packages
     for subdir in [args.conda_platform, "noarch"]:
         for package in glob.glob(str(Path(args.conda_bld_dir) / subdir / "*.conda")):
             package_name = Path(package).name

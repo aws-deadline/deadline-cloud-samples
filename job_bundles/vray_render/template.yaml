@@ -1,0 +1,76 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: V-Ray Render
+
+parameterDefinitions:
+
+# Render Parameters
+- name: VraySceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Vray Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: Vray Scene Files
+      patterns: ["*.vrscene"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the Vray scene file you want to render. Use the 'Job Attachments' tab
+    to add textures and other files that the job needs.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  default: "./output"
+  description: Choose the render output directory.
+- name: OutputFilename
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Name
+    groupLabel: Render Parameters
+  default: "output.png"
+  description: Enter the output filename (with extension of choice).
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+  default: vray
+  description: >
+    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this will
+    tell it to install vray.
+
+steps:
+- name: RenderVray
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          # Configure the task to fail if any individual command fails.
+          set -xeuo pipefail
+          vray -sceneFile='{{Param.VraySceneFile}}' \
+               -imgFile='{{Param.OutputDir}}/{{Param.OutputFilename}}' \
+               -display=0
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

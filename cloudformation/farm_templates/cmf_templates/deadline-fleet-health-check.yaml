@@ -1,0 +1,313 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deadline Cloud fleet health check. A continuous health check monitoring for a single Deadline Cloud fleet.
+
+Parameters:
+  FarmId:
+    Type: String
+  FleetId:
+    Type: String
+  FleetName:
+    Type: String
+    Description: >
+      The FleetName is used to name the health check monitoring resources that get deployed in this template 
+      for easy identification of the specified fleet.
+  FleetAutoScalingGroupName:
+    Type: String
+  HealthCheckAlarmActionArn:
+    Type: String
+    Description: >
+      An alarm action to take when the health check is failing. The recommended action is
+      a Simple Notification Service (SNS) topic notification ARN
+      such as arn:aws:sns:region:account-id:sns-topic-name, that you connect to your pager
+      or email so that you can learn about and investigate issues quickly. See the documentation page
+      https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricAlarm.html
+      for the full list of available alarm actions.
+  HealthCheckStartupGraceMinutes:
+    Type: Number
+    Description: How many minutes of grace time to give new instances before they must join the fleet.
+    Default: 10
+  HealthCheckRateMinutes:
+    Type: Number
+    Description: How many minutes between each health check of all the fleet workers.
+    Default: 10
+  HealthCheckFailureAlarmSeconds:
+    Type: Number
+    Description: How many seconds for each period of evaluating health check failures. Defaults to 1.5x the HealthCheckRate.
+    Default: 900
+
+Resources:
+  workerHealthCheckLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: !Sub "${FleetName}-WorkerHealthCheck"
+      Handler: index.handler
+      Role: !GetAtt workerHealthCheckLambdaServiceRole.Arn
+      # This function retrieves all the instances of an ASG and all the workers for a Fleet,
+      # so needs more time than the default to run.
+      Timeout: 120
+      Runtime: python3.13
+      Code:
+        ZipFile: !Sub |
+            """
+            This lambda runs on a schedule to perform health checks on the fleet.
+            It gets all the workers from fleet ${FleetName}, gets all the instances
+            from ASG ${FleetAutoScalingGroupName}, and cross-checks the worker host status.
+            """
+            import datetime
+            import logging
+
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
+
+            import boto3
+
+            farm_id = "${FarmId}"
+            fleet_id = "${FleetId}"
+
+            asg_name = "${FleetAutoScalingGroupName}"
+
+            health_check_startup_grace_minutes = ${HealthCheckStartupGraceMinutes}
+
+            session = boto3.Session()
+            deadline_client = session.client("deadline")
+            auto_scaling_client = session.client("autoscaling")
+            ec2_client = session.client("ec2")
+            cloudwatch_client = boto3.client("cloudwatch")
+
+            def list_fleet_workers():
+                paginator = deadline_client.get_paginator("list_workers")
+
+                fleet_workers = []
+                for page in paginator.paginate(farmId=farm_id, fleetId=fleet_id):
+                  fleet_workers.extend(page["workers"])
+
+                return {
+                    worker["hostProperties"].get("ec2InstanceArn", "").split("/")[-1]: {
+                        "workerId": worker["workerId"],
+                        "status": worker["status"],
+                    }
+                    for worker in fleet_workers
+                }
+
+
+            def list_asg_instances():
+                paginator = ec2_client.get_paginator("describe_instances")
+
+                asg_instances = []
+                for page in paginator.paginate(
+                    Filters=[
+                        {"Name": "tag:aws:autoscaling:groupName", "Values": [asg_name]},
+                        {"Name": "instance-state-name", "Values": ["running"]},
+                    ]
+                ):
+                    for reservation in page["Reservations"]:
+                        asg_instances.extend(reservation["Instances"])
+
+                return {
+                    instance["InstanceId"]: {"launchTime": instance["LaunchTime"]}
+                    for instance in asg_instances
+                }
+
+
+            def handler(event, context):
+                # Load all the fleet workers hosts from Deadline Cloud
+                logger.info("Retrieving all the Deadline Cloud fleet workers...")
+                fleet_workers = list_fleet_workers()
+                logger.info(f"Got {len(fleet_workers)} fleet workers.")
+
+                # Load all the running instances of the Auto Scaling Group
+                logger.info("Retrieving all the running Auto Scaling Group instances...")
+                asg_instances = list_asg_instances()
+                logger.info(f"Got {len(asg_instances)} instances.")
+
+                ## Uncomment these lines if you want to see the data underlying the health check
+                # from pprint import pprint
+                # pprint(fleet_workers)
+                # pprint(asg_instances)
+
+                worker_health_check_failure_count = 0
+
+                # Delete/terminate all the fleet workers with running ASG instances marked as NOT_RESPONDING
+                for instance_id, worker in fleet_workers.items():
+                    if worker["status"] == "NOT_RESPONDING" and instance_id in asg_instances:
+                        logger.warning(
+                            f"WorkerId {worker['workerId']!r} with InstanceId {instance_id!r} is NOT_RESPONDING, marking as Unhealthy in the ASG."
+                        )
+                        worker_health_check_failure_count += 1
+                        try:
+                            auto_scaling_client.set_instance_health(
+                                InstanceId=instance_id,
+                                HealthStatus="Unhealthy",
+                                ShouldRespectGracePeriod=False,
+                            )
+                        except Exception as e:
+                            logger.exception(e)
+                        try:
+                            deadline_client.delete_worker(farmId=farm_id, fleetId=fleet_id, workerId=worker["workerId"])
+                        except Exception as e:
+                            logger.exception(e)
+
+                # Delete all the workers in the fleet that have no corresponding instance
+                for instance_id in set(fleet_workers.keys()) - set(asg_instances.keys()):
+                    worker = fleet_workers[instance_id]
+                    logger.warning(
+                        f"WorkerId {worker['workerId']!r} with InstanceId {instance_id!r} is not a running ASG instance, deleting it from the Fleet."
+                    )
+                    worker_health_check_failure_count += 1
+                    try:
+                        deadline_client.delete_worker(farmId=farm_id, fleetId=fleet_id, workerId=worker["workerId"])
+                    except Exception as e:
+                        logger.exception(e)
+
+                # Terminate all the ASG instances that are not in the fleet, and have no grace period left
+                for instance_id in set(asg_instances.keys()) - set(fleet_workers.keys()):
+                    grace_period_end = asg_instances[instance_id][
+                        "launchTime"
+                    ] + datetime.timedelta(minutes=health_check_startup_grace_minutes)
+                    grace_duration_left = grace_period_end - datetime.datetime.now(datetime.UTC)
+                    if grace_duration_left > datetime.timedelta(seconds=0):
+                        logger.info(
+                            f"ASG InstanceId {instance_id!r} is starting up, with {grace_duration_left} left in its grace period."
+                        )
+                    else:
+                        logger.warning(
+                            f"ASG InstanceId {instance_id!r} is not registered as a worker in the fleet, marking it as Unhealthy in the ASG."
+                        )
+                        worker_health_check_failure_count += 1
+                        try:
+                            auto_scaling_client.set_instance_health(
+                                InstanceId=instance_id,
+                                HealthStatus="Unhealthy",
+                                ShouldRespectGracePeriod=False,
+                            )
+                        except Exception as e:
+                            logger.exception(e)
+
+                total_check_count = max(len(fleet_workers), len(asg_instances))
+
+                logger.log(
+                    logging.INFO if worker_health_check_failure_count == 0 else logging.WARN,
+                    f"Health check scanned {total_check_count} workers with {worker_health_check_failure_count} worker health check failures.",
+                )
+
+                # Publish the metrics at the end of the function, so that if anything fails or if it
+                # times out, the health check alarm activates due to lack of data.
+                cloudwatch_client.put_metric_data(
+                    Namespace="AWS/DeadlineCloud",
+                    MetricData=[
+                        {
+                            "MetricName": "WorkerHealthCheckCount",
+                            "Dimensions": [
+                                {"Name": "FarmId", "Value": farm_id},
+                                {"Name": "FleetId", "Value": fleet_id},
+                            ],
+                            "Unit": "Count",
+                            "Value": total_check_count,
+                        },
+                        {
+                            "MetricName": "WorkerHealthCheckFailureCount",
+                            "Dimensions": [
+                                {"Name": "FarmId", "Value": farm_id},
+                                {"Name": "FleetId", "Value": fleet_id},
+                            ],
+                            "Unit": "Count",
+                            "Value": worker_health_check_failure_count,
+                        },
+                    ]
+                )
+  workerHealthCheckEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Sub "${FleetName}-Fleet-CheckCustomerManagedFleetHealth"
+      ScheduleExpression: !Sub "rate(${HealthCheckRateMinutes} minutes)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt workerHealthCheckLambda.Arn
+          Id: Target0
+          RetryPolicy:
+            MaximumRetryAttempts: 15
+  workerHealthCheckEventRuleTargetPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt workerHealthCheckLambda.Arn
+      Principal: !Sub 'events.${AWS::URLSuffix}'
+      SourceArn: !GetAtt workerHealthCheckEventRule.Arn
+  workerHealthCheckLambdaServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub "${FleetName}-Fleet-HealthCheck"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service: !Sub 'lambda.${AWS::URLSuffix}'
+      Policies:
+        - PolicyName: WorkerHealthCheckLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Action:
+              # To get all the workers from the Fleet
+              - deadline:ListWorkers
+              # To delete workers with a NOT_RESPONDING status
+              - deadline:DeleteWorker
+              Effect: Allow
+              Resource:
+              - !Sub arn:${AWS::Partition}:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/${FleetId}/worker/*
+            - Action:
+              # To get all the instances from the Auto Scaling Group
+              - ec2:DescribeInstances
+              # To publish worker health check metrics
+              - cloudwatch:PutMetricData
+              Effect: Allow
+              Resource: '*'
+            - Action:
+              # To notify the Auto Scaling Group when instances are unhealthy
+              - autoscaling:SetInstanceHealth
+              Effect: Allow
+              Resource: !Sub arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${FleetAutoScalingGroupName}
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  workerHealthCheckFailureAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+        - !Ref HealthCheckAlarmActionArn
+      AlarmName: !Sub ${FleetName}-Fleet-WorkerHealthCheckFailure
+      AlarmDescription: !Sub >
+          IMPORTANT -- If this alarm goes off, your fleet is either not protected or is experiencing continuous problems!
+          The Health check Lambda for a Deadline Cloud fleet may not be running correctly. A misconfiguration or intermittent
+          error could cause your worker instances to keep running without running any jobs. Otherwise, something else
+          is going wrong, and workers are repeatedly failing health checks instead of scaling in and out correctly.
+
+          DeadlineCloud Fleet: ${FleetName} (${FarmId}/${FleetId})
+
+          AutoScalingGroup: ${FleetAutoScalingGroupName}
+
+          Lambda Function: ${workerHealthCheckLambda}
+
+          You should connect this alarm to page you so that you can respond quickly to this issue if it occurs.
+      Period: !Ref HealthCheckFailureAlarmSeconds
+      # Use 3 out of the last 6 periods (e.g. 45 minutes out of 90 with 15 minute periods), so that a single health
+      # check failure doesn't alarm, but persistent failure does.
+      DatapointsToAlarm: 3
+      EvaluationPeriods: 6
+      Namespace: AWS/DeadlineCloud
+      MetricName: WorkerHealthCheckFailureCount
+      Statistic: Maximum
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Threshold: 1
+      Dimensions:
+      - Name: FarmId
+        Value: !Ref FarmId
+      - Name: FleetId
+        Value: !Ref FleetId
+      Unit: Count
+      # It's important to alarm when data is missing, because if there's no data, it means something
+      # has gone wrong with the health check lambda itself. Note that when you first deploy this template,
+      # there is no data, so it will start in an alarmed status.
+      TreatMissingData: breaching

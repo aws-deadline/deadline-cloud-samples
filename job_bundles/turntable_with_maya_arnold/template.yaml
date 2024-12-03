@@ -188,7 +188,7 @@ parameterDefinitions:
 - name: CondaPackages
   type: STRING
   description: Choose which Conda packages to install for the render. Requires a conda queue environment to process the value.
-  default: maya=2024 maya-mtoa maya-openjd=0.14 ffmpeg
+  default: maya>=2024 maya-mtoa maya-openjd=0.14 ffmpeg
   userInterface:
     control: LINE_EDIT
     label: Conda Packages

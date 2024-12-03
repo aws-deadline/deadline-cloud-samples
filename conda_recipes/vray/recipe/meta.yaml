@@ -1,0 +1,36 @@
+{% set version = "62022" %}
+
+package:
+  name: vray
+  version: {{ version }}
+
+source:
+  - if: linux-64
+    then:
+      url: archive_files/vraystd_adv_{{ version }}_rhel8_clang-gcc-11.2 # [linux64 and x86_64]
+      sha256: 404157ac038bcc0b8d2edeac78e093b4f8e984b5da46cc55bf0edb61c9a81445
+  - if: linux-aarch64
+    then:
+      url: archive_files/vraystd_adv_{{ version }}_rhel8_arm64_clang-gcc-11.2 # [aarch64]
+      sha256: cbcd9c1d5c955f67a3ae34ee4bd498f67675759098bfdb18f6bdf341e471414e
+
+build:
+  number: 0
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  # V-Ray is built to be relocatable, so can ignore the warnings about DSOs.
+  missing_dso_whitelist:
+  - "*"
+
+test:
+  commands:
+    - vray --help
+    - vray --version
+
+about:
+  home: https://www.chaos.com/vray
+  doc_url: https://docs.chaos.com/display/VNS/V-Ray+Standalone+Home
+  license: Commercial
+  summary: |
+    V-Ray is a 3D photorealistic ray-traced rendering plug-in.
+    V-Ray Standalone is the full-featured and command-line renderer that supports V-Ray's native .vrscene file format.

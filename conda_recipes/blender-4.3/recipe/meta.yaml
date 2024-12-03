@@ -1,0 +1,36 @@
+# Recipe in conda-build format.
+# This recipe is only for Windows, see recipe.yaml for the Linux recipe in rattler-build format.
+
+{% set version = "4.3.0" %}
+{% set major_minor_version = ".".join(version.split(".")[:2]) %}
+
+package:
+  name: blender
+  version: {{ version }}
+
+source:
+  url: https://download.blender.org/release/Blender{{major_minor_version}}/blender-{{version}}-windows-x64.zip # [win64]
+  sha256: 68777b84f1e8970859428b3c4bc8e8675e8322b19e1566e0a90d575d00d257ac # [win64]
+  folder: blender
+
+build:
+  skip: true  # [not win64]
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+test:
+  commands:
+    - blender -h
+
+about:
+  home: https://www.blender.org/
+  license: GPL3
+  summary: >
+    Blender is the free and open source 3D creation suite. It supports the entirety of
+    the 3D pipeline—modeling, rigging, animation, simulation, rendering, compositing
+    and motion tracking, even video editing and game creation.

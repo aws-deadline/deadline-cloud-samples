@@ -1,4 +1,7 @@
-{% set version = "4.2.1" %}
+# Recipe in conda-build format.
+# This recipe is only for Windows, see recipe.yaml for the Linux recipe in rattler-build format.
+
+{% set version = "4.2.3" %}
 {% set major_minor_version = ".".join(version.split(".")[:2]) %}
 
 package:
@@ -6,13 +9,12 @@ package:
   version: {{ version }}
 
 source:
-  url: https://download.blender.org/release/Blender{{major_minor_version}}/blender-{{version}}-linux-x64.tar.gz # [linux64]
   url: https://download.blender.org/release/Blender{{major_minor_version}}/blender-{{version}}-windows-x64.zip # [win64]
-  sha256: be0fbaa0c1e52d4552023220b4c67351efbb707cac49bb381fcbee2182447005 # [linux64]
-  sha256: 46b9d27c2406454c68842d1790515732be385719e844f6b283e3c78186f9ffce # [win64]
+  sha256: 7f8be9b1dc904e7689b3112659791c29cc9ed9d46ce57c4ea5b31a0621489b3a # [win64]
   folder: blender
 
 build:
+  skip: true  # [not win64]
   number: 0
   # These build options for repackaging an application
   # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html

@@ -1,0 +1,16 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - Autodesk_Maya_2025_Linux_64bit.tgz
+    sourceDownloadInstructions: 'Download the Autodesk_Maya_2025_Linux_64bit.tgz full download file from Autodesk.'
+    buildTool: rattler-build
+  - platform: win-64
+    defaultSubmit: false
+    sourceArchiveFilename:
+    - Autodesk_Maya_2025_0_Windows_installation.zip
+    sourceDownloadInstructions: 'Follow the instructions in README.md to construct the archive zip file.'
+    buildTool: conda-build
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge

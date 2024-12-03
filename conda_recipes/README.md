@@ -2,15 +2,19 @@
 
 ## Summary
 
-This directory contains sample tools for creating an S3 conda channel and building new packages into it
-on AWS Deadline Cloud.
+This directory contains sample tools for creating an S3 conda channel and
+building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 * The job bundle [conda_build_linux_package](conda_build_linux_package) defines a job that
-  can build packages for Linux.
-* The command `submit-package-job` submits a job for building a provided conda build recipe on
-  a specified set of conda platforms. It takes the job bundle for Linux, and extends it for the set of
-  conda platforms.
-* Conda build recipe samples to submit with `submit-package-job`.
+  is cross-platform but configured for Linux.
+* The submission command `submit-package-job` submits a job for running
+  a provided conda build recipe on a specified set of conda platforms. It takes the job
+  bundle, and edits it to match the arguments provided.
+* A set of conda build recipes with the metadata needed by `submit-package-job`
+  provide a starting point for packages.
+* Supports both [conda-build](https://docs.conda.io/projects/conda-build/)
+  and [rattler-build](https://prefix-dev.github.io/rattler-build/). Only Linux works
+  with rattler-build currently.
 
 ## Infrastructure setup prerequisites
 
@@ -77,6 +81,19 @@ To submit all the platforms specified in `deadline-cloud.yaml`, including the no
 $ ./submit-package-job blender-4.2 --all-platforms
 ```
 
+The `-p` option accepts glob wildcards that are useful for submitting variant builds.
+To submit all the 64-bit Windows variants:
+
+```
+$ ./submit-package-job deadline -p win-64*
+```
+
+To submit all platforms for the `py312` variant:
+
+```
+$ ./submit-package-job deadline -p *-py312
+```
+
 ### Submitting a job to a specific queue
 
 By default, the `submit-package-job` command submits to a queue whose name starts with "Package" in
@@ -131,6 +148,22 @@ You can add more files, like a LICENSE.txt to document the license of the recipe
 The file `deadline-cloud.yaml` file provides metadata for how to submit the package build
 job to Deadline Cloud.
 
+#### The buildTool option
+
+You can select the default build tool between conda-build and rattler-build for the whole recipe
+by setting this option. [Conda build](https://docs.conda.io/projects/conda-build/) is
+the original package building tool implemented for conda, and [rattler build](https://prefix-dev.github.io/rattler-build/)
+is a newer tool built with rust and using a new package build recipe format established
+in conda enhancement proposals [CEP 13](https://github.com/conda/ceps/blob/main/cep-0013.md)
+and [CEP 14](https://github.com/conda/ceps/blob/main/cep-0014.md). Rattler build typically
+builds packages faster, especially when the package has many and/or large files.
+
+NOTE: This sample tool only supports rattler build on Linux.
+
+```
+buildTool: rattler-build
+```
+
 #### The condaPlatforms list
 
 The file's main entry is a list of conda platforms to submit for. Common platforms
@@ -139,8 +172,17 @@ for 64-bit x86 Windows. A minimal configuration looks like this:
 
 ```
 condaPlatforms:
-- platform: linux-64
-  defaultSubmit: true
+  - platform: linux-64
+    defaultSubmit: true
+```
+
+You can select the build tool separately for a platform by adding a buildTool entry:
+
+```
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    buildTool: rattler-build
 ```
 
 If the source for the package is not available for download from the internet, you
@@ -148,40 +190,43 @@ can specify a filename and human-readable instructions for where to get it.
 
 ```
 condaPlatforms:
-- platform: linux-64
-  defaultSubmit: true
-  sourceArchiveFilename: internal-animation-tool-1.3.tar.gz
-  sourceDownloadInstructions: 'Copy from internal drive /mnt/tools/internal/source'
+  - platform: linux-64
+    defaultSubmit: true
+    buildTool: rattler-build
+    sourceArchiveFilename: internal-animation-tool-1.3.tar.gz
+    sourceDownloadInstructions: 'Copy from internal drive /mnt/tools/internal/source'
 ```
 
 If you want to build different variants on a platform, for instance with CUDA support
 and without, you can add a variant field along with additional host requirements to append.
-You can also control the value of the `conda_build_config.yaml` file to provide parameter
-values to the [conda build variants](https://docs.conda.io/projects/conda-build/en/latest/resources/variants.html).
-In this example, the conda platforms for `submit-package-job` will be linux-64-cuda and linux-64-cpu-only.
+You can also control the value of a `variant_config.yaml` file to provide parameter
+values to the conda variants (See [conda-build variants](https://docs.conda.io/projects/conda-build/en/latest/resources/variants.html)
+or [rattler-build variants](https://prefix-dev.github.io/rattler-build/latest/variants/)).
+In this example, the conda platforms the `submit-package-job` will build for are linux-64-cuda
+and linux-64-cpu-only.
 
 ```
 condaPlatforms:
-- platform: linux-64
-  variant: cuda
-  defaultSubmit: true
-  additionalHostRequirements:
-    amounts:
-    - name: amount.worker.gpu
-      min: 1
-  condaBuildConfig:
-    cuda_compiler_version:
-    - 12.1
-- platform: linux-64
-  variant: cpu-only
-  defaultSubmit: true
-  additionalHostRequirements:
-    amounts:
-    - name: amount.worker.gpu
-      max: 0
-  condaBuildConfig:
-    cuda_compiler_version:
-    - None
+  - platform: linux-64
+    variant: cuda
+    defaultSubmit: true
+    additionalHostRequirements:
+      amounts:
+      - name: amount.worker.gpu
+        min: 1
+    variantConfig:
+      cuda_compiler_version:
+      - 12.1
+  - platform: linux-64
+    variant: cpu-only
+    defaultSubmit: true
+    additionalHostRequirements:
+      amounts:
+      - name: amount.worker.gpu
+        max: 0
+    variantConfig:
+      cuda_compiler_version:
+      - None
 ```
 
 #### The jobParameters list
@@ -224,6 +269,9 @@ the [list of conda-forge packages](https://conda-forge.org/packages/) and follow
 link to a package's feedstock git repository. You can also use the
 [grayskull conda recipe generator](https://github.com/conda/grayskull) to automatically
 generate starting point recipes for Python packages in PyPI.
+
+Read [Creating a conda package for an application](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/conda-package.html)
+in the Deadline Cloud developer guide to learn how you can create conda build recipes for packaging entire applications.
 
 ## Tasks
 
@@ -327,12 +375,13 @@ Here is a procedure for generating a patch and adding it to the recipe.
 3. Commit the changes, and produce a diff file.
     ```
     $ git add -u
+    $ git commit -m "patched"
     $ git format-patch -1
-    0001-Remove-version-build-hook.patch
+    0001-patched.patch
     ```
 4. Add the generated patch to the recipe, beside the `meta.yaml` file.
     ```
-    $ mv 0001-Remove-version-build-hook.patch /path/to/recipe
+    $ mv 0001-patched.patch /path/to/recipe/0001-Remove-version-build-hook.patch
     $ cd /path/to/recipe
     $ ls
     0001-Remove-version-build-hook.patch  meta.yaml
