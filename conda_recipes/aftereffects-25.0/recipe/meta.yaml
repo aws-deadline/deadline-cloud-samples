@@ -1,6 +1,6 @@
 {% set name = "aftereffects" %}
-{% set version_partial = "25.0" %}
-{% set version_minor = "1" %}
+{% set version_partial = "25" %}
+{% set version_minor = "0" %}
 {% set version = version_partial + "." + version_minor %}
 
 package:

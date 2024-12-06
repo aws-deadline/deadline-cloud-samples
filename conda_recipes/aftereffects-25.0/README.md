@@ -4,8 +4,7 @@
 
 The Windows installer requires Administrator permissions that are not available in most conda package
 build environments, such as on a Deadline Cloud service-managed fleets. Follow these instructions to
-install Adobe After Effects 25 on a freshly created EC2 instance as Administrator, and create an archive file
-for use by the conda build recipe.
+install Adobe After Effects 25 on a freshly created EC2 instance as Administrator, and create an archive file for use by the conda build recipe. If you have a Windows workstation, you can also do step 3 and 5 without starting an EC2 instance.
 
 1. Launch a fresh Windows Server 2022 instance.
    1. From the AWS EC2 management console, select the option to Launch instance.
