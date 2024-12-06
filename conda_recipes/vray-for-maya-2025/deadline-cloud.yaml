@@ -1,0 +1,8 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: vray_adv_62002_maya2025_rhel8
+    sourceDownloadInstructions: 'Download the vray_adv_62002_maya2025_rhel8 full download file from Chaos.'
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge
