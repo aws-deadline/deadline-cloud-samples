@@ -49,17 +49,19 @@ done
 # Copy .so's to the V-Ray installation
 find . -iname "*.so.*" -exec cp -P -r {} "$PREFIX/$MAYA_VRAY_VRAY_ROOT/lib/." \;
 
+mkdir -p "$PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION"
+cp $CONDA_PREFIX/$MAYA_VRAY_ROOT/maya_root/modules/VRayForMaya.module $CONDA_PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION
+sed -i "s|+ VRayForMaya2025rhel8 0.9 ../../maya_vray|+ VRayForMaya2025rhel8 0.9 $CONDA_PREFIX/$MAYA_VRAY_MAYA_ROOT|" $CONDA_PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION/VRayForMaya.module
+
 # Script to set environment variables during activation
 mkdir -p $PREFIX/etc/conda/activate.d
 cat <<EOF > $PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh
-export "MAYA_MODULE_PATH=\$CONDA_PREFIX/$MAYA_VRAY_ROOT/maya_root/modules"
 export "VRAY_EULA=https://docs.chaos.com/display/VNS/End+User+License+Agreement"
 EOF
 
 mkdir -p $PREFIX/etc/conda/deactivate.d
 cat <<EOF > $PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh
 if ! [ -z \$VRAY ]; then 
-    unset MAYA_MODULE_PATH
     unset VRAY_EULA
 fi
 EOF

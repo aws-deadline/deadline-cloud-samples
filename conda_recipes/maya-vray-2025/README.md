@@ -14,7 +14,7 @@ submitting package build jobs.
 
 ## Requirement
 To use V-Ray for Maya, we need to build:
-- V-Ray for Maya 2025 conda package by running: `./submit-package-job vray-for-maya-2025`
+- V-Ray for Maya 2025 conda package by running: `./submit-package-job maya-vray-2025`
 - Maya 2025 conda package by running: `./submit-package-job maya-2025`
 - (_Optional - build this for Maya adaptor_) Maya adaptor conda package by running:
     - [_Prerequisite_]Deadline Cloud package: `./submit-package-job deadline`
