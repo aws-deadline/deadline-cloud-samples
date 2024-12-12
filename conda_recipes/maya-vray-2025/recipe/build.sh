@@ -52,6 +52,13 @@ find . -iname "*.so.*" -exec cp -P -r {} "$PREFIX/$MAYA_VRAY_VRAY_ROOT/lib/." \;
 mkdir -p "$PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION"
 cp $CONDA_PREFIX/$MAYA_VRAY_ROOT/maya_root/modules/VRayForMaya.module $CONDA_PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION
 sed -i "s|+ VRayForMaya2025rhel8 0.9 ../../maya_vray|+ VRayForMaya2025rhel8 0.9 $CONDA_PREFIX/$MAYA_VRAY_MAYA_ROOT|" $CONDA_PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION/VRayForMaya.module
+if grep -q "$CONDA_PREFIX/$MAYA_VRAY_MAYA_ROOT" "$CONDA_PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION/VRayForMaya.module"; then
+    echo "Changing maya_root/VRayForMaya.module file path to $CONDA_PREFIX/$MAYA_VRAY_MAYA_ROOT succeeded"
+else
+    echo "Failed to change maya_root/VRayForMaya.module file path "
+    exit 1
+fi
+
 
 # Script to set environment variables during activation
 mkdir -p $PREFIX/etc/conda/activate.d
