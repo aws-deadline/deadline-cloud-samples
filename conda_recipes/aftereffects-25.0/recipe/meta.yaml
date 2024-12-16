@@ -1,0 +1,27 @@
+{% set name = "aftereffects" %}
+{% set version_partial = "25" %}
+{% set version_minor = "0" %}
+{% set version = version_partial + "." + version_minor %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+- url: archive_files/Adobe_AfterEffects_{{ version.replace(".", "_") }}_Windows_installation.zip # [win64]
+  sha256: f181bddce95e0f45555c5188a9a515a43ce20d0071d566286f748cbba36b5716 # [win64]
+  folder: aftereffects
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+about:
+  home: https://www.adobe.com/products/aftereffects.html
+  license: Commercial
+  summary: Adobe After Effects is a digital visual effects, motion graphics, and compositing application developed by Adobe Inc.; it is used for animation and in the post-production process of film making, video games and television production.

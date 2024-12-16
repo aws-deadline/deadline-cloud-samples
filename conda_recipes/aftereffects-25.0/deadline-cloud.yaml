@@ -1,0 +1,10 @@
+condaPlatforms:
+  - platform: win-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - Adobe_AfterEffects_25_0_Windows_installation.zip
+    sourceDownloadInstructions: 'Follow the instructions in README.md to construct the archive zip file.'
+    buildTool: conda-build
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge
