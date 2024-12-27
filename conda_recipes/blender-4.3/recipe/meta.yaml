@@ -1,7 +1,7 @@
 # Recipe in conda-build format.
 # This recipe is only for Windows, see recipe.yaml for the Linux recipe in rattler-build format.
 
-{% set version = "4.3.0" %}
+{% set version = "4.3.2" %}
 {% set major_minor_version = ".".join(version.split(".")[:2]) %}
 
 package:
@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://download.blender.org/release/Blender{{major_minor_version}}/blender-{{version}}-windows-x64.zip # [win64]
-  sha256: 68777b84f1e8970859428b3c4bc8e8675e8322b19e1566e0a90d575d00d257ac # [win64]
+  sha256: 933a62a770c941e316535f893629ff106ddd2aa5a956f0081ec557439073d4f6 # [win64]
   folder: blender
 
 build:

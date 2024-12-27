@@ -32,8 +32,8 @@ requirements:
     - pyyaml >=6.0
     - typing-extensions >=4.8
     - python-xxhash >=3.4,<3.6
-    - jsonschema 4.17
-    - qtpy 2.4
+    - jsonschema 4.17.*
+    - qtpy 2.4.*
     - ${{ "pywin32 >=307,<309" if win }}
 
 tests:
