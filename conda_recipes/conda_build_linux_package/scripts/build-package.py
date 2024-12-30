@@ -160,9 +160,13 @@ def main():
         rendered_meta_text = Path("rendered_meta.yaml").read_text()
         print(rendered_meta_text)
         rendered_recipe = yaml.safe_load(rendered_meta_text)
+
+        # When using conda-build, update the rendered recipe
+        updated_recipe = rendered_recipe
     elif args.build_tool == "rattler-build":
         recipe_file = f"{args.recipe_dir}/recipe.yaml"
         updated_recipe_file = f"{args.recipe_dir}/updated_recipe.yaml"
+
         command = [
             "rattler-build",
             "build",
@@ -188,6 +192,10 @@ def main():
             print(f"ERROR: The options selected resulted in more than one rendered recipe, ensure only one variant is specified.")
             sys.exit(1)
         rendered_recipe = recipe_list[0]["recipe"]
+
+        # When using rattler-build, get values from the rendered recipe but update the original recipe
+        recipe_text = Path(recipe_file).read_text()
+        updated_recipe = yaml.safe_load(recipe_text)
     else:
         print(f"ERROR: Unsupported build tool {args.build_tool}")
         sys.exit(1)
@@ -196,11 +204,10 @@ def main():
     if args.override_package_name:
         rendered_recipe["package"]["name"] = args.override_package_name
     package_name = rendered_recipe["package"]["name"]
-
     package_version = rendered_recipe["package"]["version"]
 
-    rendered_recipe["build"]["number"] = get_next_build_number(package_name, package_version, args.conda_platform, channel_options)
-    build_number = rendered_recipe["build"]["number"]
+    build_number = get_next_build_number(package_name, package_version, args.conda_platform, channel_options)
+    updated_recipe["build"]["number"] = build_number
     print(f"openjd_status: Selected build number {build_number}")
 
     # Validate that the provided input source archive files exist
@@ -214,46 +221,45 @@ def main():
             sys.exit(1)
 
     # Substitute the override archives into the recipe
-    if isinstance(rendered_recipe["source"], dict):
-        if args.override_source_archive1:
-            rendered_recipe["source"] = {}
-            if args.build_tool == "conda-build":
-                rendered_recipe["source"]["url"] = args.override_source_archive1
-            else:
-                del rendered_recipe["source"]["url"]
-                rendered_recipe["source"]["path"] = args.override_source_archive1
-    elif isinstance(rendered_recipe["source"], list):
-        rendered_source = rendered_recipe["source"]
-        if args.override_source_archive1 or args.override_source_archive2:
+    if "source" in rendered_recipe:
+        updated_recipe["source"] = rendered_recipe["source"]
+        if isinstance(rendered_recipe["source"], dict):
             if args.override_source_archive1:
                 if args.build_tool == "conda-build":
-                    rendered_source[0]["url"] = args.override_source_archive1
+                    updated_recipe["source"]["url"] = args.override_source_archive1
                 else:
-                    del rendered_source[0]["url"]
-                    rendered_source[0]["path"] = args.override_source_archive1
-            if args.override_source_archive2:
-                if args.build_tool == "conda-build":
-                    rendered_source[1]["url"] = args.override_source_archive2
-                else:
-                    del rendered_source[1]["url"]
-                    rendered_source[1]["path"] = args.override_source_archive2
-            rendered_recipe["source"] = rendered_source
-    else:
-        raise RuntimeError("The rendered recipe's source field was not a string or a list.")
+                    updated_recipe["source"].pop("url", None)
+                    updated_recipe["source"]["path"] = args.override_source_archive1
+        elif isinstance(rendered_recipe["source"], list):
+            if args.override_source_archive1 or args.override_source_archive2:
+                if args.override_source_archive1:
+                    if args.build_tool == "conda-build":
+                        updated_recipe["source"][0]["url"] = args.override_source_archive1
+                    else:
+                        updated_recipe["source"][0].pop("url", None)
+                        updated_recipe["source"][0]["path"] = args.override_source_archive1
+                if args.override_source_archive2:
+                    if args.build_tool == "conda-build":
+                        updated_recipe["source"][1]["url"] = args.override_source_archive2
+                    else:
+                        updated_recipe["source"][1].pop("url", None)
+                        updated_recipe["source"][1]["path"] = args.override_source_archive2
+        else:
+            raise RuntimeError("The rendered recipe's source field was not a string or a list.")
 
     # Save the rendered recipe with modifications
     if args.build_tool == "conda-build":
         recipe_clobber = {
-            "package": {"name": rendered_recipe["package"]["name"]},
-            "build": {"number": rendered_recipe["build"]["number"]},
-            "source": rendered_recipe["source"],
+            "package": {"name": updated_recipe["package"]["name"]},
+            "build": {"number": updated_recipe["build"]["number"]},
+            "source": updated_recipe["source"],
         }
         print("Clobber file:")
         print(json.dumps(recipe_clobber, indent=1))
         Path("recipe_clobber.yaml").write_text(json.dumps(recipe_clobber))
     else:
         with open(updated_recipe_file, "w") as fh:
-            json.dump(rendered_recipe, fh)
+            json.dump(updated_recipe, fh)
 
     prefix_length_option = []
     if args.override_prefix_length and args.override_prefix_length != "0":

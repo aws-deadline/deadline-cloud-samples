@@ -4,6 +4,7 @@ set -euo pipefail
 ENV_NAME=
 CONDA_BLD_DIR=
 REUSE_ENV=1
+TEMP_DIR=
 
 # Parse the CLI arguments
 while [ $# -gt 0 ]; do
@@ -11,6 +12,7 @@ while [ $# -gt 0 ]; do
     --reuse-env) REUSE_ENV="$2" ; shift 2 ;;
     --env-name) ENV_NAME="$2" ; shift 2 ;;
     --conda-bld-dir) CONDA_BLD_DIR="$2" ; shift 2 ;;
+    --temp-dir) TEMP_DIR="$2" ; shift 2 ;;
     *) echo "Unexpected option: $1" ; exit 1 ;;
   esac
 done
@@ -22,6 +24,17 @@ fi
 if [ -z "$CONDA_BLD_DIR" ]; then
     echo "ERROR: Option --conda-bld-dir is required."
     exit 1
+fi
+
+if [ -n "$TEMP_DIR" ]; then
+    # Use an alternative temp dir
+    mkdir -p "$TEMP_DIR"
+    export TMP="$TEMP_DIR"
+    export TEMP="$TEMP_DIR"
+    export TMPDIR="$TEMP_DIR"
+    echo "openjd_env: TMP=$TMP"
+    echo "openjd_env: TEMP=$TEMP"
+    echo "openjd_env: TMPDIR=$TMPDIR"
 fi
 
 # Install an error handler to clean the Conda cache

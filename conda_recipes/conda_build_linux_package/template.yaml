@@ -182,6 +182,8 @@ jobEnvironments:
         - '{{Session.WorkingDirectory}}/conda-bld'
         - '--reuse-env'
         - '{{Param.ReusePackageBuildEnv}}'
+        - '--temp-dir'
+        - '{{Session.WorkingDirectory}}/temp'
 
 steps:
 
