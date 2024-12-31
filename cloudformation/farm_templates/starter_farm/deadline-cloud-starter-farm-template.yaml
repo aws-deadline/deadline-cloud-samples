@@ -1,0 +1,1012 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  An AWS Deadline Cloud farm that you can use to run jobs on Linux or Windows. Its default configuration
+  includes a queue for production jobs, a second queue for building conda packages, and a CPU-only
+  Linux fleet. You can provide parameter values to deploy more fleet types.
+
+  See the README.md included with the CloudFormation template to learn more.
+
+Parameters:
+  JobAttachmentsBucketName:
+    Type: String
+    Description: The S3 bucket to use for job attachments and the default S3 conda channel.
+    MinLength: 1
+
+  # Deadline Cloud farm
+  FarmName:
+    Type: String
+    Description: The name of the farm.
+    Default: "Starter Deadline Cloud Farm"
+    MinLength: 1
+  FarmDescription:
+    Type: String
+    Description: The description of the farm.
+    Default: "Deadline Cloud farm deployed from the starter_farm sample CloudFormation template."
+
+  # Deadline Cloud queues
+  ProdQueueName:
+    Type: String
+    Description: The name of the production queue.
+    Default: "Production Job Queue"
+    MinLength: 1
+  ProdQueueDescription:
+    Type: String
+    Description: The description of the production queue.
+    Default: "The Deadline Cloud queue for running production jobs."
+    MinLength: 1
+  ProdCondaChannels:
+    Type: String
+    Description: >
+      The conda channels to use by default in the production queue alongside the default
+      S3 channel on the job attachments bucket. Separate each channel with a space.
+      For example, change this to "deadline-cloud conda-forge" to also include packages
+      from the https://conda-forge.org/ community.
+    Default: "deadline-cloud"
+  PackageBuildQueueName:
+    Type: String
+    Description: >
+      The name of the queue for building conda packages.
+    Default: "Package Build Queue"
+    MinLength: 1
+  PackageBuildQueueDescription:
+    Type: String
+    Description: The description of the package build queue.
+    Default: "The Deadline Cloud queue for building conda packages."
+
+  # Fleet names
+  CPULinuxFleetName:
+    Type: String
+    Description: The name of your Linux fleet with only CPUs. Set it to empty if you do not want a CPU Linux fleet.
+    Default: "CPU Linux Fleet"
+  CPUWindowsFleetName:
+    Type: String
+    Description: The name of your Windows fleet with only CPUs. Set it to empty if you do not want a CPU Windows fleet.
+    Default: ""
+  CUDALinuxFleetName:
+    Type: String
+    Description: The name of your Linux fleet with CUDA GPUs. Set it to empty if you do not want a CUDA Linux fleet.
+    Default: ""
+
+  # CPU Linux fleet properties
+  CPULinuxInstanceMarketType:
+    Type: String
+    Description: Whether to use on-demand or spot instances in the CPU Linux fleet.
+    Default: spot
+    AllowedValues:
+      - on-demand
+      - spot
+  MaxCPULinuxWorkerCount:
+    Type: Number
+    Description: How many worker hosts in the CPU Linux Fleet.
+    Default: 10
+  MinCPULinuxVcpu:
+    Type: Number
+    Description: Minimum number of vCPUs for instances in the CPU Linux fleet.
+    Default: 2
+  MaxCPULinuxVcpu:
+    Type: Number
+    Description: Maximum number of vCPUs for instances in the CPU Linux fleet.
+    Default: 8
+  MinCPULinuxRamMiB:
+    Type: Number
+    Description: Minimum MiB RAM for instances in the CPU Linux fleet.
+    Default: 16384
+
+  # CPU Windows fleet properties
+  CPUWindowsInstanceMarketType:
+    Type: String
+    Description: Whether to use on-demand or spot instances in the CPU Windows fleet.
+    Default: spot
+    AllowedValues:
+      - on-demand
+      - spot
+  MaxCPUWindowsWorkerCount:
+    Type: Number
+    Description: How many worker hosts in the CPU Windows Fleet.
+    Default: 10
+  MinCPUWindowsVcpu:
+    Type: Number
+    Description: Minimum number of vCPUs for instances in the CPU Windows fleet.
+    Default: 2
+  MaxCPUWindowsVcpu:
+    Type: Number
+    Description: Maximum number of vCPUs for instances in the CPU Windows fleet.
+    Default: 8
+  MinCPUWindowsRamMiB:
+    Type: Number
+    Description: Minimum MiB RAM for instances in the CPU Windows fleet.
+    Default: 16384
+
+  # CUDA Linux fleet properties
+  CUDALinuxInstanceMarketType:
+    Type: String
+    Description: Whether to use on-demand or spot instances in the CUDA Linux fleet.
+    Default: on-demand
+    AllowedValues:
+      - on-demand
+      - spot
+  MaxCUDALinuxWorkerCount:
+    Type: Number
+    Description: How many worker hosts in the CUDA Linux Fleet.
+    Default: 1
+  MinCUDALinuxVcpu:
+    Type: Number
+    Description: Minimum number of vCPUs for instances in the CUDA Linux fleet.
+    Default: 4
+  MaxCUDALinuxVcpu:
+    Type: Number
+    Description: Maximum number of vCPUs for instances in the CUDA Linux fleet.
+    Default: 16
+  MinCUDALinuxRamMiB:
+    Type: Number
+    Description: Minimum MiB RAM for instances in the CUDA Linux fleet.
+    Default: 32768
+
+  # EBS volume properties
+  RootEbsVolumeSizeGiB:
+    Type: Number
+    Description: EBS volume size GiB to use in the fleets.
+    Default: 300
+  RootEbsVolumeIops:
+    Type: Number
+    Description: EBS volume IOPS to use in the fleets.
+    Default: 3000
+  RootEbsVolumeThroughputMiB:
+    Type: Number
+    Description: EBS volume throughput MiB to use in the fleets.
+    Default: 125
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Required Farm Parameters"
+        Parameters:
+          - JobAttachmentsBucketName
+
+      - Label:
+          default: "Farm and Queue Names"
+        Parameters:
+          - FarmName
+          - ProdQueueName
+          - PackageBuildQueueName
+
+      - Label:
+          default: "Fleet Names (an empty name skips the fleet)"
+        Parameters:
+          - CPULinuxFleetName
+          - CPUWindowsFleetName
+          - CUDALinuxFleetName
+
+      - Label:
+          default: "Farm and Queue Configuration"
+        Parameters:
+          - ProdCondaChannels
+          - FarmDescription
+          - ProdQueueDescription
+          - PackageBuildQueueDescription
+
+      - Label:
+          default: "CPU-Linux Fleet Configuration"
+        Parameters:
+          - MaxCPULinuxWorkerCount
+          - CPULinuxInstanceMarketType
+          - MinCPULinuxVcpu
+          - MaxCPULinuxVcpu
+          - MinCPULinuxRamMiB
+
+      - Label:
+          default: "CPU-Windows Fleet Configuration"
+        Parameters:
+          - MaxCPUWindowsWorkerCount
+          - CPUWindowsInstanceMarketType
+          - MinCPUWindowsVcpu
+          - MaxCPUWindowsVcpu
+          - MinCPUWindowsRamMiB
+
+      - Label:
+          default: "CUDA-Linux Fleet Configuration"
+        Parameters:
+          - MaxCUDALinuxWorkerCount
+          - CUDALinuxInstanceMarketType
+          - MinCUDALinuxVcpu
+          - MaxCUDALinuxVcpu
+          - MinCUDALinuxRamMiB
+
+      - Label:
+          default: "EBS Volume Configuration (all fleets)"
+        Parameters:
+          - RootEbsVolumeSizeGiB
+          - RootEbsVolumeIops
+          - RootEbsVolumeThroughputMiB
+
+    ParameterLabels:
+      JobAttachmentsBucketName:
+        default: "Job Attachments S3 Bucket"
+      FarmName:
+        default: "Farm Name"
+      FarmDescription:
+        default: "Farm Description"
+      ProdQueueName:
+        default: "Production Queue Name"
+      ProdQueueDescription:
+        default: "Production Queue Description"
+      ProdCondaChannels:
+        default: "Production Queue Conda Channels"
+      PackageBuildQueueName:
+        default: "Package Build Queue Name"
+      PackageBuildQueueDescription:
+        default: "Package Build Queue Description"
+
+      CPULinuxFleetName:
+        default: "CPU-Linux Fleet Name"
+      CPULinuxInstanceMarketType:
+        default: "CPU-Linux Instance Purchase Type"
+      MaxCPULinuxWorkerCount:
+        default: "Maximum CPU-Linux Workers"
+      MinCPULinuxVcpu:
+        default: "Minimum CPU-Linux vCPUs"
+      MaxCPULinuxVcpu:
+        default: "Maximum CPU-Linux vCPUs"
+      MinCPULinuxRamMiB:
+        default: "Minimum CPU-Linux RAM (MiB)"
+
+      CPUWindowsFleetName:
+        default: "CPU-Windows Fleet Name"
+      CPUWindowsInstanceMarketType:
+        default: "CPU-Windows Instance Purchase Type"
+      MaxCPUWindowsWorkerCount:
+        default: "Maximum CPU-Windows Workers"
+      MinCPUWindowsVcpu:
+        default: "Minimum CPU-Windows vCPUs"
+      MaxCPUWindowsVcpu:
+        default: "Maximum CPU-Windows vCPUs"
+      MinCPUWindowsRamMiB:
+        default: "Minimum CPU-Windows RAM (MiB)"
+
+      CUDALinuxFleetName:
+        default: "CUDA-Linux Fleet Name"
+      CUDALinuxInstanceMarketType:
+        default: "CUDA-Linux Instance Purchase Type"
+      MaxCUDALinuxWorkerCount:
+        default: "Maximum CUDA-Linux Workers"
+      MinCUDALinuxVcpu:
+        default: "Minimum CUDA-Linux vCPUs"
+      MaxCUDALinuxVcpu:
+        default: "Maximum CUDA-Linux vCPUs"
+      MinCUDALinuxRamMiB:
+        default: "Minimum CUDA-Linux RAM (MiB)"
+
+      RootEbsVolumeSizeGiB:
+        default: "Root Volume Size (GiB)"
+      RootEbsVolumeIops:
+        default: "Root Volume IOPS"
+      RootEbsVolumeThroughputMiB:
+        default: "Root Volume Throughput (MiB)"
+
+
+Conditions:
+
+  HasCPULinuxFleet: !Not [!Equals [!Ref CPULinuxFleetName, ""]]
+  HasCPUWindowsFleet: !Not [!Equals [!Ref CPUWindowsFleetName, ""]]
+  HasCUDALinuxFleet: !Not [!Equals [!Ref CUDALinuxFleetName, ""]]
+
+
+Resources:
+
+  farm:
+    Type: AWS::Deadline::Farm
+    Properties:
+      DisplayName: !Ref FarmName
+      Description: !Ref FarmDescription
+
+  queue:
+    Type: AWS::Deadline::Queue
+    Properties:
+      DisplayName: !Ref ProdQueueName
+      Description: !Ref ProdQueueDescription
+      FarmId: !GetAtt farm.FarmId
+      JobAttachmentSettings:
+        S3BucketName: !Ref JobAttachmentsBucketName
+        RootPrefix: DeadlineCloud
+      RoleArn: !GetAtt queueIAMRole.Arn
+
+  condaQueueEnv:
+    Type: AWS::Deadline::QueueEnvironment
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queue.QueueId
+      Priority: 1
+      # The start and end delimiters are used by the apply-conda-queue-env.py script
+      # to insert a specified queue environment template. The template provided as a sample is the result
+      # of running the following:
+      #
+      # $ python ../apply-conda-queue-env.py deadline-cloud-starter-farm-template.yaml \
+      #          ../../../queue_environments/conda_queue_env_improved_caching.yaml \
+      #          's3://${JobAttachmentsBucketName}/Conda/Default ${ProdCondaChannels}'
+      Template: !Sub |
+        ### START_QUEUE_ENV
+        specificationVersion: "environment-2023-09"
+        parameterDefinitions:
+        # CondaPackages and CondaChannels are compatible with the other Conda queue environment templates
+        - name: CondaPackages
+          type: STRING
+          description: >
+            This is a space-separated list of Conda package match specifications to
+            install for the job. E.g. "blender=3.6" for a job that renders frames in
+            Blender 3.6.
+          default: ""
+          userInterface:
+            control: LINE_EDIT
+            label: Conda Packages
+        - name: CondaChannels
+          type: STRING
+          description: >
+            This is a space-separated list of Conda channels from which to install
+            packages. Deadline Cloud SMF packages are installed from the
+            "deadline-cloud" channel that is configured by Deadline Cloud.
+
+            Add "conda-forge" to get packages from the https://conda-forge.org/
+            community, and "defaults" to get packages from Anaconda Inc (make sure
+            your usage complies with https://legal.anaconda.com/policies).
+          default: "s3://${JobAttachmentsBucketName}/Conda/Default ${ProdCondaChannels}"
+          userInterface:
+            control: LINE_EDIT
+            label: Conda Channels
+
+        - name: NamedCondaEnv
+          description: |
+            If empty, the Conda environment is created only for the session. If provided,
+            a named Conda environment is reused across any jobs/sessions that run on the worker host.
+            When reusing an environment, the parameter NamedCondaEnvUpdateAfterMinutes controls
+            how long it will use the environment without checking for package updates.
+
+            If the name is "AUTOMATIC", the environment name is determined by taking the hash of the
+            CondaPackages and CondaChannels parameters, so that jobs providing identical values for
+            these parameters will share the same named Conda environment. Automatically-named environments
+            are deleted by the onExit action if they haven't been updated in more than 96 hours.
+
+            If you select a name explicitly, take care to use the environment names consistently, because
+            different jobs can define the same named environment in a different way.
+
+            When creating or updating this environment, it prints information about the operations
+            to the log file "$CONDA_PREFIX/var/log/conda_queue_env.log".
+          type: STRING
+          default: "AUTOMATIC"
+          userInterface:
+            control: LINE_EDIT
+            label: Named Conda Environment
+
+        - name: NamedCondaEnvAction
+          description: |
+            When a NamedCondaEnv is selected, controls how to treat it.
+              1. ACTIVATE activates the existing named environment, or creates one if it
+                 doesn't exist. If it's been NamedCondaEnvUpdateAfterMinutes since creation
+                 or the last update, it updates the environment.
+              2. REMOVE_AND_CREATE always removes the existing named environment, and creates
+                 a new one from scratch.
+          type: STRING
+          default: "ACTIVATE"
+          allowedValues: ["ACTIVATE", "REMOVE_AND_CREATE"]
+          userInterface:
+            control: DROPDOWN_LIST
+            label: Named Conda Environment Action
+
+        - name: NamedCondaEnvUpdateAfterMinutes
+          description: |
+            When NamedCondaEnvAction is ACTIVATE, this controls how long it will use the named
+            Conda environment before doing another update.
+          type: INT
+          default: 600
+          userInterface:
+            control: SPIN_BOX
+            label: Named Conda Environment Update After (Minutes)
+
+        - name: RunCondaClean
+          description: |
+            If set to True, runs the command 'conda clean --yes --all' before creating the Conda environment.
+            This removes Conda caches for the package index, package files, and package directories.
+          type: STRING
+          default: "False"
+          allowedValues: ["True", "False"]
+          userInterface:
+            control: CHECK_BOX
+            label: Clean the Conda Cache
+
+        environment:
+          name: Conda
+          script:
+            actions:
+              onEnter:
+                command: "bash"
+                args: ["{{Env.File.Enter}}"]
+              onExit:
+                command: "bash"
+                args: ["{{Env.File.Exit}}"]
+            embeddedFiles:
+            - name: Enter
+              filename: conda-queue-env-enter.sh
+              type: TEXT
+              data: |
+                set -euo pipefail
+
+                if [ -z '{{Param.CondaPackages}}' ]; then
+                    echo "Skipping Conda env as CondaPackages parameter was empty."
+                    exit 0
+                fi
+
+                # Install an error handler to clean the cache if there is an error creating the virtual environment
+                function conda_clean_on_error {
+                    if [ ! "$1" = "0" ]; then
+                      echo "Error detected, cleaning the Conda cache."
+                      conda clean --yes --all
+                    fi
+                }
+                trap 'conda_clean_on_error $?' EXIT
+
+                function remove_named_env {
+                    for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
+                        if [ -d $ENVS_DIR/$1 ]; then
+                            echo "Removing directory $ENVS_DIR/$1 for the environment"
+                            rm -rf $ENVS_DIR/$1
+                            if [ -d $ENVS_DIR/$1 ]; then
+                                echo "ERROR: Could not remove the directory. Possibly a permissions error or a process holding a lock."
+                                exit 1
+                            fi
+                        fi
+                    done
+                }
+
+                NAMED_CONDA_ENV='{{Param.NamedCondaEnv}}'
+
+                # If the special name 'AUTOMATIC' is provided, use the hash of the CondaChannels and CondaPackages
+                # parameters to generate the actual name.
+                if [ -n "$NAMED_CONDA_ENV" ] && [ "$NAMED_CONDA_ENV" = 'AUTOMATIC' ]; then
+                    echo 'Using an automatic name for the Conda environment, based on the hash of these values:'
+                    echo '  CondaChannels: {{Param.CondaChannels}}'
+                    echo '  CondaPackages: {{Param.CondaPackages}}'
+
+                    NAMED_CONDA_ENV="hashname_$(echo 'Channels/{{Param.CondaChannels}} -- Packages/{{Param.CondaPackages}}' | sha256sum | cut -d " " -f 1 | head -c 24)"
+                    echo "Automatic name is $NAMED_CONDA_ENV"
+                fi
+
+                # If we're not reusing the Conda env, clean up any prior ones
+                if [ '{{Param.NamedCondaEnvAction}}' = 'REMOVE_AND_CREATE' ] && [ -n "$NAMED_CONDA_ENV" ]; then
+                    echo "NamedCondaEnvAction parameter is set to REMOVE_AND_CREATE, removing the virtual environment..."
+                    remove_named_env "$NAMED_CONDA_ENV"
+                fi
+
+                # If requested, clean the Conda package cache
+                if [ '{{Param.RunCondaClean}}' = 'True' ]; then
+                    echo "RunCondaClean parameter is True, cleaning the Conda cache..."
+                    conda clean --yes --all
+                fi
+
+                # Convert the space-separated list of channels into consecutive '-c' channel options
+                CHANNEL_OPTS="$(echo '{{Param.CondaChannels}}' | sed -r 's/(\s+|^)(\S)/ -c \2/g')"
+                # Put the conda packages list in a variable, as package specs can have characters like '|' in them
+                CONDA_PACKAGES='{{Param.CondaPackages}}'
+
+                # Initialize/activate the Conda virtual environment
+                if [ -n "$NAMED_CONDA_ENV" ] && conda env list | grep -q "^$NAMED_CONDA_ENV "; then
+                    echo "Reusing the existing named Conda environment $NAMED_CONDA_ENV."
+
+                    # Activate the Conda environment
+                    python '{{Env.File.OpenJDVarsStart}}' .vars
+                    set +u
+                    conda activate "$NAMED_CONDA_ENV"
+                    set -u
+                    python '{{Env.File.OpenJDVarsCapture}}' .vars
+
+                    CUR_TIMESTAMP="$(date +%s)"
+                    TIMESTAMP_FILE="$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+                    if [ -f "$TIMESTAMP_FILE" ]; then
+                        PREV_UPDATE_TIMESTAMP="$(cat "$TIMESTAMP_FILE")"
+                        MINUTES_SINCE_UPDATE="$(( ( $CUR_TIMESTAMP - $PREV_UPDATE_TIMESTAMP ) / 60 ))"
+                    else
+                        echo "The file recording the previous timestamp was not found"
+                        MINUTES_SINCE_UPDATE=0
+                    fi
+                    echo "Minutes elapsed since last update of this named Conda environment: $MINUTES_SINCE_UPDATE"
+
+                    if [ $MINUTES_SINCE_UPDATE -ge {{Param.NamedCondaEnvUpdateAfterMinutes}} ]; then
+                        echo "Elapsed time greater than or equal to {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, updating the environment packages to the latest"
+                        set +u
+                        conda install --yes \
+                            --update-all \
+                            $CONDA_PACKAGES \
+                            $CHANNEL_OPTS
+                        set -u
+
+                        # Save the channels and packages used in the environment, to help out debugging
+                        LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                        echo "Updated $NAMED_CONDA_ENV env at $(date --iso-8601=minutes)" >> "$LOGFILE"
+                        echo '  CondaChannels: {{Param.CondaChannels}}' >> "$LOGFILE"
+                        echo '  CondaPackages: {{Param.CondaPackages}}' >> "$LOGFILE"
+
+                        # Save a timestamp of when we updated
+                        echo "$CUR_TIMESTAMP" > "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+                    else
+                        echo "Elapsed time less than {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, skipping updates"
+                    fi
+                elif [ -n "$NAMED_CONDA_ENV" ]; then
+                    echo "Named Conda environment $NAMED_CONDA_ENV not found, creating it."
+
+                    # Make sure there's no incomplete environment hanging around
+                    remove_named_env "$NAMED_CONDA_ENV"
+
+                    # Create the virtual environment
+                    conda create --yes \
+                        --name "$NAMED_CONDA_ENV" \
+                        $CONDA_PACKAGES \
+                        $CHANNEL_OPTS
+
+                    # Activate the Conda environment
+                    python '{{Env.File.OpenJDVarsStart}}' .vars
+                    set +u
+                    conda activate "$NAMED_CONDA_ENV"
+                    set -u
+                    python '{{Env.File.OpenJDVarsCapture}}' .vars
+
+                    # Save the channels and packages used in the environment, to help out debugging
+                    LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                    mkdir -p "$(dirname $LOGFILE)"
+                    echo "Created $NAMED_CONDA_ENV env at $(date --iso-8601=minutes)" >> "$LOGFILE"
+                    echo '  CondaChannels: {{Param.CondaChannels}}' >> "$LOGFILE"
+                    echo '  CondaPackages: {{Param.CondaPackages}}' >> "$LOGFILE"
+
+                    # Save a timestamp of when we updated
+                    date +%s > "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+                else
+                    echo "Creating temporary Conda environment in the session directory..."
+
+                    # Create the virtual environment
+                    conda create --yes \
+                        -p '{{Session.WorkingDirectory}}/.env' \
+                        $CONDA_PACKAGES \
+                        $CHANNEL_OPTS
+
+                    # Activate the Conda environment
+                    python '{{Env.File.OpenJDVarsStart}}' .vars
+                    set +u
+                    conda activate '{{Session.WorkingDirectory}}/.env'
+                    set -u
+                    python '{{Env.File.OpenJDVarsCapture}}' .vars
+                fi
+
+                # Print information about the environment
+                conda info
+            - name: Exit
+              filename: conda-queue-env-exit.sh
+              type: TEXT
+              data: |
+                set -euo pipefail
+
+                # When using this queue environment on long-lived worker hosts, such as on premises,
+                # automatically named conda environments can accumulate. This code removes them after
+                # 96 hours of unuse. 96 hours was chosen so the caches stick around for a long weekend.
+
+                DELETE_AFTER_HOURS=96
+
+                echo "Cleaning up automatically-named conda environments not updated within $DELETE_AFTER_HOURS hours."
+
+                AUTO_CONDA_ENVS="$(conda env list | grep "^hashname_" | cut -d " " -f 1)"
+                REMOVED_ENV=0
+
+                CUR_TIMESTAMP="$(date +%s)"
+                for ENV_NAME in $AUTO_CONDA_ENVS; do
+                    echo "Checking environment $ENV_NAME"
+
+                    set +u
+                    conda activate $ENV_NAME
+                    set -u
+
+                    LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                    if [ -f "$LOGFILE" ]; then
+                        # Creation and each update outputs 3 lines to the log, so print the last 3
+                        tail -3 "$LOGFILE"
+                    fi
+
+                    PREV_UPDATE_TIMESTAMP="$(cat "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp")"
+                    HOURS_SINCE_UPDATE="$(( ( $CUR_TIMESTAMP - $PREV_UPDATE_TIMESTAMP ) / 1440 ))"
+                    echo "Environment was last updated $HOURS_SINCE_UPDATE hours ago."
+
+                    set +u
+                    conda deactivate
+                    set -u
+
+                    if [ $HOURS_SINCE_UPDATE -gt $DELETE_AFTER_HOURS ]; then
+                        echo "Elapsed time $HOURS_SINCE_UPDATE is greater than $DELETE_AFTER_HOURS hours, removing the environment."
+                        conda env remove --yes -q -n $ENV_NAME
+                        REMOVED_ENV=1
+                    fi
+                done
+
+                if [ "$REMOVED_ENV" = "1" ]; then
+                    echo "Cleaning the conda cache to reclaim disk space."
+                    conda clean --yes --all
+                else
+                    echo "Nothing to clean up."
+                fi
+
+            - name: OpenJDVarsStart
+              filename: openjd-vars-start.py
+              type: TEXT
+              data: |
+                import json
+                import os
+                import sys
+
+                # Exclude the env var "_" as it has special meaning to shells
+                before = dict(os.environ)
+                if "_" in before:
+                    del before["_"]
+
+                with open(sys.argv[1], "w", encoding="utf8") as f:
+                    json.dump(before, f)
+            - name: OpenJDVarsCapture
+              filename: openjd-vars-capture.py
+              type: TEXT
+              data: |
+                import json
+                import os
+                import sys
+
+                # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+                with open(sys.argv[1], "r", encoding="utf8") as f:
+                    before = json.load(f)
+                after = dict(os.environ)
+                # Exclude the env var "_" as it has special meaning to shells
+                if "_" in after:
+                    del after["_"]
+
+                # Identify the modified and deleted environment variables
+                vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+                vars_to_delete = {k for k in before if k not in after}
+
+                # Print the env var changes following the Open Job Description specification
+                for k, v in vars_to_put.items():
+                    kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+                    print(f"openjd_env: {kv}")
+                for k in vars_to_delete:
+                    print(f"openjd_unset_env: {k}")
+        ### END_QUEUE_ENV
+      TemplateType: YAML
+
+  queueIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "ProdQueue-${FarmId}"
+        - FarmId: !GetAtt farm.FarmId
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - !Sub 'deadline.${AWS::URLSuffix}'
+              - !Sub 'credentials.deadline.${AWS::URLSuffix}'
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
+              ArnEquals:
+                aws:SourceArn: !Ref farm
+      Policies:
+        - PolicyName: QueuePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: JobAttachmentsReadWrite
+              Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              Effect: Allow
+              Resource:
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}"
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}/DeadlineCloud/*"
+              Condition:
+                StringEquals:
+                  aws:ResourceAccount: !Sub '${AWS::AccountId}'
+            - Sid: CondaChannelReadOnly
+              Action:
+              - s3:GetObject
+              - s3:ListBucket
+              Effect: Allow
+              Resource:
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}"
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}/Conda/*"
+              Condition:
+                StringEquals:
+                  aws:ResourceAccount: !Sub '${AWS::AccountId}'
+            - Sid: JobLogsReadOnly
+              Action:
+              - logs:GetLogEvents
+              Effect: Allow
+              Resource: !Sub
+                - "arn:aws:logs:us-west-2:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
+                - FarmId: !GetAtt farm.FarmId
+            - Sid: DeadlineServiceManagedFleetSoftwareAccess
+              Action:
+              - s3:GetObject
+              - s3:ListBucket
+              Effect: Allow
+              Resource:
+              - "*"
+              Condition:
+                ArnLike:
+                  s3:DataAccessPointArn: "arn:aws:s3:*:*:accesspoint/deadline-software-*"
+                StringEquals:
+                  s3:AccessPointNetworkOrigin: VPC
+
+  queueForPackageBuild:
+    Type: AWS::Deadline::Queue
+    Properties:
+      DisplayName: !Ref PackageBuildQueueName
+      Description: !Ref PackageBuildQueueDescription
+      FarmId: !GetAtt farm.FarmId
+      JobAttachmentSettings:
+        S3BucketName: !Ref JobAttachmentsBucketName
+        RootPrefix: DeadlineCloudPkgBld
+      RoleArn: !GetAtt queueForPackageBuildIAMRole.Arn
+
+  queueForPackageBuildIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "PackageBuildQueue-${FarmId}"
+        - FarmId: !GetAtt farm.FarmId
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - !Sub 'deadline.${AWS::URLSuffix}'
+              - !Sub 'credentials.deadline.${AWS::URLSuffix}'
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
+              ArnEquals:
+                aws:SourceArn: !Ref farm
+      Policies:
+        - PolicyName: QueuePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: JobAttachmentsReadWrite
+              Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              Effect: Allow
+              Resource:
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}"
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}/DeadlineCloudPkgBld/*"
+              Condition:
+                StringEquals:
+                  aws:ResourceAccount: !Sub '${AWS::AccountId}'
+            - Sid: CondaChannelReadWrite
+              Action:
+              - s3:GetObject
+              - s3:ListBucket
+              # These two are in addition to the ones in the non-package building role
+              - s3:PutObject
+              - s3:DeleteObject
+              Effect: Allow
+              Resource:
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}"
+              - !Sub "arn:aws:s3:::${JobAttachmentsBucketName}/Conda/*"
+              Condition:
+                StringEquals:
+                  aws:ResourceAccount: !Sub '${AWS::AccountId}'
+            - Sid: JobLogsReadOnly
+              Action:
+              - logs:GetLogEvents
+              Effect: Allow
+              Resource: !Sub
+                - "arn:aws:logs:us-west-2:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
+                - FarmId: !GetAtt farm.FarmId
+            - Sid: DeadlineServiceManagedFleetSoftwareAccess
+              Action:
+              - s3:GetObject
+              - s3:ListBucket
+              Effect: Allow
+              Resource:
+              - "*"
+              Condition:
+                ArnLike:
+                  s3:DataAccessPointArn: "arn:aws:s3:*:*:accesspoint/deadline-software-*"
+                StringEquals:
+                  s3:AccessPointNetworkOrigin: VPC
+
+  deadlineFleetCUDALinux:
+    Type: AWS::Deadline::Fleet
+    Condition: HasCUDALinuxFleet
+    Properties:
+      DisplayName: !Ref CUDALinuxFleetName
+      FarmId: !GetAtt farm.FarmId
+      RoleArn: !GetAtt fleetRole.Arn
+      MinWorkerCount: 0
+      MaxWorkerCount: !Ref MaxCUDALinuxWorkerCount
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            AcceleratorCapabilities:
+              Count:
+                Min: 1
+                Max: 1
+              Selections:
+                - Name: a10g
+                  Runtime: latest
+                - Name: l4
+                  Runtime: latest
+            VCpuCount:
+              Min: !Ref MinCUDALinuxVcpu
+              Max: !Ref MaxCUDALinuxVcpu
+            MemoryMiB:
+              Min: !Ref MinCUDALinuxRamMiB
+            RootEbsVolume:
+              SizeGiB: !Ref RootEbsVolumeSizeGiB
+              Iops: !Ref RootEbsVolumeIops
+              ThroughputMiB: !Ref RootEbsVolumeThroughputMiB
+            OsFamily: LINUX
+            CpuArchitectureType: x86_64
+          InstanceMarketOptions:
+            Type: !Ref CUDALinuxInstanceMarketType
+
+  deadlineFleetCPULinux:
+    Type: AWS::Deadline::Fleet
+    Condition: HasCPULinuxFleet
+    Properties:
+      DisplayName: !Ref CPULinuxFleetName
+      FarmId: !GetAtt farm.FarmId
+      RoleArn: !GetAtt fleetRole.Arn
+      MinWorkerCount: 0
+      MaxWorkerCount: !Ref MaxCPULinuxWorkerCount
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            VCpuCount:
+              Min: !Ref MinCPULinuxVcpu
+              Max: !Ref MaxCPULinuxVcpu
+            MemoryMiB:
+              Min: !Ref MinCPULinuxRamMiB
+            RootEbsVolume:
+              SizeGiB: !Ref RootEbsVolumeSizeGiB
+              Iops: !Ref RootEbsVolumeIops
+              ThroughputMiB: !Ref RootEbsVolumeThroughputMiB
+            OsFamily: LINUX
+            CpuArchitectureType: x86_64
+          InstanceMarketOptions:
+            Type: !Ref CPULinuxInstanceMarketType
+
+  deadlineFleetCPUWindows:
+    Type: AWS::Deadline::Fleet
+    Condition: HasCPUWindowsFleet
+    Properties:
+      DisplayName: !Ref CPUWindowsFleetName
+      FarmId: !GetAtt farm.FarmId
+      RoleArn: !GetAtt fleetRole.Arn
+      MinWorkerCount: 0
+      MaxWorkerCount: !Ref MaxCPUWindowsWorkerCount
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            VCpuCount:
+              Min: !Ref MinCPUWindowsVcpu
+              Max: !Ref MaxCPUWindowsVcpu
+            MemoryMiB:
+              Min: !Ref MinCPUWindowsRamMiB
+            RootEbsVolume:
+              SizeGiB: !Ref RootEbsVolumeSizeGiB
+              Iops: !Ref RootEbsVolumeIops
+              ThroughputMiB: !Ref RootEbsVolumeThroughputMiB
+            OsFamily: WINDOWS
+            CpuArchitectureType: x86_64
+          InstanceMarketOptions:
+            Type: !Ref CPUWindowsInstanceMarketType
+
+  deadlineProdQueueCPULinuxFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Condition: HasCPULinuxFleet
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queue.QueueId
+      FleetId: !GetAtt deadlineFleetCPULinux.FleetId
+
+  deadlineProdQueueCPUWindowsFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Condition: HasCPUWindowsFleet
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queue.QueueId
+      FleetId: !GetAtt deadlineFleetCPUWindows.FleetId
+
+  deadlineProdQueueCUDALinuxFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Condition: HasCUDALinuxFleet
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queue.QueueId
+      FleetId: !GetAtt deadlineFleetCUDALinux.FleetId
+
+  deadlinePackageBuildQueueCPULinuxFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Condition: HasCPULinuxFleet
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queueForPackageBuild.QueueId
+      FleetId: !GetAtt deadlineFleetCPULinux.FleetId
+
+  deadlinePackageBuildQueueCPUWindowsFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Condition: HasCPUWindowsFleet
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queueForPackageBuild.QueueId
+      FleetId: !GetAtt deadlineFleetCPUWindows.FleetId
+
+  deadlinePackageBuildQueueCUDALinuxFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Condition: HasCUDALinuxFleet
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queueForPackageBuild.QueueId
+      FleetId: !GetAtt deadlineFleetCUDALinux.FleetId
+
+  fleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "Fleet-${FarmId}"
+        - FarmId: !GetAtt farm.FarmId
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub "credentials.deadline.${AWS::URLSuffix}"
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
+              ArnEquals:
+                aws:SourceArn: !Ref farm
+      Policies:
+        - PolicyName: FleetWorkerLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              # Allow Deadline Cloud to create new log streams for the farm
+              - logs:CreateLogStream
+              Resource:
+              - !Sub
+                - arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${FarmId}/*
+                - FarmId: !GetAtt farm.FarmId
+              Condition:
+                ForAnyValue:StringEquals:
+                  aws:CalledVia:
+                  - !Sub "deadline.${AWS::URLSuffix}"
+            - Effect: Allow
+              Action:
+              # Allow the Worker to put events to its Worker log and to Session logs for running Jobs
+              - logs:PutLogEvents
+              # Allow Deadline Cloud Monitor users to read Worker logs
+              - logs:GetLogEvents
+              Resource:
+              - !Sub
+                - arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${FarmId}/*
+                - FarmId: !GetAtt farm.FarmId
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSDeadlineCloud-FleetWorker'
