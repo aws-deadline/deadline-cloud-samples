@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "0.8.2"
+  version: "0.9.0"
 
 package:
   name: openjd-adaptor-runtime
@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/o/openjd-adaptor-runtime/openjd_adaptor_runtime-${{ version }}.tar.gz
-  sha256: 9402ab555ad60ca81c4669fb634c569abaca794e2eefafac1dada89fdb300c2a
+  sha256: a2a117b23df4e7fa31360b4572528ecabeeed190f5a4c51177560d401df79704
   patches:
     - 0001-Remove-version-hook.patch
 

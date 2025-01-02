@@ -1,8 +1,8 @@
 {% set name = "cinema4d" %}
 {% set display_name = "Cinema4D" %}
 {% set version_major = "2025" %}
-{% set version_minor = "0" %}
-{% set version_patch = "2" %}
+{% set version_minor = "1" %}
+{% set version_patch = "1" %}
 {% set version = version_major + "." + version_minor + "." + version_patch %}
 
 package:
@@ -11,7 +11,7 @@ package:
 
 source:
   url: archive_files/{{ display_name }}_{{ version_major }}_{{ version }}_Win.zip # [win64]
-  sha256: 7cefab01e5b02e6c43b74e658f4f4484f8dc978cd801ede6de466a662ef4914b
+  sha256: e7de8b07187e2d054d4c0ea16b9510448987992dc70ae7eb71e0d7f6659d9115
   folder: cinema4d
 
 build:

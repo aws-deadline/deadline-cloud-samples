@@ -4,7 +4,7 @@
 # https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes
 
 {% set name = "cinema4d-openjd" %}
-{% set version = "0.5.4" %}
+{% set version = "0.6.0" %}
 
 package:
   name: {{ name }}
@@ -12,7 +12,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-{{ version }}.tar.gz
-  sha256: 314ea9fadc658b4e25b3616aa36a1d2ee9f24863f7c0bb39a26c512b9f976ea8
+  sha256: c35166730d274da0c1c753835efabd358bb07b496173258ee03e194ef541c1ac
   patches:
     - 0001-Remove-version-hook.patch
 
@@ -20,7 +20,7 @@ source:
 # the username and git branch as appropriate for your case.
 # source:
 #   git_url: https://github.com/aws-deadline/deadline-cloud-for-cinema-4d.git
-#   git_rev: region-render
+#   git_rev: {{ version }}
 
 build:
   entry_points:
@@ -41,7 +41,7 @@ requirements:
     # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
     - python
     - deadline ==0.49.*
-    - openjd-adaptor-runtime ==0.8.*
+    - openjd-adaptor-runtime ==0.9.*
 
 test:
   imports:
