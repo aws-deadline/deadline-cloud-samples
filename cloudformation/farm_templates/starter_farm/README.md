@@ -9,8 +9,10 @@ in custom ways. Sample jobs to submit are available in the
 Deadline Cloud provides many [integrated submitter plugins for applications](https://github.com/aws-deadline/#integrations),
 and you can [build your own jobs](https://docs.aws.amazon.com/en_us/deadline-cloud/latest/developerguide/building-jobs.html).
 
-The deployed production queue supports conda virtual environments for the applications that jobs need.
-It configures two conda channels by default: a private channel on an S3 bucket you provide and the
+The deployed farm includes one or more [service-managed fleets](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/smf-manage.html)
+that you select during deployment. The production queue supports conda virtual environments for the applications that jobs need,
+and the package build queue can be used to build more packages if needed. It configures two conda channels by default:
+a private channel on an S3 bucket you provide and the
 [deadline-cloud channel](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html#conda-queue-environment).
 The `deadline-cloud` channel provides applications like Blender, Houdini, Maya, and Nuke.
 You can add the [conda-forge channel](https://conda-forge.org/) to this list when deploying the CloudFormation
@@ -87,7 +89,7 @@ your AWS Account. The AWS region should be the same as the one you use to deploy
    aws s3api put-object --body empty_channel_repodata.json --key Conda/Default/noarch/repodata.json --bucket <JOB_ATTACHMENTS_BUCKET>
    ```
 
-### Option 2: To initialize the channel by building a conda package:
+#### Option 2: To initialize the channel by building a conda package:
 
 The `deadline` package recipe used by this option depends on other packages in the `conda-forge` channel, so will work best if you
 added `conda-forge` to the ProdCondaChannels parameter to the CloudFormation template.
