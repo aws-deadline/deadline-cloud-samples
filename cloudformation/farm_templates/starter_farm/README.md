@@ -36,7 +36,7 @@ your AWS Account. The AWS region should be the same as the one you use to deploy
    [AWS Deadline Cloud management console](https://console.aws.amazon.com/deadlinecloud/home),
    select the "Go to Monitor setup" option and follow the steps to enter a name for your monitor URL,
    enable IAM Identity Center, and then create a user login account to access the monitor. Your
-   monitor URL will look similar to `https://<ENTERED_MONITOR_NAME>.<AWS_REGION>.deadlinecloud.amazonaws.com/`,
+   monitor URL will look similar to `https://<ENTERED_MONITOR_NAME>.<AWS_REGION>.deadlinecloud.amazonaws.com/`.
    You will need this URL to log in with the Deadline Cloud monitor desktop application.
 
 ## Setup Instructions

@@ -1,7 +1,8 @@
 # Deploying Deadline Cloud fleet health check
 
 ## Introduction
-This CloudFormation template sets up continuous health check monitoring for a single Deadline Cloud fleet with autoscaling. It creates a Lambda function, an EventBridge rule, and a CloudWatch alarm that can be configured with an SNS topic.
+This CloudFormation template sets up continuous health check monitoring for a single Deadline Cloud customer-managed fleet
+with autoscaling. It creates a Lambda function, an EventBridge rule, and a CloudWatch alarm that can be configured with an SNS topic.
 
 ## Prerequisites
 Before deploying this CloudFormation template, check that you have the following resources created in your AWS Account.
@@ -29,7 +30,7 @@ Before deploying this CloudFormation template, check that you have the following
 1. Download the `deadline-fleet-health-check.yaml` CloudFormation template.
 2. From the [CloudFormation management console](https://console.aws.amazon.com/cloudformation/), navigate to __Create Stack > With new resources (standard)__.
 3. Upload the `deadline-fleet-health-check.yaml` CloudFormation template.
-4. Specify the name of the stack and parameters you copied from the Prerequisites section. 
+4. Specify the name of the stack and parameters you copied from the Prerequisites section.
 5. Follow the CloudFormation console steps to complete stack creation.
 
 ### Using the CLI

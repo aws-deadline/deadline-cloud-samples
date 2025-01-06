@@ -2,6 +2,12 @@
 
 This repository contains a set of samples to use with [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
 
+## CloudFormation template samples
+
+The [cloudformation](cloudformation) directory contains sample CloudFormation templates you can use to
+deploy a Deadline Cloud farm or other infrastructure to work with your farm. The [starter_farm sample](cloudformation/farm_templates/starter_farm/)
+is a good place to start. Other samples include event notification and health checks for customer-managed fleets.
+
 ## Job bundle samples
 
 The [job_bundles](job_bundles) directory contains sample jobs that you can submit to your Deadline Cloud queue. You can use the
@@ -47,11 +53,11 @@ you can attach to your Deadline Cloud queue, to provide software applications to
 
 ## Security
 
-We take all security reports seriously. When we receive such reports, we will 
-investigate and subsequently address any potential vulnerabilities as quickly 
-as possible. If you discover a potential security issue in this project, please 
+We take all security reports seriously. When we receive such reports, we will
+investigate and subsequently address any potential vulnerabilities as quickly
+as possible. If you discover a potential security issue in this project, please
 notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/)
-or directly via email to [AWS Security](aws-security@amazon.com). Please do not 
+or directly via email to [AWS Security](aws-security@amazon.com). Please do not
 create a public GitHub issue in this project.
 
 ## License
