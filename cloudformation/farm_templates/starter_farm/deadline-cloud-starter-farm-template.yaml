@@ -9,7 +9,7 @@ Description: >
 Parameters:
   JobAttachmentsBucketName:
     Type: String
-    Description: The S3 bucket to use for job attachments and the default S3 conda channel.
+    Description: An existing S3 bucket to use for job attachments and the default S3 conda channel.
     MinLength: 1
 
   # Deadline Cloud farm
@@ -223,7 +223,7 @@ Metadata:
 
     ParameterLabels:
       JobAttachmentsBucketName:
-        default: "Job Attachments S3 Bucket"
+        default: "Existing S3 Bucket For Job Attachments"
       FarmName:
         default: "Farm Name"
       FarmDescription:
