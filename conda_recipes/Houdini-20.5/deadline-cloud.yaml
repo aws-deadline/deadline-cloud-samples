@@ -1,0 +1,9 @@
+# @Author: Your name
+# @Date:   2024-09-05 10:19:18
+# @Last Modified by:   Your name
+# @Last Modified time: 2024-09-05 12:18:26
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: houdini-20.5.332-linux_x86_64_gcc11.2.tar.gz
+

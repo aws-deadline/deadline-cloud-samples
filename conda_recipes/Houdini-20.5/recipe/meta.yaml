@@ -1,0 +1,40 @@
+# @Author: Derek Zavada
+# @Date:   2024-09-05 13:35:23
+# @Last Modified by:   Your name
+# @Last Modified time: 2024-09-11 16:02:25
+{% set name = "houdini" %}
+{% set version_partial = "20.5" %}
+{% set version_minor = "332" %}
+{% set version = version_partial + "." + version_minor %}
+
+{% set bucket_name = "houdinihive-bucket-deadlinecloud" %}
+
+{% set sha256 = "66a6cb0967cf528d1f5d2f6588a397b141299b577ad1b1c891bc7e2bdf2016d5" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: s3://{{ bucket_name }}/houdini/{{ version_partial }}/houdini-{{ version_partial }}.{{ version_minor }}-linux_x86_64_gcc11.2.tar.gz
+  sha256: {{ sha256 }}
+  folder: installer
+
+build:
+  number: 0
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  # The binary is built to be relocatable, so can ignore the warnings about DSOs.
+  missing_dso_whitelist:
+  - "*"
+#  overlinking_ignore_patterns:
+#  - "**"
+
+#test:
+#  commands:
+#    - houdini -h
+
+about:
+  home: https://www.sidefx.com/products/houdini/
+  license: Commercial
+  summary: Houdini is built from the ground up to be a procedural system that empowers artists to work freely, create multiple iterations and rapidly share workflows with colleagues.
