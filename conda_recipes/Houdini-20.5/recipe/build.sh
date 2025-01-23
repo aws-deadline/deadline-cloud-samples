@@ -1,8 +1,3 @@
-#!/bin/bash
-# @Author: Your name
-# @Date:   2024-09-05 10:14:54
-# @Last Modified by:   Your name
-# @Last Modified time: 2024-10-08 08:02:40
 #!/bin/sh
 set -xeuo pipefail
 
