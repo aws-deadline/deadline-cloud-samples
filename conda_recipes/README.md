@@ -23,6 +23,9 @@ See the Deadline Cloud developer guide documentation
 for instructions on how to set up a Deadline Cloud farm for building packages into an Amazon S3 conda channel.
 Name your package build queue "Package Build Queue" for the job submission command to select it by default.
 
+To make this process faster and simpler, you can use our provided starter farm CloudFormation template [here](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/cloudformation/farm_templates/starter_farm) to deploy your Deadline infrastructure along with
+a configured package build queue as documented in the Deadline Cloud developer guide linked above. 
+
 To submit package build jobs, you will need the
 [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
 installed on your workstation.

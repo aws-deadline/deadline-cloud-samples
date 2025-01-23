@@ -1,6 +1,6 @@
 condaPlatforms:
   - platform: win-64
     defaultSubmit: true
-    sourceArchiveFilename: Cinema4D_2025_2025.1.1_Win.zip
+    sourceArchiveFilename: Cinema4D_2025_2025.0.2_Win.zip
     sourceDownloadInstructions: 'Follow the instructions from README in this folder on how to make this file.'
     buildTool: conda-build
