@@ -8,7 +8,7 @@ cd $PREFIX/opt
 # The Houdini installer expects `bc` to run, but does not fail when
 # it is missing. Ensure that it is installed before running the installer
 bc --help
-# Example messages:
+
 
 # Install Houdini
 INSTALLER=$SRC_DIR/installer/houdini.install
