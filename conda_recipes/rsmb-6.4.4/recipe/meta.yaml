@@ -1,0 +1,27 @@
+{% set name = "rsmb" %}
+{% set version_partial = "6.4" %}
+{% set version_minor = "4" %}
+{% set version = version_partial + "." + version_minor %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+- url: archive_files/RSMB_{{ version.replace(".", "_") }}_aex.zip # [win64]
+  sha256: eddf86b744f8588a2f5655535b8e4b2a1790f97c4bb8740e0e129f8f4cd5f490 # [win64]
+  folder: rsmb
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+about:
+  home: https://www.revisionfx.com/products/rsmb/after-effects
+  license: Commercial
+  summary: ReVision ReelSmart Motion Blur (RSMB) provides high quality motion blur and deblur for Adobe After Effects.
