@@ -728,7 +728,7 @@ Resources:
               - logs:GetLogEvents
               Effect: Allow
               Resource: !Sub
-                - "arn:aws:logs:us-west-2:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
+                - "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
                 - FarmId: !GetAtt farm.FarmId
             - Sid: DeadlineServiceManagedFleetSoftwareAccess
               Action:
@@ -811,7 +811,7 @@ Resources:
               - logs:GetLogEvents
               Effect: Allow
               Resource: !Sub
-                - "arn:aws:logs:us-west-2:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
+                - "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
                 - FarmId: !GetAtt farm.FarmId
             - Sid: DeadlineServiceManagedFleetSoftwareAccess
               Action:
