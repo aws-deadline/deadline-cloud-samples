@@ -44,6 +44,19 @@ Resources:
                       [get_worker_limit(deadline, farm_id, x) for x in active_fleets]
                   )
           
+                  paused_job_count = get_paused_job_count(active_jobs)
+                  has_high_priority_job = has_high_priority_jobs(active_jobs)
+          
+                  # Handle "Only Paused Jobs" jobs where we now can allocate workers to jobs with 0 priority
+                  if paused_job_count != len(active_jobs):
+                      # Filter out any jobs that are set to priority 0 UNLESS they are all set to 0
+                      active_jobs = filter(lambda job: job["priority"] != 0, active_jobs)
+          
+                  if has_high_priority_job:
+                      # Handle "High Priority" jobs where we should only balance to jobs with 100 priority
+                      # Filter out any jobs that are not priority 100 if we have at least one job at priority 100
+                      active_jobs = filter(lambda job: job["priority"] == 100, active_jobs)
+          
                   job_weights = [
                       {
                           "name": x["name"],
@@ -76,6 +89,16 @@ Resources:
                   response.append({"totalWorkers": total_workers, "updates": updates})
               print(json.dumps(response))
               return {"statusCode": 200, "body": json.dumps(response)}
+          
+          
+          def has_high_priority_jobs(active_jobs):
+              for job in active_jobs:
+                  if job["priority"] == 100:
+                      return True
+              return False
+          
+          def get_paused_job_count(active_jobs):
+              return len(list(filter(lambda job: job["priority"] == 0, active_jobs)))
           
           
           def get_all_active_jobs(deadline, farm_id, queue_id):
