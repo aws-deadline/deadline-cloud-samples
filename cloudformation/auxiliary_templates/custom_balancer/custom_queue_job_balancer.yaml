@@ -1,0 +1,412 @@
+Description: An AWS Serverless Application Model template describing your function.
+Description: A Lambda Function that acts as a balancer for a Deadline Cloud Queue by modifying maxWorkers
+Parameters:
+  FarmId:
+    Description: The FarmID of the Deadline Farm that you are adding a balancer for
+    Type: String
+  QueueId:
+    Description: The QueueID of the Deadline Queue that you are adding a balancer for
+    Type: String
+Resources:
+  DeadlineWeightedJobBalancer:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ERROR_WEIGHT: '-10'
+          PRIORITY_WEIGHT: '100'
+          RENDERING_TASK_BUFFER: '1'
+          RENDERING_TASK_WEIGHT: '-100'
+          SUBMISSION_TIME_WEIGHT: '3'
+      Handler: index.lambda_handler
+      Role: !GetAtt DeadlineWeightedJobBalancerExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from datetime import datetime, timezone
+          from math import ceil
+          
+          def lambda_handler(event, context):
+              deadline = boto3.client("deadline")
+              # input event is list of objects with farm and queue ids
+              # loop through each one and balance the job weights
+              response = []
+              for item in event:
+                  updates = []
+                  farm_id = item["farmId"]
+                  queue_id = item["queueId"]
+          
+                  active_jobs = get_all_active_jobs(deadline, farm_id, queue_id)
+                  active_fleets = get_all_associated_fleets(deadline, farm_id, queue_id)
+                  total_workers = sum(
+                      [get_worker_limit(deadline, farm_id, x) for x in active_fleets]
+                  )
+          
+                  job_weights = [
+                      {
+                          "name": x["name"],
+                          "jobId": x["jobId"],
+                          "priority": x["priority"],
+                          "weight": calculate_job_weights(deadline, farm_id, queue_id, x),
+                      }
+                      for x in active_jobs
+                  ]
+          
+                  total_weights = max(1, sum([x["weight"] for x in job_weights]))
+                  for job_weight in job_weights:
+                      # ceil because we'd rather have too high of a limit rather than idle workers
+                      job_limit = max(
+                          1, ceil((job_weight["weight"] / total_weights) * total_workers)
+                      )
+                      update_response = update_job_limit(
+                          deadline, farm_id, queue_id, job_weight["jobId"], job_limit
+                      )
+                      updates.append(
+                          {
+                              "name": job_weight["name"],
+                              "jobId": job_weight["jobId"],
+                              "priority": job_weight["priority"],
+                              "weight": job_weight["weight"],
+                              "workerLimit": job_limit,
+                              "response": update_response,
+                          }
+                      )
+                  response.append({"totalWorkers": total_workers, "updates": updates})
+              print(json.dumps(response))
+              return {"statusCode": 200, "body": json.dumps(response)}
+          
+          
+          def get_all_active_jobs(deadline, farm_id, queue_id):
+              active_jobs = []
+              filter_expressions = {
+                  "filters": [
+                      {
+                          "groupFilter": {
+                              "filters": [
+                                  {
+                                      "stringFilter": {
+                                          "name": "TASK_RUN_STATUS",
+                                          "operator": "EQUAL",
+                                          "value": "READY",
+                                      }
+                                  },
+                                  {
+                                      "stringFilter": {
+                                          "name": "TASK_RUN_STATUS",
+                                          "operator": "EQUAL",
+                                          "value": "ASSIGNED",
+                                      }
+                                  },
+                                  {
+                                      "stringFilter": {
+                                          "name": "TASK_RUN_STATUS",
+                                          "operator": "EQUAL",
+                                          "value": "SCHEDULED",
+                                      }
+                                  },
+                              ],
+                              "operator": "OR",
+                          }
+                      },
+                      {
+                          "stringFilter": {
+                              "name": "TASK_RUN_STATUS",
+                              "operator": "EQUAL",
+                              "value": "RUNNING",
+                          }
+                      },
+                  ],
+                  "operator": "OR",
+              }
+          
+              job_search_response = deadline.search_jobs(
+                  filterExpressions=filter_expressions,
+                  farmId=farm_id,
+                  queueIds=[queue_id],
+                  itemOffset=0,
+                  pageSize=100,
+              )
+              active_jobs.extend(job_search_response["jobs"])
+          
+              while job_search_response.get("nextItemOffset"):
+                  job_search_response = deadline.search_jobs(
+                      filterExpressions=filter_expressions,
+                      farmId=farm_id,
+                      queueIds=[queue_id],
+                      itemOffset=job_search_response.get("nextItemOffset"),
+                      pageSize=100,
+                  )
+                  active_jobs.extend(job_search_response["jobs"])
+              return active_jobs
+          
+          
+          def get_all_associated_fleets(deadline, farm_id, queue_id):
+              associated_fleets = []
+              response = deadline.list_queue_fleet_associations(farmId=farm_id, queueId=queue_id)
+              associated_fleets.extend(
+                  [
+                      x["fleetId"]
+                      for x in response["queueFleetAssociations"]
+                      if x["status"] == "ACTIVE"
+                  ]
+              )
+          
+              while response.get("nextToken"):
+                  response = deadline.list_queue_fleet_associations(
+                      farmId=farm_id, queueId=queue_id, nextToken=response.get("nextToken")
+                  )
+                  associated_fleets.extend(
+                      [
+                          x["fleetId"]
+                          for x in response["queueFleetAssociations"]
+                          if x["status"] == "ACTIVE"
+                      ]
+                  )
+              return associated_fleets
+          
+          
+          def get_worker_limit(deadline, farm_id, fleet_id):
+              fleet_info = deadline.get_fleet(farmId=farm_id, fleetId=fleet_id)
+              return fleet_info["maxWorkerCount"]
+          
+          
+          def calculate_job_weights(deadline, farm_id, queue_id, job):
+              # get every step
+              steps = []
+              steps_response = deadline.list_steps(
+                  farmId=farm_id,
+                  queueId=queue_id,
+                  jobId=job["jobId"],
+              )
+              steps.extend(steps_response["steps"])
+              while steps_response.get("nextToken"):
+                  steps_response = deadline.list_steps(
+                      farmId=farm_id,
+                      queueId=queue_id,
+                      jobId=job["jobId"],
+                      nextToken=steps_response.get("nextToken"),
+                  )
+                  steps.extend(steps_response["steps"])
+          
+              # get every task
+              tasks = []
+              for step in steps:
+                  task_response = deadline.list_tasks(
+                      farmId=farm_id,
+                      queueId=queue_id,
+                      stepId=step["stepId"],
+                      jobId=job["jobId"],
+                  )
+                  tasks.extend(task_response["tasks"])
+                  while task_response.get("nextToken"):
+                      task_response = deadline.list_tasks(
+                          farmId=farm_id,
+                          queueId=queue_id,
+                          stepId=step["stepId"],
+                          jobId=job["jobId"],
+                          nextToken=task_response.get("nextToken"),
+                      )
+                      tasks.extend(task_response["tasks"])
+          
+              error_count = sum([x["failureRetryCount"] for x in tasks])
+              # total_rendering_tasks = sum([x["runStatus"] in ["RUNNING", "ASSIGNED", "STARTING", "SCHEDULED", "READY"] for x in tasks])
+              total_rendering_tasks = sum(
+                  [
+                      x["runStatus"] in ["RUNNING", "ASSIGNED", "STARTING", "SCHEDULED"]
+                      for x in tasks
+                  ]
+              )
+          
+              PW = float(os.environ["PRIORITY_WEIGHT"])
+              EW = float(os.environ["ERROR_WEIGHT"])
+              SW = float(os.environ["SUBMISSION_TIME_WEIGHT"])
+              RW = float(os.environ["RENDERING_TASK_WEIGHT"])
+              RB = float(os.environ["RENDERING_TASK_BUFFER"])
+          
+              now = datetime.now(timezone.utc)  # Get current time in UTC
+              time_difference = (now - job["createdAt"]).total_seconds()
+          
+              priority_factor = job["priority"] * PW
+              error_factor = error_count * EW
+              time_factor = time_difference * SW
+              rendering_factor = (total_rendering_tasks - RB) * RW
+              weight = max(1, priority_factor + error_factor + time_factor + rendering_factor)
+              return weight
+          
+          
+          def update_job_limit(deadline, farm_id, queue_id, job_id, worker_limit):
+              try:
+                  update_job_result = deadline.update_job(
+                      farmId=farm_id, queueId=queue_id, jobId=job_id, maxWorkerCount=worker_limit
+                  )
+                  return {
+                      "HTTPStatusCode": update_job_result.get("ResponseMetadata").get(
+                          "HTTPStatusCode"
+                      ),
+                      "RequestId": update_job_result.get("ResponseMetadata").get("RequestId"),
+                  }
+              except Exception as e:
+                  return {"Error": str(e)}
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 60
+      Architectures:
+        - x86_64
+
+  DeadlineWeightedJobBalancerConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref DeadlineWeightedJobBalancer
+      MaximumEventAgeInSeconds: 21600
+      MaximumRetryAttempts: 2
+      Qualifier: '$LATEST'
+
+  DeadlineWeightedJobBalancerSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: String
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Name: !Join
+        - ''
+        - - !Ref 'AWS::StackName'
+          - BalancerScheduler
+      ScheduleExpression: "rate(1 minute)"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt
+          - DeadlineWeightedJobBalancer
+          - Arn
+        DeadLetterConfig:
+          Arn: !GetAtt
+            - UnprocessedBalancingEventQueue
+            - Arn
+        Input: !Sub '[{"farmId": "${FarmId}", "queueId": "${QueueId}"}]'
+        RetryPolicy:
+          MaximumRetryAttempts: 1
+        RoleArn: !GetAtt
+          - DeadlineWeightedJobBalancerScheduleRole
+          - Arn
+
+  DeadlineWeightedJobBalancerScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - scheduler.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub "${AWS::AccountId}"
+      RoleName: !Join
+        - ''
+        - - !Ref 'AWS::StackName'
+          - BalancerSchedulerRole
+      Policies:
+        - PolicyName: Amazon-EventBridge-Scheduler-Execution-Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt DeadlineWeightedJobBalancer.Arn
+                  - !Sub "${DeadlineWeightedJobBalancer.Arn}:*"
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt
+                    - UnprocessedBalancingEventQueue
+                    - Arn
+
+  UnprocessedBalancingEventQueue:
+    Type: 'AWS::SQS::Queue'
+    Properties:
+      QueueName: !Join
+        - "-"
+        - - deadline-unprocessed-balancing-events
+          - !Ref QueueId
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+
+  UnprocessedBalancingEventQueuePolicy:
+    DependsOn: DeadlineWeightedJobBalancerSchedule
+    Type: 'AWS::SQS::QueuePolicy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: 'sqs:SendMessage'
+            Condition:
+              ArnEquals:
+                'aws:SourceArn': !GetAtt
+                  - DeadlineWeightedJobBalancerSchedule
+                  - Arn
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Resource: !GetAtt
+              - UnprocessedBalancingEventQueue
+              - Arn
+        Version: 2012-10-17
+      Queues:
+        - !Ref UnprocessedBalancingEventQueue
+
+  DeadlineWeightedJobBalancerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      RoleName: !Join
+        - ''
+        - - !Ref 'AWS::StackName'
+          - DeadlineWeightedJobBalancerRole
+      Policies:
+        - PolicyName: DefaultExecutionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*:*:*"
+        - PolicyName: LambdaPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - deadline:GetFleet
+                  - deadline:UpdateJob
+                  - deadline:SearchJobs
+                  - deadline:ListSteps
+                  - deadline:ListTasks
+                  - deadline:ListQueueFleetAssociations
+                Resource:
+                  - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}"
+                  - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/*"
+                  - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/queue/${QueueId}/job/*"
+                  - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/queue/${QueueId}"
+              - Effect: Allow
+                Action:
+                  - identitystore:ListGroupMembershipsForMember
+                Resource: '*'
