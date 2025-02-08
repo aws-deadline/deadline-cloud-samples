@@ -255,7 +255,7 @@ Resources:
               error_factor = error_count * EW
               time_factor = time_difference * SW
               rendering_factor = (total_rendering_tasks - RB) * RW
-              weight = max(1, priority_factor + error_factor + time_factor + rendering_factor)
+              weight = max(1, (priority_factor * priority_factor) + error_factor + time_factor + rendering_factor)
               return weight
           
           
