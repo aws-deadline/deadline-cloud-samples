@@ -1,0 +1,33 @@
+context:
+  name: "redshift"
+  display_name: "Redshift"
+  version: "2025.3.0_1665182561"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      path: ../redshift_core.tar.gz # run installer into a custom folder and tarball that folder
+    else:
+      url: https://installer.maxon.net/installer/rs/redshift_${{version}}_win_x64.zip # [win64]
+      sha256: 0bcc0141db539d58ed030a3136cf43b66702c84fa43b9931505b684b90f82558 # might need to replace sha256 if using a different installer version
+    target_directory: ${name}
+
+requirements:
+  run:
+    - houdini
+
+build:
+  number: 0
+  always_copy_files: False
+  dynamic_linking:
+    rpaths: ['lib/', 'opt/houdini/dsolib']
+
+about:
+  homepage: https://redshift.maxon.net
+  summary: >
+    3D computer animation, modeling, simulation, and rendering software
+
