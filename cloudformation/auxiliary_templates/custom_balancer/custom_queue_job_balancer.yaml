@@ -167,23 +167,12 @@ Resources:
           
           def get_all_associated_fleets(deadline, farm_id, queue_id):
               associated_fleets = []
-              response = deadline.list_queue_fleet_associations(farmId=farm_id, queueId=queue_id)
-              associated_fleets.extend(
-                  [
-                      x["fleetId"]
-                      for x in response["queueFleetAssociations"]
-                      if x["status"] == "ACTIVE"
-                  ]
-              )
-          
-              while response.get("nextToken"):
-                  response = deadline.list_queue_fleet_associations(
-                      farmId=farm_id, queueId=queue_id, nextToken=response.get("nextToken")
-                  )
+              qfa_paginator = deadline.get_paginator("list_queue_fleet_associations")
+              for qfa_page in qfa_paginator.paginate(farmId=farm_id, queueId=queue_id):
                   associated_fleets.extend(
                       [
                           x["fleetId"]
-                          for x in response["queueFleetAssociations"]
+                          for x in qfa_page.get("queueFleetAssociations", [])
                           if x["status"] == "ACTIVE"
                       ]
                   )
@@ -198,40 +187,17 @@ Resources:
           def calculate_job_weights(deadline, farm_id, queue_id, job):
               # get every step
               steps = []
-              steps_response = deadline.list_steps(
-                  farmId=farm_id,
-                  queueId=queue_id,
-                  jobId=job["jobId"],
-              )
-              steps.extend(steps_response["steps"])
-              while steps_response.get("nextToken"):
-                  steps_response = deadline.list_steps(
-                      farmId=farm_id,
-                      queueId=queue_id,
-                      jobId=job["jobId"],
-                      nextToken=steps_response.get("nextToken"),
-                  )
-                  steps.extend(steps_response["steps"])
+          
+              steps_paginator = deadline.get_paginator("list_steps")
+              for step_page in steps_paginator.paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"]):
+                  steps.extend(step_page.get("steps", []))
           
               # get every task
               tasks = []
               for step in steps:
-                  task_response = deadline.list_tasks(
-                      farmId=farm_id,
-                      queueId=queue_id,
-                      stepId=step["stepId"],
-                      jobId=job["jobId"],
-                  )
-                  tasks.extend(task_response["tasks"])
-                  while task_response.get("nextToken"):
-                      task_response = deadline.list_tasks(
-                          farmId=farm_id,
-                          queueId=queue_id,
-                          stepId=step["stepId"],
-                          jobId=job["jobId"],
-                          nextToken=task_response.get("nextToken"),
-                      )
-                      tasks.extend(task_response["tasks"])
+                  tasks_paginator = deadline.get_paginator("list_tasks")
+                  for task_page in tasks_paginator.paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"], stepId=step["stepId"]):
+                      tasks.extend(task_page.get("tasks", []))
           
               error_count = sum([x["failureRetryCount"] for x in tasks])
               # total_rendering_tasks = sum([x["runStatus"] in ["RUNNING", "ASSIGNED", "STARTING", "SCHEDULED", "READY"] for x in tasks])
