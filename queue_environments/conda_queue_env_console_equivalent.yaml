@@ -4,8 +4,8 @@ parameterDefinitions:
   type: STRING
   description: >
     This is a space-separated list of Conda package match specifications to
-    install for the job. E.g. "blender=3.6" for a job that renders frames in
-    Blender 3.6.
+    install for the job. E.g. "blender=4.3" for a job that renders frames in
+    Blender 4.3.
   default: ""
   userInterface:
     control: LINE_EDIT
@@ -62,20 +62,18 @@ environment:
         echo "Creating a Conda environment in the session directory..."
 
         # Create the virtual environment
-        conda create --yes \
-            -p '{{Session.WorkingDirectory}}/.env' \
+        ENV_DIR="$(mktemp -d '{{Session.WorkingDirectory}}/.env-XXXXX')"
+        conda create --yes --quiet \
+            -p "$ENV_DIR" \
             $CONDA_PACKAGES \
             $CHANNEL_OPTS
 
-        # Activate the Conda environment, capturing the environment variables for the session to use
+        # Capture the environment variables set by activation
         python '{{Env.File.OpenJDVarsStart}}' .vars
-        set +u
-        conda activate '{{Session.WorkingDirectory}}/.env'
-        set -u
-        python '{{Env.File.OpenJDVarsCapture}}' .vars
+        conda run -p "$ENV_DIR" python '{{Env.File.OpenJDVarsCapture}}' .vars
 
         # Print information about the activated Conda environment
-        conda info
+        conda run -p "$ENV_DIR" conda info
     - name: OpenJDVarsStart
       filename: openjd-vars-start.py
       type: TEXT

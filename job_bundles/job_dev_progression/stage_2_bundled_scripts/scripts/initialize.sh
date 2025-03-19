@@ -13,5 +13,5 @@ mkdir -p "$2"
 cd "$2"
 
 # Copy the input CSV file
-mkdir csv
+mkdir -p csv
 cp "$1" csv/dataset.csv

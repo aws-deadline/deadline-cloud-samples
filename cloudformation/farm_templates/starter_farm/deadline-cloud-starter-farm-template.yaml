@@ -334,8 +334,8 @@ Resources:
           type: STRING
           description: >
             This is a space-separated list of Conda package match specifications to
-            install for the job. E.g. "blender=3.6" for a job that renders frames in
-            Blender 3.6.
+            install for the job. E.g. "blender=4.3" for a job that renders frames in
+            Blender 4.3.
           default: ""
           userInterface:
             control: LINE_EDIT
@@ -491,133 +491,131 @@ Resources:
                 # Initialize/activate the Conda virtual environment
                 if [ -n "$NAMED_CONDA_ENV" ] && conda env list | grep -q "^$NAMED_CONDA_ENV "; then
                     echo "Reusing the existing named Conda environment $NAMED_CONDA_ENV."
+                    echo ""
 
-                    # Activate the Conda environment
+                    # Capture environment variables set by activation
                     python '{{Env.File.OpenJDVarsStart}}' .vars
-                    set +u
-                    conda activate "$NAMED_CONDA_ENV"
-                    set -u
-                    python '{{Env.File.OpenJDVarsCapture}}' .vars
+                    conda run -n "$NAMED_CONDA_ENV" python '{{Env.File.OpenJDVarsCapture}}' .vars
+                    ENV_DIR=$(conda run -n "$NAMED_CONDA_ENV" bash -c 'echo $CONDA_PREFIX')
 
                     CUR_TIMESTAMP="$(date +%s)"
-                    TIMESTAMP_FILE="$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+                    TIMESTAMP_FILE="$ENV_DIR/var/log/conda_queue_env_update_timestamp"
+                    UPDATE_AFTER='{{Param.NamedCondaEnvUpdateAfterMinutes}}'
                     if [ -f "$TIMESTAMP_FILE" ]; then
                         PREV_UPDATE_TIMESTAMP="$(cat "$TIMESTAMP_FILE")"
-                        MINUTES_SINCE_UPDATE="$(( ( $CUR_TIMESTAMP - $PREV_UPDATE_TIMESTAMP ) / 60 ))"
+                        MINUTES_SINCE_UPDATE="$(python -c "print(($CUR_TIMESTAMP - $PREV_UPDATE_TIMESTAMP) // 60)")"
                     else
                         echo "The file recording the previous timestamp was not found"
-                        MINUTES_SINCE_UPDATE=0
+                        MINUTES_SINCE_UPDATE="$UPDATE_AFTER"
                     fi
                     echo "Minutes elapsed since last update of this named Conda environment: $MINUTES_SINCE_UPDATE"
 
-                    if [ $MINUTES_SINCE_UPDATE -ge {{Param.NamedCondaEnvUpdateAfterMinutes}} ]; then
-                        echo "Elapsed time greater than or equal to {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, updating the environment packages to the latest"
-                        set +u
-                        conda install --yes \
-                            --update-all \
+                    if [ $MINUTES_SINCE_UPDATE -ge $UPDATE_AFTER ]; then
+                        echo "Elapsed time greater than or equal to $UPDATE_AFTER minutes, updating the environment packages to the latest"
+                        conda install -n "$NAMED_CONDA_ENV" --yes --quiet \
                             $CONDA_PACKAGES \
                             $CHANNEL_OPTS
-                        set -u
 
                         # Save the channels and packages used in the environment, to help out debugging
-                        LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                        LOGFILE="$ENV_DIR/var/log/conda_queue_env.log"
                         echo "Updated $NAMED_CONDA_ENV env at $(date --iso-8601=minutes)" >> "$LOGFILE"
                         echo '  CondaChannels: {{Param.CondaChannels}}' >> "$LOGFILE"
                         echo '  CondaPackages: {{Param.CondaPackages}}' >> "$LOGFILE"
 
                         # Save a timestamp of when we updated
-                        echo "$CUR_TIMESTAMP" > "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+                        echo "$CUR_TIMESTAMP" > "$ENV_DIR/var/log/conda_queue_env_update_timestamp"
                     else
-                        echo "Elapsed time less than {{Param.NamedCondaEnvUpdateAfterMinutes}} minutes, skipping updates"
+                        echo "Elapsed time less than $UPDATE_AFTER minutes, skipping updates"
                     fi
+
+                    echo ""
+                    conda list -n "$NAMED_CONDA_ENV"
                 elif [ -n "$NAMED_CONDA_ENV" ]; then
                     echo "Named Conda environment $NAMED_CONDA_ENV not found, creating it."
 
-                    # Make sure there's no incomplete environment hanging around
+                    # Remove incomplete environments
                     remove_named_env "$NAMED_CONDA_ENV"
 
-                    # Create the virtual environment
-                    conda create --yes \
+                    conda create --yes --quiet \
                         --name "$NAMED_CONDA_ENV" \
                         $CONDA_PACKAGES \
                         $CHANNEL_OPTS
 
-                    # Activate the Conda environment
+                    # Capture environment variables set by activation
                     python '{{Env.File.OpenJDVarsStart}}' .vars
-                    set +u
-                    conda activate "$NAMED_CONDA_ENV"
-                    set -u
-                    python '{{Env.File.OpenJDVarsCapture}}' .vars
+                    conda run -n "$NAMED_CONDA_ENV" python '{{Env.File.OpenJDVarsCapture}}' .vars
+                    ENV_DIR=$(conda run -n $NAMED_CONDA_ENV bash -c 'echo $CONDA_PREFIX')
 
-                    # Save the channels and packages used in the environment, to help out debugging
-                    LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                    # Save the channels and packages used in the environment, to help debugging
+                    LOGFILE="$ENV_DIR/var/log/conda_queue_env.log"
                     mkdir -p "$(dirname $LOGFILE)"
                     echo "Created $NAMED_CONDA_ENV env at $(date --iso-8601=minutes)" >> "$LOGFILE"
                     echo '  CondaChannels: {{Param.CondaChannels}}' >> "$LOGFILE"
                     echo '  CondaPackages: {{Param.CondaPackages}}' >> "$LOGFILE"
 
                     # Save a timestamp of when we updated
-                    date +%s > "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp"
+                    date +%s > "$ENV_DIR/var/log/conda_queue_env_update_timestamp"
                 else
                     echo "Creating temporary Conda environment in the session directory..."
 
-                    # Create the virtual environment
-                    conda create --yes \
-                        -p '{{Session.WorkingDirectory}}/.env' \
+                    ENV_DIR="$(mktemp -d '{{Session.WorkingDirectory}}/.env-XXXXX')"
+                    conda create --yes --quiet \
+                        -p "$ENV_DIR" \
                         $CONDA_PACKAGES \
                         $CHANNEL_OPTS
 
-                    # Activate the Conda environment
+                    # Capture environment variables set by activation
                     python '{{Env.File.OpenJDVarsStart}}' .vars
-                    set +u
-                    conda activate '{{Session.WorkingDirectory}}/.env'
-                    set -u
-                    python '{{Env.File.OpenJDVarsCapture}}' .vars
+                    conda run -p "$ENV_DIR" python '{{Env.File.OpenJDVarsCapture}}' .vars
                 fi
 
-                # Print information about the environment
-                conda info
+                conda run -p "$ENV_DIR" conda info
             - name: Exit
               filename: conda-queue-env-exit.sh
               type: TEXT
               data: |
                 set -euo pipefail
 
-                # When using this queue environment on long-lived worker hosts, such as on premises,
-                # automatically named conda environments can accumulate. This code removes them after
-                # 96 hours of unuse. 96 hours was chosen so the caches stick around for a long weekend.
+                # When using this queue environment on long-lived worker hosts, such as on premises, the
+                # automatically named conda environments can accumulate. This code cleans up these environments
+                # after they haven't been used for 96 hours, a length of time chosen so that when a farm is idle
+                # for a long weekend it doesn't clear all these environment caches.
 
-                DELETE_AFTER_HOURS=96
+                # Deactivate the environment so we can delete it if necessary
+                set +u
+                eval "$(conda shell.bash deactivate)"
+                set -u
 
-                echo "Cleaning up automatically-named conda environments not updated within $DELETE_AFTER_HOURS hours."
+                ENV_DELETE_AFTER_HOURS=96
 
-                AUTO_CONDA_ENVS="$(conda env list | grep "^hashname_" | cut -d " " -f 1)"
+                echo "Cleaning up any automatically-named conda environments that weren't updated within $ENV_DELETE_AFTER_HOURS hours."
+
+                AUTO_CONDA_ENVS="$(conda env list | { grep "^hashname_" || true; } | cut -d " " -f 1)"
                 REMOVED_ENV=0
 
                 CUR_TIMESTAMP="$(date +%s)"
                 for ENV_NAME in $AUTO_CONDA_ENVS; do
                     echo "Checking environment $ENV_NAME"
+                    ENV_DIR=$(conda run -n $ENV_NAME bash -c 'echo $CONDA_PREFIX')
 
-                    set +u
-                    conda activate $ENV_NAME
-                    set -u
-
-                    LOGFILE="$CONDA_PREFIX/var/log/conda_queue_env.log"
+                    LOGFILE="$ENV_DIR/var/log/conda_queue_env.log"
                     if [ -f "$LOGFILE" ]; then
                         # Creation and each update outputs 3 lines to the log, so print the last 3
                         tail -3 "$LOGFILE"
                     fi
 
-                    PREV_UPDATE_TIMESTAMP="$(cat "$CONDA_PREFIX/var/log/conda_queue_env_update_timestamp")"
-                    HOURS_SINCE_UPDATE="$(( ( $CUR_TIMESTAMP - $PREV_UPDATE_TIMESTAMP ) / 1440 ))"
+                    TIMESTAMP_FILE="$ENV_DIR/var/log/conda_queue_env_update_timestamp"
+                    if [ -f "$TIMESTAMP_FILE" ]; then
+                        PREV_UPDATE_TIMESTAMP="$(cat "$TIMESTAMP_FILE")"
+                    else
+                        echo "The file recording the previous timestamp was not found"
+                        PREV_UPDATE_TIMESTAMP=0
+                    fi
+                    HOURS_SINCE_UPDATE="$(python -c print"(($CUR_TIMESTAMP - $PREV_UPDATE_TIMESTAMP) // 3600)")"
                     echo "Environment was last updated $HOURS_SINCE_UPDATE hours ago."
 
-                    set +u
-                    conda deactivate
-                    set -u
-
-                    if [ $HOURS_SINCE_UPDATE -gt $DELETE_AFTER_HOURS ]; then
-                        echo "Elapsed time $HOURS_SINCE_UPDATE is greater than $DELETE_AFTER_HOURS hours, removing the environment."
+                    if [ $HOURS_SINCE_UPDATE -gt $ENV_DELETE_AFTER_HOURS ]; then
+                        echo "Elapsed time $HOURS_SINCE_UPDATE is greater than $ENV_DELETE_AFTER_HOURS hours, removing the environment."
                         conda env remove --yes -q -n $ENV_NAME
                         REMOVED_ENV=1
                     fi
@@ -626,8 +624,6 @@ Resources:
                 if [ "$REMOVED_ENV" = "1" ]; then
                     echo "Cleaning the conda cache to reclaim disk space."
                     conda clean --yes --all
-                else
-                    echo "Nothing to clean up."
                 fi
 
             - name: OpenJDVarsStart
