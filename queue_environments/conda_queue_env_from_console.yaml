@@ -4,8 +4,8 @@ parameterDefinitions:
   type: STRING
   description: >
     This is a space-separated list of Conda package match specifications to
-    install for the job. E.g. "blender=3.6" for a job that renders frames in
-    Blender 3.6.
+    install for the job. E.g. "blender=4.3" for a job that renders frames in
+    Blender 4.3.
   default: ""
   userInterface:
     control: LINE_EDIT

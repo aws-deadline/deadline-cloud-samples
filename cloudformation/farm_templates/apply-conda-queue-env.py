@@ -58,7 +58,7 @@ def main():
         result_cfn_template.append(line)
         if start_delim in line:
             prefix = line.split(start_delim, 1)[0]
-            result_cfn_template.extend(prefix + qe_line for qe_line in queue_env)
+            result_cfn_template.extend((prefix + qe_line).rstrip() for qe_line in queue_env)
             skipping_content = True
     result_cfn_template.append("")
 
