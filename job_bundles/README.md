@@ -62,6 +62,11 @@ and a short script that substitutes job parameters and the Frame task parameter 
 
 If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to add it here.
 
+### 3D Gaussian Splatting pipeline
+
+The [gsplat_pipeline](gsplat_pipeline/README.md) job bundle can take a video file as input and train a 3D Gaussian Splatting point cloud.
+This example shows Deadline Cloud running a 3D reconstruction workload that uses CUDA GPUs for acceleration.
+
 ### Turntable job with Maya/Arnold
 
 The [turntable_with_maya_arnold](turntable_with_maya_arnold) job bundle is an example pipeline utility job for taking a 3D model
@@ -105,8 +110,8 @@ If you do not want to use the `deadline` Python package's support for features l
 [deadline:CreateJob API](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_CreateJob.html) directly.
 
 
-## Example Husk USD Render with Asset Introspection 
+## Example Husk USD Render with Asset Introspection
 
 The [houdini_husk_usd_render](houdini_husk_usd_render) sample shows how to use the Houdini Husk CLI USD renderer using a short job template and service-provided Conda packages.
-Additionally, this sample shows how to write a custom asset introspection tool for job attachments, ensuring that only the required data is uploaded when using job attachments 
+Additionally, this sample shows how to write a custom asset introspection tool for job attachments, ensuring that only the required data is uploaded when using job attachments
 while removing manual steps of the artists having to attach the required files.

@@ -237,8 +237,11 @@ $ python ../apply-conda-queue-env.py \
 ### Create a CloudFormation template for your own farm
 
 If you want to organize the queues in your farm differently from this starter sample, or you need a different
-set of fleet configurations, you can copy this CloudFormation template and start editing it. We recommend
-you follow Infrastructure as Code best practices, such as keeping your templates in version control and
+set of fleet configurations, you can copy this CloudFormation template and start editing it. See the
+[CUDA farm CloudFormation template](../cuda_farm/README.md) for an example where we've simplified and specialized
+the starter farm for jobs that use CUDA.
+
+We recommend you follow Infrastructure as Code best practices, such as keeping your templates in version control and
 strictly making changes by editing the template and deploying it instead of mixing CloudFormation together
 with manual infrastructure updates from the AWS console. See the
 [AWS Well-Architected guidance on Infrastructure as Code](https://docs.aws.amazon.com/wellarchitected/latest/devops-guidance/dl.eac.1-organize-infrastructure-as-code-for-scale.html)
