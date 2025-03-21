@@ -143,7 +143,7 @@ or import your .ply file into your tool of choice.
 ## Understand the cost of your training jobs
 
 Deadline Cloud monitor includes a usage explorer feature that can estimate the cost of the jobs you run
-and help you understand how much each training costs. For the sample, I trained at higher quality with a larger
+and help you understand how much each training costs. The sample illustrated here was trained at higher quality with a larger
 number of images than default and the Structure-from-Motion and training took about an hour. The example costs
 shown here are for an on-demand CUDA fleet. If you're comfortable running your tests on off-peak hours when
 CUDA-capable instances are available with low enough interruption rates, you could use a spot CUDA fleet
@@ -166,11 +166,11 @@ tool, installable into your Python via `pip install openjd-cli`. See the
 [Introduction to Creating a Job](https://github.com/OpenJobDescription/openjd-specifications/wiki/Introduction-to-Creating-a-Job)
 documentation for some ideas on local development setup.
 
-I created an EC2 instance using the [AWS deep Learning AMI with Conda](https://docs.aws.amazon.com/dlami/latest/devguide/overview-conda.html),
-and set the conda channel configuration to exclude defaults and instead use `s3://<my-conda-channel-bucket>/Conda/Default`
-and `conda-forge`. The S3 conda channel contains a `nerfstudio` package created from
-[NeRF Studio sample conda package recipe README](../../conda_recipes/nerfstudio/README.md). Then I ran `pip install openjd-cli`
-before running the following command:
+One way to run it is on EC2, using the [AWS deep Learning AMI with Conda](https://docs.aws.amazon.com/dlami/latest/devguide/overview-conda.html).
+Create a GPU instance with the AMI, and login to get terminal access. Set the conda channel configuration to exclude defaults
+and instead use `s3://<my-conda-channel-bucket>/Conda/Default` and `conda-forge`. The S3 conda channel should contain a `nerfstudio` package
+like the one from [NeRF Studio sample conda package recipe README](../../conda_recipes/nerfstudio/README.md). Then run `pip install openjd-cli`
+before the command:
 
 ```
 $ openjd run gsplat_pipeline/template.yaml \
