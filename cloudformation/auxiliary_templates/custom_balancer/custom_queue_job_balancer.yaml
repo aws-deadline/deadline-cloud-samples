@@ -39,67 +39,72 @@ Resources:
           def lambda_handler(event, context):
               deadline = boto3.client("deadline")
           
-              # input event is list of objects with farm and queue ids
-              # loop through each one and balance the job weights
+              # Input event matches the structure of a Job Lifecycle Status Change event
+              # {"detail": {"farmId": "${FarmId}", "queueId": "${QueueId}"}}
               response = []
-              for item in event:
-                  updates = []
-                  farm_id = item["farmId"]
-                  queue_id = item["queueId"]
+              updates = []
+              farm_id = event.get("detail", {}).get("farmId", "")
+              queue_id = event.get("detail", {}).get("queueId", "")
+              previous_lifecycle_status = event.get("detail", {}).get("previousLifecycleStatus" , None)
+              if not farm_id and queue_id:
+                  return {"statusCode": 422, "body": "Missing .detail.farmId or .detail.queueId"}
           
-                  active_fleet_ids = get_all_associated_fleet_ids(deadline, farm_id, queue_id)
-                  total_max_worker_count = sum(
-                      [get_max_worker_count(deadline, farm_id, x) for x in active_fleet_ids]
+              if previous_lifecycle_status is not None:
+                  return {"statusCode": 200, "body": "Balancer skipping lifecycle events that are not job submission"}
+          
+              active_fleet_ids = get_all_associated_fleet_ids(deadline, farm_id, queue_id)
+              total_max_worker_count = sum(
+                  [get_max_worker_count(deadline, farm_id, x) for x in active_fleet_ids]
+              )
+          
+              active_jobs = get_all_active_jobs(deadline, farm_id, queue_id)
+              active_job_count = len(active_jobs)
+          
+              priority_100_jobs = [job for job in active_jobs if job["priority"] == 100]
+              priority_100_job_count = len(priority_100_jobs)
+          
+              priority_0_jobs = [job for job in active_jobs if job["priority"] == 0]
+              priority_0_job_count = len(priority_0_jobs)
+          
+              if priority_100_job_count > 0:
+                  # Priority 100 jobs get all the capacity if they exist
+                  # so allocate all the weights to them
+                  active_jobs = priority_100_jobs
+              elif priority_0_job_count < active_job_count:
+                  # Priority 0 jobs get no capacity until all other jobs are done
+                  # so allocate all the weights to higher priority jobs
+                  active_jobs = [job for job in active_jobs if job["priority"] != 0]
+          
+              for job in active_jobs:
+                  job["weight"] = calculate_job_weight(deadline, farm_id, queue_id, job)
+          
+              job_weight_sum = max(1, sum(job["weight"] for job in active_jobs))
+              for job in active_jobs:
+                  # ceil because we'd rather have too high of a limit rather than idle workers
+                  job_max_worker_count = max(
+                      1, ceil((job["weight"] / job_weight_sum) * total_max_worker_count)
                   )
-          
-                  active_jobs = get_all_active_jobs(deadline, farm_id, queue_id)
-                  active_job_count = len(active_jobs)
-          
-                  priority_100_jobs = [job for job in active_jobs if job["priority"] == 100]
-                  priority_100_job_count = len(priority_100_jobs)
-          
-                  priority_0_jobs = [job for job in active_jobs if job["priority"] == 0]
-                  priority_0_job_count = len(priority_0_jobs)
-          
-                  if priority_100_job_count > 0:
-                      # Priority 100 jobs get all the capacity if they exist
-                      # so allocate all the weights to them
-                      active_jobs = priority_100_jobs
-                  elif priority_0_job_count < active_job_count:
-                      # Priority 0 jobs get no capacity until all other jobs are done
-                      # so allocate all the weights to higher priority jobs
-                      active_jobs = [job for job in active_jobs if job["priority"] != 0]
-          
-                  for job in active_jobs:
-                      job["weight"] = calculate_job_weight(deadline, farm_id, queue_id, job)
-          
-                  job_weight_sum = max(1, sum(job["weight"] for job in active_jobs))
-                  for job in active_jobs:
-                      # ceil because we'd rather have too high of a limit rather than idle workers
-                      job_max_worker_count = max(
-                          1, ceil((job["weight"] / job_weight_sum) * total_max_worker_count)
-                      )
-                      update_response = update_job_max_worker_count(
-                          deadline, farm_id, queue_id, job["jobId"], job_max_worker_count
-                      )
-                      updates.append(
-                          {
-                              "name": job["name"],
-                              "jobId": job["jobId"],
-                              "priority": job["priority"],
-                              "weight": job["weight"],
-                              "workerLimit": job_max_worker_count,
-                              "response": update_response,
-                          }
-                      )
-                  response.append({
-                      "totalMaxWorkerCount": total_max_worker_count,
-                      "activeJobCount": active_job_count,
-                      "priority100JobCount": priority_100_job_count,
-                      "priority0JobCount": priority_0_job_count,
-                      "allocatedJobCount": len(active_jobs),
-                      "updates": updates
-                  })
+                  update_response = update_job_max_worker_count(
+                      deadline, farm_id, queue_id, job["jobId"], job_max_worker_count
+                  )
+                  updates.append(
+                      {
+                          "name": job["name"],
+                          "jobId": job["jobId"],
+                          "priority": job["priority"],
+                          "weight": job["weight"],
+                          "workerLimit": job_max_worker_count,
+                          "response": update_response,
+                      }
+                  )
+              response.append({
+                  "totalMaxWorkerCount": total_max_worker_count,
+                  "activeJobCount": active_job_count,
+                  "priority100JobCount": priority_100_job_count,
+                  "priority0JobCount": priority_0_job_count,
+                  "allocatedJobCount": len(active_jobs),
+                  "updates": updates
+              })
               print(json.dumps(response))
               return {"statusCode": 200, "body": json.dumps(response)}
           
@@ -199,7 +204,8 @@ Resources:
               steps = steps_pages.build_full_result()["steps"]
               # get every task across all steps
               for step in steps:
-                  tasks_pages = deadline.get_paginator("list_tasks").paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"], stepId=step["stepId"])
+                  tasks_pages = deadline.get_paginator("list_tasks").paginate(farmId=farm_id, queueId=queue_id,
+                                                                              jobId=job["jobId"], stepId=step["stepId"])
                   tasks.extend(tasks_pages.build_full_result()["tasks"])
           
               error_count = sum([task["failureRetryCount"] for task in tasks])
@@ -268,7 +274,7 @@ Resources:
           Arn: !GetAtt
             - UnprocessedBalancingEventQueue
             - Arn
-        Input: !Sub '[{"farmId": "${FarmId}", "queueId": "${QueueId}"}]'
+        Input: !Sub '{"detail": {"farmId": "${FarmId}", "queueId": "${QueueId}"}}'
         RetryPolicy:
           MaximumRetryAttempts: 1
         RoleArn: !GetAtt
