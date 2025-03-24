@@ -6,6 +6,18 @@ Parameters:
   QueueId:
     Description: The QueueID of the Deadline Queue that you are adding a balancer for
     Type: String
+  BalanceOnJobSubmission:
+    Description: "Whether or not to trigger the Balancer in response to a Job Submission"
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+
+Conditions:
+  JobSubmissionTriggersLambda: !Equals
+    - !Ref BalanceOnJobSubmission
+    - "true"
 Resources:
   DeadlineWeightedJobBalancer:
     Type: AWS::Lambda::Function
@@ -253,6 +265,65 @@ Resources:
       MaximumEventAgeInSeconds: 21600
       MaximumRetryAttempts: 2
       Qualifier: '$LATEST'
+
+  DeadlineWeightedJobBalancerSubmissionRule:
+    Condition: JobSubmissionTriggersLambda
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Responds to Job Submissions and balances the Queue
+      State: ENABLED
+      EventPattern:
+        source:
+          - "aws.deadline"
+        detail-type:
+          - "Job Lifecycle Status Change"
+      Targets:
+        - Arn: !GetAtt
+            - DeadlineWeightedJobBalancer
+            - Arn
+          DeadLetterConfig:
+            Arn: !GetAtt
+              - UnprocessedBalancingEventQueue
+              - Arn
+          RetryPolicy:
+            MaximumRetryAttempts: 1
+          RoleArn: !GetAtt
+            - DeadlineWeightedJobBalancerSubmissionRuleRole
+            - Arn
+  DeadlineWeightedJobBalancerSubmissionRuleRole:
+    Condition: JobSubmissionTriggersLambda
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub "${AWS::AccountId}"
+      Policies:
+        - PolicyName: Amazon-EventBridge-Rule-Execution-Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt DeadlineWeightedJobBalancer.Arn
+                  - !Sub "${DeadlineWeightedJobBalancer.Arn}:*"
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt
+                    - UnprocessedBalancingEventQueue
+                    - Arn
 
   DeadlineWeightedJobBalancerSchedule:
     Type: AWS::Scheduler::Schedule
