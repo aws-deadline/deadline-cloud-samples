@@ -8,26 +8,29 @@ package:
   version: ${{ version }}
 
 source:
-  - if: linux
-    then:
-      path: ../redshift_core.tar.gz # run installer into a custom folder and tarball that folder
-    else:
-      url: https://installer.maxon.net/installer/rs/redshift_${{version}}_win_x64.zip # [win64]
-      sha256: 0bcc0141db539d58ed030a3136cf43b66702c84fa43b9931505b684b90f82558 # might need to replace sha256 if using a different installer version
-    target_directory: ${name}
-
-requirements:
-  run:
-    - houdini
+  - path: /usr/redshift #the default redshift install path. Assumes redshift has been installed on this computer
+  #- path: ../redshift_core.tar.gz #optionally use a tarball of the install path instead
+    target_directory: redshift
 
 build:
   number: 0
-  always_copy_files: False
+  prefix_detection:
+    ignore_binary_files: True
   dynamic_linking:
-    rpaths: ['lib/', 'opt/houdini/dsolib']
+    rpaths:
+    - opt/houdini/dsolib
+    rpath_allowlist:
+      - "**"
+    binary_relocation:
+      - "**/redshift/redshift4houdini/**/dso/*.so"
+    missing_dso_allowlist:
+      - "**"
+
+tests:
+  - script:
+    - $REDSHIFT_COREDATAPATH/bin/redshiftCmdLine -listrenderoptions
 
 about:
   homepage: https://redshift.maxon.net
   summary: >
     3D computer animation, modeling, simulation, and rendering software
-
