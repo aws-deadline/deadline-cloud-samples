@@ -1,4 +1,3 @@
-Description: An AWS Serverless Application Model template describing your function.
 Description: A Lambda Function that acts as a balancer for a Deadline Cloud Queue by modifying maxWorkers
 Parameters:
   FarmId:
@@ -22,14 +21,24 @@ Resources:
       Role: !GetAtt DeadlineWeightedJobBalancerExecutionRole.Arn
       Code:
         ZipFile: |
+          import os
+          import sys
+          import subprocess
+          
+          # Install the latest version of boto3 that has the job maxWorkerCount in it
+          os.makedirs("/tmp/site-packages", exist_ok=True)
+          sys.path.insert(0, "/tmp/site-packages")
+          subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "--target", "/tmp/site-packages", "boto3"])
+          
           import json
           import boto3
-          import os
           from datetime import datetime, timezone
           from math import ceil
           
+          
           def lambda_handler(event, context):
               deadline = boto3.client("deadline")
+          
               # input event is list of objects with farm and queue ids
               # loop through each one and balance the job weights
               response = []
@@ -38,67 +47,61 @@ Resources:
                   farm_id = item["farmId"]
                   queue_id = item["queueId"]
           
-                  active_jobs = get_all_active_jobs(deadline, farm_id, queue_id)
-                  active_fleets = get_all_associated_fleets(deadline, farm_id, queue_id)
-                  total_workers = sum(
-                      [get_worker_limit(deadline, farm_id, x) for x in active_fleets]
+                  active_fleet_ids = get_all_associated_fleet_ids(deadline, farm_id, queue_id)
+                  total_max_worker_count = sum(
+                      [get_max_worker_count(deadline, farm_id, x) for x in active_fleet_ids]
                   )
           
-                  paused_job_count = get_paused_job_count(active_jobs)
-                  has_high_priority_job = has_high_priority_jobs(active_jobs)
+                  active_jobs = get_all_active_jobs(deadline, farm_id, queue_id)
+                  active_job_count = len(active_jobs)
           
-                  # Handle "Only Paused Jobs" jobs where we now can allocate workers to jobs with 0 priority
-                  if paused_job_count != len(active_jobs):
-                      # Filter out any jobs that are set to priority 0 UNLESS they are all set to 0
-                      active_jobs = filter(lambda job: job["priority"] != 0, active_jobs)
+                  priority_100_jobs = [job for job in active_jobs if job["priority"] == 100]
+                  priority_100_job_count = len(priority_100_jobs)
           
-                  if has_high_priority_job:
-                      # Handle "High Priority" jobs where we should only balance to jobs with 100 priority
-                      # Filter out any jobs that are not priority 100 if we have at least one job at priority 100
-                      active_jobs = filter(lambda job: job["priority"] == 100, active_jobs)
+                  priority_0_jobs = [job for job in active_jobs if job["priority"] == 0]
+                  priority_0_job_count = len(priority_0_jobs)
           
-                  job_weights = [
-                      {
-                          "name": x["name"],
-                          "jobId": x["jobId"],
-                          "priority": x["priority"],
-                          "weight": calculate_job_weights(deadline, farm_id, queue_id, x),
-                      }
-                      for x in active_jobs
-                  ]
+                  if priority_100_job_count > 0:
+                      # Priority 100 jobs get all the capacity if they exist
+                      # so allocate all the weights to them
+                      active_jobs = priority_100_jobs
+                  elif priority_0_job_count < active_job_count:
+                      # Priority 0 jobs get no capacity until all other jobs are done
+                      # so allocate all the weights to higher priority jobs
+                      active_jobs = [job for job in active_jobs if job["priority"] != 0]
           
-                  total_weights = max(1, sum([x["weight"] for x in job_weights]))
-                  for job_weight in job_weights:
+                  for job in active_jobs:
+                      job["weight"] = calculate_job_weight(deadline, farm_id, queue_id, job)
+          
+                  job_weight_sum = max(1, sum(job["weight"] for job in active_jobs))
+                  for job in active_jobs:
                       # ceil because we'd rather have too high of a limit rather than idle workers
-                      job_limit = max(
-                          1, ceil((job_weight["weight"] / total_weights) * total_workers)
+                      job_max_worker_count = max(
+                          1, ceil((job["weight"] / job_weight_sum) * total_max_worker_count)
                       )
-                      update_response = update_job_limit(
-                          deadline, farm_id, queue_id, job_weight["jobId"], job_limit
+                      update_response = update_job_max_worker_count(
+                          deadline, farm_id, queue_id, job["jobId"], job_max_worker_count
                       )
                       updates.append(
                           {
-                              "name": job_weight["name"],
-                              "jobId": job_weight["jobId"],
-                              "priority": job_weight["priority"],
-                              "weight": job_weight["weight"],
-                              "workerLimit": job_limit,
+                              "name": job["name"],
+                              "jobId": job["jobId"],
+                              "priority": job["priority"],
+                              "weight": job["weight"],
+                              "workerLimit": job_max_worker_count,
                               "response": update_response,
                           }
                       )
-                  response.append({"totalWorkers": total_workers, "updates": updates})
+                  response.append({
+                      "totalMaxWorkerCount": total_max_worker_count,
+                      "activeJobCount": active_job_count,
+                      "priority100JobCount": priority_100_job_count,
+                      "priority0JobCount": priority_0_job_count,
+                      "allocatedJobCount": len(active_jobs),
+                      "updates": updates
+                  })
               print(json.dumps(response))
               return {"statusCode": 200, "body": json.dumps(response)}
-          
-          
-          def has_high_priority_jobs(active_jobs):
-              for job in active_jobs:
-                  if job["priority"] == 100:
-                      return True
-              return False
-          
-          def get_paused_job_count(active_jobs):
-              return len(list(filter(lambda job: job["priority"] == 0, active_jobs)))
           
           
           def get_all_active_jobs(deadline, farm_id, queue_id):
@@ -165,48 +168,41 @@ Resources:
               return active_jobs
           
           
-          def get_all_associated_fleets(deadline, farm_id, queue_id):
-              associated_fleets = []
+          def get_all_associated_fleet_ids(deadline, farm_id, queue_id):
+              associated_fleet_ids = []
               qfa_paginator = deadline.get_paginator("list_queue_fleet_associations")
               for qfa_page in qfa_paginator.paginate(farmId=farm_id, queueId=queue_id):
-                  associated_fleets.extend(
+                  associated_fleet_ids.extend(
                       [
-                          x["fleetId"]
-                          for x in qfa_page.get("queueFleetAssociations", [])
-                          if x["status"] == "ACTIVE"
+                          qfa["fleetId"]
+                          for qfa in qfa_page.get("queueFleetAssociations", [])
+                          if qfa["status"] == "ACTIVE"
                       ]
                   )
-              return associated_fleets
+              return associated_fleet_ids
           
           
-          def get_worker_limit(deadline, farm_id, fleet_id):
+          def get_max_worker_count(deadline, farm_id, fleet_id):
               fleet_info = deadline.get_fleet(farmId=farm_id, fleetId=fleet_id)
               return fleet_info["maxWorkerCount"]
           
           
-          def calculate_job_weights(deadline, farm_id, queue_id, job):
-              # get every step
-              steps = []
+          def calculate_job_weight(deadline, farm_id, queue_id, job):
+              job_task_run_status_counts = job["taskRunStatusCounts"]
+              total_rendering_tasks = sum(job_task_run_status_counts[run_status]
+                                          for run_status in ["RUNNING", "ASSIGNED", "STARTING", "SCHEDULED", "READY"])
           
-              steps_paginator = deadline.get_paginator("list_steps")
-              for step_page in steps_paginator.paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"]):
-                  steps.extend(step_page.get("steps", []))
-          
-              # get every task
+              # While task run statuses are available counted at the job level, task failure retry counts are not.
+              # Therefore, we loop through all the individual tasks to get that.
               tasks = []
+              steps_pages = deadline.get_paginator("list_steps").paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"])
+              steps = steps_pages.build_full_result()["steps"]
+              # get every task across all steps
               for step in steps:
-                  tasks_paginator = deadline.get_paginator("list_tasks")
-                  for task_page in tasks_paginator.paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"], stepId=step["stepId"]):
-                      tasks.extend(task_page.get("tasks", []))
+                  tasks_pages = deadline.get_paginator("list_tasks").paginate(farmId=farm_id, queueId=queue_id, jobId=job["jobId"], stepId=step["stepId"])
+                  tasks.extend(tasks_pages.build_full_result()["tasks"])
           
-              error_count = sum([x["failureRetryCount"] for x in tasks])
-              # total_rendering_tasks = sum([x["runStatus"] in ["RUNNING", "ASSIGNED", "STARTING", "SCHEDULED", "READY"] for x in tasks])
-              total_rendering_tasks = sum(
-                  [
-                      x["runStatus"] in ["RUNNING", "ASSIGNED", "STARTING", "SCHEDULED"]
-                      for x in tasks
-                  ]
-              )
+              error_count = sum([task["failureRetryCount"] for task in tasks])
           
               PW = float(os.environ["PRIORITY_WEIGHT"])
               EW = float(os.environ["ERROR_WEIGHT"])
@@ -225,7 +221,7 @@ Resources:
               return weight
           
           
-          def update_job_limit(deadline, farm_id, queue_id, job_id, worker_limit):
+          def update_job_max_worker_count(deadline, farm_id, queue_id, job_id, worker_limit):
               try:
                   update_job_result = deadline.update_job(
                       farmId=farm_id, queueId=queue_id, jobId=job_id, maxWorkerCount=worker_limit
@@ -395,7 +391,3 @@ Resources:
                   - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/*"
                   - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/queue/${QueueId}/job/*"
                   - !Sub "arn:aws:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/queue/${QueueId}"
-              - Effect: Allow
-                Action:
-                  - identitystore:ListGroupMembershipsForMember
-                Resource: '*'
