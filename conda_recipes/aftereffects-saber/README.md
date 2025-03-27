@@ -1,11 +1,11 @@
 # Saber plug-in conda build recipe for After Effects
 
 ## About
-This recipe installs the Saber.aex plug-in file to the AE plugin directory located under `$PREFIX/opt/aftereffects/Plug-ins` in the Conda environment. To write conda recipes to add more plug-ins to your After Effects Deadline Cloud setup, use this recipe as a template to guide your development.
+This recipe installs the Saber.aex plug-in file to the AE plugin directory located under `$PREFIX/opt/aftereffects/Plug-ins` in the Conda environment. To write conda recipes to add more plug-ins to your After Effects (AE) Deadline Cloud setup, use this recipe as a template to guide your development.
 
 ## Creating an archive file for Windows
 
-Follow these instructions to install Adobe After Effects 25 on a freshly created EC2 instance as Administrator, then install the AE Saber plug-in, then create an archive file of the Saber plugin and use it with the conda build recipe. If you have a Windows workstation, you can also do step 3 and 5 without starting an EC2 instance.
+Follow these instructions to install AE 25 on a freshly created EC2 instance as Administrator, then install the AE Saber plug-in, then create an archive file of the Saber plugin and use it with the conda build recipe. If you have a Windows workstation, you can also do step 3 and 5 without starting an EC2 instance.
 
 1. Launch a fresh Windows Server 2022 instance.
    1. From the AWS EC2 management console, select the option to Launch instance.
@@ -32,10 +32,10 @@ Follow these instructions to install Adobe After Effects 25 on a freshly created
       1. Computer: `localhost:33389`
       2. User name: `Administrator`
    5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
-3. Install Adobe After Effects 25 on the instance.
+3. Install Adobe AE 25 on the instance.
    1. Download Adobe Creative Cloud after logging into your Adobe account.
-   2. Download Adobe After Effects 25 from Creative Cloud App.
-   3. The After Effects installer will launch. Proceed to install as normal with the components you want included.
+   2. Download Adobe AE 25 from Creative Cloud App.
+   3. The AE installer will launch. Proceed to install as normal with the components you want included.
 4. Install Saber plug-in
    1. Download Saber plug-in from here: https://www.videocopilot.net/blog/2016/03/new-plug-in-saber-now-available-100-free
    2. Log in with a powershell window again, either from the EC2 management console session manager or reconnecting to RDP.
