@@ -46,3 +46,4 @@ Follow these instructions to install Adobe After Effects 25 on a freshly created
       `Write-S3Object -BucketName MY_BUCKET_NAME -Key Saber_1_0_40_Windows_installation.zip -File Saber_1_0_40_Windows_installation.zip`.
 4. From the AWS EC2 management console, select the instance you used and terminate it.
 5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the saber conda build recipe meta.yaml.
+6. Follow the instructions [here](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/conda_recipes/README.md) to build the conda recipe into your custom conda channel.
