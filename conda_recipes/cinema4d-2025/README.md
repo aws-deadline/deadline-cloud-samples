@@ -35,17 +35,26 @@ for use by the conda build recipe.
         2. User name: `Administrator`
     5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
 3. Install Cinema 4D 2025 on the instance.
-    1. Download the Cinema 4D 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2025-downloads). For example, the files `Cinema4D_2025_2025.0.2_Win.exe`.
-       If you have placed them on S3, you can use a PowerShell command like `Read-S3Object -BucketName MY_BUCKET_NAME -Key MY_UPLOADED_KEY_NAME -File MY_FILE_NAME`.
-    2. Run the installer. Accept the prompts to continue.
-    3. The Cinema 4D installer will launch. Proceed to install as normal with the components you want included.
-    4. Restart the instance to ensure that changes from the installation took effect.
-    5. Log in with a PowerShell window again, either from the EC2 management console session manager or reconnecting to RDP.
-    5. Run the following commands to create the archive.
-        1. `cd 'C:\Program Files\'`
-        2. `Compress-Archive -Path '.\Maxon Cinema 4D 2025\' -DestinationPath Cinema4D_2025_2025.0.2_Win.zip`
-        3. `(Get-FileHash -Path .\Cinema4D_2025_2025.0.2_Win.zip -Algorithm SHA256).Hash.ToLower()`
-    6. Record the file sha256 hash, and upload the archive to your private S3 bucket. You can use a PowerShell command like
-       `Write-S3Object -BucketName MY_BUCKET_NAME -Key Cinema4D_2025_2025.0.2_Win.zip -File Cinema4D_2025_2025.0.2_Win.zip`.
-4. From the AWS EC2 management console, select the instance you used and terminate it.
-5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the Cinema 4D-2025 conda build recipe meta.yaml.
+    1. Download the Cinema 4D 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2025-downloads). For example, the file `Cinema4D_2025_2025.1.3_Win.exe`.
+       If you have placed it on S3, you can use a PowerShell command like `Read-S3Object -BucketName MY_BUCKET_NAME -Key MY_UPLOADED_KEY_NAME -File MY_FILE_NAME`.
+    2. Run the C4D installer on the EC2 instance. Use the default settings.
+4. Install Redshift for Cinema 4D 2025 (Optional) 
+    > **Note:** If you need Redshift to work on EC2 instances with GPUs, complete these steps before proceeding:
+    1. Download the Full Redshift 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads > Redshift). For example, the file `redshift_2025.3.0_win_x64.exe`.
+    2. Run the Redshift installer on the EC2 instance. Use the default settings.
+    3. Run the following commands to configure Redshift:
+        1. `Rename-Item C:\ProgramData\Redshift C:\ProgramData\RedshiftData`
+        2. `Move-Item -Path C:\ProgramData\RedshiftData -Destination 'C:\Program Files\Maxon Cinema 4D 2025'`
+        3. `$pathconfig = 'C:\Program Files\Maxon Cinema 4D 2025\plugins\Redshift\pathconfig.xml'`
+        4. `New-Item $pathconfig -ItemType File -Value ('<path name="REDSHIFT_COREDATAPATH" value="%C4D_LOCATION%\RedshiftData" />' + [Environment]::NewLine)`
+        5. `Add-Content $pathconfig '<path name="REDSHIFT_LOCALDATAPATH" value="%C4D_LOCATION%\RedshiftData" />'`
+5. Restart the instance to ensure that all installation changes take effect.
+6. Log in with a PowerShell window again, either from the EC2 management console session manager or reconnecting to RDP.
+7. Create and upload the archive:
+    1. `cd 'C:\Program Files\'`
+    2. `Compress-Archive -Path '.\Maxon Cinema 4D 2025\' -DestinationPath Cinema4D_2025_2025.1.3_Win.zip`
+    3. `(Get-FileHash -Path .\Cinema4D_2025_2025.1.3_Win.zip -Algorithm SHA256).Hash.ToLower()`
+    4. Record the file sha256 hash, and upload the archive to your private S3 bucket. You can use a PowerShell command like
+       `Write-S3Object -BucketName MY_BUCKET_NAME -Key Cinema4D_2025_2025.1.3_Win.zip -File Cinema4D_2025_2025.1.3_Win.zip`.
+8. From the AWS EC2 management console, select the instance you used and terminate it.
+9. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the Cinema 4D-2025 conda build recipe meta.yaml.
