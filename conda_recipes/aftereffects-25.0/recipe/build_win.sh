@@ -2,8 +2,8 @@
 set -xeuo pipefail
 
 # The location within $PREFIX where AE will be installed
-mkdir -p $PREFIX/opt
-cp -r $SRC_DIR/aftereffects $PREFIX/opt/
+mkdir -p $PREFIX
+cp -r $SRC_DIR/aftereffects $PREFIX
 
 # The version without the update number
 AE_VERSION=${PKG_VERSION%.*}
@@ -16,29 +16,29 @@ mkdir -p "$PREFIX/etc/conda/activate.d"
 mkdir -p "$PREFIX/etc/conda/deactivate.d"
 
 cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
-set "AE_LOCATION=$PREFIX/opt/aftereffects"
+set "AE_LOCATION=$PREFIX/aftereffects"
 set "AE_VERSION=$AE_VERSION"
-set "PATH=$PREFIX/opt/aftereffects;%PATH%"
+set "PATH=$PREFIX/aftereffects;%PATH%"
 EOF
 cat "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 
 cat <<EOF > $PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh
 export "AE_VERSION=$AE_VERSION"
-export "AE_LOCATION=\$CONDA_PREFIX/opt/aftereffects"
-export PATH="\$(cygpath '$PREFIX/opt/aftereffects'):\$PATH"
+export "AE_LOCATION=\$CONDA_PREFIX/aftereffects"
+export PATH="\$(cygpath '$PREFIX/aftereffects'):\$PATH"
 EOF
 cat $PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh
 
 
 cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
-set "PATH=%PATH:$PREFIX/opt/aftereffects;=%"
+set "PATH=%PATH:$PREFIX/aftereffects;=%"
 set AE_VERSION=
 set AE_LOCATION=
 EOF
 cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 
 cat <<EOF > $PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh
-export PATH="\${PATH/\$(cygpath '$PREFIX/opt/aftereffects'):/}"
+export PATH="\${PATH/\$(cygpath '$PREFIX/aftereffects'):/}"
 unset AE_VERSION
 unset AE_LOCATION
 EOF
