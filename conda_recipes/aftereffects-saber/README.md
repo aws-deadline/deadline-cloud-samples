@@ -1,7 +1,7 @@
 # Saber plug-in conda build recipe for After Effects
 
 ## About
-This recipe installs the Saber.aex plug-in file to the After Effects (AE) plugin directory located under `$PREFIX/opt/aftereffects/Plug-ins` in the Conda environment. To write conda recipes to add more plug-ins to your AE Deadline Cloud setup, use this recipe as a template to guide your development.
+This recipe installs the Saber.aex plug-in file to the After Effects (AE) plugin directory located under the Plug-ins folder of After Effects SMF. To write conda recipes to add more plug-ins to your AE Deadline Cloud setup, use this recipe as a template to guide your development.
 
 ## Creating an archive file for Windows
 

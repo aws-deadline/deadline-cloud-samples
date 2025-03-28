@@ -3,7 +3,8 @@ set -xeuo pipefail
 
 mkdir -p $PREFIX/opt
 
-AE_LOCATION="$PREFIX/opt/aftereffects"
+AE_LOCATION="$PREFIX/aftereffects"
+
 AE_PLUGINS_DIRECTORY="$AE_LOCATION/Plug-ins"
 
 mkdir -p $AE_PLUGINS_DIRECTORY
