@@ -37,9 +37,9 @@ install Adobe After Effects 25 on a freshly created EC2 instance as Administrato
    3. The After Effects installer will launch. Proceed to install as normal with the components you want included.
    4. Log in with a powershell window again, either from the EC2 management console session manager or reconnecting to RDP.
    5. Run the following commands to create the archive.
-      1. `Compress-Archive -Path 'C:\Program Files\Adobe\Adobe After Effects 2025\Support Files' -DestinationPath Adobe_AfterEffects_25_0_Windows_installation.zip`
-      2. `(Get-FileHash -Path "Adobe_AfterEffects_25_0_Windows_installation.zip" -Algorithm SHA256).Hash.ToLower()`
+      1. `Compress-Archive -Path 'C:\Program Files\Adobe\Adobe After Effects 2025\Support Files' -DestinationPath Adobe_AfterEffects_25_1_Windows_installation.zip`
+      2. `(Get-FileHash -Path "Adobe_AfterEffects_25_1_Windows_installation.zip" -Algorithm SHA256).Hash.ToLower()`
    6. Record the file sha256 hash, and upload the archive to your private S3 bucket. You can use a PowerShell command like
-      `Write-S3Object -BucketName MY_BUCKET_NAME -Key Adobe_AfterEffects_25_0_Windows_installation.zip -File Adobe_AfterEffects_25_0_Windows_installation.zip`.
+      `Write-S3Object -BucketName MY_BUCKET_NAME -Key Adobe_AfterEffects_25_1_Windows_installation.zip -File Adobe_AfterEffects_25_1_Windows_installation.zip`.
 4. From the AWS EC2 management console, select the instance you used and terminate it.
 5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the aftereffects-25 conda build recipe meta.yaml.
