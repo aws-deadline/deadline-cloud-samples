@@ -40,7 +40,7 @@ requirements:
   run:
     # For the variant config file in deadline-cloud.yaml to work, python must not specify a version here.
     - python
-    - deadline >=0.49.7
+    - deadline >=0.49.7,<0.50
     - openjd-adaptor-runtime ==0.9.*
 
 test:
