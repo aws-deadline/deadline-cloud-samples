@@ -4,7 +4,7 @@
 This recipe installs the Saber.aex plug-in file to the After Effects (AE) plugin directory located under the Plug-ins folder of After Effects SMF. To write conda recipes to add more plug-ins to your AE Deadline Cloud setup, use this recipe as a template to guide your development.
 
 ## Plugin Solution for After Effects
-When adding plug-ins to After Effects on Windows SMF, add them to the path `$PREFIX/aftereffects/Plug-ins` so that the After Effects rendering executable can find the plugins. The plugins added to this folder must have extension `.aex` to work on Windows SMF.
+When adding plug-ins to After Effects on Windows SMF, we provide a supported environment variable called `$AE_LOCATION`. Within that location, you can add your plugins to `$AE_LOCATION/Plug-ins` so that the After Effects rendering executable can find the plugins. The plugins added to this folder must have extension `.aex` to work on Windows SMF.
 
 ## Creating an archive file for Windows of Saber
 Follow these instructions to install AE 25 on a freshly created EC2 instance as Administrator, then install the AE Saber plug-in, then create an archive file of the Saber plugin and use it with the conda build recipe. If you have a Windows workstation, you can also do step 3 and 5 without starting an EC2 instance.

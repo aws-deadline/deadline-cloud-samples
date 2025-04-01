@@ -1,8 +1,6 @@
 #!/bin/sh
 set -xeuo pipefail
 
-AE_LOCATION="$PREFIX/aftereffects"
-
 AE_PLUGINS_DIRECTORY="$AE_LOCATION/Plug-ins"
 
 mkdir -p $AE_PLUGINS_DIRECTORY
