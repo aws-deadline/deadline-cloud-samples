@@ -2,7 +2,7 @@
 # See recipe.yaml for the recipe in rattler-build format.
 
 {% set name = "deadline" %}
-{% set version = "0.49.3" %}
+{% set version = "0.49.7" %}
 
 package:
   name: {{ name }}
@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/deadline-{{ version }}.tar.gz
-  sha256: 30ff5c2bf3c9e0b9c42b777661ed470cbc6333d877cf386f9c5c31918844a553
+  sha256: 917c6a3682015fe5f967991d2ce68befbd0e36c99fdb28cbca8ffcf6bf8742dd
   patches:
     - 0001-Remove-version-build-hook.patch
 
@@ -30,7 +30,7 @@ requirements:
     - pip
   run:
     - python
-    - boto3 >=1.34.75
+    - boto3 >=1.36.8
     - click >=8.1.7
     - pyyaml >=6.0
     - typing-extensions >=4.8

@@ -2,8 +2,8 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "4.1.1"
-  major_minor_version: "4.1"
+  version: "4.4.0"
+  major_minor_version: "4.4"
 
 package:
   name: blender
@@ -13,12 +13,12 @@ source:
   - if: linux
     then:
       url: https://download.blender.org/release/Blender${{ major_minor_version }}/blender-${{ version }}-linux-x64.tar.xz
-      sha256: ab2ea3fe991601a5e6bd2cda786ecaa919c0b39e0550e59978b5d40270c260d3
+      sha256: b4a74463677618d09621332ddbd62baa1a3ed06a11818714f6c5f1c7f31a15c6
       target_directory: blender
   - if: win
     then:
       url: https://download.blender.org/release/Blender${{ major_minor_version }}/blender-${{ version }}-windows-x64.zip
-      sha256: 40b4829888770b93aafe96875e00a12e781720010dbbad3aa898362ea3cad62c
+      sha256: 1a603c06d67ef5ae4fae2e5991742a183af525e2f4162e0e5a8c5d010ba0119e
       target_directory: blender
 
 build:
