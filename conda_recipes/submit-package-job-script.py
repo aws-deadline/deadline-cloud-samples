@@ -18,11 +18,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import yaml
-from deadline.client.api import create_job_from_job_bundle, get_boto3_client, list_queues
-from deadline.client.config import get_setting, set_setting
-from deadline.client.config.config_file import read_config
-from deadline.client.job_bundle import create_job_history_bundle_dir
 
+try:
+    from deadline.client.api import create_job_from_job_bundle, get_boto3_client, list_queues
+    from deadline.client.config import get_setting, set_setting
+    from deadline.client.config.config_file import read_config
+    from deadline.client.job_bundle import create_job_history_bundle_dir
+except ModuleNotFoundError:
+    print("ERROR: The `deadline` library is not installed. Please install it with the following command:")
+    print(f" \"{sys.executable}\" -m pip install deadline")
+    sys.exit(1)
 
 def validate_recipe(recipe_dir):
     """Validate the conda build recipe directory with some basic sanity checks."""
