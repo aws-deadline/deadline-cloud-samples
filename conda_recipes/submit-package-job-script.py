@@ -287,6 +287,14 @@ def create_job_bundle(
                 print(f"    {platform_meta['sourceDownloadInstructions']}")
                 sys.exit(1)
 
+        source_archive_directory = platform_meta.get("sourceArchiveDirectory")
+        if source_archive_directory:
+            parameter_values[f"OverrideSourceDir_{step_name_suffix}"] = str(archive_file_dir / source_archive_directory)
+            if not (archive_file_dir / source_archive_directory).is_dir():
+                print(f"ERROR: Directory {source_archive_directory} not found in {archive_file_dir}.")
+                print(f"To submit the {recipe_dir.name} package build, you need this directory.")
+                sys.exit(1)
+
         # Rename the platform-specific parameter values
         per_step_parameters = set(platform_template["meta"]["perStepParameters"])
 

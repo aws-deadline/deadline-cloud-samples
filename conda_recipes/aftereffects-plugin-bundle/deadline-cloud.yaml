@@ -1,0 +1,5 @@
+condaPlatforms:
+  - platform: win-64
+    defaultSubmit: true
+    sourceArchiveDirectory: aftereffects-plugin-bundle/win-64/
+    buildTool: conda-build

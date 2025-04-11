@@ -107,6 +107,7 @@ def main():
     parser.add_argument("--override-prefix-length")
     parser.add_argument("--override-source-archive1")
     parser.add_argument("--override-source-archive2")
+    parser.add_argument("--override-source-dir")
     parser.add_argument("--variant-config-file")
     args = parser.parse_args()
 
@@ -219,33 +220,40 @@ def main():
         if not os.path.isfile(args.override_source_archive2):
             print(f"ERROR: Override source archive 2 does not exist: {args.override_source_archive2}")
             sys.exit(1)
+    if args.override_source_dir:
+        if not os.path.isdir(args.override_source_dir):
+            print(f"ERROR: Override source dir does not exist: {args.override_source_dir}")
+            sys.exit(1)
 
     # Substitute the override archives into the recipe
     if "source" in rendered_recipe:
         updated_recipe["source"] = rendered_recipe["source"]
-        if isinstance(rendered_recipe["source"], dict):
-            if args.override_source_archive1:
-                if args.build_tool == "conda-build":
-                    updated_recipe["source"]["url"] = args.override_source_archive1
-                else:
-                    updated_recipe["source"].pop("url", None)
-                    updated_recipe["source"]["path"] = args.override_source_archive1
-        elif isinstance(rendered_recipe["source"], list):
-            if args.override_source_archive1 or args.override_source_archive2:
-                if args.override_source_archive1:
-                    if args.build_tool == "conda-build":
-                        updated_recipe["source"][0]["url"] = args.override_source_archive1
-                    else:
-                        updated_recipe["source"][0].pop("url", None)
-                        updated_recipe["source"][0]["path"] = args.override_source_archive1
-                if args.override_source_archive2:
-                    if args.build_tool == "conda-build":
-                        updated_recipe["source"][1]["url"] = args.override_source_archive2
-                    else:
-                        updated_recipe["source"][1].pop("url", None)
-                        updated_recipe["source"][1]["path"] = args.override_source_archive2
-        else:
+        # If the source is not in list form, turn it into a list
+        if isinstance(updated_recipe["source"], dict):
+            updated_recipe["source"] = [updated_recipe["source"]]
+
+        if not isinstance(updated_recipe["source"], list):
             raise RuntimeError("The rendered recipe's source field was not a string or a list.")
+
+        # Put the source archives in a list to help process sequentially
+        override_source_archives = []
+        if args.override_source_archive1:
+            override_source_archives.append(args.override_source_archive1)
+        if args.override_source_archive2:
+            override_source_archives.append(args.override_source_archive2)
+        override_source_dir = args.override_source_dir
+
+        # Iterate through the source entries and update either the directory path or URL
+        # based on the input override parameters.
+        for source_entry in updated_recipe["source"]:
+            if "path" in source_entry:
+                if override_source_dir:
+                    source_entry["path"] = override_source_dir
+            elif "url" in source_entry:
+                if override_source_archives:
+                    source_entry["url"] = override_source_archives.pop(0)
+                    if args.build_tool != "conda-build":
+                        source_entry["path"] = source_entry.pop("url")
 
     # Save the rendered recipe with modifications
     if args.build_tool == "conda-build":
