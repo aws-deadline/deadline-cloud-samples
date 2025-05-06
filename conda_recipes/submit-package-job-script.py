@@ -18,11 +18,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import yaml
-from deadline.client.api import create_job_from_job_bundle, get_boto3_client, list_queues
-from deadline.client.config import get_setting, set_setting
-from deadline.client.config.config_file import read_config
-from deadline.client.job_bundle import create_job_history_bundle_dir
 
+try:
+    from deadline.client.api import create_job_from_job_bundle, get_boto3_client, list_queues
+    from deadline.client.config import get_setting, set_setting
+    from deadline.client.config.config_file import read_config
+    from deadline.client.job_bundle import create_job_history_bundle_dir
+except ModuleNotFoundError:
+    print("ERROR: The `deadline` library is not installed. Please install it with the following command:")
+    print(f" \"{sys.executable}\" -m pip install deadline")
+    sys.exit(1)
 
 def validate_recipe(recipe_dir):
     """Validate the conda build recipe directory with some basic sanity checks."""
@@ -280,6 +285,14 @@ def create_job_bundle(
                 print(f"To submit the {recipe_dir.name} package build, you need these files.")
                 print(f"To acquire this archive, follow these instructions and place it in the {archive_file_dir} directory:")
                 print(f"    {platform_meta['sourceDownloadInstructions']}")
+                sys.exit(1)
+
+        source_archive_directory = platform_meta.get("sourceArchiveDirectory")
+        if source_archive_directory:
+            parameter_values[f"OverrideSourceDir_{step_name_suffix}"] = str(archive_file_dir / source_archive_directory)
+            if not (archive_file_dir / source_archive_directory).is_dir():
+                print(f"ERROR: Directory {source_archive_directory} not found in {archive_file_dir}.")
+                print(f"To submit the {recipe_dir.name} package build, you need this directory.")
                 sys.exit(1)
 
         # Rename the platform-specific parameter values

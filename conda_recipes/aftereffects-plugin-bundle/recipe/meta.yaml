@@ -1,0 +1,24 @@
+
+package:
+  name: aftereffects-plugin-bundle
+  version: "1.0"
+
+source:
+- path: ../../archive_files/aftereffects-plugin-bundle/win-64 # [win64]
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+requirements:
+  run:
+    - aftereffects >=25,<26
+
+about:
+  license: LicenseRef-Multiple
+  summary: This package contains all the After Effects plugins provided to the recipe in a directory.

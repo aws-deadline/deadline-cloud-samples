@@ -61,6 +61,18 @@ parameterDefinitions:
   objectType: FILE
   dataFlow: IN
   default: ""
+- name: OverrideSourceDir
+  description: |
+    If the source includes a local directory, this replaces the recipe's source directory with this directory. Use "" or leave the
+    parameter out to use the recipe's source directory.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Override Source Dir
+    groupLabel: Conda Package Recipe
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: ""
 - name: OverridePackageName
   description: If provided, overrides the package name in the recipe's meta.yaml file.
   type: STRING
@@ -199,6 +211,7 @@ steps:
       - BuildTool
       - OverrideSourceArchive1
       - OverrideSourceArchive2
+      - OverrideSourceDir
       - CondaPlatform
       - VariantConfigFile
 
@@ -245,6 +258,7 @@ steps:
             --override-package-name '{{Param.OverridePackageName}}' \
             --override-source-archive1 '{{Param.OverrideSourceArchive1}}' \
             --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
+            --override-source-dir '{{Param.OverrideSourceDir}}' \
             --variant-config-file '{{Param.VariantConfigFile}}'
 
   hostRequirements:
