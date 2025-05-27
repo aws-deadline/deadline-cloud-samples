@@ -26,8 +26,9 @@ try:
     from deadline.client.job_bundle import create_job_history_bundle_dir
 except ModuleNotFoundError:
     print("ERROR: The `deadline` library is not installed. Please install it with the following command:")
-    print(f" \"{sys.executable}\" -m pip install deadline")
+    print(f' "{sys.executable}" -m pip install deadline')
     sys.exit(1)
+
 
 def validate_recipe(recipe_dir):
     """Validate the conda build recipe directory with some basic sanity checks."""
@@ -370,13 +371,17 @@ def create_job_bundle(
     }
 
     (job_bundle_dir / "template.yaml").write_text(json.dumps(job_template, indent=1, sort_keys=False))
+
+    parameter_values_list = [{"name": name, "value": value} for name, value in parameter_values.items()]
     (job_bundle_dir / "parameter_values.yaml").write_text(
         json.dumps(
-            {"parameterValues": [{"name": name, "value": value} for name, value in parameter_values.items()]},
+            {"parameterValues": parameter_values_list},
             indent=1,
             sort_keys=False,
         )
     )
+
+    return parameter_values_list
 
 
 def progress_callback(op_name):
@@ -441,7 +446,7 @@ def main():
     if default_build_tool not in ["conda-build", "rattler-build"]:
         raise RuntimeError(f"Recipe provided an unsupported build tool {default_build_tool}")
 
-    create_job_bundle(
+    job_parameters = create_job_bundle(
         default_build_tool=default_build_tool,
         job_bundle_dir=job_bundle_dir,
         recipe_dir=recipe_dir,
@@ -453,9 +458,11 @@ def main():
         conda_platforms=conda_platforms,
     )
     print(f"Wrote job bundle:\n  '{job_bundle_dir}'")
+    print()
 
     create_job_from_job_bundle(
         job_bundle_dir,
+        job_parameters=job_parameters,
         print_function_callback=print,
         hashing_progress_callback=progress_callback("Hashing"),
         upload_progress_callback=progress_callback("Uploading"),
