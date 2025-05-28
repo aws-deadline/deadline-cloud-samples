@@ -12,5 +12,6 @@ condaPlatforms:
     sourceDownloadInstructions: 'Follow the instructions in README.md to construct the archive zip file.'
     buildTool: conda-build
 jobParameters:
+  # conda-forge is used to get patchelf on Linux
   - name: CondaChannels
     value: conda-forge

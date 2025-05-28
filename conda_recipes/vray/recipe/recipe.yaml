@@ -1,0 +1,47 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "7.10.00"
+
+package:
+  name: vray
+  version: ${{ version }}
+
+source:
+  - if: linux and x86_64
+    then:
+      url: file://archive_files/vraystd_adv_${{ version | replace(".", "") }}_rhel8_clang-gcc-11.2
+      sha256: 2f220418b0093ff87239d43fe4b4b923b753761ded02c0ade2d8d63b9600a8fa
+  - if: linux and arm64
+    then:
+      url: file://archive_files/vraystd_adv_${{ version | replace(".", "") }}_rhel8_arm64_clang-gcc-11.2
+      sha256: 1f2d40bf7638fa8bea113f47a9c762bcf725f68fd833a89918a7b9163f764d37
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  build:
+    - if: linux
+      then:
+      - patchelf
+
+tests:
+  - script:
+    - vray -help -display=0
+    - vray -version -display=0
+
+about:
+  homepage: https://www.chaos.com/vray
+  license: LicenseRef-ChaosEULA
+  summary: V-Ray Standalone is a full-featured and programmable command-line renderer that supports V-Ray's native .vrscene file format.

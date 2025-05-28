@@ -17,9 +17,21 @@ parameterDefinitions:
       patterns: ["*.vrscene"]
     - label: All Files
       patterns: ["*"]
+  minLength: 1
   description: >
-    Choose the Vray scene file you want to render. Use the 'Job Attachments' tab
-    to add textures and other files that the job needs.
+    Choose the Vray scene file you want to render. Use the 'InputAssetDir' parameter on
+    'Job Attachments' tab to add textures and other files that the job needs.
+- name: InputAssetDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Input Asset Directory
+    groupLabel: Render Parameters
+  default: ""
+  description: >
+    Choose a directory with additional asset files that the job needs.
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY
@@ -68,7 +80,8 @@ steps:
           set -xeuo pipefail
           vray -sceneFile='{{Param.VraySceneFile}}' \
                -imgFile='{{Param.OutputDir}}/{{Param.OutputFilename}}' \
-               -display=0
+               -display=0 \
+               -progressUpdateFreq=30000
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

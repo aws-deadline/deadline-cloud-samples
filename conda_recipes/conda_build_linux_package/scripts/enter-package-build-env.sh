@@ -79,7 +79,7 @@ if conda env list | grep -q "^$ENV_NAME "; then
 else
     echo "Creating the named Conda environment $ENV_NAME for running conda-build."
 
-    conda create --yes -n "$ENV_NAME" \
+    conda create --yes --quiet -n "$ENV_NAME" \
         -c conda-forge \
         python=3.12 conda conda-build rattler-build conda-index boto3 pyyaml
 
