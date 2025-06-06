@@ -1,0 +1,145 @@
+specificationVersion: "jobtemplate-2023-09"
+name: "POV-Ray 3.7 Render Job"
+description: "POV-Ray raytracing render job template with configurable parameters"
+
+parameterDefinitions:
+  - name: InputScene
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: Vray Scene File
+      groupLabel: Render Parameters
+      fileFilters:
+      - label: POV-Ray Scene File
+        patterns: ["*.pov"]
+      - label: All Files
+        patterns: ["*"]
+    description: "Input POV-Ray scene file (.pov)"
+    default: "sample/sample.pov"
+    
+  - name: OutputFilename
+    type: PATH
+    objectType: FILE
+    dataFlow: OUT
+    userInterface:
+      control: CHOOSE_OUTPUT_FILE
+      label: Output File
+      groupLabel: Render Parameters
+    description: "Output filename (without extension)"
+    default: "render"
+    
+  - name: ImageWidth
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Image Width
+      groupLabel: Render Parameters
+    description: "Image width in pixels"
+    default: 800
+    
+  - name: ImageHeight
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Image Height
+      groupLabel: Render Parameters
+    description: "Image height in pixels"
+    default: 600
+    
+  - name: Quality
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Render Quality
+      groupLabel: Render Parameters
+    description: "Render quality (0-11, higher is better)"
+    default: 9
+    minValue: 0
+    maxValue: 11
+    
+  - name: Antialiasing
+    type: FLOAT
+    userInterface:
+      control: SPIN_BOX
+      label: Antialiasing
+      groupLabel: Render Parameters
+    description: "Antialiasing threshold (0.0-1.0)"
+    default: 0.3
+    minValue: 0.0
+    maxValue: 1.0
+    
+  - name: CondaPackages
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Conda Packages
+      groupLabel: Software Environment
+    description: "Conda packages to install"
+    default: "povray"
+
+  - name: CondaChannels
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Conda Channels
+      groupLabel: Software Environment
+    description: "This is a space-separated list of Conda channels from which to install packages. POV-Ray is available on Conda Forge so we override the channels list"
+    default: "conda-forge"
+  
+
+steps:
+  - name: PovrayRender
+    description: "Render POV-Ray scene"
+    script:
+      actions:
+        onRun:
+          command: "bash"
+          args: ["{{Task.File.povrayRender}}"]
+      embeddedFiles:
+        - name: povrayRender
+          type: TEXT
+          data: |
+            set -euo pipefail
+            
+            echo "Starting POV-Ray render..."
+            echo "Input scene: {{Param.InputScene}}"
+            echo "Output filename: {{Param.OutputFilename}}"
+            echo "Resolution: {{Param.ImageWidth}}x{{Param.ImageHeight}}"
+            echo "Quality: {{Param.Quality}}"
+            echo "Antialiasing: {{Param.Antialiasing}}"
+            
+            # Check if input scene exists
+            if [[ ! -f "{{Param.InputScene}}" ]]; then
+                echo "Error: Input scene file not found: {{Param.InputScene}}"
+                exit 1
+            fi
+            
+            
+            OUTPUT_FILE="{{Param.OutputFilename}}.png"
+            
+            echo "Rendering to: $OUTPUT_FILE"
+            
+            # Run POV-Ray render
+            povray \
+              +I"{{Param.InputScene}}" \
+              +O"$OUTPUT_FILE" \
+              +W{{Param.ImageWidth}} \
+              +H{{Param.ImageHeight}} \
+              +FN \
+              +Q{{Param.Quality}} \
+              +A{{Param.Antialiasing}} \
+              +V \
+              -D
+            
+            # Check if render was successful
+            if [[ -f "$OUTPUT_FILE" ]]; then
+                echo "Render completed successfully: $OUTPUT_FILE"
+                file "$OUTPUT_FILE" || echo "File info not available"
+            else
+                echo "Error: Render failed - output file not created"
+                exit 1
+            fi
+            
+            echo "POV-Ray render job completed."
