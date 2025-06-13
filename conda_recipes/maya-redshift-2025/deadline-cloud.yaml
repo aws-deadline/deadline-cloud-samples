@@ -1,0 +1,7 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - redshift_2025.4.2_1782753868_linux_x64.run
+    sourceDownloadInstructions: 'Download the redshift_2025.4.2_1782753868_linux_x64.run file.'
+    buildTool: rattler-build
