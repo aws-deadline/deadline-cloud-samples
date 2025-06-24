@@ -4,7 +4,7 @@
 # https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes
 
 {% set name = "cinema4d-openjd" %}
-{% set version = "0.7.3" %}
+{% set version = "0.7.8" %}
 
 package:
   name: {{ name }}
@@ -12,7 +12,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-{{ version }}.tar.gz
-  sha256: 0aec84bc57a542393534fb5f76cab5051da49a5827ba97954f76d7b300601163
+  sha256: 0ec30804cce941f0a4a819086206121dbbd16633bf5567249d29a89685974023
   patches:
     - 0001-Remove-version-hook.patch
 
