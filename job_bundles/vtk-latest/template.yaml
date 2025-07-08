@@ -1,0 +1,142 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: VTK Visualization
+
+parameterDefinitions:
+
+# Input Parameters
+- name: InputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Input Directory
+    groupLabel: Input Parameters
+  default: "./sample"
+  description: >
+    Directory containing the VTK script and any additional required files.
+
+- name: InputScript
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Input Script Filename
+    groupLabel: Input Parameters
+  default: "flow_simulation_visualization.py"
+  description: >
+    Name of the Python script to run (must be in the input directory).
+
+# Output Parameters
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Parameters
+  default: "./output"
+  description: >
+    Directory where the visualization output will be saved.
+
+- name: OutputFilename
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output Filename
+    groupLabel: Output Parameters
+  default: "visualization.jpg"
+  description: >
+    Name of the output image file.
+
+# Render Parameters
+- name: Width
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Width (pixels)
+    groupLabel: Render Parameters
+  default: 1280
+  description: >
+    Width of the output image in pixels.
+
+- name: Height
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Height (pixels)
+    groupLabel: Render Parameters
+  default: 720
+  description: >
+    Height of the output image in pixels.
+
+# Software Parameters
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Parameters
+  default: "vtk numpy"
+  description: >
+    Conda packages to install for the environment. Add any additional packages your script requires.
+    These packages must be available in a channel made available by a Queue Environment. vtk and numpy are available in CondaForge
+
+# Additional Script Parameters
+- name: ExtraParams
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Additional Parameters
+    groupLabel: Script Parameters
+  default: ""
+  description: >
+    Additional parameters to pass to the script (in format: '--param1 value1 --param2 value2').
+
+steps:
+- name: RenderVTKVisualization
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          #!/bin/bash
+          set -xeuo pipefail
+          
+          # Display environment information
+          echo "Current directory: $(pwd)"
+          echo "Listing input directory content:"
+          ls -la "{{Param.InputDir}}"
+          
+          # Make sure output directory exists
+          mkdir -p "{{Param.OutputDir}}"
+          
+          # Check if the input script exists
+          if [ ! -f "{{Param.InputDir}}/{{Param.InputScript}}" ]; then
+            echo "ERROR: Script {{Param.InputScript}} not found in the input directory!"
+            exit 1
+          fi
+          
+          # Run the VTK visualization script
+          echo "Running VTK visualization script: {{Param.InputScript}}"
+          
+          python "{{Param.InputDir}}/{{Param.InputScript}}" \
+            --output "{{Param.OutputDir}}/{{Param.OutputFilename}}" \
+            --width {{Param.Width}} \
+            --height {{Param.Height}} \
+            {{Param.ExtraParams}}
+          
+          echo "Visualization complete. Results saved to {{Param.OutputDir}}/{{Param.OutputFilename}}"
+          ls -la "{{Param.OutputDir}}"
+          
+          # Check if the output file was created
+          if [ ! -f "{{Param.OutputDir}}/{{Param.OutputFilename}}" ]; then
+            echo "WARNING: Output file {{Param.OutputFilename}} was not found in the output directory!"
+            echo "This might be expected if your script saves output with a different name or format."
+          else
+            echo "Output file successfully created: {{Param.OutputDir}}/{{Param.OutputFilename}}"
+          fi
