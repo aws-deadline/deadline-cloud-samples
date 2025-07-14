@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "0.14.4"
+  version: "0.15.7"
 
 package:
   name: maya-openjd
@@ -11,9 +11,7 @@ package:
 # This source reference uses the source archive published to PyPI
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-maya/deadline_cloud_for_maya-${{ version }}.tar.gz
-  sha256: 9b86a6c02df800ed3e69a3094c0f7d2aaa8b07304af34068fc41e2e14313268e
-  patches:
-    - 0001-Remove-version-hook.patch
+  sha256: ed7c230d7dc45e3c0b8dc1914a2894f779622179e4e645ea5e8259af20967f50
 
 build:
   number: 0

@@ -2,7 +2,7 @@
 # See recipe.yaml for the recipe in rattler-build format.
 
 {% set name = "openjd-adaptor-runtime" %}
-{% set version = "0.9.0" %}
+{% set version = "0.9.1" %}
 
 package:
   name: {{ name }}
@@ -11,9 +11,7 @@ package:
 # # This source reference uses the source archive published to PyPI
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/openjd_adaptor_runtime-{{ version }}.tar.gz
-  sha256: a2a117b23df4e7fa31360b4572528ecabeeed190f5a4c51177560d401df79704
-  patches:
-    - 0001-Remove-version-hook.patch
+  sha256: 8741388d40c07cf90c099105ef3bb899966d36b79295d916ce21864cf28ca223
 
 # This source reference uses git to retrieve the tag for the specified version. You can modify
 # the git_url and git_rev to point to a branch in your own fork of the project.
