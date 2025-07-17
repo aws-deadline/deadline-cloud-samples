@@ -1,0 +1,32 @@
+# Recipe in conda-build format.
+# See https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html for information
+# about this file.
+
+{% set version = "2026" %}
+
+package:
+  name: vredcore
+  version: {{ version }}
+
+source:
+  url: file://archive_files/VREDCore-${{version}}.sh
+  sha256: 22c4113d9efaf71e1176373954cf6ce2f68b1463e8067a23df955238aeeb830b
+  folder: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+    - "**"
+
+test:
+  script:
+    - $VREDCORE -help
+
+about:
+  homepage: https://www.autodesk.com/products/vred/overview
+  license: Commercial
+  summary: Autodesk VRED is a 3D visualization software used to create product presentations, design reviews, and virtual prototypes
