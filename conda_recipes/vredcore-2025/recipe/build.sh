@@ -12,9 +12,8 @@ $SRC_DIR/installer/VREDCore-2025.sh --target $INSTALL_DIR
 # from the system package manager, dnf.
 mkdir -p "$SRC_DIR/download"
 cd "$SRC_DIR/download"
-dnf download --resolve -y xorg-x11-server-Xorg \
-    pixman libXfont2 libepoxy cairo xkbcomp libunwind libgudev \
-    libX11-xcb xorg-x11-server-common xorg-x11-xauth \
+dnf download --resolve -y xorg-x11-server-Xorg xorg-x11-server-common \
+    libX11-xcb pixman libXfont2 libepoxy cairo xkbcomp libunwind libgudev \
     freetype fontconfig harfbuzz libbrotli graphite2 libfontenc \
     xcb-util-cursor libXfixes libXdmcp libxkbfile
 
@@ -22,8 +21,6 @@ dnf download --resolve -y xorg-x11-server-Xorg \
 for rpm_file in $(realpath $SRC_DIR/download/*.rpm); do
     rpm2cpio "$rpm_file" | cpio -idm
 done
-
-patchelf --add-rpath '$ORIGIN/../..' "$INSTALL_DIR"/lib/python*/lib-dynload/*.so
 
 # Copy and patch shared libraries
 for SO_FILE in $(find usr/lib64 -type f,l); do
@@ -80,7 +77,6 @@ for PYSO in "$INSTALL_DIR"/lib/python*/site-packages/*/*.so \
 done
 
 # Xorg tries to call /usr/lib/xkbcomp. This switches that to just call xkbcmp, a symlink to the original
-# # ln -sf $INSTALL_DIR/usr/bin/xkbcomp $INSTALL_DIR/usr/bin/xkbcmp
 python <<EOF
 with open("$INSTALL_DIR/usr/libexec/Xorg", "rb+") as fh:
     data = fh.read()
@@ -98,17 +94,17 @@ with open("$INSTALL_DIR/usr/libexec/Xorg", "rb+") as fh:
     fh.write(data)
 EOF
 
-# Patches Xorg.wrap binary to redirect hardcoded paths to /tmp/xorg.
-# - /usr/libexec -> /tmp/xorg (for executable lookup)
-# - /etc/X11/Xwrapper.config -> /tmp/xorg/Xwrapper.conf (for config)
+# Patches Xorg.wrap binary to redirect hardcoded paths to usr/libexec.
+# - /usr/libexec -> usr/libexec (for executable lookup)
+# - /etc/X11/Xwrapper.config -> usr/libexec/Xwrap.cfg (for config)
 # These modifications allow Xorg to work with files in conda-managed locations 
-# via symlinks that will be created to /tmp/xorg.
+# via symlinks that will be created to usr/libexec.
 python <<EOF
 with open("$INSTALL_DIR/usr/libexec/Xorg.wrap", "rb+") as fh:
     data = fh.read()
 
     old_path = b"/usr/libexec"
-    new_path = "/tmp/xorg".encode()
+    new_path = "usr/libexec".encode()
     if len(new_path) <= len(old_path):
         new_path = new_path.ljust(len(old_path), b'\0')
         data = data.replace(old_path, new_path)
@@ -118,7 +114,7 @@ with open("$INSTALL_DIR/usr/libexec/Xorg.wrap", "rb+") as fh:
         )
 
     old_config_path = b"/etc/X11/Xwrapper.config"
-    new_config_path = "/tmp/xorg/Xwrapper.conf".encode()
+    new_config_path = "usr/libexec/Xwrap.cfg".encode()
     if len(new_config_path) <= len(old_config_path):
         new_config_path = new_config_path.ljust(len(old_config_path), b'\0')
         data = data.replace(old_config_path, new_config_path)
@@ -155,27 +151,35 @@ sed -i "/^Section \"Files\"/a\\
     ModulePath \"$PREFIX/opt/Autodesk/VRED_2025/lib\"" $INSTALL_DIR/etc/X11/xorg.conf
 
 # Create symbolic link
-ln -sf $INSTALL_DIR/usr/libexec /tmp/xorg
 ln -sf $INSTALL_DIR/usr/bin/xkbcomp $INSTALL_DIR/usr/bin/xkbcmp
 
 # Create a Xorg wrapper config file
-# This should has symlink setup: /tmp/xorg/Xwrapper.conf --> $INSTALL_DIR/usr/libexec/Xwrapper.conf
-if [ -f  $INSTALL_DIR/usr/libexec/Xwrapper.conf ]; then
+if [ -f  $INSTALL_DIR/usr/libexec/Xwrap.cfg ]; then
   echo "Xwrapper Config file already exists"
 else
   echo "Creating a new Xwrapper Config"
   mkdir -p $INSTALL_DIR/usr/libexec
-  cat << EOF2 > $INSTALL_DIR/usr/libexec/Xwrapper.conf
+  cat << EOF2 > $INSTALL_DIR/usr/libexec/Xwrap.cfg
 needs_root_rights=no
 allowed_users=anybody
 EOF2
-  echo "New Xwrapper.conf file created at $INSTALL_DIR/usr/libexec/Xwrapper.conf"
-  cat $INSTALL_DIR/usr/libexec/Xwrapper.conf
+  echo "New Xwrapper conf file created at $INSTALL_DIR/usr/libexec/Xwrap.cfg"
+  cat $INSTALL_DIR/usr/libexec/Xwrap.cfg
 fi
+
+mkdir -p $INSTALL_DIR/var/run
+# Go to $INSTALL_DIR just for launching X Server
+pushd $INSTALL_DIR
 
 # Start X Server
 $INSTALL_DIR/usr/bin/Xorg -keeptty -sharevts -novtswitch -ignoreABI -nolisten tcp -config $INSTALL_DIR/etc/X11/xorg.conf &
 sleep 3
+
+# Write Xorg PID to a file
+echo \$! > "$INSTALL_DIR/var/run/xorg.pid"
+
+# Go back to the original location
+popd
 EOF
 
 chmod +x $INSTALL_DIR/bin/start-xserver
@@ -191,7 +195,6 @@ if ! pgrep -x Xorg > /dev/null; then
     $INSTALL_DIR/bin/start-xserver
 fi
 export DISPLAY=:0
-export XAUTHORITY=/tmp/.Xauthority
 
 "$INSTALL_DIR/bin/VREDCore" "\$@"
 EOF
@@ -207,5 +210,17 @@ EOF
 # Setup environment variables for deactivation
 mkdir -p "$PREFIX/etc/conda/deactivate.d"
 cat <<EOF > $PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh
+#!/bin/bash
+
 unset VREDCORE
+
+# Kill Xorg server if it's running
+if [ -f "$INSTALL_DIR/var/run/xorg.pid" ]; then
+    XORG_PID=\$(cat "$INSTALL_DIR/var/run/xorg.pid")
+    if ps -p \$XORG_PID > /dev/null; then
+        kill \$XORG_PID
+        # Wait for X server to completely shut down
+        sleep 2
+    fi
+fi
 EOF
