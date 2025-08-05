@@ -21,9 +21,12 @@ from your shell:
 
 ## Instructions for Houdini plugin packages
 
-Plugins can be registered with Houdini following the standard process of creating
-and loading Houdini [package](https://www.sidefx.com/docs/houdini/ref/plugins.html)
-files. 
+When creating a plugin package for Houdini, place its package file in the following
+location so that Houdini loads the plugin at startup. Refer to the Houdini
+[plugins documentation](https://www.sidefx.com/docs/houdini/ref/plugins.html) page
+for more details on creating package files.
+
+* `$PREFIX/opt/houdini/packages`
 
 ## Adapting for other Houdini versions
 This recipe is written for Houdini 20.5.654, but should be able to be adapted

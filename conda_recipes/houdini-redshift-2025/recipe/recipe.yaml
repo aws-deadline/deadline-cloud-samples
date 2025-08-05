@@ -1,0 +1,43 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2025.6.0_1924545106"
+
+package:
+  name: houdini-redshift
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: file://archive_files/redshift_${{ version }}_linux_x64.run
+      sha256: bdf0d787b3c991f1401bb31e2037a52a7ef686445812abed2d162882eb048039
+      target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  build:
+    - patchelf
+  run:
+    - houdini >=20.5, <21
+
+tests:
+  - script:
+    - redshiftCmdLine -listrenderoptions
+
+about:
+  homepage: https://www.maxon.net/en/redshift
+  license: LicenseRef-MaxonEULA
+  summary: Redshift is a powerful 3D rendering software that helps visualize your 3D designs, models, animations, and scenes.

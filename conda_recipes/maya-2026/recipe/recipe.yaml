@@ -1,0 +1,47 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2026.0"
+  major_version: "2026"
+  minor_version: "0"
+
+package:
+  name: maya
+  version: ${{ version }}
+
+source:
+  url: file://archive_files/Autodesk_Maya_{{ major_version }}_Linux_64bit.tgz
+  sha256: d3e8cc63ea573383eb02046398a9f49c26cb55708eb8fb6266d04c46a5d6a48e
+  target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  build:
+    - patchelf
+
+tests:
+   - script:
+     # Maya's Python interpreter
+     - mayapy --help
+     # Confirm that mayapy can initialize maya.standalone, and that both OpenMaya 1.0 and 2.0 are available
+     - mayapy -c 'import maya; import maya.standalone; import maya.OpenMaya as om1; import maya.api.OpenMaya as om2; maya.standalone.initialize(); print("Hello from mayapy"); maya.standalone.uninitialize()'
+     # The maya -batch command
+     - maya -batch -command 'print "Hello from maya -batch"; quit -exitCode 0 -force'
+
+
+about:
+  homepage: https://www.autodesk.com/products/maya/overview
+  license: LicenseRef-AutodeskEULA
+  summary: Maya is professional 3D software for creating realistic characters and blockbuster-worthy effects.

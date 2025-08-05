@@ -1,0 +1,10 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: redshift_2025.6.0_1924545106_linux_x64.run
+    sourceDownloadInstructions: Download the Redshift installer from the Maxon website
+    buildTool: rattler-build
+jobParameters:
+  # conda-forge is used to get patchelf
+  - name: CondaChannels
+    value: conda-forge

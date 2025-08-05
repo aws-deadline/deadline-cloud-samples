@@ -27,8 +27,6 @@ $INSTALLER \
     --make-dir $PREFIX/opt/houdini
 
 HOUDINI_DIR=$PREFIX/opt/houdini
-# The Houdini version without the build number
-HOUDINI_VERSION=${PKG_VERSION%.*}
 
 # Remove the documentation, it's not needed on the farm
 rm -r $HOUDINI_DIR/houdini/help
@@ -63,7 +61,7 @@ done
 mkdir -p $PREFIX/etc/conda/activate.d
 cat <<EOF > $PREFIX/etc/conda/activate.d/houdini-$PKG_VERSION-vars.sh
 export "HOUDINI_LOCATION=\$CONDA_PREFIX/opt/houdini"
-export "HOUDINI_VERSION=$HOUDINI_VERSION"
+export "HOUDINI_VERSION=$PKG_VERSION"
 export "HOUDINI_BINARY_PATH=\$HOUDINI_LOCATION/bin"
 export "HOUDINI_HOUDINI_PATH=\$HOUDINI_LOCATION/houdini"
 export "HOUDINI_INCLUDE_PATH=\$HOUDINI_LOCATION/toolkit/include"
