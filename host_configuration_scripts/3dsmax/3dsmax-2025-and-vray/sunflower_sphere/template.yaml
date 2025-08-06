@@ -1,0 +1,155 @@
+specificationVersion: jobtemplate-2023-09
+name: sunflower_sphere
+description: null
+parameterDefinitions:
+- name: MaxSceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ./scene/DeadlineTest_01.max
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Max Scene File
+    groupLabel: 3dsMax Settings
+    fileFilters:
+    - label: Max Scene Files
+      patterns:
+      - '*.max'
+    - label: All Files
+      patterns:
+      - '*'
+  description: The Max scene file to render.
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: 3dsMax Settings
+  description: The frames to render. E.g. 1-3,8,11-15
+  minLength: 1
+- name: OutputFilePath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output File Path
+    groupLabel: 3dsMax Settings
+  description: The render output path.
+- name: OutputFileName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Name
+    groupLabel: 3dsMax Settings
+  description: The output file name.
+  default: image_###
+- name: OutputFileFormat
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Format
+    groupLabel: 3dsMax Settings
+  description: The output file extension.
+- name: ImageWidth
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Width
+    groupLabel: 3dsMax Settings
+  minValue: 1
+  description: The image width of the output.
+- name: ImageHeight
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Height
+    groupLabel: 3dsMax Settings
+  minValue: 1
+  description: The image height of the output.
+- name: StrictErrorChecking
+  type: STRING
+  userInterface:
+    control: CHECK_BOX
+    label: Strict Error Checking
+    groupLabel: 3dsMax Settings
+  description: Fail when errors occur.
+  default: 'false'
+  allowedValues:
+  - 'true'
+  - 'false'
+steps:
+- name: State01
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: '{{Param.Frames}}'
+    - name: Camera
+      type: STRING
+      range:
+      - PhysCamera001
+  stepEnvironments:
+  - name: 3ds Max
+    description: Runs 3ds Max in the background.
+    script:
+      embeddedFiles:
+      - name: initData
+        filename: init-data.yaml
+        type: TEXT
+        data: |
+          scene_file: {{Param.MaxSceneFile}}
+          renderer: V_Ray_7__update_1
+          state_set: State01
+          output_file_name: State01_DeadlineTest_01_###
+          output_file_path: '{{Param.OutputFilePath}}'
+          output_file_format: '{{Param.OutputFileFormat}}'
+          image_width: '{{Param.ImageWidth}}'
+          image_height: '{{Param.ImageHeight}}'
+      - name: runStart
+        filename: start.bat
+        type: TEXT
+        data: |
+          3dsmax-openjd daemon start --connection-file {{Session.WorkingDirectory}}/connection.json --init-data file://{{Env.File.initData}}
+      - name: runStop
+        filename: stop.bat
+        type: TEXT
+        data: |
+          3dsmax-openjd daemon stop --connection-file {{Session.WorkingDirectory}}/connection.json
+      actions:
+        onEnter:
+          command: powershell
+          args:
+          - '{{Env.File.runStart}}'
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          timeout: 87000
+        onExit:
+          command: powershell
+          args:
+          - '{{Env.File.runStop}}'
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          timeout: 600
+  script:
+    actions:
+      onRun:
+        command: powershell
+        args:
+        - '{{Task.File.runRender}}'
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+    embeddedFiles:
+    - name: runData
+      filename: run-data.yaml
+      type: TEXT
+      data: |-
+        frame: {{Task.Param.Frame}}
+        camera: '{{Task.Param.Camera}}'
+    - name: runRender
+      filename: render.bat
+      type: TEXT
+      runnable: true
+      data: |
+        3dsmax-openjd daemon run --connection-file {{ Session.WorkingDirectory }}/connection.json --run-data file://{{Task.File.runData}}
