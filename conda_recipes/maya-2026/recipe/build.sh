@@ -29,7 +29,7 @@ mkdir -p "$SRC_DIR/download"
 cd "$SRC_DIR/download"
 dnf download --resolve -y freetype alsa-lib fontconfig harfbuzz libbrotli graphite2 \
     libxkbfile xcb-util-cursor xcb-util-wm xcb-util-keysyms libxkbcommon-x11 \
-    libva libvdpau pciutils-libs fontconfig
+    libva libvdpau pciutils-libs
 
 for RPM_FILE in *.rpm; do
     rpm2cpio "$RPM_FILE" | cpio -idm
@@ -74,7 +74,7 @@ ln -r -s $PREFIX/$MAYA_ROOT/bin/Render $PREFIX/bin/Render
 # and the Arnold support tip "error: (44) Product key not found"
 # at https://arnoldsupport.com/2022/02/02/error-44-product-key-not-found/.
 
-unzip -j "$SRC_DIR/installer/Packages/package.zip" bin/ProductInformation.pit -d "$INSTALL_DIR"
+unzip -j "$SRC_DIR/installer/Packages/package.zip" bin/ProductInformation.pit -d "$INSTALL_DIR/lib"
 
 cat <<EOF > "$INSTALL_DIR"/AdlmThinClientCustomEnv.xml
 <?xml version="1.0"encoding="utf-8"?>
