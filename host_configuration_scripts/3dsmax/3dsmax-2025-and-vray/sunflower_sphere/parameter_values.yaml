@@ -1,0 +1,17 @@
+parameterValues:
+- name: Frames
+  value: '0'
+- name: OutputFileFormat
+  value: .jpg
+- name: ImageWidth
+  value: 1280
+- name: ImageHeight
+  value: 720
+- name: deadline:targetTaskRunStatus
+  value: READY
+- name: deadline:maxFailedTasksCount
+  value: 20
+- name: deadline:maxRetriesPerTask
+  value: 0
+- name: deadline:priority
+  value: 50
