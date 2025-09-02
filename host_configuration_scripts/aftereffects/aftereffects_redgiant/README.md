@@ -14,7 +14,7 @@ This guide covers setting up the required software installers for the After Effe
 
 ## Required Installers
 
-*🔔 Note: the installer names can differ depending software version, please keep note of differences so that the following script setup goes smoothly*
+*🔔 Note: the installer names can differ depending on the software versions, please keep note of differences so that the following script setup goes smoothly*
 
 ### 1. Adobe After Effects
 
@@ -61,15 +61,16 @@ This is needed for the Maxon App installation to go smoothly. Download from Micr
 
 ### 1. Create S3 Bucket Structure
 
-If you have a job attachments bucket, you can just go ahead and use that. If you want a separate bucket, go ahead and create one. Then, add a folder called Installers like this:
+If you have a job attachments bucket, you can just go ahead and use that. If you want a separate bucket, go ahead and create one. Then, add a folder called Installers to the S3 bucket. These steps can be done on the AWS console or completed by doing the following:
 ```bash
 export INSTALLER_S3_BUCKET=your-installer-bucket
 aws s3api put-object --bucket $INSTALLER_S3_BUCKET --key Installers/
 ```
 
+
 ### 2. Upload Installers
 
-Navigate to your local folder where you downloaded your installers (for ex. Downloads) and run the following:
+To upload the installers to S3, you can upload the `.zip` and `.exe` files to your bucket under the Installers folder via the AWS S3 console. For a programmatic approach, navigate to your local folder where you downloaded your installers (for ex. Downloads) and run the following:
 
 ```bash
 export INSTALLER_S3_BUCKET=your-installer-bucket
@@ -133,11 +134,13 @@ $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 
 **Customer Managed Fleet (CMF) Configuration (Optional - SMF users can skip this):**
 
-For SMF deployments, the script works out-of-the-box with the default settings. For CMF deployments with your own license server:
+For SMF deployments, the script works out-of-the-box with the default settings. For CMF, you can create a license endpoint and use it with CMF, see here for information on that: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html.
+
+Once you have that setup, get the VPC endpoint ID provided on the license endpoints console page and set the following variables as shown:
 
 ```powershell
-$is_cmf = $true  # Set to $true for Customer Managed Fleet
-$vpc_endpoint = "vpce-000000000000000-abcdefg.vpce-svc-000000000000000.us-west-2.vpce.amazonaws.com"  # Your VPC endpoint
+$is_cmf = $true  # Set to $true for Customer Managed Fleets
+$vpc_endpoint = "vpce-000000000000000-abcdefg.vpce-svc-000000000000000.us-west-2.vpce.amazonaws.com"  # Your VPC endpoint provided by license endpoints console page
 ```
 
 This will set the `redshift_LICENSE` environment variable to `7055@$vpc_endpoint` for Red Giant licensing. If you're not using UBL, you'll need to override the `redshift_LICENSE` environment variable with whatever port number or value you need to connect your CMF instance to your license server.
