@@ -1,0 +1,34 @@
+{% set name = "saber" %}
+{% set version_partial = "1" %}
+{% set version_minor = "0" %}
+{% set version_patch = "40" %}
+{% set version = version_partial + "." + version_minor + "." + version_patch %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+- url: archive_files/Saber_{{ version.replace(".", "_") }}_Windows_installation.zip # [win64]
+  sha256: f5551f4cf0a149c48defe324be9d97a12b434cbdfd869f5996f1af5a66cb7bc3 # [win64]
+  folder: saber
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+requirements:
+  build:
+    - aftereffects
+  run:
+    - aftereffects
+
+about:
+  home: https://www.videocopilot.net/blog/2016/03/new-plug-in-saber-now-available-100-free/
+  license: Commercial
+  summary: The Saber plugin, a free offering from Video Copilot, is a powerful tool for Adobe After Effects that allows users to create a variety of energy-based effects, including beams, lightsabers, lasers, portals, neon lights, and more.

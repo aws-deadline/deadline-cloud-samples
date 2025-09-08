@@ -1,0 +1,335 @@
+name: fuzzypixel_maya.ma
+parameterDefinitions:
+- dataFlow: IN
+  description: The Maya scene file to render.
+  name: MayaSceneFile
+  objectType: FILE
+  type: PATH
+- description: The frames to render. E.g. 1-3,8,11-15
+  minLength: 1
+  name: Frames
+  type: STRING
+- dataFlow: NONE
+  description: The Maya project path.
+  minLength: 1
+  name: ProjectPath
+  objectType: DIRECTORY
+  type: PATH
+- dataFlow: OUT
+  description: The render output path.
+  name: OutputFilePath
+  objectType: DIRECTORY
+  type: PATH
+- allowedValues:
+  - 'true'
+  - 'false'
+  default: 'false'
+  description: Include all lights in the render.
+  name: RenderSetupIncludeLights
+  type: STRING
+- allowedValues:
+  - 'true'
+  - 'false'
+  default: 'false'
+  description: Fail when errors occur.
+  name: StrictErrorChecking
+  type: STRING
+- description: The output filename prefix.
+  name: OutputFilePrefix
+  type: STRING
+- description: The image width of the output.
+  minValue: 1
+  name: ImageWidth
+  type: INT
+- description: The image height of the output.
+  minValue: 1
+  name: ImageHeight
+  type: INT
+- allowedValues:
+  - 'true'
+  - 'false'
+  default: 'true'
+  description: Whether to produce an error when there is an Arnold license failure.
+  name: ArnoldErrorOnLicenseFailure
+  type: STRING
+- description: Fleet Attribute name.
+  name: FleetAttributeName
+  type: STRING
+- description: Fleet Attribute value.
+  name: FleetAttributeValue
+  type: STRING
+specificationVersion: jobtemplate-2023-09
+steps:
+- hostRequirements:
+    attributes:
+    - anyOf:
+      - '{{Param.FleetAttributeValue}}'
+      name: '{{Param.FleetAttributeName}}'
+  name: beauty_rose
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      range: '{{Param.Frames}}'
+      type: INT
+    - name: Camera
+      range:
+      - shotCam:shotCam
+      type: STRING
+  script:
+    actions:
+      onRun:
+        args:
+        - daemon
+        - run
+        - --connection-file
+        - '{{ Session.WorkingDirectory }}/connection.json'
+        - --run-data
+        - file://{{ Task.File.runData }}
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+        command: MayaAdaptor
+    embeddedFiles:
+    - data: 'frame: {{Task.Param.Frame}}
+
+        camera: ''{{Task.Param.Camera}}''
+
+        '
+      filename: run-data.yaml
+      name: runData
+      type: TEXT
+  stepEnvironments:
+  - description: Runs Maya in the background.
+    name: Maya
+    script:
+      actions:
+        onEnter:
+          args:
+          - daemon
+          - start
+          - --path-mapping-rules
+          - file://{{Session.PathMappingRulesFile}}
+          - --connection-file
+          - '{{Session.WorkingDirectory}}/connection.json'
+          - --init-data
+          - file://{{Env.File.initData}}
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          command: MayaAdaptor
+        onExit:
+          args:
+          - daemon
+          - stop
+          - --connection-file
+          - '{{ Session.WorkingDirectory }}/connection.json'
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          command: MayaAdaptor
+      embeddedFiles:
+      - data: 'renderer: arnold
+
+          render_layer: beauty_rose
+
+          scene_file: {{Param.MayaSceneFile}}
+
+          project_path: {{Param.ProjectPath}}
+
+          output_file_path: {{Param.OutputFilePath}}
+
+          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+
+          strict_error_checking: {{Param.StrictErrorChecking}}
+
+          output_file_prefix: {{Param.OutputFilePrefix}}
+
+          image_width: {{Param.ImageWidth}}
+
+          image_height: {{Param.ImageHeight}}
+
+          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+
+          '
+        filename: init-data.yaml
+        name: initData
+        type: TEXT
+- hostRequirements:
+    attributes:
+    - anyOf:
+      - '{{Param.FleetAttributeValue}}'
+      name: '{{Param.FleetAttributeName}}'
+  name: beauty_set
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      range: '{{Param.Frames}}'
+      type: INT
+    - name: Camera
+      range:
+      - shotCam:shotCam
+      type: STRING
+  script:
+    actions:
+      onRun:
+        args:
+        - daemon
+        - run
+        - --connection-file
+        - '{{ Session.WorkingDirectory }}/connection.json'
+        - --run-data
+        - file://{{ Task.File.runData }}
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+        command: MayaAdaptor
+    embeddedFiles:
+    - data: 'frame: {{Task.Param.Frame}}
+
+        camera: ''{{Task.Param.Camera}}''
+
+        '
+      filename: run-data.yaml
+      name: runData
+      type: TEXT
+  stepEnvironments:
+  - description: Runs Maya in the background.
+    name: Maya
+    script:
+      actions:
+        onEnter:
+          args:
+          - daemon
+          - start
+          - --path-mapping-rules
+          - file://{{Session.PathMappingRulesFile}}
+          - --connection-file
+          - '{{Session.WorkingDirectory}}/connection.json'
+          - --init-data
+          - file://{{Env.File.initData}}
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          command: MayaAdaptor
+        onExit:
+          args:
+          - daemon
+          - stop
+          - --connection-file
+          - '{{ Session.WorkingDirectory }}/connection.json'
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          command: MayaAdaptor
+      embeddedFiles:
+      - data: 'renderer: arnold
+
+          render_layer: beauty_set
+
+          scene_file: {{Param.MayaSceneFile}}
+
+          project_path: {{Param.ProjectPath}}
+
+          output_file_path: {{Param.OutputFilePath}}
+
+          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+
+          strict_error_checking: {{Param.StrictErrorChecking}}
+
+          output_file_prefix: {{Param.OutputFilePrefix}}
+
+          image_width: {{Param.ImageWidth}}
+
+          image_height: {{Param.ImageHeight}}
+
+          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+
+          '
+        filename: init-data.yaml
+        name: initData
+        type: TEXT
+- hostRequirements:
+    attributes:
+    - anyOf:
+      - '{{Param.FleetAttributeValue}}'
+      name: '{{Param.FleetAttributeName}}'
+  name: beauty_volume
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      range: '{{Param.Frames}}'
+      type: INT
+    - name: Camera
+      range:
+      - shotCam:shotCam
+      type: STRING
+  script:
+    actions:
+      onRun:
+        args:
+        - daemon
+        - run
+        - --connection-file
+        - '{{ Session.WorkingDirectory }}/connection.json'
+        - --run-data
+        - file://{{ Task.File.runData }}
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+        command: MayaAdaptor
+    embeddedFiles:
+    - data: 'frame: {{Task.Param.Frame}}
+
+        camera: ''{{Task.Param.Camera}}''
+
+        '
+      filename: run-data.yaml
+      name: runData
+      type: TEXT
+  stepEnvironments:
+  - description: Runs Maya in the background.
+    name: Maya
+    script:
+      actions:
+        onEnter:
+          args:
+          - daemon
+          - start
+          - --path-mapping-rules
+          - file://{{Session.PathMappingRulesFile}}
+          - --connection-file
+          - '{{Session.WorkingDirectory}}/connection.json'
+          - --init-data
+          - file://{{Env.File.initData}}
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          command: MayaAdaptor
+        onExit:
+          args:
+          - daemon
+          - stop
+          - --connection-file
+          - '{{ Session.WorkingDirectory }}/connection.json'
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+          command: MayaAdaptor
+      embeddedFiles:
+      - data: 'renderer: arnold
+
+          render_layer: beauty_volume
+
+          scene_file: {{Param.MayaSceneFile}}
+
+          project_path: {{Param.ProjectPath}}
+
+          output_file_path: {{Param.OutputFilePath}}
+
+          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+
+          strict_error_checking: {{Param.StrictErrorChecking}}
+
+          output_file_prefix: {{Param.OutputFilePrefix}}
+
+          image_width: {{Param.ImageWidth}}
+
+          image_height: {{Param.ImageHeight}}
+
+          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+
+          '
+        filename: init-data.yaml
+        name: initData
+        type: TEXT

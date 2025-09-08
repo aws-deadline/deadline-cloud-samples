@@ -31,27 +31,27 @@ mkdir -p "$PREFIX/etc/conda/deactivate.d"
 cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 export C4D_VERSION=$CINEMA_4D_VERSION
 export C4D_LOCATION="$PREFIX\\cinema4d"
-export CINEMA4D_ADAPTOR_COMMANDLINE_EXE="$PREFIX\\cinema4d\\Commandline.exe"
+export C4D_COMMANDLINE_EXECUTABLE="$PREFIX\\cinema4d\\Commandline.exe"
 EOF
 cat "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 
 cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 set "C4D_VERSION=$CINEMA_4D_VERSION"
 set "C4D_LOCATION=$PREFIX\cinema4d"
-set "CINEMA4D_ADAPTOR_COMMANDLINE_EXE=$PREFIX\cinema4d\Commandline.exe"
+set "C4D_COMMANDLINE_EXECUTABLE=$PREFIX\cinema4d\Commandline.exe"
 EOF
 cat "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 
 cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 unset C4D_VERSION
 unset C4D_LOCATION
-unset CINEMA4D_ADAPTOR_COMMANDLINE_EXE
+unset C4D_COMMANDLINE_EXECUTABLE
 EOF
 cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 
 cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 set C4D_VERSION=
 set C4D_LOCATION=
-set CINEMA4D_ADAPTOR_COMMANDLINE_EXE=
+set C4D_COMMANDLINE_EXECUTABLE=
 EOF
 cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"

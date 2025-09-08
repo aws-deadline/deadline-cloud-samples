@@ -27,7 +27,9 @@ ln -r -s "$INSTALL_DIR/bin/maya$MAYA_VERSION" "$INSTALL_DIR/bin/maya"
 # from the system package manager, dnf.
 mkdir -p "$SRC_DIR/download"
 cd "$SRC_DIR/download"
-dnf download --resolve -y freetype alsa-lib fontconfig harfbuzz libbrotli graphite2 libxkbfile
+dnf download --resolve -y freetype alsa-lib fontconfig harfbuzz libbrotli graphite2 \
+    libxkbfile xcb-util-cursor xcb-util-wm xcb-util-keysyms libxkbcommon-x11
+
 for RPM_FILE in *.rpm; do
     rpm2cpio "$RPM_FILE" | cpio -idm
 done

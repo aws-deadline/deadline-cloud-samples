@@ -1,0 +1,33 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2026"
+
+package:
+  name: vredcore
+  version: ${{ version }}
+
+source:
+  url: file://archive_files/VREDCore-${{version}}.sh
+  sha256: 22c4113d9efaf71e1176373954cf6ce2f68b1463e8067a23df955238aeeb830b
+  target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+tests:
+  - script:
+    - $VREDCORE -help
+
+about:
+  homepage: https://www.autodesk.com/products/vred/overview
+  summary: Autodesk VRED is a 3D visualization software used to create product presentations, design reviews, and virtual prototypes

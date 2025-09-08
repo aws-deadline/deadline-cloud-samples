@@ -58,7 +58,7 @@ steps:
         cd '{{Param.WorkspacePath}}'
 
         # Copy the input CSV files
-        mkdir csv
+        mkdir -p csv
         cp '{{Param.InputCsvFile}}' csv/dataset.csv
 
 - name: ProcessWithPython

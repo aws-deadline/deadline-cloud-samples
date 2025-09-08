@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: VREDCore-2025.sh
+    sourceDownloadInstructions: 'Download the VREDCore-2025.sh file from Autodesk website.'
+    buildTool: rattler-build  # conda-build or rattler-build

@@ -13,4 +13,6 @@ conda_recipes/archive_files/vraystd_*
 **/*.zip
 **/*.exe
 **/*.run
-
+**/*.pyc
+**/*.aex
+**/*.conda

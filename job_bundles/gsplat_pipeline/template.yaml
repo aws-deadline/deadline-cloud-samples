@@ -1,0 +1,251 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: Gaussian Splatting pipeline (FFmpeg -> COLMAP/GLOMAP -> NeRF Studio)
+description: |
+  This job runs a pipeline on AWS Deadline Cloud that takes an input video file and trains a Gaussian Splatting
+  .ply file as output. It uses FFmpeg to extract frames from the video, COLMAP and GLOMAP to solve structure-from-motion,
+  and NeRF Studio to train the Gaussian Splatting and export it to .ply.
+
+  It requires the Deadline Cloud queue have a conda queue environment like
+  https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/queue_environments/conda_queue_env_improved_caching.yaml
+  to provide a conda virtual environment. The conda chnanels should include conda-forge and a
+  channel with a nerfstudio package. To build your own nerfstudio package, follow
+  https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html
+  to create an S3 conda channel with a Deadline Cloud queue for building packages, and build the recipe
+  https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes/nerfstudio-1.1
+
+parameterDefinitions:
+
+# Input Data
+- name: InputVideoFile
+  description: The video file input of the subject to solve Gaussian Splatting for.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Input Video File
+    groupLabel: Input Data
+    fileFilters:
+    - label: Video Files
+      patterns: ["*.mp4", "*.mov"]
+    - label: All Files
+      patterns: ["*"]
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  minLength: 1
+- name: ApproxImageCount
+  description: >
+    An approximate image count to use from the input video. Adjust this based on how long
+    the video is and how fast it moves about the subject.
+  userInterface:
+    control: SPIN_BOX
+    label: Approximate Image Count
+    groupLabel: Input Data
+  type: INT
+  default: 100
+  minValue: 10
+- name: ImageDownscaleFactor
+  description: Scale the image size down by this much when converting from video to images.
+  userInterface:
+    control: SPIN_BOX
+    label: Image Downscale Factor
+    groupLabel: Input Data
+  type: FLOAT
+  default: 1.0
+  minValue: 1.0
+
+# Output Data
+- name: OutputPlyFile
+  description: Select the Gaussian Splatting output .ply file.
+  userInterface:
+    control: CHOOSE_OUTPUT_FILE
+    label: Output Ply File
+    groupLabel: Output Data
+    fileFilters:
+    - label: Gaussian Splat PLY Files
+      patterns: ["*.ply"]
+    - label: All Files
+      patterns: ["*"]
+  type: PATH
+  objectType: FILE
+  dataFlow: OUT
+  minLength: 1
+
+# Gaussian Splatting
+- name: GaussianSplattingTrainer
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Gaussian Splatting Trainer
+    groupLabel: Gaussian Splatting
+  type: STRING
+  default: "NERFSTUDIO"
+  allowedValues: ["NERFSTUDIO", "GSPLAT_SIMPLE_TRAINER"]
+- name: MaxNumIterations
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Maximum Number of Iterations
+    groupLabel: Gaussian Splatting
+  description: The maximum number of training iterations for Gaussian Splatting.
+  minValue: 1
+  default: 30000
+- name: NerfStudioOptions
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: NeRF Studio Options
+    groupLabel: Gaussian Splatting
+  description: |
+    Additional command-line options to provide to the NeRF Studio ns-train command.
+    Options for the model:
+          splatfacto-w-light, splatfacto, splatfacto-big
+    Example options to add:
+          "--pipeline.model.num-downscales 1" to reduce how many powers of 2 it shrinks the image
+          "--save-only-latest-checkpoint False" to save more checkpoint files
+  default: "splatfacto --pipeline.model.num-downscales 2"
+- name: GSplatSimpleTrainerOptions
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: GSplat Simple Trainer Options
+    groupLabel: Gaussian Splatting
+  description: |
+    Additional command-line options to provide to the gsplat simple_trainer.py script.
+    Options for the model:
+          default, mcmc
+    Example options to add:
+          "--data-factor 1" to keep the full image resolution
+          "--use-bilateral-grid" to use the experimental bilateral-grid option
+          "--strategy.cap-max 2000000" to increase the max number of splats to 2 million
+  default: "mcmc --data-factor 4 --strategy.cap-max 1000000 --no-use-bilateral-grid"
+
+# Workspace
+- name: WorkspaceDir
+  description: If provided, this path is used for the pipeline's workspace. If not provided, a temporary directory is used.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Workspace Directory
+    groupLabel: Workspace
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ""
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  description: >
+    Choose which conda packages to install in the environment. Add a queue environment to your Deadline Cloud queue like
+    https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/queue_environments/conda_queue_env_improved_caching.yaml
+    to provide a conda virtual environment with these packages for the job.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+  default: ffmpeg colmap=*=gpu* glomap nerfstudio
+
+# Hidden
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
+jobEnvironments:
+- name: Env Vars
+  variables:
+    # Tell Qt applications to run off-screen.
+    QT_QPA_PLATFORM: offscreen
+    # Turn off buffering in Python
+    PYTHONUNBUFFERED: "True"
+  script:
+    actions:
+      onEnter:
+        command: "{{Env.File.Enter}}"
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env bash
+        set -xeuo pipefail
+
+        # Normalize all scripts to unix line endings, set the execute bit,
+        # and add the scripts dir to $PATH.
+        for FILE in '{{Param.JobScriptDir}}'/*.sh; do
+            cat $FILE | tr -d '\r' > $FILE.tr
+            mv -f $FILE.tr $FILE
+            chmod u+x $FILE
+        done
+        echo "openjd_env: PATH={{Param.JobScriptDir}}:$PATH"
+
+        # Initialize the workspace directory
+        WORKSPACE_DIR='{{Param.WorkspaceDir}}'
+        if [ -z "$WORKSPACE_DIR" ]; then
+            WORKSPACE_DIR=$(mktemp -d -p '{{Session.WorkingDirectory}}' workspace_XXXXX)
+        fi
+        mkdir -p "$WORKSPACE_DIR"
+        echo "openjd_env: WORKSPACE_DIR=$WORKSPACE_DIR"
+
+steps:
+
+- name: GaussianSplattingPipeline
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+      - name: Run
+        filename: gaussian_splatting_pipeline.sh
+        type: TEXT
+        data: |
+          #!/bin/env bash
+          set -xeuo pipefail
+          cd "$WORKSPACE_DIR"
+
+          # 1. Extract video frames
+          extract_video_frames.sh \
+                  '{{Param.InputVideoFile}}' \
+                  {{Param.ApproxImageCount}} \
+                  {{Param.ImageDownscaleFactor}} \
+                  ./source_images
+
+          # 2. Solve Structure-from-Motion, saving the pinhole model and undistorted images
+          solve_glomap_sfm.sh \
+                  ./source_images \
+                  ./sfm_workspace \
+                  ./sparse \
+                  ./images
+
+          # 3. Train Gaussian Splatting, saving the .ply output
+          if [ '{{Param.GaussianSplattingTrainer}}' == "NERFSTUDIO" ]; then
+              train_nerfstudio_splatfacto.sh \
+                      ./sparse \
+                      ./images \
+                      '{{Param.MaxNumIterations}}' \
+                      '{{Param.OutputPlyFile}}' \
+                      {{Param.NerfStudioOptions}}
+          elif [ '{{Param.GaussianSplattingTrainer}}' == "GSPLAT_SIMPLE_TRAINER" ]; then
+              train_gsplat_simple_trainer.sh \
+                      . \
+                      '{{Param.MaxNumIterations}}' \
+                      '{{Param.OutputPlyFile}}' \
+                      {{Param.GSplatSimpleTrainerOptions}}
+          else
+              echo 'ERROR: Unrecognized Gaussian Splatting method {{Param.GaussianSplattingTrainer}}'
+              exit 1
+          fi
+
+          echo "openjd_status: Finished Gaussian Splatting pipeline"
+  hostRequirements:
+    attributes:
+      - name: attr.worker.os.family
+        anyOf:
+        - linux
+    amounts:
+      - name: amount.worker.gpu
+        min: 1

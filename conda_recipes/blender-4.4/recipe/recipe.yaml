@@ -1,0 +1,45 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "4.4.3"
+  major_minor_version: "4.4"
+
+package:
+  name: blender
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: https://download.blender.org/release/Blender${{ major_minor_version }}/blender-${{ version }}-linux-x64.tar.xz
+      sha256: 8d3be07d2bc412b502c6bfe3cfe3e22195a4164076867da987ce148d73c27946
+      target_directory: blender
+  - if: win
+    then:
+      url: https://download.blender.org/release/Blender${{ major_minor_version }}/blender-${{ version }}-windows-x64.zip
+      sha256: 60a9703b07f2cf42509f699ccdec4f5ede71c1932f6c14329f0e14c023e27d5c
+      target_directory: blender
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+tests:
+  - script:
+    - blender -h
+
+about:
+  homepage: https://www.blender.org/
+  license: GPL-3.0
+  summary: >
+    Blender is the free and open source 3D creation suite. It supports the entirety of
+    the 3D pipeline—modeling, rigging, animation, simulation, rendering, compositing
+    and motion tracking, even video editing and game creation.

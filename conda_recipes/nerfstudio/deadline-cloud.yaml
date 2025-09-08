@@ -1,0 +1,27 @@
+condaPlatforms:
+  - platform: linux-64
+    variant: cuda
+    defaultSubmit: true
+    additionalHostRequirements:
+      amounts:
+        - name: amount.worker.gpu
+          min: 1
+    variantConfig:
+      # See https://github.com/conda-forge/conda-forge-pinning-feedstock/blob/main/recipe/conda_build_config.yaml
+      # for the values that conda-forge uses.
+      c_compiler:
+        - gcc
+      c_stdlib:
+        - sysroot
+      cxx_compiler:
+        - gxx
+      cuda_compiler:
+        - cuda-nvcc
+      cuda_compiler_version:
+        - 12.6
+      python:
+        - 3.12.* *_cpython
+    buildTool: rattler-build
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge

@@ -9,7 +9,7 @@ body:
         Thank you for taking the time to fill out this bug report!
 
         ⚠️ If the bug that you are reporting is a security-related issue or security vulnerability,
-        then please do not create a report via this template. Instead please 
+        then please do not create a report via this template. Instead please
         notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/)
         or directly via email to [AWS Security](aws-security@amazon.com).
 
@@ -54,8 +54,8 @@ body:
       description: Please provide information on the environment and software versions that you are using to reproduce the bug.
       value: |
         At minimum:
-        1. Operating system: (e.g. Windows Server 2022; Amazon Linux 2023; etc.) 
-        2. Output of `python3 --version`: 
+        1. Operating system (e.g. Windows Server 2022; Amazon Linux 2023; etc.)
+        2. Output of `python3 --version`
         3. Versions of relevant Deadline Cloud tooling that you're using (e.g. `deadline --version`, if using the CLI):
 
         Please share other details about your environment that you think might be relevant to reproducing the bug.

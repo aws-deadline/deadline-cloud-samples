@@ -18,10 +18,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import yaml
-from deadline.client.api import create_job_from_job_bundle, get_boto3_client, list_queues
-from deadline.client.config import get_setting, set_setting
-from deadline.client.config.config_file import read_config
-from deadline.client.job_bundle import create_job_history_bundle_dir
+
+try:
+    from deadline.client.api import create_job_from_job_bundle, get_boto3_client, list_queues
+    from deadline.client.config import get_setting, set_setting
+    from deadline.client.config.config_file import read_config
+    from deadline.client.job_bundle import create_job_history_bundle_dir
+except ModuleNotFoundError:
+    print("ERROR: The `deadline` library is not installed. Please install it with the following command:")
+    print(f' "{sys.executable}" -m pip install deadline')
+    sys.exit(1)
 
 
 def validate_recipe(recipe_dir):
@@ -282,6 +288,14 @@ def create_job_bundle(
                 print(f"    {platform_meta['sourceDownloadInstructions']}")
                 sys.exit(1)
 
+        source_archive_directory = platform_meta.get("sourceArchiveDirectory")
+        if source_archive_directory:
+            parameter_values[f"OverrideSourceDir_{step_name_suffix}"] = str(archive_file_dir / source_archive_directory)
+            if not (archive_file_dir / source_archive_directory).is_dir():
+                print(f"ERROR: Directory {source_archive_directory} not found in {archive_file_dir}.")
+                print(f"To submit the {recipe_dir.name} package build, you need this directory.")
+                sys.exit(1)
+
         # Rename the platform-specific parameter values
         per_step_parameters = set(platform_template["meta"]["perStepParameters"])
 
@@ -357,13 +371,17 @@ def create_job_bundle(
     }
 
     (job_bundle_dir / "template.yaml").write_text(json.dumps(job_template, indent=1, sort_keys=False))
+
+    parameter_values_list = [{"name": name, "value": value} for name, value in parameter_values.items()]
     (job_bundle_dir / "parameter_values.yaml").write_text(
         json.dumps(
-            {"parameterValues": [{"name": name, "value": value} for name, value in parameter_values.items()]},
+            {"parameterValues": parameter_values_list},
             indent=1,
             sort_keys=False,
         )
     )
+
+    return parameter_values_list
 
 
 def progress_callback(op_name):
@@ -428,7 +446,7 @@ def main():
     if default_build_tool not in ["conda-build", "rattler-build"]:
         raise RuntimeError(f"Recipe provided an unsupported build tool {default_build_tool}")
 
-    create_job_bundle(
+    job_parameters = create_job_bundle(
         default_build_tool=default_build_tool,
         job_bundle_dir=job_bundle_dir,
         recipe_dir=recipe_dir,
@@ -440,9 +458,11 @@ def main():
         conda_platforms=conda_platforms,
     )
     print(f"Wrote job bundle:\n  '{job_bundle_dir}'")
+    print()
 
     create_job_from_job_bundle(
         job_bundle_dir,
+        job_parameters=job_parameters,
         print_function_callback=print,
         hashing_progress_callback=progress_callback("Hashing"),
         upload_progress_callback=progress_callback("Uploading"),

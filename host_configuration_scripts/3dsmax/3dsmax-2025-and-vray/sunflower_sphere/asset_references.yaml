@@ -1,0 +1,10 @@
+assetReferences:
+  inputs:
+    directories:
+    - ./scene
+    filenames:
+    - ./sunflower_sphere.mxp
+  outputs:
+    directories:
+    - output
+  referencedPaths: []

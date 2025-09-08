@@ -5,15 +5,20 @@
 
 set -euo pipefail
 
+# Find the path to the 'deadline' executable
+DEADLINE_PATH="$(which deadline)"
 
-DEADLINE_PATH=$(which deadline)
-if [ $(basename $(dirname $DEADLINE_PATH)) = Scripts ]; then
+if [ "$(basename "$(dirname "$DEADLINE_PATH")")" = Scripts ]; then
     # Windows Python installation with Scripts directory
-    DEADLINE_PYTHON=$(dirname $(dirname $DEADLINE_PATH))/Python.exe
+    DEADLINE_PYTHON="$(dirname "$(dirname "$DEADLINE_PATH")")/Python.exe"
+
+    # Run the Python script submitter with the same Python
+    "$DEADLINE_PYTHON" "$0-script.py" "$@"
 else
     # Take the #! from the script
-    DEADLINE_PYTHON=$(head -1 $DEADLINE_PATH | cut -c 3-)
-fi
+    DEADLINE_PYTHON=$(head -1 "$DEADLINE_PATH" | cut -c 3-)
 
-# Run the Python script submitter with the same Python
-$DEADLINE_PYTHON $0-script.py "$@"
+    # Run the Python script submitter with the same Python.
+    # Not quoting the command for cases like `#!/usr/bin/env python`
+    $DEADLINE_PYTHON "$0-script.py" "$@"
+fi

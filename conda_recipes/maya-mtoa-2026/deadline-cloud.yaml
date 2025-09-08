@@ -1,0 +1,7 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - Autodesk_Maya_2026_Linux_64bit.tgz
+    sourceDownloadInstructions: 'Download the Autodesk_Maya_2026_Linux_64bit.tgz full download file from Autodesk.'
+    buildTool: rattler-build
