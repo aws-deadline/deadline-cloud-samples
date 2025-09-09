@@ -5,12 +5,19 @@
 This package build recipe creates a conda package for the C4DtoA plugin you
 provide in an input folder.
 
+Usage based licensing is available on [Deadline Cloud SMF](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html)
+automatically.
+
 
 ## Building the package for Windows
 
-Copy the c4dtoa plugin folder into
+[Install](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Installation_ci_Installing_Arnold_for_Cinema_4D_on_Windows_html)
+C4DtoA and copy C:\Program Files\Maxon Cinema 4D 2025\plugins\C4DtoA into
 [`conda_recipes/archive_files/cinema4d-c4dtoa-2025/win-64`](../archive_files/cinema4d-c4dtoa-2025/win-64/)
-You can find the plugin locally in your Cinema 4D preferences folder.
+
+### Build the package on a Deadline Cloud build queue
+
+Follow [this guide](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/) to build the package on Deadline Cloud.
 
 ### Build the package locally
 

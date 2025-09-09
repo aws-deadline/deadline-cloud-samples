@@ -19,4 +19,4 @@ requirements:
     - cinema4d >=2025
 
 about:
-  license: LicenseRef-Multiple
+  license: Commercial
