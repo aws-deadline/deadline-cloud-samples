@@ -8,7 +8,9 @@ provide in an input folder.
 
 ## Building the package for Windows
 
-Copy the vray plugin folder into
+[Install](https://docs.chaos.com/display/VC4D/Installation) V-Ray for Cinema 4D.
+
+Copy C:\Program Files\Maxon Cinema 4D 2025\plugins\V-Ray into
 [`conda_recipes/archive_files/cinema4d-vray-2025/win-64`](../archive_files/cinema4d-vray-2025/win-64/)
 You can find the plugin locally in your Cinema 4D preferences folder.
 
@@ -86,3 +88,6 @@ No channel URL was provided, using a default prefix on the queue's job attachmen
 Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
 ...
 ```
+
+On Service Mangaged Fleets V-Ray licensing should work with no setup required.
+On Customer Managed Fleets follow this [licensing guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html).
