@@ -19,4 +19,7 @@ requirements:
     - cinema4d >=2025
 
 about:
-  license: LicenseRef-Multiple
+  homepage: https://insydium.ltd/
+  documentation: https://insydium.ltd/products/x-particles/
+  license: LicenseRef-Insydium
+  summary: X-Particles is a fully-featured advanced particle and VFX system for Maxon’s Cinema 4D. Its unique rule system of Questions and Actions enables complete control over particle simulations.

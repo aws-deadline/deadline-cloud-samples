@@ -5,12 +5,32 @@
 This package build recipe creates a conda package for the INSYDIUM plugin you
 provide in an input folder.
 
+Note: INSYDIUM requires a [GPU](https://insydium.ltd/help/?q=My+render+node+system+does+not+have+a+GPU%2C+will+INSYDIUM+Fused+work%3F).
+
 
 ## Building the package for Windows
 
-Copy the INSYDIUM plugin folder into
-[`conda_recipes/archive_files/cinema4d-insydium-2025/win-64`](../archive_files/cinema4d-insydium-2025/win-64/)
-You can find the plugin locally in your Cinema 4D preferences folder.
+To build the INSYDIUM package, follow these instructions:
+
+1. Install by following [instructions here](https://insydium.ltd/help/?q=1608)
+2. [Optional] Verify that "INSYDIUM" works with Cinema 4D locally. You can test this using any of the sample scenes available [here](https://insydium.ltd/support-home/content-repository/).
+3. Copy the "INSYDIUM" folder from your installation directory to `conda_recipes/archive_files/cinema4d-insydium-2025/win-64`. (The default installation location on Windows is `C:\Program Files\Maxon Cinema 4D 2025\plugins\INSYDIUM`)
+
+### Build the package on Deadline Cloud
+
+If you create a package build queue as described in the Deadline Cloud developer guide page
+[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html),
+you can submit the package to build on your farm.
+
+Note that this approach automatically determines a new build number each time you run
+the package build job, you do not have to handle that yourself like when building locally.
+
+```
+C:\Dev\deadline-cloud-samples\conda_recipes>submit-package-job cinema4d-insydium-2025
+No channel URL was provided, using a default prefix on the queue's job attachments bucket
+Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
+...
+```
 
 ### Build the package locally
 
@@ -31,6 +51,9 @@ C:\Dev\deadline-cloud-samples\conda_recipes>dir C:\...\conda-bld\win-64
 04/10/2025  02:21 PM           232,806 cinema4d-insydium-2025-0.conda
 ...
 ```
+
+The --no-test flag avoids a conda error if cinema4d-2025 package hasn't already
+been built locally.
 
 ### Publish the locally built package to an S3 conda channel
 
@@ -70,57 +93,3 @@ Here's an example of doing this for the package that was built by rattler-build:
     upload: temp-local-channel\win-64\repodata.json to s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default/win-64/repodata.json
     ...
     ```
-
-### Build the package on Deadline Cloud
-
-If you create a package build queue as described in the Deadline Cloud developer guide page
-[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html),
-you can submit the package to build on your farm.
-
-Note that this approach automatically determines a new build number each time you run
-the package build job, you do not have to handle that yourself like when building locally.
-
-```
-C:\Dev\deadline-cloud-samples\conda_recipes>submit-package-job cinema4d-insydium-2025
-No channel URL was provided, using a default prefix on the queue's job attachments bucket
-Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
-...
-```
-
-### INSYDUIM license check
-
-Add this [queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs.html)
-template to ensure render node license verifies correctly:
-
-```
-specificationVersion: "environment-2023-09"
-environment:
- name: INSYDIUM
- script:
-  actions:
-   onEnter:
-    command: "python"
-    args: [ "{{Env.File.Enter}}" ]
-  embeddedFiles:
-   - name: Enter
-     filename: check_insydium_license.py
-     type: TEXT
-     data: |
-      import subprocess
-
-      def check_license():
-          url = "https://license.insydium.net"
-          print(f"Testing {url}...")
-          try:
-              result = subprocess.run(['curl', '-v', url], timeout=30)
-              if result.returncode == 0:
-                  print("\nSUCCESS!")
-              else:
-                  print(f"\nFAILED (exit code: {result.returncode})")
-              return result.returncode == 0
-          except Exception as e:
-              print(f"Error: {e}")
-              return False
-
-      check_license()
-```
