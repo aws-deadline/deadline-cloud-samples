@@ -1,0 +1,7 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: FLIP-Fluids.zip
+    # These instructions show you how to get the free demo version of FLIP Fluids. Using the paid version would involve different steps depending on where you purchased it from.
+    sourceDownloadInstructions: 'Run "curl -LO https://github.com/rlguy/Blender-FLIP-Fluids/releases/download/v1.8.4/FLIP_Fluids_addon_1.8.4_demo_.2025-07-17.zip --output-dir archive_files && zip -r archive_files/FLIP-Fluids.zip archive_files/FLIP_Fluids_addon_1.8.4_demo_.2025-07-17.zip"'
+    buildTool: rattler-build
