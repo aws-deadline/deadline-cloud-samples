@@ -213,6 +213,7 @@ def create_job_bundle(
     s3_channel_bucket,
     s3_channel_prefix,
     conda_platforms,
+    enable_fast_build,
 ):
     # Read the conda_build_linux_package template, and then decompose it into pieces
     build_linux_package_bundle_dir = Path(__file__).parent / "conda_build_linux_package"
@@ -358,6 +359,13 @@ def create_job_bundle(
     It then reindexes the channel.
     """
 
+    # Add fast build environment variable if enabled
+    if enable_fast_build:
+        print("Enabling fast build optimizations")
+        if "variables" not in package_build_env["entity"]:
+            package_build_env["entity"]["variables"] = {}
+        package_build_env["entity"]["variables"]["CONDA_BUILD_ENABLE_FAST_BUILD"] = "true"
+
     # Assemble the job template
     job_template = {
         "specificationVersion": "jobtemplate-2023-09",
@@ -414,6 +422,9 @@ def main():
     parser.add_argument(
         "--all-platforms", action="store_true", help="Submit all the platforms specified by the recipe's deadline-cloud.yaml."
     )
+    parser.add_argument(
+        "--fast-build", action="store_true", help="Enable build optimizations for faster package creation."
+    )
     args = parser.parse_args()
 
     if args.conda_platform and args.all_platforms:
@@ -456,6 +467,7 @@ def main():
         s3_channel_bucket=s3_channel_bucket,
         s3_channel_prefix=s3_channel_prefix,
         conda_platforms=conda_platforms,
+        enable_fast_build=args.fast_build,
     )
     print(f"Wrote job bundle:\n  '{job_bundle_dir}'")
     print()

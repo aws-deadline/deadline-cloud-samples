@@ -128,6 +128,22 @@ IAM role of the queue you're submitting to includes permissions for the S3 bucke
 $ ./submit-package-job blender-4.2 --s3-channel s3://<another-s3-bucket>/channel/prefix
 ```
 
+### Enabling fast build optimizations
+
+You can enable fast build optimizations to create faster builds
+by adding the `--fast-build` flag:
+
+```
+$ ./submit-package-job blender-4.2 --fast-build
+```
+
+This enables:
+- **conda-build**: Uses `--zstd-compression-level 1` for faster compression with good compression ratio
+- **rattler-build**: Uses `--package-format conda:min` for optimized package format
+
+The fast build optimization is particularly beneficial for packages with many files or large binaries,
+as it reduces package size and can speed up both the build process and package installation.
+
 ## Recipe directory structure for `submit-package-build`
 
 The `submit-package-build` command expects conda build recipes in a specific directory structure. It's inspired by the

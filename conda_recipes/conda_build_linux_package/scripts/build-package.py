@@ -276,8 +276,13 @@ def main():
             sys.exit(1)
         prefix_length_option = ["--prefix-length", f"{args.override_prefix_length}"]
 
+    # Check for fast build optimization environment variable
+    enable_fast_build = os.environ.get("CONDA_BUILD_ENABLE_FAST_BUILD", "false").lower() == "true"
+
     # Run the package build tool
     if args.build_tool == "conda-build":
+        fast_build_opts = ["--zstd-compression-level", "1"] if enable_fast_build else []
+        
         command = [
             "conda",
             "build",
@@ -287,9 +292,12 @@ def main():
             *channel_options,
             "--clobber-file",
             "recipe_clobber.yaml",
+            *fast_build_opts,
             args.recipe_dir,
         ]
     else:
+        fast_build_opts = ["--package-format", "conda:min"] if enable_fast_build else []
+        
         command = [
             "rattler-build",
             "build",
@@ -299,6 +307,7 @@ def main():
             "--output-dir",
             args.conda_bld_dir,
             "--verbose",
+            *fast_build_opts,
             *prefix_length_option,
             *channel_options,
         ]
