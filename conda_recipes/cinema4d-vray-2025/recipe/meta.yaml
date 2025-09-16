@@ -19,4 +19,9 @@ requirements:
     - cinema4d >=2025
 
 about:
-  license: LicenseRef-Multiple
+  homepage: https://www.chaos.com/vray/maya
+  documentation: https://docs.chaos.com/display/VMAYA
+  license: LicenseRef-ChaosEULA
+  summary: |
+    V-Ray is a 3D photorealistic ray-traced rendering plug-in.
+    V-Ray for Maya is a 3D rendering plugin for Maya that's used to create visual effects and animations for film, television, and other industries.

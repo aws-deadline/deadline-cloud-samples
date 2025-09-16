@@ -8,6 +8,11 @@ provide in an input folder.
 
 ## Building the package for Windows
 
+1. Install the V-Ray for Cinema 4D plugin by [following instructions here](https://docs.chaos.com/display/VC4D/Installation).
+  i. Choose "Workstation" install
+2. Copy the "V-Ray" folder from your installation directory to conda_recipes/archive_files/cinema4d-vray-2025/win-64.
+(The default installation location on Windows is C:\Program Files\Maxon Cinema 4D 2025\plugins\V-Ray)
+
 [Install](https://docs.chaos.com/display/VC4D/Installation) V-Ray for Cinema 4D.
 
 Copy C:\Program Files\Maxon Cinema 4D 2025\plugins\V-Ray into
@@ -33,6 +38,9 @@ C:\Dev\deadline-cloud-samples\conda_recipes>dir C:\...\conda-bld\win-64
 04/10/2025  02:21 PM           232,806 cinema4d-vray-2025-0.conda
 ...
 ```
+
+Note: The `--no-test` skips a build error locating cinema4d package only
+required at runtime and already provided by the SMF default Conda environment.
 
 ### Publish the locally built package to an S3 conda channel
 
