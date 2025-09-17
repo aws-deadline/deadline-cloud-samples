@@ -109,6 +109,7 @@ def main():
     parser.add_argument("--override-source-archive2")
     parser.add_argument("--override-source-dir")
     parser.add_argument("--variant-config-file")
+    parser.add_argument("--enable-fast-build", choices=("true", "false"), default="false")
     args = parser.parse_args()
 
     session = boto3.Session()
@@ -276,8 +277,8 @@ def main():
             sys.exit(1)
         prefix_length_option = ["--prefix-length", f"{args.override_prefix_length}"]
 
-    # Check for fast build optimization environment variable
-    enable_fast_build = os.environ.get("CONDA_BUILD_ENABLE_FAST_BUILD", "false").lower() == "true"
+    # Check for fast build optimization from CLI argument
+    enable_fast_build = args.enable_fast_build == "true"
 
     # Run the package build tool
     if args.build_tool == "conda-build":

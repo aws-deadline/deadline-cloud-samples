@@ -359,12 +359,12 @@ def create_job_bundle(
     It then reindexes the channel.
     """
 
-    # Add fast build environment variable if enabled
+    # Add fast build parameter if enabled
     if enable_fast_build:
         print("Enabling fast build optimizations")
-        if "variables" not in package_build_env["entity"]:
-            package_build_env["entity"]["variables"] = {}
-        package_build_env["entity"]["variables"]["CONDA_BUILD_ENABLE_FAST_BUILD"] = "true"
+        parameter_values["EnableFastBuild"] = "true"
+    else:
+        parameter_values["EnableFastBuild"] = "false"
 
     # Assemble the job template
     job_template = {
@@ -423,7 +423,7 @@ def main():
         "--all-platforms", action="store_true", help="Submit all the platforms specified by the recipe's deadline-cloud.yaml."
     )
     parser.add_argument(
-        "--fast-build", action="store_true", help="Enable build optimizations for faster package creation."
+        "-f", "--fast-build", action="store_true", help="Enable build optimizations by reduing the amount of compression performed for faster package creation."
     )
     args = parser.parse_args()
 

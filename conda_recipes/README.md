@@ -138,7 +138,7 @@ $ ./submit-package-job blender-4.2 --fast-build
 ```
 
 This enables:
-- **conda-build**: Uses `--zstd-compression-level 1` for faster compression with good compression ratio
+- **conda-build**: Uses `--zstd-compression-level 1` for faster compression with a larger package size
 - **rattler-build**: Uses `--package-format conda:min` for optimized package format
 
 The fast build optimization is particularly beneficial for packages with many files or large binaries,
