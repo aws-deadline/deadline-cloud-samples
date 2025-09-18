@@ -15,6 +15,17 @@ automatically.
 C4DtoA and copy C:\Program Files\Maxon Cinema 4D 2025\plugins\C4DtoA into
 [`conda_recipes/archive_files/cinema4d-c4dtoa-2025/win-64`](../archive_files/cinema4d-c4dtoa-2025/win-64/)
 
+
+To build the c4dtoA package, follow these instructions:
+
+1. Install the Cinema 4D to Arnold plugin by following [instructions here](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Installation_ci_Installing_Arnold_for_Cinema_4D_on_Windows_html).
+  i. We have used "C4DtoA-4.8.3.2-windows-2025.exe" with "Cinema 4D 2025.3.3"
+    in this example, but theoretically it should work with other versions as
+    well. Ensure that the C4DtoA and Cinema 4D versions are compatible with each other.
+2. [Optional] Verify that "Arnold" works with Cinema 4D locally. You can test this using any of the sample scenes available here.
+3. Copy the "C4DtoA" folder from your installation directory to `conda_recipes/archive_files/cinema4d-c4dtoa-2025/win-64`.
+  (The default installation location on Windows is `C:\Program Files\Maxon Cinema 4D 2025\plugins\C4DtoA`)
+
 ### Build the package on a Deadline Cloud build queue
 
 Follow [this guide](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/) to build the package on Deadline Cloud.
@@ -38,6 +49,9 @@ C:\Dev\deadline-cloud-samples\conda_recipes>dir C:\...\conda-bld\win-64
 04/10/2025  02:21 PM           232,806 cinema4d-c4dtoa-2025-0.conda
 ...
 ```
+
+Note: The `--no-test` skips a build error locating cinema4d package only
+required at runtime and already provided by the SMF default Conda environment.
 
 ### Publish the locally built package to an S3 conda channel
 
