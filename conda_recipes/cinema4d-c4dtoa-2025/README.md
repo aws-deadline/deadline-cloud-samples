@@ -22,7 +22,7 @@ To build the c4dtoA package, follow these instructions:
   i. We have used "C4DtoA-4.8.3.2-windows-2025.exe" with "Cinema 4D 2025.3.3"
     in this example, but theoretically it should work with other versions as
     well. Ensure that the C4DtoA and Cinema 4D versions are compatible with each other.
-2. [Optional] Verify that "Arnold" works with Cinema 4D locally. You can test this using any of the sample scenes available here.
+2. [Optional] Verify that "Arnold" works with Cinema 4D locally. You can test this using any of the sample scenes available [here](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Tutorials_ci_Learning_Scenes_html).
 3. Copy the "C4DtoA" folder from your installation directory to `conda_recipes/archive_files/cinema4d-c4dtoa-2025/win-64`.
   (The default installation location on Windows is `C:\Program Files\Maxon Cinema 4D 2025\plugins\C4DtoA`)
 
