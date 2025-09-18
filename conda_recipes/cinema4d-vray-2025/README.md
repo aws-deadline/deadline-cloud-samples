@@ -10,14 +10,10 @@ provide in an input folder.
 
 1. Install the V-Ray for Cinema 4D plugin by [following instructions here](https://docs.chaos.com/display/VC4D/Installation).
   i. Choose "Workstation" install
-2. Copy the "V-Ray" folder from your installation directory to conda_recipes/archive_files/cinema4d-vray-2025/win-64.
+2. [Optional] Verify that "V-Ray" works with Cinema 4D locally. You can test this using any of the sample scenes available [here](https://www.chaos.com/cloud/scenes?srsltid=AfmBOorJmV6Bugw1DTiIyfiA1gxANUxdp1tUaHOTdyZLJnBGJxLON8Xi#cinema-4d).
+3. Copy the "V-Ray" folder from your installation directory to conda_recipes/archive_files/cinema4d-vray-2025/win-64.
 (The default installation location on Windows is C:\Program Files\Maxon Cinema 4D 2025\plugins\V-Ray)
 
-[Install](https://docs.chaos.com/display/VC4D/Installation) V-Ray for Cinema 4D.
-
-Copy C:\Program Files\Maxon Cinema 4D 2025\plugins\V-Ray into
-[`conda_recipes/archive_files/cinema4d-vray-2025/win-64`](../archive_files/cinema4d-vray-2025/win-64/)
-You can find the plugin locally in your Cinema 4D preferences folder.
 
 ### Build the package locally
 
