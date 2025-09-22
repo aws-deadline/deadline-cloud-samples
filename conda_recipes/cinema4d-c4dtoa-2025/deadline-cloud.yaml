@@ -3,3 +3,7 @@ condaPlatforms:
     defaultSubmit: true
     sourceArchiveDirectory: cinema4d-c4dtoa-2025/win-64/
     buildTool: conda-build
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveDirectory: cinema4d-c4dtoa-2025/linux-64/
+    buildTool: conda-build
