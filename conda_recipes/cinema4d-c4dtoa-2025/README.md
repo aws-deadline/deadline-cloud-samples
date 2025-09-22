@@ -11,11 +11,6 @@ automatically.
 
 ## Building the package for Windows
 
-[Install](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Installation_ci_Installing_Arnold_for_Cinema_4D_on_Windows_html)
-C4DtoA and copy C:\Program Files\Maxon Cinema 4D 2025\plugins\C4DtoA into
-[`conda_recipes/archive_files/cinema4d-c4dtoa-2025/win-64`](../archive_files/cinema4d-c4dtoa-2025/win-64/)
-
-
 To build the c4dtoA package, follow these instructions:
 
 1. Install the Cinema 4D to Arnold plugin by following [instructions here](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Installation_ci_Installing_Arnold_for_Cinema_4D_on_Windows_html).
@@ -26,9 +21,21 @@ To build the c4dtoA package, follow these instructions:
 3. Copy the "C4DtoA" folder from your installation directory to `conda_recipes/archive_files/cinema4d-c4dtoa-2025/win-64`.
   (The default installation location on Windows is `C:\Program Files\Maxon Cinema 4D 2025\plugins\C4DtoA`)
 
-### Build the package on a Deadline Cloud build queue
+### Build the package on Deadline Cloud
 
-Follow [this guide](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/) to build the package on Deadline Cloud.
+If you create a package build queue as described in the Deadline Cloud developer guide page
+[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html),
+you can submit the package to build on your farm.
+
+Note that this approach automatically determines a new build number each time you run
+the package build job, you do not have to handle that yourself like when building locally.
+
+```
+C:\Dev\deadline-cloud-samples\conda_recipes>submit-package-job cinema4d-c4dtoa-2025
+No channel URL was provided, using a default prefix on the queue's job attachments bucket
+Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
+...
+```
 
 ### Build the package locally
 
@@ -91,19 +98,3 @@ Here's an example of doing this for the package that was built by rattler-build:
     upload: temp-local-channel\win-64\repodata.json to s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default/win-64/repodata.json
     ...
     ```
-
-### Build the package on Deadline Cloud
-
-If you create a package build queue as described in the Deadline Cloud developer guide page
-[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html),
-you can submit the package to build on your farm.
-
-Note that this approach automatically determines a new build number each time you run
-the package build job, you do not have to handle that yourself like when building locally.
-
-```
-C:\Dev\deadline-cloud-samples\conda_recipes>submit-package-job cinema4d-c4dtoa-2025
-No channel URL was provided, using a default prefix on the queue's job attachments bucket
-Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
-...
-```
