@@ -15,6 +15,26 @@ provide in an input folder.
 (The default installation location on Windows is C:\Program Files\Maxon Cinema 4D 2025\plugins\V-Ray)
 
 
+### Build the package on Deadline Cloud
+
+If you create a package build queue as described in the Deadline Cloud developer guide page
+[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html),
+you can submit the package to build on your farm.
+
+Note that this approach automatically determines a new build number each time you run
+the package build job, you do not have to handle that yourself like when building locally.
+
+```
+C:\Dev\deadline-cloud-samples\conda_recipes>submit-package-job cinema4d-vray-2025
+No channel URL was provided, using a default prefix on the queue's job attachments bucket
+Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
+...
+```
+
+On Service Mangaged Fleets V-Ray licensing should work with no setup required.
+On Customer Managed Fleets follow this [licensing guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html).
+
+
 ### Build the package locally
 
 
@@ -76,22 +96,3 @@ Here's an example of doing this for the package that was built by rattler-build:
     upload: temp-local-channel\win-64\repodata.json to s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default/win-64/repodata.json
     ...
     ```
-
-### Build the package on Deadline Cloud
-
-If you create a package build queue as described in the Deadline Cloud developer guide page
-[Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html),
-you can submit the package to build on your farm.
-
-Note that this approach automatically determines a new build number each time you run
-the package build job, you do not have to handle that yourself like when building locally.
-
-```
-C:\Dev\deadline-cloud-samples\conda_recipes>submit-package-job cinema4d-vray-2025
-No channel URL was provided, using a default prefix on the queue's job attachments bucket
-Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
-...
-```
-
-On Service Mangaged Fleets V-Ray licensing should work with no setup required.
-On Customer Managed Fleets follow this [licensing guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html).
