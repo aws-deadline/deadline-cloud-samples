@@ -111,7 +111,7 @@ This allows the host config script to pull down the installers from your S3 buck
 
 ## Usage
 
-### 1. Configure Installation Script
+### 1. Configure Host Config Installation Script
 
 Before running the installation script, you need to update the configuration variables at the top of the script. All configurable settings are located in the "Script Configuration Variables" section:
 
@@ -148,10 +148,12 @@ This will set the `redshift_LICENSE` environment variable to `7055@$vpc_endpoint
 You will also need to install your own Nvidia GPU driver to your CMF instance to support GPU rendering with Red Giant. Otherwise, you will most likely experience hanging or failing jobs.
 
 
-### 2. Run Installation Script
+### 2. Add Host Config Script to Windows GPU Fleet
 
-The contents of the script `.\install-software.ps1` should go in your Configuration Scripts for your fleet, which you can add to your fleet when you go to Fleets, select your fleet, go under Configurations, and add your script under Worker configuration script. For more information, see the [AWS Deadline Cloud SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html).
+The contents of the script `.\install-software.ps1` should go in your Configuration Scripts for your fleet, which you can add to your fleet when you go to Fleets, select your fleet, go under Configurations, and add your script under Worker configuration script. Once pasted, scroll down and set the script timeout to **3600 seconds**. For more information, see the [AWS Deadline Cloud SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html).
 
+
+## Local Dev Testing
 To test the script locally, run Powershell with Admin privileges on a Windows machine, add the credentials to your AWS account in the Powershell windows, and then run the following:
 
 ```powershell
