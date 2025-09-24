@@ -127,8 +127,31 @@ Building packages into channel s3://<MY_S3_CHANNEL_BUCKET>/Conda/Default
 
 ### Build the package locally
 
+To build locally on Linux, you can follow the linked installation instructions for either
+[rattler-build](https://rattler.build/) or [conda-build](https://docs.conda.io/projects/conda-build).
 
 From the `conda_recipes` directory, run:
+
+```
+[/dev/deadline-cloud-samples/conda_recipes]$ rattler-build build -r cinema4d-c4dtoa-2025/recipe
+
+ ╭─ Finding outputs from recipe
+ │ Found 1 variants
+ │
+ │ Build variant: cinema4d-c4dtoa-2025-hb0f4dca_0
+ │
+ │ ╭─────────────────┬────────────╮
+ │ │ Variant         ┆ Version    │
+ │ ╞═════════════════╪════════════╡
+ │ │ target_platform ┆ "linux-64" │
+ │ ╰─────────────────┴────────────╯
+ │
+ ╰─────────────────── (took 0 seconds)
+
+```
+
+or:
+
 
 ```
 [/dev/deadline-cloud-samples/conda_recipes]$ conda build cinema4d-c4dtoa-2025/recipe --no-test
