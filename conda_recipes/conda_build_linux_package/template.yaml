@@ -118,6 +118,14 @@ parameterDefinitions:
     groupLabel: Conda Package Recipe
   default: "false"
   allowedValues: ["true", "false"]
+- name: ExtraBuildToolArgs
+  description: Additional arguments to pass to the conda-build or rattler-build command.
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Additional Build Arguments
+    groupLabel: Conda Package Recipe
+  default: ""
 
 # Group: Conda Channel
 - name: CondaChannelName
@@ -269,7 +277,8 @@ steps:
             --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
             --override-source-dir '{{Param.OverrideSourceDir}}' \
             --variant-config-file '{{Param.VariantConfigFile}}' \
-            --enable-fast-build '{{Param.EnableFastBuild}}'
+            --enable-fast-build '{{Param.EnableFastBuild}}' \
+            --extra-build-tool-args '{{Param.ExtraBuildToolArgs}}'
 
   hostRequirements:
     # Host requirements for the linux-64 conda platform

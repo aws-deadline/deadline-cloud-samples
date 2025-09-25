@@ -131,7 +131,7 @@ $ ./submit-package-job blender-4.2 --s3-channel s3://<another-s3-bucket>/channel
 ### Enabling fast build optimizations
 
 You can enable fast build optimizations to create faster builds
-by adding the `--fast-build` flag:
+by adding the `--fast-build` or `-f` flag:
 
 ```
 $ ./submit-package-job blender-4.2 --fast-build
@@ -143,6 +143,20 @@ This enables:
 
 The fast build optimization is particularly beneficial for packages with many files or large binaries,
 as it reduces package size and can speed up both the build process and package installation.
+
+### Adding custom build arguments
+
+You can pass additional arguments to the conda-build or rattler-build command using the `--extra-build-tool-args` or `-a` option:
+
+```
+$ ./submit-package-job blender-4.2 --extra-build-tool-args "--no-test --quiet"
+```
+
+This allows you to customize the build process with any supported conda-build or rattler-build arguments:
+- **conda-build**: Examples include `--no-test`, `--quiet`, `--debug`
+- **rattler-build**: Examples include `--quiet`, `--debug`, `--skip-existing`
+
+The build arguments are parsed as space-separated values and added to the build command. Use quotes to group arguments that contain spaces.
 
 ## Recipe directory structure for `submit-package-build`
 

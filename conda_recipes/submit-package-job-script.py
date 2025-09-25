@@ -214,6 +214,7 @@ def create_job_bundle(
     s3_channel_prefix,
     conda_platforms,
     enable_fast_build,
+    extra_build_tool_args,
 ):
     # Read the conda_build_linux_package template, and then decompose it into pieces
     build_linux_package_bundle_dir = Path(__file__).parent / "conda_build_linux_package"
@@ -366,6 +367,14 @@ def create_job_bundle(
     else:
         parameter_values["EnableFastBuild"] = "false"
 
+    # Add build args parameter if provided
+    if extra_build_tool_args:
+        print(f"Adding custom build arguments: {extra_build_tool_args}")
+        parameter_values["ExtraBuildToolArgs"] = extra_build_tool_args
+    else:
+        parameter_values["ExtraBuildToolArgs"] = ""
+
+
     # Assemble the job template
     job_template = {
         "specificationVersion": "jobtemplate-2023-09",
@@ -425,6 +434,9 @@ def main():
     parser.add_argument(
         "-f", "--fast-build", action="store_true", help="Enable build optimizations by reduing the amount of compression performed for faster package creation."
     )
+    parser.add_argument(
+        "-a", "--extra-build-tool-args", help="Additional arguments to pass to the conda-build or rattler-build command, space-separated."
+    )
     args = parser.parse_args()
 
     if args.conda_platform and args.all_platforms:
@@ -468,6 +480,7 @@ def main():
         s3_channel_prefix=s3_channel_prefix,
         conda_platforms=conda_platforms,
         enable_fast_build=args.fast_build,
+        extra_build_tool_args=args.extra_build_tool_args,
     )
     print(f"Wrote job bundle:\n  '{job_bundle_dir}'")
     print()
