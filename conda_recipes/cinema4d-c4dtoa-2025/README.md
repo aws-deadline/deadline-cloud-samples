@@ -107,7 +107,7 @@ To build the c4dtoA package, follow these instructions:
 1. Install the Cinema 4D to Arnold plugin by following [instructions here](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Installation_ci_Installing_Arnold_for_Cinema_4D_on_Linux_html).
 2. [Optional] Verify that "Arnold" works with Cinema 4D locally. You can test this using any of the sample scenes available [here](https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Tutorials_ci_Learning_Scenes_html).
 3. Copy the "C4DtoA" folder from your installation directory to `conda_recipes/archive_files/cinema4d-c4dtoa-2025/linux-64`.
-  (The default installation location on Windows is `/opt/maxon/cinema4dr2025.303/bin/plugins/`)
+  (The default installation location on Linux is `/opt/maxon/cinema4dr2025.303/bin/plugins/`)
 
 ### Build the package on Deadline Cloud
 
