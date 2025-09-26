@@ -1,0 +1,24 @@
+
+package:
+  name: cinema4d-c4dtoa
+  version: "2025"
+
+source:
+- path: ../../archive_files/cinema4d-c4dtoa-2025/win-64 # [win64]
+
+build:
+  number: 0
+  binary_relocation: false
+  detect_binary_files_with_prefix: false
+  ignore_prefix_files: true
+  missing_dso_whitelist:
+    - "**"
+
+requirements:
+  run:
+    - cinema4d >=2025
+
+about:
+  home: https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_cinema_4d_ci_Arnold_for_Cinema_4D_User_Guide_html
+  license: Commercial
+  summary: Autodesk Arnold is an advanced cross-platform rendering library, or API, developed by Solid Angle and used by a number of prominent organizations in film, television, and animation, including Sony Pictures Imageworks. It was developed as a photo-realistic, physically-based ray tracing alternative to traditional scanline-based rendering software for CG animation.
