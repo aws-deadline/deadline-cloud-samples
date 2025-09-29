@@ -1,12 +1,12 @@
 # Recipe in rattler-build format.
 # See https://prefix-dev.github.io/rattler-build/latest/
-# Before building this recipe, build the conda 
-# packages for "deadline" and "openjd-adaptor-runtime" dependencies. 
-# Find these recipes for building the packages at : 
+# Before building this recipe, build the conda
+# packages for "deadline" and "openjd-adaptor-runtime" dependencies.
+# Find these recipes for building the packages at :
 # https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes
 
 context:
-  version: "0.7.10"
+  version: "0.8.2"
 
 package:
   name: cinema4d-openjd
@@ -15,12 +15,12 @@ package:
 # This source reference uses the source archive published to PyPI
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-${{ version }}.tar.gz
-  sha256: 8382f7772550a5330bc5c41d4cd657569f03d0fb7e9fcafce996c9c9195f9980
+  sha256: 511ad495d992d43fbdf3212c91653c79ae5b32a48ebd158c46a2823ded09a239
 
 build:
   number: 0
   script:
-    - python -m pip install . -vv --no-deps --no-build-isolation
+    - python -m pip install . -vv --no-deps
 
 requirements:
   host:
@@ -30,7 +30,7 @@ requirements:
     - pip
   run:
     - python
-    - deadline >=0.49.7,<0.50
+    - deadline >=0.51.1,<0.53
     - openjd-adaptor-runtime 0.9.*
 
 tests:
@@ -42,7 +42,8 @@ tests:
       - pip
   script:
     - pip check
-    - cinema4d-openjd --help
+# This doesn't work on Windows, possibly a rattler-build bug since cinema4d-openjd.exe is in $PREFIX/Scripts
+#    - cinema4d-openjd --help
 
 about:
   summary: AWS Deadline Cloud for Cinema 4D

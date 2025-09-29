@@ -1,4 +1,4 @@
-# Sample conda build recipes and package build infrastructure for AWS Deadline Cloud
+# Sample conda package recipes and package build infrastructure for AWS Deadline Cloud
 
 ## Summary
 
@@ -8,13 +8,12 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 * The job bundle [conda_build_linux_package](conda_build_linux_package) defines a job that
   is cross-platform but configured for Linux.
 * The submission command `submit-package-job` submits a job for running
-  a provided conda build recipe on a specified set of conda platforms. It takes the job
+  a provided rattler-build recipe on a specified set of conda platforms. It takes the job
   bundle, and edits it to match the arguments provided.
-* A set of conda build recipes with the metadata needed by `submit-package-job`
+* A set of rattler-build and conda-build recipes with the metadata needed by `submit-package-job`
   provide a starting point for packages.
-* Supports both [conda-build](https://docs.conda.io/projects/conda-build/)
-  and [rattler-build](https://prefix-dev.github.io/rattler-build/). Only Linux works
-  with rattler-build currently.
+* Supports [rattler-build](https://prefix-dev.github.io/rattler-build/),
+  and (as deprecated) [conda-build](https://docs.conda.io/projects/conda-build/).
 
 ## Infrastructure setup prerequisites
 
@@ -24,7 +23,7 @@ for instructions on how to set up a Deadline Cloud farm for building packages in
 Name your package build queue "Package Build Queue" for the job submission command to select it by default.
 
 To make this process faster and simpler, you can use our provided starter farm CloudFormation template [here](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/cloudformation/farm_templates/starter_farm) to deploy your Deadline infrastructure along with
-a configured package build queue as documented in the Deadline Cloud developer guide linked above. 
+a configured package build queue as documented in the Deadline Cloud developer guide linked above.
 
 To submit package build jobs, you will need the
 [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
@@ -138,8 +137,8 @@ $ ./submit-package-job blender-4.2 --fast-build
 ```
 
 This enables:
-- **conda-build**: Uses `--zstd-compression-level 1` for faster compression with a larger package size
 - **rattler-build**: Uses `--package-format conda:min` for optimized package format
+- **conda-build** (deprecated): Uses `--zstd-compression-level 1` for faster compression with a larger package size
 
 The fast build optimization is particularly beneficial for packages with many files or large binaries,
 as it reduces package size and can speed up both the build process and package installation.
@@ -160,12 +159,12 @@ The build arguments are parsed as space-separated values and added to the build 
 
 ## Recipe directory structure for `submit-package-build`
 
-The `submit-package-build` command expects conda build recipes in a specific directory structure. It's inspired by the
+The `submit-package-build` command expects rattler-build recipes in a specific directory structure. It's inspired by the
 [conda-forge feedstock repository structure](https://conda-forge.org/docs/maintainer/adding_pkgs/#feedstock-repository-structure).
 
 **recipe**
 
-This folder contains the conda build recipe, including `meta.yaml` and package build scripts.
+This folder contains the rattler-build recipe, including `recipe.yaml` and package build scripts.
 
 **deadline-cloud.yaml**
 
@@ -183,15 +182,13 @@ job to Deadline Cloud.
 
 #### The buildTool option
 
-You can select the default build tool between conda-build and rattler-build for the whole recipe
-by setting this option. [Conda build](https://docs.conda.io/projects/conda-build/) is
-the original package building tool implemented for conda, and [rattler build](https://prefix-dev.github.io/rattler-build/)
+You can select the default build tool between rattler-build and conda-build (deprecated) for the whole recipe
+by setting this option. [Rattler build](https://prefix-dev.github.io/rattler-build/)
 is a newer tool built with rust and using a new package build recipe format established
 in conda enhancement proposals [CEP 13](https://github.com/conda/ceps/blob/main/cep-0013.md)
-and [CEP 14](https://github.com/conda/ceps/blob/main/cep-0014.md). Rattler build typically
+and [CEP 14](https://github.com/conda/ceps/blob/main/cep-0014.md). [Conda build](https://docs.conda.io/projects/conda-build/)
+(support in this sample is deprecated) is the original package building tool implemented for conda. Rattler build typically
 builds packages faster, especially when the package has many and/or large files.
-
-NOTE: This sample tool only supports rattler build on Linux.
 
 ```
 buildTool: rattler-build
@@ -269,7 +266,7 @@ The format is the same as the
 [parameter_values.yaml](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-parameters.html)
 file of a job bundle.
 
-If the conda build recpe depends on packages from conda-forge or defaults, you can
+If the package recipe depends on packages from conda-forge or defaults, you can
 specify the value of the CondaChannels parameter to include it while building.
 
 ```
@@ -288,13 +285,13 @@ jobParameters:
 ```
 
 Look through the job parameter definitions in the [conda_build_linux_package](conda_build_linux_package/template.yaml)
-job bundle to see the parameters it defines. If you need to pass another argument to the `conda build`
-command, you can modify the job bundle template with a new job parameter and wire it into the conda build CLI command.
+job bundle to see the parameters it defines. If you need to pass another argument to the `rattler-build`
+command, you can modify the job bundle template with a new job parameter and wire it into the package building CLI command.
 
 ### Contents of the `recipe` directory
 
-The `recipe` directory contains a conda build recipe. You can read the official
-[conda build recipe documentation](https://docs.conda.io/projects/conda-build/en/stable/concepts/recipe.html)
+The `recipe` directory contains a rattler build recipe. You can read the official
+[rattler-build recipe documentation](https://rattler.build/dev/reference/recipe_file/)
 to learn more.
 
 To find example recipes available licensed under Apache-2.0 or similar, you can search
@@ -304,7 +301,7 @@ link to a package's feedstock git repository. You can also use the
 generate starting point recipes for Python packages in PyPI.
 
 Read [Creating a conda package for an application](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/conda-package.html)
-in the Deadline Cloud developer guide to learn how you can create conda build recipes for packaging entire applications.
+in the Deadline Cloud developer guide to learn how you can create package recipes for packaging entire applications.
 
 ## Tasks
 
@@ -412,7 +409,7 @@ Here is a procedure for generating a patch and adding it to the recipe.
     $ git format-patch -1
     0001-patched.patch
     ```
-4. Add the generated patch to the recipe, beside the `meta.yaml` file.
+4. Add the generated patch to the recipe, beside the `meta.yaml` or `recipe.yaml` file.
     ```
     $ mv 0001-patched.patch /path/to/recipe/0001-Remove-version-build-hook.patch
     $ cd /path/to/recipe

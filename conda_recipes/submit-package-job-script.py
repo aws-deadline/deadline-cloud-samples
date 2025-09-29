@@ -136,18 +136,6 @@ def extract_job_entity(job_template, entity_type, entity_name):
                 "entity": deepcopy(entity),
             }
 
-            # Get the entity's metadata, which is YAML in the description starting from a line
-            # containing only the content "meta:"
-            description_lines = entity.get("description", "").splitlines()
-            meta_index = None
-            try:
-                meta_index = description_lines.index("meta:")
-            except ValueError:
-                pass
-            if meta_index is not None:
-                meta = yaml.safe_load("\n".join(description_lines[meta_index:]))
-                result["meta"] = meta["meta"]
-
             return result
 
     raise RuntimeError(f"Job template does not have an entity named {entity_name!r} to extract from the {entity_type} list")
@@ -225,7 +213,6 @@ def create_job_bundle(
     }
     package_build_env = extract_job_entity(build_linux_package_template, "jobEnvironment", "Package Build Env")
     build_package_template = extract_job_entity(build_linux_package_template, "step", "PackageBuild")
-    reindex_channel_template = extract_job_entity(build_linux_package_template, "step", "ReindexCondaChannel")
 
     conda_platform_host_requirements = yaml.safe_load((Path(__file__).parent / "conda_platform_host_requirements.yaml").read_text())
 
@@ -236,7 +223,12 @@ def create_job_bundle(
         dirs_exist_ok=True,
     )
 
-    collected_parameters = {}
+    # Start with all the parameters that are not per-step
+    collected_parameters = {
+        param["name"]: param
+        for param in build_linux_package_template["parameterDefinitions"]
+        if not param["userInterface"].get("groupLabel", "").startswith("Per-step")
+    }
     build_package_steps = []
 
     # Populate job-level parameter values
@@ -257,7 +249,10 @@ def create_job_bundle(
         build_tool = platform_meta.get("buildTool", default_build_tool)
 
         if build_tool not in ["conda-build", "rattler-build"]:
-            raise RuntimeError(f"Recipe provided an unsupported build tool {build_tool}")
+            if build_tool:
+                raise RuntimeError(f"Recipe provided an unsupported build tool {build_tool}")
+            else:
+                raise RuntimeError(f"Recipe must provide a build tool with the buildTool option")
 
         parameter_values[f"CondaPlatform_{step_name_suffix}"] = platform
         parameter_values[f"BuildTool_{step_name_suffix}"] = build_tool
@@ -298,15 +293,12 @@ def create_job_bundle(
                 print(f"To submit the {recipe_dir.name} package build, you need this directory.")
                 sys.exit(1)
 
-        # Rename the platform-specific parameter values
-        per_step_parameters = set(platform_template["meta"]["perStepParameters"])
-
-        # Process the parameters, using an annotation to share them or make them unique (based on platform)
+        # Process the per-step parameters
         params = platform_template["parameterDefinitions"]
         renames = []
         for param in params:
-            original_param_name = param["name"]
-            if original_param_name in per_step_parameters:
+            if param["userInterface"].get("groupLabel", "").startswith("Per-step"):
+                original_param_name = param["name"]
                 param["name"] = f"{original_param_name}_{step_name_suffix}"
                 param["userInterface"]["groupLabel"] += f": {step_name_suffix}"
                 renames.append(
@@ -315,7 +307,7 @@ def create_job_bundle(
                         "{{Param." + param["name"] + "}}",
                     )
                 )
-            collected_parameters[param["name"]] = param
+                collected_parameters[param["name"]] = param
 
         step = platform_template["entity"]
         step["name"] += step_name_suffix
@@ -344,14 +336,6 @@ def create_job_bundle(
         build_package_steps.append(apply_regex_substitutions_to_object(step, renames))
 
     print(f"Creating steps for conda platforms: {', '.join(sorted(p['name'] for p in conda_platforms))}")
-
-    # Process the channel reindex step
-    reindex_step = reindex_channel_template["entity"]
-    reindex_step["dependencies"] = [{"dependsOn": step["name"]} for step in build_package_steps]
-    for param in reindex_channel_template["parameterDefinitions"]:
-        collected_parameters[param["name"]] = param
-    for param in package_build_env["parameterDefinitions"]:
-        collected_parameters[param["name"]] = param
 
     job_description = f"""
     This job uses conda-build to build a Conda package for
@@ -384,10 +368,10 @@ def create_job_bundle(
         "jobEnvironments": [
             package_build_env["entity"],
         ],
-        "steps": [*build_package_steps, reindex_step],
+        "steps": [*build_package_steps],
     }
 
-    (job_bundle_dir / "template.yaml").write_text(json.dumps(job_template, indent=1, sort_keys=False))
+    (job_bundle_dir / "template.yaml").write_text(json.dumps(job_template, sort_keys=False))
 
     parameter_values_list = [{"name": name, "value": value} for name, value in parameter_values.items()]
     (job_bundle_dir / "parameter_values.yaml").write_text(
@@ -464,9 +448,9 @@ def main():
     #       when that is fixed.
     job_bundle_dir = Path(create_job_history_bundle_dir("CondaBuild", job_name[:10]))
 
-    default_build_tool = submit_meta.get("buildTool", "conda-build")
+    default_build_tool = submit_meta.get("buildTool")
 
-    if default_build_tool not in ["conda-build", "rattler-build"]:
+    if default_build_tool is not None and default_build_tool not in ["conda-build", "rattler-build"]:
         raise RuntimeError(f"Recipe provided an unsupported build tool {default_build_tool}")
 
     job_parameters = create_job_bundle(

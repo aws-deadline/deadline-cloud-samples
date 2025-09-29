@@ -53,18 +53,18 @@ def get_next_build_number(package_name, package_version, conda_platform, channel
         f"{package_name}=={package_version}",
     ]
     print_command(command)
-    package_search_result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    package_search_result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print(package_search_result.stdout.decode(errors="replace").replace("\r\n", "\n"))
-    package_search_result_json = json.loads(package_search_result.stdout)
 
-    if package_search_result.returncode == 0 and package_name in package_search_result_json:
-        build_number = max(package["build_number"] for package in package_search_result_json[package_name]) + 1
+    # Not all conda versions handle --json the same, so just do text search here
+    if b"PackagesNotFoundError" in package_search_result.stdout:
+        print("No matching conda packages found.")
+        build_number = 0
     else:
-        if package_search_result_json.get("error", "").startswith("PackagesNotFoundError") or package_search_result.returncode == 0:
-            print("No matching conda packages found.")
-            build_number = 0
+        package_search_result_json = json.loads(package_search_result.stdout)
+        if package_search_result.returncode == 0 and package_name in package_search_result_json:
+            build_number = max(package["build_number"] for package in package_search_result_json[package_name]) + 1
         else:
-            print(json.dumps(package_search_result_json, indent=1))
             sys.exit(1)
 
     return build_number
@@ -73,17 +73,17 @@ def get_next_build_number(package_name, package_version, conda_platform, channel
 def get_channel_options(
     s3_channel_bucket,
     s3_channel_prefix,
-    proxy_s3_conda_channel,
     conda_channels,
     s3_client,
 ):
     channel_options = []
     try:
+        main_s3_channel = f"s3://{s3_channel_bucket}/{s3_channel_prefix}"
         repodata_key = f"{s3_channel_prefix}/noarch/repodata.json.zst"
         print(f"Checking whether the S3 channel already has an index by looking for s3://{s3_channel_bucket}/{repodata_key}")
         s3_client.head_object(Bucket=s3_channel_bucket, Key=repodata_key)
-        print(f"Found an index, adding {proxy_s3_conda_channel} to the input channel list")
-        channel_options.extend(["-c", proxy_s3_conda_channel])
+        print(f"Found an index, adding {main_s3_channel} to the input channel list")
+        channel_options.extend(["-c", main_s3_channel])
     except ClientError as exc:
         print(exc)
         error_code = int(exc.response["ResponseMetadata"]["HTTPStatusCode"])
@@ -103,7 +103,6 @@ def main():
     parser.add_argument("--conda-channels", default="")
     parser.add_argument("--conda-bld-dir", required=True)
     parser.add_argument("--s3-conda-channel", required=True)
-    parser.add_argument("--proxy-s3-conda-channel", required=True)
     parser.add_argument("--override-prefix-length")
     parser.add_argument("--override-source-archive1")
     parser.add_argument("--override-source-archive2")
@@ -134,7 +133,6 @@ def main():
     channel_options = get_channel_options(
         s3_channel_bucket,
         s3_channel_prefix,
-        args.proxy_s3_conda_channel,
         args.conda_channels,
         s3_client,
     )
@@ -145,6 +143,7 @@ def main():
     # Render the recipe, to substitute any jinja templating. We can take and modify literal
     # values from the rendered recipe to apply the customizations specified by job parameters.
     if args.build_tool == "conda-build":
+        print("WARNING: The conda-build tool is deprecated in this tool. Recommended to switch to the rattler-build tool.")
         recipe_file = f"{args.recipe_dir}/meta.yaml"
         command = [
             "conda",
@@ -173,6 +172,8 @@ def main():
         command = [
             "rattler-build",
             "build",
+            "--color",
+            "never",
             "--render-only",
             "--recipe",
             recipe_file,
@@ -255,7 +256,7 @@ def main():
                 if override_source_archives:
                     source_entry["url"] = override_source_archives.pop(0)
                     if args.build_tool != "conda-build":
-                        source_entry["path"] = source_entry.pop("url")
+                        source_entry["url"] = f"file://{source_entry['url']}"
 
     # Save the rendered recipe with modifications
     if args.build_tool == "conda-build":
@@ -268,6 +269,8 @@ def main():
         print(json.dumps(recipe_clobber, indent=1))
         Path("recipe_clobber.yaml").write_text(json.dumps(recipe_clobber))
     else:
+        print("Updated recipe.yaml:")
+        print(json.dumps(updated_recipe, indent=2))
         with open(updated_recipe_file, "w") as fh:
             json.dump(updated_recipe, fh)
 
@@ -289,7 +292,7 @@ def main():
     # Run the package build tool
     if args.build_tool == "conda-build":
         fast_build_opts = ["--zstd-compression-level", "1"] if enable_fast_build else []
-        
+
         command = [
             "conda",
             "build",
@@ -305,10 +308,12 @@ def main():
         ]
     else:
         fast_build_opts = ["--package-format", "conda:min"] if enable_fast_build else []
-        
+
         command = [
             "rattler-build",
             "build",
+            "--color",
+            "never",
             "--recipe",
             updated_recipe_file,
             *variant_config_option,
