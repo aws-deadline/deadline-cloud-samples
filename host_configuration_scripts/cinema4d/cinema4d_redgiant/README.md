@@ -2,7 +2,7 @@
 
 This guide covers setting up the required software installers for Red Giant host config script package build. You'll be fetching the necessary standalone installers from Maxon, storing them in S3, and then putting the provided ps1 script to the host configuration script so that it pulls the installer and runs it in silent mode on each Deadline worker launch. This solution has been tested and verified to work on Windows GPU SMF fleets only, but can also be applied to a CMF as well assuming your instance is a GPU Windows instance with the necessary driver installed to support GPU usage (not fully tested but theoretically should work).
 
-> **⚠️ Performance Impact**: This script can add about **5-10 minutes** to worker launch time due to software installation. This number goes down as you vertically scale your instance size up. For example, a g6.xlarge with 4 vCPUs + 16 GiB of memory adds 10 minutes while a g6.4xlarge with 16 vCPUs and 64 GiB memory adds 6 minutes. Plan accordingly for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. Additionally, if you have AE jobs that doesn't require Red Giant, you can have one fleet for just AE renders via Conda and another fleet for AE + RGU using this host configuration.
+> **⚠️ Performance Impact**: This script can add about **5-10 minutes** to worker launch time due to software installation. This number goes down as you vertically scale your instance size up. For example, a g6.xlarge with 4 vCPUs + 16 GiB of memory adds 10 minutes while a g6.4xlarge with 16 vCPUs and 64 GiB memory adds 6 minutes. Plan accordingly for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. Additionally, if you have Cinema 4D jobs that doesn't require Red Giant, you can have one fleet for just Cinema 4D renders via Conda and another fleet for Cinema 4D + RGU using this host configuration.
 
 ## Prerequisites
 
@@ -109,6 +109,11 @@ $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 ### 2. Add Host Config Script to Windows GPU Fleet
 
 The contents of the script `.\install-software.ps1` should go in your Configuration Scripts for your fleet, which you can add to your fleet when you go to Fleets, select your fleet, go under Configurations, and add your script under Worker configuration script. Once pasted, scroll down and set the script timeout to **900 seconds**. For more information, see the [AWS Deadline Cloud SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html).
+
+## Local Installation
+
+1. Install the Red Giant plugin by [following instructions here](https://support.maxon.net/hc/en-us/articles/212354258-How-do-I-install-my-products)
+2. Submit to Deadline Cloud from Cinema 4D by using menu command **Extensions > AWS Deadline Cloud Submitter**
 
 
 ## Local Dev Testing
