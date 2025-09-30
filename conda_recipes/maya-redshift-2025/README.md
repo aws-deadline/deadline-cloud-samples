@@ -1,5 +1,12 @@
 # Redshift for Maya conda build recipe
 
+This package provides Redshift 2025.4.2 support for Maya versions 2025, and 2026.
+
+## Supported Maya Versions
+
+- Maya 2025  
+- Maya 2026
+
 ## Download the installer file for Linux
 
 Download the redshift_2025.4.2_1782753868_linux_x64.run installer, or suitable alternate version from Maxon, and

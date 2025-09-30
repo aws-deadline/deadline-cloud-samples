@@ -27,7 +27,7 @@ build:
 
 requirements:
   run:
-    - maya >=2025, <2026
+    - maya >=2025, <2027
 
 
 about:

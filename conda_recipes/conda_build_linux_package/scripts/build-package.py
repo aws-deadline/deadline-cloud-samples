@@ -109,6 +109,8 @@ def main():
     parser.add_argument("--override-source-archive2")
     parser.add_argument("--override-source-dir")
     parser.add_argument("--variant-config-file")
+    parser.add_argument("--enable-fast-build", choices=("true", "false"), default="false")
+    parser.add_argument("--extra-build-tool-args", default="")
     args = parser.parse_args()
 
     session = boto3.Session()
@@ -276,8 +278,18 @@ def main():
             sys.exit(1)
         prefix_length_option = ["--prefix-length", f"{args.override_prefix_length}"]
 
+    # Check for fast build optimization from CLI argument
+    enable_fast_build = args.enable_fast_build == "true"
+
+    # Parse additional build arguments
+    extra_build_tool_args = []
+    if args.extra_build_tool_args:
+        extra_build_tool_args = shlex.split(args.extra_build_tool_args)
+
     # Run the package build tool
     if args.build_tool == "conda-build":
+        fast_build_opts = ["--zstd-compression-level", "1"] if enable_fast_build else []
+        
         command = [
             "conda",
             "build",
@@ -287,9 +299,13 @@ def main():
             *channel_options,
             "--clobber-file",
             "recipe_clobber.yaml",
+            *fast_build_opts,
+            *extra_build_tool_args,
             args.recipe_dir,
         ]
     else:
+        fast_build_opts = ["--package-format", "conda:min"] if enable_fast_build else []
+        
         command = [
             "rattler-build",
             "build",
@@ -299,6 +315,8 @@ def main():
             "--output-dir",
             args.conda_bld_dir,
             "--verbose",
+            *fast_build_opts,
+            *extra_build_tool_args,
             *prefix_length_option,
             *channel_options,
         ]
