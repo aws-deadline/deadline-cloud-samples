@@ -113,7 +113,8 @@ The contents of the script `.\install-software.ps1` should go in your Configurat
 ## Local Installation
 
 1. Install the Red Giant plugin by [following instructions here](https://support.maxon.net/hc/en-us/articles/212354258-How-do-I-install-my-products)
-2. Submit to Deadline Cloud from Cinema 4D by using menu command **Extensions > AWS Deadline Cloud Submitter**
+2. [Optional] Learn how to use Red Giant inside Cinema 4D with [this demonstration video](https://www.youtube.com/watch?v=L6B1REPQoPU)
+3. Submit to Deadline Cloud from Cinema 4D by using menu command **Extensions > AWS Deadline Cloud Submitter**
 
 
 ## Local Dev Testing
