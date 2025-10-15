@@ -43,3 +43,9 @@ install Adobe After Effects 25 on a freshly created EC2 instance as Administrato
       `Write-S3Object -BucketName MY_BUCKET_NAME -Key Adobe_AfterEffects_25_1_Windows_installation.zip -File Adobe_AfterEffects_25_1_Windows_installation.zip`.
 4. From the AWS EC2 management console, select the instance you used and terminate it.
 5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the aftereffects-25 conda build recipe meta.yaml.
+
+
+## Plugin Support
+To add After Effects plugins support in addition to the base AE conda package, see the following:
+- Sample AE plugin recipe using Saber: https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes/aftereffects-saber
+- Sample AE plugin bundle recipe for multiple plugins: https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes/aftereffects-plugin-bundle
