@@ -44,6 +44,15 @@ rm -r "${PREFIX}/${REDSHIFT_ROOT}"/redshift4solaris
 # prefix.
 
 for MAYA_VERSION in $MAYA_VERSIONS; do
+
+  # Add a relative RPATH from Redshift into Maya using patchelf, which is part of
+  # the conda-build virtual environment. This is so we can follow the recommendation
+  # of https://docs.conda.io/projects/conda-build/en/latest/resources/use-shared-libraries.html
+  # to never use LD_LIBRARY_PATH in Conda environments.
+
+  patchelf --add-rpath "\$ORIGIN/../../../../autodesk/maya${MAYA_VERSION}/lib" "${PREFIX}/${REDSHIFT_ROOT}/redshift4maya/${MAYA_VERSION}"/redshift4maya.so
+  patchelf --add-rpath "\$ORIGIN/../../../../autodesk/maya${MAYA_VERSION}/plug-ins/xgen/lib" "${PREFIX}/${REDSHIFT_ROOT}/redshift4maya/${MAYA_VERSION}"/redshift4maya.so
+
   # Generate the .mod file for this specific version
   mkdir -p "$PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION"
   cat <<EOF > "$PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION/redshift4maya.mod"

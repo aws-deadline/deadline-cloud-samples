@@ -109,6 +109,23 @@ parameterDefinitions:
     control: CHOOSE_INPUT_FILE
     label: Variant config YAML file
     groupLabel: Conda Package Recipe
+- name: EnableFastBuild
+  description: Enable build optimizations for faster package creation.
+  type: STRING
+  userInterface:
+    control: CHECK_BOX
+    label: Enable Fast Build
+    groupLabel: Conda Package Recipe
+  default: "false"
+  allowedValues: ["true", "false"]
+- name: ExtraBuildToolArgs
+  description: Additional arguments to pass to the conda-build or rattler-build command.
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Additional Build Arguments
+    groupLabel: Conda Package Recipe
+  default: ""
 
 # Group: Conda Channel
 - name: CondaChannelName
@@ -259,7 +276,9 @@ steps:
             --override-source-archive1 '{{Param.OverrideSourceArchive1}}' \
             --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
             --override-source-dir '{{Param.OverrideSourceDir}}' \
-            --variant-config-file '{{Param.VariantConfigFile}}'
+            --variant-config-file '{{Param.VariantConfigFile}}' \
+            --enable-fast-build '{{Param.EnableFastBuild}}' \
+            --extra-build-tool-args '{{Param.ExtraBuildToolArgs}}'
 
   hostRequirements:
     # Host requirements for the linux-64 conda platform

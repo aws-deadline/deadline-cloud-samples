@@ -1,0 +1,25 @@
+
+package:
+  name: cinema4d-insydium
+  version: "2025"
+
+source:
+- path: ../../archive_files/cinema4d-insydium-2025/win-64 # [win64]
+
+build:
+  number: 0
+  binary_relocation: false
+  detect_binary_files_with_prefix: false
+  ignore_prefix_files: true
+  missing_dso_whitelist:
+    - "**"
+
+requirements:
+  run:
+    - cinema4d >=2025
+
+about:
+  homepage: https://insydium.ltd/
+  documentation: https://insydium.ltd/products/x-particles/
+  license: LicenseRef-Insydium
+  summary: X-Particles is a fully-featured advanced particle and VFX system for Maxon’s Cinema 4D. Its unique rule system of Questions and Actions enables complete control over particle simulations.
