@@ -11,14 +11,11 @@ See also the job bundle [tiled_region_render_with_maya_arnold](https://github.co
 ## V-Ray Render Handler Modifications
 
 As of 2025/10 modifications to the Deadline Cloud Maya adaptor are nessessary to create the tiles for this job.
-To do this, a local copy of the [deadline-cloud-for-maya](https://github.com/aws-deadline/deadline-cloud-for-maya/tree/mainline)
-repository can be used to create a development version of the Maya adaptor. The following code can be added to
+To do this, a local copy of the [deadline-cloud-for-maya](https://github.com/aws-deadline/deadline-cloud-for-maya/tree/mainline) repository can be used to create a development version of the Maya adaptor. The following code can be added to
 the `start_render` function in [vray_renderer.py](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/src/deadline/maya_adaptor/MayaClient/render_handlers/vray_handler.py)
-after setting the log message level. This is repeated in the below sample to help find where in the file to make changes. 
+after setting the log message level. This section is repeated in the below sample to help find where in the file to make changes. 
 
-After making changes,
-[rebuild the wheels](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/DEVELOPMENT.md#application-interface-adaptor-development-workflow)
-for the package.
+After making changes, [rebuild the wheels](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/DEVELOPMENT.md#application-interface-adaptor-development-workflow) for the package.
 
 ```
         # Set the log message level to 3 (report errors, warnings and general information) if needed
