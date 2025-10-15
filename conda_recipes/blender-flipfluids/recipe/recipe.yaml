@@ -1,0 +1,52 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  # This sample uses the free demo version of FLIP Fluids. If you want to use the paid version you'll need to change
+  # the sha256sum in the section below and the filepath in the build.sh script to match that version's naming.
+  version: "1.8.4"
+
+package:
+  name: blender-flipfluids
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      # This zip file contains the FLIP Fluids Demo addon archive. Rattler build
+      # automatically extracts source files. In this case, we don't want the contents of the addon to
+      # be extracted, so we've placed the addon into it's own archive. 
+      url: file://archive_files/FLIP-Fluids.zip
+      sha256: d0afeb07d4ba19936eff3c040d5541b68202d1cd9b7ddfdf2da62d869f2d0f6c
+      target_directory: flipfluids
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  run:
+    - blender
+
+tests:
+  - script:
+    - |
+      cat <<EOF > test.py
+      import bpy
+      for addon in bpy.context.preferences.addons:
+          print(addon)
+      EOF
+    - blender --background --python test.py | grep flip_fluids_addon
+
+about:
+  homepage: https://flipfluids.com/
+  license: MIT AND GPL-3.0-only
+  summary: The FLIP Fluids addon is a tool that helps you set up, run, and render liquid simulation effects.
