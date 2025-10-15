@@ -15,7 +15,7 @@ To do this, a local copy of the [deadline-cloud-for-maya](https://github.com/aws
 the `start_render` function in [vray_renderer.py](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/src/deadline/maya_adaptor/MayaClient/render_handlers/vray_handler.py)
 after setting the log message level. This section is repeated in the below sample to help find where in the file to make changes. 
 
-After making changes, [rebuild the wheels](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/DEVELOPMENT.md#application-interface-adaptor-development-workflow) for the package.
+After making changes [rebuild the wheels](https://github.com/aws-deadline/deadline-cloud-for-maya/blob/mainline/DEVELOPMENT.md#application-interface-adaptor-development-workflow) for the package.
 
 ```
         # Set the log message level to 3 (report errors, warnings and general information) if needed
