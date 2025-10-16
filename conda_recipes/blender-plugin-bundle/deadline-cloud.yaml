@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: blender-plugins.zip
+    sourceDownloadInstructions: 'Create a zip archive containing multiple Blender addon zip files and place it in archive_files/blender-plugins.zip'
+    buildTool: rattler-build

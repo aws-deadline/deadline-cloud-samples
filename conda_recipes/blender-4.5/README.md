@@ -94,6 +94,11 @@ If you decide to make a separate conda package for your addon and you're addon r
 Have the activate script move them into Blender's Python. Likewise, change the deactivate to remove them. This way, you can make use of the environment variables that this recipe 
 sets for the location of Blender and it's Python.
 
+### Examples Blender Addons
+
+- [Blender - Flip Fluids](../blender-flipfluids/)
+- [Blender - Plugin Bundle](../blender-plugin-build/)
+
 
 ## Troubleshooting
 
