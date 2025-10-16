@@ -190,9 +190,9 @@ parameterDefinitions:
   description: Choose which Conda packages to install for the render. Requires a conda queue environment to process the value.
   default: maya>=2024 maya-mtoa maya-openjd=0.14 ffmpeg
   userInterface:
-    control: LINE_EDIT
-    label: Conda Packages
-    groupLabel: Software Environment
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
 
 # Hidden
 - name: WorkspacePath

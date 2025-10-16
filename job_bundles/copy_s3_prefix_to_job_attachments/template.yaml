@@ -29,7 +29,7 @@ parameterDefinitions:
     control: LINE_EDIT
     groupLabel: Software
   type: STRING
-  default: python boto3 python-xxhash
+  default: python pip boto3 python-xxhash
 - name: CondaChannels
   description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
   userInterface:
@@ -77,6 +77,11 @@ steps:
         - '{{Param.Parallelism}}'
         - '--copy-source'
         - '{{Param.S3CopySource}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
 
 - name: HashObjects
   description: |
@@ -102,6 +107,11 @@ steps:
         - '{{Task.Param.Index}}'
         - '--copy-source'
         - '{{Param.S3CopySource}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
 
 - name: CopyObjects
   description: |
@@ -126,6 +136,11 @@ steps:
         - '{{Task.Param.Index}}'
         - '--copy-source'
         - '{{Param.S3CopySource}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
 
 - name: SaveManifest
   description: |
@@ -145,3 +160,8 @@ steps:
         - '{{Param.Parallelism}}'
         - '--copy-source'
         - '{{Param.S3CopySource}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
