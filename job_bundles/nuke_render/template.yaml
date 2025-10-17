@@ -1,0 +1,119 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Nuke Render
+description: |
+  This job bundle renders Nuke scripts using Nuke's headless rendering mode.
+  
+  To run it, you will need a Nuke installation available in the PATH in one of the following ways:
+    * As a conda package when your queue has a conda queue environment set up to
+      provide virtual environments for jobs.
+    * Installed on the worker hosts that run the job. You can customize your Deadline Cloud
+      queue, fleets, and this job to fit your own production pipeline.
+
+parameterDefinitions:
+
+# Render Parameters
+- name: NukeScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Nuke Script File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: Nuke Script Files
+      patterns: ["*.nk"]
+    - label: All Files
+      patterns: ["*"]
+  minLength: 1
+  default: "./scene/motionblur3d_10.nk"
+  description: >
+    Choose the Nuke script file you want to render. Use the 'Job Attachments' tab
+    to add additional assets that the job needs.
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  default: "1"
+  description: Frame range to render (e.g., "1-10" or "1,5,10").
+- name: ProjectPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: INOUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Project Directory
+    groupLabel: Render Parameters
+  default: "./scene"
+  description: Choose the project working directory containing the Nuke script and assets.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  default: "./scene/nuke_output"
+  description: Choose the render output directory.
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+  default: "nuke nuke-openjd"
+  description: >
+    Conda packages to install for the render. 
+    Example: "nuke=16.* nuke-openjd" or "nuke nuke-openjd"
+- name: RezPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Rez Packages
+    groupLabel: Software Environment
+  default: "nuke"
+  description: >
+    If you have a Queue Environment that creates a Rez environment from a parameter called RezPackages, this will
+    tell it to install nuke.
+
+steps:
+- name: NukeRender
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Render}}']
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+    embeddedFiles:
+    - name: Render
+      type: TEXT
+      data: |
+        # Configure the task to fail if any individual command fails.
+        set -xeuo pipefail
+        
+        echo "Nuke script is {{Param.NukeScript}}"
+        cd '{{Param.ProjectPath}}'
+        
+        # Create output directory if it doesn't exist
+        mkdir -p '{{Param.OutputDir}}'
+        
+        # Render the frame using Nuke
+        nuke -F {{Task.Param.Frame}} \
+             --sro -V 2 \
+             -x '{{Param.NukeScript}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
