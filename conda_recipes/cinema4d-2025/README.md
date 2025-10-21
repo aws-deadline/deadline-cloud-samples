@@ -58,3 +58,11 @@ for use by the conda build recipe.
        `Write-S3Object -BucketName MY_BUCKET_NAME -Key Cinema4D_2025_2025.1.3_Win.zip -File Cinema4D_2025_2025.1.3_Win.zip`.
 8. From the AWS EC2 management console, select the instance you used and terminate it.
 9. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the Cinema 4D-2025 conda build recipe meta.yaml.
+
+
+## Instructions for Cinema4D plugin packages
+This repository contains examples for how to create plugin conda packages for Cinema4D:
+
+* [Cinema4D to Arnold](../cinema4d-c4dtoa-2025/)
+* [Cinema4D - Insydium](../cinema4d-insydium-2025/)
+* [Cinema4D - Vray](../cinema4d-vray-2025/)
