@@ -23,6 +23,13 @@ source:
 
 build:
   number: 0
+  script:
+    - if: unix
+      then:
+        - bash $RECIPE_DIR/build.sh
+    - if: win
+      then:
+        - bash %RECIPE_DIR%\build_win.sh
   # These build options for repackaging an application
   # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
   prefix_detection:

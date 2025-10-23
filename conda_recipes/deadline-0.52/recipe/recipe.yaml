@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "0.53.1"
+  version: "0.52.1"
 
 package:
   name: deadline
@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/d/deadline/deadline-${{ version }}.tar.gz
-  sha256: 54ac45077b808365b9df1675579348e05c76262f5b62a3a41039d7ee86931530
+  sha256: 45947d43a588cca39ffec6db510da50ca104c96ed886c475d35aa31167404c4b
 
 build:
   number: 0
@@ -29,7 +29,7 @@ requirements:
     - click >=8.1.7
     - pyyaml >=6.0
     - typing-extensions >=4.8
-    - python-xxhash >=3.4,<3.7
+    - python-xxhash >=3.4,<3.6
     - ${{ "pywin32 >=307,<311" if win }}
     - qtpy 2.4.*
     - psutil >=7

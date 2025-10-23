@@ -1,6 +1,6 @@
 specificationVersion: jobtemplate-2023-09
 
-name: "CondaBuild: {{Param.RecipeName}}"
+name: "CondaBuild: {{Param.RecipeDir}}"
 description: |
   This job uses conda-build to build a Conda package for the conda build recipe and optional attached source archive.
 
@@ -12,22 +12,6 @@ description: |
 
 parameterDefinitions:
 # Group: Conda Package Recipe
-- name: BuildTool
-  type: STRING
-  userInterface:
-    control: DROPDOWN_LIST
-    label: Package Build Tool
-    groupLabel: Conda Package Recipe
-  description: Choose the build tool to use for the recipe (conda-build or rattler-build).
-  default: conda-build
-  allowedValues: ["conda-build", "rattler-build"]
-- name: RecipeName
-  description: The name of the recipe being built.
-  userInterface:
-    control: LINE_EDIT
-    label: Recipe Name
-    groupLabel: Conda Package Recipe
-  type: STRING
 - name: RecipeDir
   description: The directory containing the conda-build recipe.
   userInterface:
@@ -37,42 +21,6 @@ parameterDefinitions:
   type: PATH
   objectType: DIRECTORY
   dataFlow: IN
-- name: OverrideSourceArchive1
-  description: |
-    This replaces the recipe's first source URL with this archive file. Use "" or leave the
-    parameter out to use the recipe's first source URL.
-  userInterface:
-    control: CHOOSE_INPUT_FILE
-    label: Override Source Archive File 1
-    groupLabel: Conda Package Recipe
-  type: PATH
-  objectType: FILE
-  dataFlow: IN
-  default: ""
-- name: OverrideSourceArchive2
-  description: |
-    If the source URLs are a list, this replaces the recipe's second source URL with this archive file. Use "" or leave the
-    parameter out to use the recipe's second source URL.
-  userInterface:
-    control: CHOOSE_INPUT_FILE
-    label: Override Source Archive File 2
-    groupLabel: Conda Package Recipe
-  type: PATH
-  objectType: FILE
-  dataFlow: IN
-  default: ""
-- name: OverrideSourceDir
-  description: |
-    If the source includes a local directory, this replaces the recipe's source directory with this directory. Use "" or leave the
-    parameter out to use the recipe's source directory.
-  userInterface:
-    control: CHOOSE_DIRECTORY
-    label: Override Source Dir
-    groupLabel: Conda Package Recipe
-  type: PATH
-  objectType: DIRECTORY
-  dataFlow: IN
-  default: ""
 - name: OverridePackageName
   description: If provided, overrides the package name in the recipe's meta.yaml file.
   type: STRING
@@ -98,17 +46,6 @@ parameterDefinitions:
     control: SPIN_BOX
     label: Override Prefix Length
     groupLabel: Conda Package Recipe
-- name: VariantConfigFile
-  description: |
-    If provided, this is used as the variant config for the conda package build.
-  type: PATH
-  objectType: FILE
-  dataFlow: IN
-  default: ""
-  userInterface:
-    control: CHOOSE_INPUT_FILE
-    label: Variant config YAML file
-    groupLabel: Conda Package Recipe
 - name: EnableFastBuild
   description: Enable build optimizations for faster package creation.
   type: STRING
@@ -127,6 +64,64 @@ parameterDefinitions:
     groupLabel: Conda Package Recipe
   default: ""
 
+# Group: Per-step Conda Package Recipe
+- name: BuildTool
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Package Build Tool
+    groupLabel: Per-step Conda Package Recipe
+  description: Choose the build tool to use for the recipe (conda-build or rattler-build).
+  default: conda-build
+  allowedValues: ["conda-build", "rattler-build"]
+- name: OverrideSourceArchive1
+  description: |
+    This replaces the recipe's first source URL with this archive file. Use "" or leave the
+    parameter out to use the recipe's first source URL.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Override Source Archive File 1
+    groupLabel: Per-step Conda Package Recipe
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ""
+- name: OverrideSourceArchive2
+  description: |
+    If the source URLs are a list, this replaces the recipe's second source URL with this archive file. Use "" or leave the
+    parameter out to use the recipe's second source URL.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Override Source Archive File 2
+    groupLabel: Per-step Conda Package Recipe
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ""
+- name: OverrideSourceDir
+  description: |
+    If the source includes a local directory, this replaces the recipe's source directory with this directory. Use "" or leave the
+    parameter out to use the recipe's source directory.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Override Source Dir
+    groupLabel: Per-step Conda Package Recipe
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: ""
+- name: VariantConfigFile
+  description: |
+    If provided, this is used as the variant config for the conda package build.
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ""
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Variant config YAML file
+    groupLabel: Per-step Conda Package Recipe
+
 # Group: Conda Channel
 - name: CondaChannelName
   description: The name of the Conda channel to update.
@@ -143,16 +138,6 @@ parameterDefinitions:
     label: S3 Conda Channel
     groupLabel: Conda Channel
   type: STRING
-- name: CondaPlatform
-  description: |
-    The Conda platform we're building the package for, e.g.
-    linux-64, win-64.
-  userInterface:
-    control: LINE_EDIT
-    label: Conda Platform
-    groupLabel: Conda Channel
-  type: STRING
-  default: linux-64
 - name: CondaChannels
   description: A space-separated list of conda channels to read packages from.
   userInterface:
@@ -161,6 +146,18 @@ parameterDefinitions:
     groupLabel: Conda Channel
   type: STRING
   default: ""
+
+# Group:  Per-step Conda Channel
+- name: CondaPlatform
+  description: |
+    The Conda platform we're building the package for, e.g.
+    linux-64, win-64.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Platform
+    groupLabel: Per-step Conda Channel
+  type: STRING
+  default: linux-64
 
 # Group: Package Build Env
 - name: PackageBuildEnvName
@@ -223,34 +220,6 @@ steps:
     The following metadata controls how the submit-package-job-script.py script
     decomposes and re-assembles this job to support multiple conda platforms.
 
-    meta:
-      perStepParameters:
-      - BuildTool
-      - OverrideSourceArchive1
-      - OverrideSourceArchive2
-      - OverrideSourceDir
-      - CondaPlatform
-      - VariantConfigFile
-
-  stepEnvironments:
-  - name: S3 Conda Channels
-    script:
-      actions:
-        onEnter:
-          command: "bash"
-          args:
-          - '{{Param.JobScriptDir}}/enter-proxy-s3-conda-channels.sh'
-          - '--build-tool'
-          - '{{Param.BuildTool}}'
-          - '--conda-channels'
-          - '{{Param.CondaChannels}}'
-          - '--s3-conda-channel'
-          - '{{Param.S3CondaChannel}}'
-        onExit:
-          command: "bash"
-          args:
-          - '{{Param.JobScriptDir}}/exit-proxy-s3-conda-channels.sh'
-
   script:
     actions:
       onRun:
@@ -267,9 +236,8 @@ steps:
             --build-tool '{{Param.BuildTool}}' \
             --conda-bld-dir '{{Session.WorkingDirectory}}/conda-bld' \
             --conda-platform '{{Param.CondaPlatform}}' \
-            --conda-channels "$CONDA_CHANNELS" \
+            --conda-channels '{{Param.CondaChannels}}' \
             --s3-conda-channel '{{Param.S3CondaChannel}}' \
-            --proxy-s3-conda-channel "$S3_CONDA_CHANNEL" \
             --override-prefix-length '{{Param.OverridePrefixLength}}' \
             --recipe-dir '{{Param.RecipeDir}}' \
             --override-package-name '{{Param.OverridePackageName}}' \
@@ -280,6 +248,9 @@ steps:
             --enable-fast-build '{{Param.EnableFastBuild}}' \
             --extra-build-tool-args '{{Param.ExtraBuildToolArgs}}'
 
+        # Versions 0.26.0 and later protect against concurrent indexing.
+        rattler-index s3 '{{Param.S3CondaChannel}}' -vv
+
   hostRequirements:
     # Host requirements for the linux-64 conda platform
     attributes:
@@ -289,46 +260,3 @@ steps:
     - name: attr.worker.cpu.arch
       anyOf:
       - x86_64
-
-- name: ReindexCondaChannel
-  description: Reindexes an S3 conda channel.
-
-  dependencies:
-  - dependsOn: PackageBuild
-
-  stepEnvironments:
-  - name: ReindexingMutex
-    script:
-      actions:
-        onEnter:
-          command: python
-          args:
-          - '{{Param.JobScriptDir}}/s3-object-mutex.py'
-          - 'enter'
-          - '{{Param.S3CondaChannel}}/'
-        onExit:
-          command: python
-          args:
-          - '{{Param.JobScriptDir}}/s3-object-mutex.py'
-          - 'exit'
-          - '{{Param.S3CondaChannel}}/'
-
-  script:
-    actions:
-      onRun:
-        command: bash
-        args:
-        - '{{Param.JobScriptDir}}/reindex-conda-channel.sh'
-        - '--reindexing-dir'
-        - '{{Session.WorkingDirectory}}/reindex'
-        - '--s3-conda-channel'
-        - '{{Param.S3CondaChannel}}'
-        - '--conda-channel-name'
-        - '{{Param.CondaChannelName}}'
-
-  hostRequirements:
-    # Always reindex on Linux, because reindexing uses the Linux-only mountpoint-s3.
-    attributes:
-    - name: attr.worker.os.family
-      anyOf:
-      - linux
