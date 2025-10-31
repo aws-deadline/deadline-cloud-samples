@@ -353,7 +353,7 @@ jobEnvironments:
                 with open(envfile, "r", encoding="utf8") as f:
                     before = json.load(f)
             else:
-                print("No initial environment found, must run Env.File.CaptureVars script first")
+                print("No initial environment found, must run Env.File.InitialVars script first")
                 sys.exit(1)
             after = dict(os.environ)
 
