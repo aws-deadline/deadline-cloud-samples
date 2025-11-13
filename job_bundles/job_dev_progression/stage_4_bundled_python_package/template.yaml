@@ -30,7 +30,7 @@ parameterDefinitions:
 - name: CondaPackages
   description: A list of conda packages to install. The job expects a Queue Environment to handle this.
   type: STRING
-  default: polars pyarrow seaborn
+  default: pip polars pyarrow seaborn
 - name: CondaChannels
   description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
   type: STRING

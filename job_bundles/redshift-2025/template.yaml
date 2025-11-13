@@ -57,9 +57,9 @@ parameterDefinitions:
 - name: CondaPackages
   type: STRING
   userInterface:
-    control: LINE_EDIT
-    label: Conda Packages
-    groupLabel: Software Environment
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
   default: "cinema4d=2025"
   description: >
     Conda package for Cinema 4D 2025 that includes Redshift.
@@ -86,38 +86,38 @@ steps:
         data: |
           #!/bin/bash
           set -euo pipefail
-          
+
           # Disable MinGW path conversion on Windows
           export MSYS_NO_PATHCONV=1
-          
+
           echo "Starting Redshift render using redshiftCmdLine..."
-          
+
           # Create output directory if it doesn't exist
           mkdir -p '{{Param.OutputDir}}'
-          
+
           # Check if scene file exists
           if [[ ! -f '{{Param.SceneFile}}' ]]; then
             echo "openjd_fail: Scene file not found: {{Param.SceneFile}}"
             exit 1
           fi
-          
+
           C4D_LOCATION="${CONDA_PREFIX}/cinema4d"
           REDSHIFT_EXE="${CONDA_PREFIX}/cinema4d/RedshiftData/bin/redshiftCmdLine.exe"
-          
+
           # Set Cinema 4D and Redshift environment variables
           export REDSHIFT_COREDATAPATH="${C4D_LOCATION}/RedshiftData"
           export REDSHIFT_LOCALDATAPATH="${C4D_LOCATION}/RedshiftData"
-          
+
           # Check if redshiftCmdLine executable exists
           if [[ ! -f "$REDSHIFT_EXE" ]]; then
             echo "openjd_fail: redshiftCmdLine executable not found at: $REDSHIFT_EXE"
             echo "Please verify the installed conda packages includes Redshift"
             exit 1
           fi
-          
+
           # Use redshiftCmdLine to render the scene
           echo "Running redshiftCmdLine with scene: {{Param.SceneFile}}"
-          
+
           "$REDSHIFT_EXE" '{{Param.SceneFile}}' -ores {{Param.Width}}x{{Param.Height}} -oip '{{Param.OutputDir}}'
-          
+
           exit 0

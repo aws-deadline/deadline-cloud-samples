@@ -248,7 +248,7 @@ parameterDefinitions:
   - name: IncludeAlphaChannel
     type: STRING
     userInterface:
-      control: HIDDEN
+      control: DROPDOWN_LIST
       label: Include Alpha Channel
       groupLabel: Render Options
     default: 'false'
@@ -291,7 +291,7 @@ parameterDefinitions:
   - name: OverrideRenderPass
     type: STRING
     userInterface:
-      control: HIDDEN
+      control: DROPDOWN_LIST
       label: Override Render Pass
       groupLabel: Render Options
     default: 'false'
@@ -304,7 +304,7 @@ parameterDefinitions:
   - name: PremultiplyAlpha
     type: STRING
     userInterface:
-      control: HIDDEN
+      control: DROPDOWN_LIST
       label: Premultiply Alpha
       groupLabel: Render Options
     default: 'false'
@@ -315,7 +315,7 @@ parameterDefinitions:
   - name: TonemapHDR
     type: STRING
     userInterface:
-      control: HIDDEN
+      control: DROPDOWN_LIST
       label: Tone map HDR
       groupLabel: Render Options
     default: 'false'
@@ -326,7 +326,7 @@ parameterDefinitions:
   - name: JobType
     type: STRING
     userInterface:
-      control: HIDDEN
+      control: DROPDOWN_LIST
       label: Job Type
       groupLabel: Render Options
     default: 'Render'
@@ -337,7 +337,7 @@ parameterDefinitions:
   - name: SequenceName
     type: STRING
     userInterface:
-      control: HIDDEN
+      control: LINE_EDIT
       label: Sequence Name
       groupLabel: Render Options
     default: ""
@@ -358,48 +358,6 @@ parameterDefinitions:
     description: >
       A list of conda packages to install. If a queue accepts this parameter, then it will create a conda virtual
       environment.
-  - name: submitter_name
-    type: STRING
-    userInterface:
-      control: HIDDEN
-    default: 'VRED'
-    description: >
-      The type of submitter that is used to submit the render job.
-  - name: name
-    type: STRING
-    userInterface:
-      control: HIDDEN
-    default: ''
-    description: >
-      The name of the render job.
-  - name: description
-    type: STRING
-    userInterface:
-      control: HIDDEN
-    default: ''
-    description: >
-      The description of the render job.
-  - name: input_filenames
-    type: STRING
-    userInterface:
-      control: HIDDEN
-    default: ''
-    description: >
-      Input filenames.
-  - name: input_directories
-    type: STRING
-    userInterface:
-      control: HIDDEN
-    default: ''
-    description: >
-      Input directories.
-  - name: output_directories
-    type: STRING
-    userInterface:
-      control: HIDDEN
-    default: ''
-    description: >
-      Output directories.
 
 steps:
   - name: VRED Render

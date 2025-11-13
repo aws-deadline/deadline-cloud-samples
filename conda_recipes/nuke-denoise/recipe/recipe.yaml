@@ -1,0 +1,29 @@
+package:  
+  name: nuke-denoise
+  version: 3.6.9
+
+source:
+  url: file://archive_files/DENoise.tar.gz
+  sha256: ecbe1b40a19bf6f9ec05aca3d09428386292c57d4cd968b8f1ac767778642ebc
+  target_directory: installer
+
+build:
+  number: 0
+  prefix_detection:
+    ignore_binary_files: True
+  # The binary is built to be relocatable, so can ignore the warnings about DSOs.
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "*"
+
+requirements:
+  build:
+    - patchelf
+  run:
+    - nuke
+
+about:
+  homepage: https://revisionfx.com/products/denoise/nuke/
+  license: LicenseRef-REVisionFXEULA
+  summary: DE:Noise handles spurious frame-to-frame defects ranging from fine digital/electronic noise to blotchy spots like dirt on film.

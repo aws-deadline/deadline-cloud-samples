@@ -119,6 +119,19 @@ repeatedly re-download the same applications, but each session will have the ove
 packages into the virtual environment. Look at the sample with improved caching to reuse virtual
 environments across multiple jobs.
 
+### Conda queue environment using the py-rattler library
+
+The file [conda_queue_env_pyrattler.yaml](conda_queue_env_pyrattler.yaml) provides the same functionality as
+the above Conda queue environments, but uses the [py-rattler library](https://conda.github.io/rattler/py-rattler/).
+Rattler is a library that provides common functionality used within the conda ecosystem. It's written
+in Rust and tries to provide a clean API to its functionalities. The environments it creates are almost the same,
+but we found that py-rattler does not include 'pip' alongside 'python' by default, so if you need pip you must
+add it explicitly. It also raises an error for a subset of syntax that conda accepts, such as 'colmap=*=gpu*'.
+
+Testing has shown that this queue environment generally runs faster than the above when on the same instance types,
+but the error messages it produces when failing to solve for a virtual environment do not include as
+much detail to help diagnose what happened.
+
 ### Rez queue environment
 
 The file [rez_queue_env.yaml](rez_queue_env.yaml) provides the same functionality as
