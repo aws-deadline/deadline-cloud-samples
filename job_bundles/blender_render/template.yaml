@@ -59,19 +59,19 @@ parameterDefinitions:
 - name: CondaPackages
   type: STRING
   userInterface:
-    control: LINE_EDIT
-    label: Conda Packages
-    groupLabel: Software Environment
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
   default: blender
   description: >
-    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this will
-    tell it to install blender.
+    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this
+    will set the default packages to use for the job.
 - name: RezPackages
   type: STRING
   userInterface:
-    control: LINE_EDIT
-    label: Rez Packages
-    groupLabel: Software Environment
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
   default: blender
   description: >
     If you have a Queue Environment that creates a Rez environment from a parameter called RezPackages, this will

@@ -4,7 +4,10 @@ description: |
   A simple job bundle that allows the user to select a KeyShot scene file, the
   frames to render, the output file path and render via the keyshot_headless
   command on Windows.
+
 parameterDefinitions:
+
+# KeyShot Scene Settings
 - name: KeyShotFile
   description: The KeyShot scene file to render.
   type: PATH
@@ -29,6 +32,8 @@ parameterDefinitions:
     label: Frames
     groupLabel: KeyShot Scene Settings
   minLength: 1
+
+# KeyShot Output Settings
 - name: OutputName
   description: The file name prefix to save out each frame with
   type: STRING
@@ -49,7 +54,7 @@ parameterDefinitions:
 - name: OutputFormat
   description: The render output format
   type: STRING
-  allowedValues: 
+  allowedValues:
     [
       "PNG",
       "JPEG",
@@ -65,6 +70,19 @@ parameterDefinitions:
     control: DROPDOWN_LIST
     label: Output Format
     groupLabel: KeyShot Output Settings
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
+  default: keyshot
+  description: >
+    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this
+    will set the default packages to use for the job.
+
 steps:
 - name: Render
   parameterSpace:
@@ -76,7 +94,7 @@ steps:
     actions:
       onRun:
         command: keyshot_headless
-        args: 
+        args:
         - -progress
         - -floating_feature
         - keyshot2
@@ -109,3 +127,8 @@ steps:
           print(f"Output Format: {output_format_code}")
           lux.renderImage(path=output_path, opts=opts, format=output_format_code)
           print("Finished Rendering")
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - windows

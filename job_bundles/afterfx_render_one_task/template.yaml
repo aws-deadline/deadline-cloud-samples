@@ -2,8 +2,11 @@ specificationVersion: jobtemplate-2023-09
 name: After Effects Render - one task
 description: >
   A simple job bundle that allows a user to select
-  a project and comp to render with aerender.
+  a project file and enter a comp to render with aerender.
+
 parameterDefinitions:
+
+# Project settings
 - name: ProjectFile
   type: PATH
   objectType: FILE
@@ -28,6 +31,8 @@ parameterDefinitions:
     label: Comp name
     groupLabel: Project settings
   description: Selected composition to render.
+
+# Inputs/outputs
 - name: InputDirectory
   type: PATH
   objectType: DIRECTORY
@@ -51,6 +56,8 @@ parameterDefinitions:
     label: Output directory
     groupLabel: Inputs/outputs
   description: The render output directory
+
+# Frame range
 - name: StartFrame
   type: INT
   userInterface:
@@ -68,20 +75,53 @@ parameterDefinitions:
   default: 50
   description: The last frame to render.
 
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
+  default: aftereffects
+  description: >
+    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this
+    will set the default packages to use for the job.
+
 steps:
-- name: "{{Param.CompName}}"
+- name: RenderComp
   script:
     actions:
       onRun:
-        command: aerender
+        command: python
         args:
-        - "-project"
-        - "{{Param.ProjectFile}}"
-        - "-comp"
-        - "{{Param.CompName}}"
-        - "-output"
-        - "{{Param.OutputDirectory}}"
-        - "-s"
-        - "{{Param.StartFrame}}"
-        - "-e"
-        - "{{Param.EndFrame}}"
+          - "{{Task.File.Run}}"
+          - "{{Param.OutputDirectory}}"
+          - "aerender"
+          - "-project"
+          - "{{Param.ProjectFile}}"
+          - "-comp"
+          - "{{Param.CompName}}"
+          - "-output"
+          - "{{Param.OutputDirectory}}/output_[####].png"
+          - "-s"
+          - "{{Param.StartFrame}}"
+          - "-e"
+          - "{{Param.EndFrame}}"
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          import os
+          import sys
+          import subprocess
+
+          # Ensure the output directory exists
+          os.makedirs(sys.argv[1], exist_ok=True)
+
+          # Run the After Effects subprocess
+          subprocess.run(sys.argv[2:], check=True)
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - windows
