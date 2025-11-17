@@ -1,0 +1,142 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Diffusers LoRA Training
+description: Train a LoRA adapter for Stable Diffusion models using the Hugging Face Diffusers library
+
+parameterDefinitions:
+- name: ModelName
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Base Model
+    groupLabel: Model Settings
+  default: "runwayml/stable-diffusion-v1-5"
+  allowedValues:
+  - "runwayml/stable-diffusion-v1-5"
+  - "CompVis/stable-diffusion-v1-4"
+  - "stabilityai/stable-diffusion-xl-base-1.0"
+  - "stabilityai/stable-diffusion-2-1"
+
+- name: DatasetPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Training Images Directory
+    groupLabel: Training Data
+  description: Directory containing training images (.jpg, .png, .jpeg)
+
+- name: InstancePrompt
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Instance Prompt
+    groupLabel: Training Data
+  description: Prompt describing the training images (e.g., "a photo of sks dog")
+  default: "a photo of sks dog"
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Settings
+  description: Directory to save the trained LoRA weights
+
+- name: Resolution
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution
+    groupLabel: Training Settings
+  description: Image resolution for training
+  default: 512
+  minValue: 256
+  maxValue: 1024
+
+- name: MaxTrainSteps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Max Training Steps
+    groupLabel: Training Settings
+  description: Maximum number of training steps
+  default: 500
+  minValue: 1
+  maxValue: 10000
+
+- name: LearningRate
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Learning Rate
+    groupLabel: Training Settings
+  description: Learning rate for training
+  default: "1e-4"
+
+- name: LoRARank
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: LoRA Rank
+    groupLabel: Training Settings
+  description: Rank of LoRA update matrices
+  default: 4
+  minValue: 1
+  maxValue: 128
+
+- name: LoRAAlpha
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: LoRA Alpha
+    groupLabel: Training Settings
+  description: LoRA scaling factor (higher = stronger effect, typically 4x rank)
+  default: 64
+  minValue: 1
+  maxValue: 256
+
+- name: TrainScript
+  description: Training script
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: train_lora.py
+
+steps:
+- name: TrainLoRA
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['-c', '{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        
+        pip install -q diffusers[torch] transformers accelerate peft
+        
+        python -u -c "from accelerate.utils import write_basic_config; write_basic_config()"
+        
+        python -u -m accelerate.commands.launch {{Param.TrainScript}} \
+          --model-name "{{Param.ModelName}}" \
+          --dataset-path "{{Param.DatasetPath}}" \
+          --instance-prompt "{{Param.InstancePrompt}}" \
+          --resolution {{Param.Resolution}} \
+          --max-train-steps {{Param.MaxTrainSteps}} \
+          --learning-rate {{Param.LearningRate}} \
+          --lora-rank {{Param.LoRARank}} \
+          --output-dir "{{Param.OutputDir}}" \
+          --lora-alpha {{Param.LoRAAlpha}}
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]

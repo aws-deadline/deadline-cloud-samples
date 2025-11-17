@@ -1,0 +1,174 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Diffusers Image Generation
+description: Generate images using Stable Diffusion with optional LoRA adapters
+
+parameterDefinitions:
+- name: ModelName
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Base Model
+    groupLabel: Model Settings
+  default: "runwayml/stable-diffusion-v1-5"
+  allowedValues:
+  - "runwayml/stable-diffusion-v1-5"
+  - "CompVis/stable-diffusion-v1-4"
+  - "stabilityai/stable-diffusion-xl-base-1.0"
+  - "stabilityai/stable-diffusion-2-1"
+
+- name: LoRAPath
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: LoRA Weights
+    groupLabel: Model Settings
+  description: Path to trained LoRA weights .safetensors file (required)
+
+- name: LoRARank
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: LoRA Rank
+    groupLabel: Model Settings
+  description: Rank used during LoRA training (must match training)
+  default: 4
+  minValue: 1
+  maxValue: 128
+
+- name: Prompt
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Prompt
+    groupLabel: Generation Settings
+  description: Text prompt for image generation
+  default: "a photo of an astronaut riding a horse on mars"
+
+- name: NegativePrompt
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Negative Prompt
+    groupLabel: Generation Settings
+  description: Negative prompt to guide what to avoid
+  default: "blurry, low quality"
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Settings
+
+- name: NumImages
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Number of Images
+    groupLabel: Generation Settings
+  description: Total number of images to generate
+  default: 10
+  minValue: 1
+  maxValue: 1000
+
+- name: Width
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Width
+    groupLabel: Generation Settings
+  default: 512
+  minValue: 256
+  maxValue: 1024
+
+- name: Height
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Height
+    groupLabel: Generation Settings
+  default: 512
+  minValue: 256
+  maxValue: 1024
+
+- name: NumInferenceSteps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Inference Steps
+    groupLabel: Generation Settings
+  description: Number of denoising steps
+  default: 50
+  minValue: 1
+  maxValue: 150
+
+- name: GuidanceScale
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Guidance Scale
+    groupLabel: Generation Settings
+  description: Classifier-free guidance scale
+  default: "7.5"
+
+- name: Seed
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Seed
+    groupLabel: Generation Settings
+  description: Random seed for reproducibility (-1 for random)
+  default: "-1"
+
+- name: GenerateScript
+  description: Generation script
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: generate_image.py
+
+steps:
+- name: GenerateImages
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ImageIndex
+      type: INT
+      range: "1-{{Param.NumImages}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['-c', '{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        
+        pip install -q diffusers[torch] transformers accelerate peft safetensors
+        
+        python -u {{Param.GenerateScript}} \
+          --model-name "{{Param.ModelName}}" \
+          --lora-path "{{Param.LoRAPath}}" \
+          --prompt "{{Param.Prompt}}" \
+          --negative-prompt "{{Param.NegativePrompt}}" \
+          --width {{Param.Width}} \
+          --height {{Param.Height}} \
+          --num-inference-steps {{Param.NumInferenceSteps}} \
+          --guidance-scale {{Param.GuidanceScale}} \
+          --seed {{Param.Seed}} \
+          --image-index {{Task.Param.ImageIndex}} \
+          --output-dir "{{Param.OutputDir}}" \
+          --lora-rank {{Param.LoRARank}}
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]
