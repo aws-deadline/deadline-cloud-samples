@@ -172,3 +172,6 @@ steps:
     attributes:
     - name: attr.worker.os.family
       anyOf: [linux]
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
