@@ -81,7 +81,7 @@ This package implements intelligent version matching:
 
 2. **Plugin Dependencies**
    - Add both Houdini and Redshift packages as dependencies in your plugin's `recipe.yaml`
-   - Specify version constraints: `houdini >=20.5,<21` and `houdini-redshift >=2025.6.0`
+   - Specify version constraints: `houdini >=20.0,<21` and `houdini-redshift >=2025.6.0`
 
 ## Application-Specific Requirements
 
@@ -99,7 +99,7 @@ Redshift is a GPU-accelerated renderer with specific requirements. See the [Reds
 ### System Requirements
 
 - Linux x86_64 compatibility
-- Compatible Houdini installation (20.5+, <21)
+- Compatible Houdini installation (20.0+, <21)
 - NVIDIA drivers with CUDA support
 
 ## Adapting to Other Versions
@@ -157,7 +157,9 @@ houdini-redshift-2025/
 ├── deadline-cloud.yaml          # Deadline Cloud configuration
 └── recipe/
     ├── recipe.yaml             # Rattler-build recipe
-    └── build.sh                # Linux build script with version detection
+    ├── build.sh                # Linux build script
+    ├── activate.sh             # Conda activation script with version detection
+    └── deactivate.sh           # Conda deactivation script
 ```
 
 ## Resources

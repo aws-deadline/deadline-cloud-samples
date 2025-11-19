@@ -157,7 +157,9 @@ houdini-redshift-2026/
 ├── deadline-cloud.yaml          # Deadline Cloud configuration
 └── recipe/
     ├── recipe.yaml             # Rattler-build recipe
-    └── build.sh                # Linux build script with version detection
+    ├── build.sh                # Linux build script
+    ├── activate.sh             # Conda activation script with version detection
+    └── deactivate.sh           # Conda deactivation script
 ```
 
 ## Resources
