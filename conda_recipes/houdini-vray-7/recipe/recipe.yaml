@@ -1,0 +1,43 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "7.10.01"
+
+package:
+  name: houdini-vray
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: file://archive_files/vray_adv_71001_houdini20.5_23119_gcc11_linux.zip
+      sha256: 98437785c3c88f6c9a837d76fd413a2ed79c8ba27901572a77ed8893e958229d
+      target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  build:
+    - patchelf
+  run:
+    - "houdini==20.5.278|==20.5.332|==20.5.370|==20.5.410|==20.5.445|==20.5.487|==20.5.522|==20.5.550|==20.5.584|==20.5.613|==20.5.654|==20.5.684"
+
+tests:
+  - script:
+    - hython -c "print(hou.lop.availableRendererInfo())" | grep -q "HdVRayRendererPlugin"
+
+about:
+  homepage: https://www.chaos.com/vray
+  license: LicenseRef-ChaosEULA
+  summary: V-Ray for Houdini is a production-proven CPU & GPU rendering software for high-end VFX and animation.
