@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "2025.6.0_1924545106"
+  version: "2026.1.1_2105803004"
 
 package:
   name: houdini-redshift
@@ -12,7 +12,7 @@ source:
   - if: linux
     then:
       url: file://archive_files/redshift_${{ version }}_linux_x64.run
-      sha256: bdf0d787b3c991f1401bb31e2037a52a7ef686445812abed2d162882eb048039
+      sha256: 3af69b23a5b4bff88ba85017e2992f3d6fd38036857c67e03284e4bcddce670c
       target_directory: installer
 
 build:
@@ -31,7 +31,7 @@ requirements:
   build:
     - patchelf
   run:
-    - houdini >=20.0, <21
+    - houdini >=20.0, <21.5
 
 tests:
   - script:

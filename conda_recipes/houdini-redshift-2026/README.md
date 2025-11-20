@@ -1,12 +1,12 @@
-# Redshift for Houdini 2025 Conda Recipe for AWS Deadline Cloud
+# Redshift for Houdini 2026 Conda Recipe for AWS Deadline Cloud
 
 ## Overview
 
-This directory contains a conda build recipe for Redshift for Houdini 2025.6.0, specifically configured for use with AWS Deadline Cloud. This package enables you to run Redshift rendering jobs with Houdini on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for Redshift for Houdini 2026.1.1, specifically configured for use with AWS Deadline Cloud. This package enables you to run Redshift rendering jobs with Houdini on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
-- **Application**: Redshift for Houdini 2025.6.0_1924545106
+- **Application**: Redshift for Houdini redshift_2026.1.1_2105803004
 - **Supported Platforms**: linux-64
 - **Source**: Maxon website
 - **License**: LicenseRef-MaxonEULA
@@ -34,9 +34,9 @@ Before building this package, ensure you have:
 ### Linux
 
 #### Download from Maxon
-1. Download the `redshift_2025.6.0_1924545106_linux_x64.run` installer from the Maxon website
+1. Download the `redshift_2026.1.1_2105803004_linux_x64.run` installer from the Maxon website
 2. Place the downloaded file in the `conda_recipes/archive_files` directory
-3. Verify the SHA256 hash matches: `bdf0d787b3c991f1401bb31e2037a52a7ef686445812abed2d162882eb048039`
+3. Verify the SHA256 hash matches: `3af69b23a5b4bff88ba85017e2992f3d6fd38036857c67e03284e4bcddce670c`
 
 ## Plugin Integration
 
@@ -81,7 +81,7 @@ This package implements intelligent version matching:
 
 2. **Plugin Dependencies**
    - Add both Houdini and Redshift packages as dependencies in your plugin's `recipe.yaml`
-   - Specify version constraints: `houdini >=20.0,<21` and `houdini-redshift >=2025.6.0`
+   - Specify version constraints: `houdini >=21.0,<21.5` and `houdini-redshift >=2026.1.0`
 
 ## Application-Specific Requirements
 
@@ -99,7 +99,7 @@ Redshift is a GPU-accelerated renderer with specific requirements. See the [Reds
 ### System Requirements
 
 - Linux x86_64 compatibility
-- Compatible Houdini installation (20.0+, <21)
+- Compatible Houdini installation (21.0+, <21.5)
 - NVIDIA drivers with CUDA support
 
 ## Adapting to Other Versions
@@ -112,7 +112,7 @@ To adapt this recipe for other Redshift versions:
    ```yaml
    # In recipe/recipe.yaml
    context:
-     version: "2025.x.x_xxxxxxxx"  # new version
+     version: "2026.x.x_xxxxxxxx"  # new version
    
    # In deadline-cloud.yaml
    sourceArchiveFilename: redshift_[version]_linux_x64.run
@@ -152,7 +152,7 @@ To adapt this recipe for other Redshift versions:
 ## Recipe Structure
 
 ```
-houdini-redshift-2025/
+houdini-redshift-2026/
 ├── README.md                    # This file
 ├── deadline-cloud.yaml          # Deadline Cloud configuration
 └── recipe/

@@ -21,7 +21,6 @@ cd "$REDSHIFT_UNPACK_DIR"
 ./setup.sh --installpath "$REDSHIFT_ROOT"
 
 # Clean up unneeded DCC artifacts
-rm -r "$REDSHIFT_ROOT/redshift4blender"
 rm -r "$REDSHIFT_ROOT/redshift4c4d"
 rm -r "$REDSHIFT_ROOT/redshift4katana"
 rm -r "$REDSHIFT_ROOT/redshift4maya"
@@ -47,9 +46,6 @@ cat <<EOF > "$PREFIX/opt/houdini/packages/redshift_package.json"
 }
 EOF
 
-# Script to set environment variables during activation
-# Environment variables are based on what is needed for portable Redshift installations
-# https://help.maxon.net/r3d/houdini/en-us/Content/html/Custom+Install+Locations.html
 mkdir -p "$PREFIX/etc/conda/activate.d"
 cp "$RECIPE_DIR/activate.sh" "$PREFIX/etc/conda/activate.d/houdini-redshift-$PKG_VERSION-vars.sh"
 
