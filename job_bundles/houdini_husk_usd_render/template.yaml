@@ -81,7 +81,7 @@ parameterDefinitions:
     groupLabel: Render Parameters
   description: Choose the renderer you wish to use. BRAY_HdKarma uses the CPU while BRAY_HdKarmaXPU requires a GPU fleet. If you select BRAY_HdKarmaXPU your queue must be associated with a GPU fleet.
   default: BRAY_HdKarma
-  allowedValues: [BRAY_HdKarma, BRAY_HdKarmaXPU]
+  allowedValues: [BRAY_HdKarma, BRAY_HdKarmaXPU, HdVRayRendererPlugin, HdRedshiftRendererPlugin]
 - name: CondaPackages
   type: STRING
   userInterface:
@@ -125,4 +125,3 @@ steps:
     - name: attr.worker.os.family
       anyOf:
       - linux
-

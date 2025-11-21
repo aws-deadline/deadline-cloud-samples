@@ -51,6 +51,22 @@ Please note that husk will not render your scene if no camera is included. the `
 Only a few husk parameters are included for demonstration purpose. Please see the [husk documentation](https://www.sidefx.com/docs/houdini/ref/utils/husk.html) for reference.
 
 
+## Additional Renderers
+
+In addition to the default Karma renderers (BRAY_HdKarma and BRAY_HdKarmaXPU), this job bundle also supports V-Ray and Redshift renderers through their Hydra render delegates:
+
+* **HdVRayRendererPlugin** - V-Ray for Houdini renderer
+* **HdRedshiftRendererPlugin** - Redshift for Houdini renderer
+
+To use these renderers, you must set up V-Ray for Houdini or Redshift for Houdini in your environment. One option to do this is by using the Conda sample recipes available in this repository:
+
+* **V-Ray 7 for Houdini:** [houdini-vray-7](../../conda_recipes/houdini-vray-7/)
+* **Redshift 2025 for Houdini:** [houdini-redshift-2025](../../conda_recipes/houdini-redshift-2025/)
+* **Redshift 2026 for Houdini:** [houdini-redshift-2026](../../conda_recipes/houdini-redshift-2026/)
+
+These conda recipes can be used to create conda packages that include the necessary renderer plugins. Please refer to the individual recipe README files for specific setup instructions and licensing requirements.
+
+
 ## Sample Asset
 
 sample.usda is a simple scene containing a cube and a sphere. 
