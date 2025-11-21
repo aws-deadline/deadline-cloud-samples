@@ -107,6 +107,20 @@ parameterDefinitions:
   dataFlow: IN
   default: train_lora.py
 
+- name: CondaChannels
+  type: STRING
+  default: conda-forge
+  description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
+
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: "pytorch diffusers transformers accelerate peft safetensors pillow"
+  description: >
+    Conda packages to install for the environment. These packages must be available in a channel
+    made available by a Queue Environment.
+
 steps:
 - name: TrainLoRA
   script:
@@ -121,8 +135,6 @@ steps:
       data: |
         #!/bin/bash
         set -euo pipefail
-        
-        pip install -q diffusers[torch] transformers accelerate peft
         
         python -u -c "from accelerate.utils import write_basic_config; write_basic_config()"
         
