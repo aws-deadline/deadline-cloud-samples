@@ -30,7 +30,7 @@ args = parser.parse_args()
 if not args.lora_path or not os.path.exists(args.lora_path):
     raise ValueError(f"LoRA weights file is required but not found at: {args.lora_path}")
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 print(f"Using device: {device}")
 
 pipe = StableDiffusionPipeline.from_pretrained(
