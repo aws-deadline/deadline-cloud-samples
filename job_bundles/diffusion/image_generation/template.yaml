@@ -147,6 +147,12 @@ parameterDefinitions:
     Conda packages to install for the environment. These packages must be available in a channel
     made available by a Queue Environment.
 
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    # Turn off buffering of Python's output
+    PYTHONUNBUFFERED: "True"
+
 steps:
 - name: GenerateImages
   parameterSpace:
@@ -166,7 +172,7 @@ steps:
       data: |
         #!/bin/bash
         set -euo pipefail
-        
+
         python -u {{Param.GenerateScript}} \
           --model-name "{{Param.ModelName}}" \
           --lora-path "{{Param.LoRAPath}}" \

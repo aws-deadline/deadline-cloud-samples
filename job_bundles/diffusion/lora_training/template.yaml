@@ -121,6 +121,12 @@ parameterDefinitions:
     Conda packages to install for the environment. These packages must be available in a channel
     made available by a Queue Environment.
 
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    # Turn off buffering of Python's output
+    PYTHONUNBUFFERED: "True"
+
 steps:
 - name: TrainLoRA
   script:
@@ -135,9 +141,9 @@ steps:
       data: |
         #!/bin/bash
         set -euo pipefail
-        
+
         python -u -c "from accelerate.utils import write_basic_config; write_basic_config()"
-        
+
         python -u -m accelerate.commands.launch {{Param.TrainScript}} \
           --model-name "{{Param.ModelName}}" \
           --dataset-path "{{Param.DatasetPath}}" \
