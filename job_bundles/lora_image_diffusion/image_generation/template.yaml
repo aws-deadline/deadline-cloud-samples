@@ -3,19 +3,6 @@ name: Diffusers Image Generation
 description: Generate images using Stable Diffusion with optional LoRA adapters
 
 parameterDefinitions:
-- name: ModelName
-  type: STRING
-  userInterface:
-    control: DROPDOWN_LIST
-    label: Base Model
-    groupLabel: Model Settings
-  default: "runwayml/stable-diffusion-v1-5"
-  allowedValues:
-  - "runwayml/stable-diffusion-v1-5"
-  - "CompVis/stable-diffusion-v1-4"
-  - "stabilityai/stable-diffusion-xl-base-1.0"
-  - "stabilityai/stable-diffusion-2-1"
-
 - name: LoRAPath
   type: PATH
   objectType: FILE
@@ -25,17 +12,6 @@ parameterDefinitions:
     label: LoRA Weights
     groupLabel: Model Settings
   description: Path to trained LoRA weights .safetensors file (required)
-
-- name: LoRARank
-  type: INT
-  userInterface:
-    control: SPIN_BOX
-    label: LoRA Rank
-    groupLabel: Model Settings
-  description: Rank used during LoRA training (must match training)
-  default: 4
-  minValue: 1
-  maxValue: 128
 
 - name: Prompt
   type: STRING
@@ -135,6 +111,8 @@ parameterDefinitions:
 
 - name: CondaChannels
   type: STRING
+  userInterface:
+    control: HIDDEN
   default: conda-forge
   description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
 
@@ -174,7 +152,6 @@ steps:
         set -euo pipefail
 
         python -u {{Param.GenerateScript}} \
-          --model-name "{{Param.ModelName}}" \
           --lora-path "{{Param.LoRAPath}}" \
           --prompt "{{Param.Prompt}}" \
           --negative-prompt "{{Param.NegativePrompt}}" \
@@ -184,8 +161,7 @@ steps:
           --guidance-scale {{Param.GuidanceScale}} \
           --seed {{Param.Seed}} \
           --image-index {{Task.Param.ImageIndex}} \
-          --output-dir "{{Param.OutputDir}}" \
-          --lora-rank {{Param.LoRARank}}
+          --output-dir "{{Param.OutputDir}}"
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

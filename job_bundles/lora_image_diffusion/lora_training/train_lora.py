@@ -138,7 +138,7 @@ for step in range(args.max_train_steps):
     lr_scheduler.step()
     optimizer.zero_grad()
 
-    if step % 100 == 0:
+    if step % 25 == 0:
         print(f"Step {step}/{args.max_train_steps}, Loss: {loss.item():.4f}")
 
 accelerator.wait_for_everyone()
@@ -152,8 +152,16 @@ if accelerator.is_main_process:
     unet_lora_state_dict = get_peft_model_state_dict(unet)
     print(f"Saving LoRA keys (first 3): {list(unet_lora_state_dict.keys())[:3]}")
     os.makedirs(args.output_dir, exist_ok=True)
-    save_file(
-        unet_lora_state_dict,
-        os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"),
-    )
-    print(f"Training complete! LoRA weights saved to {args.output_dir}")
+    output_filename = "pytorch_lora_weights.safetensors"
+    output_path = os.path.join(args.output_dir, output_filename)
+
+    # Embed training metadata in the safetensors file
+    metadata = {
+        "base_model": args.model_name,
+        "lora_rank": str(args.lora_rank),
+        "lora_alpha": str(args.lora_alpha),
+        "instance_prompt": args.instance_prompt,
+    }
+    save_file(unet_lora_state_dict, output_path, metadata=metadata)
+    print(f"Training complete! LoRA weights saved to {output_path}")
+    print(f"Embedded metadata: {metadata}")

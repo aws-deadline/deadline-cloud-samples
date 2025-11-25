@@ -32,8 +32,8 @@ parameterDefinitions:
     control: LINE_EDIT
     label: Instance Prompt
     groupLabel: Training Data
-  description: Prompt describing the training images (e.g., "a photo of sks dog")
-  default: "a photo of sks dog"
+  description: Prompt describing the training images (e.g., "a photo of Luna, my dog")
+  default: "a photo of Luna, my dog"
 
 - name: OutputDir
   type: PATH
@@ -83,7 +83,7 @@ parameterDefinitions:
     label: LoRA Rank
     groupLabel: Training Settings
   description: Rank of LoRA update matrices
-  default: 4
+  default: 12
   minValue: 1
   maxValue: 128
 
@@ -93,8 +93,8 @@ parameterDefinitions:
     control: SPIN_BOX
     label: LoRA Alpha
     groupLabel: Training Settings
-  description: LoRA scaling factor (higher = stronger effect, typically 4x rank)
-  default: 64
+  description: LoRA scaling factor (higher = stronger effect, typically 1x to 4x rank)
+  default: 12
   minValue: 1
   maxValue: 256
 
@@ -109,6 +109,8 @@ parameterDefinitions:
 
 - name: CondaChannels
   type: STRING
+  userInterface:
+    control: HIDDEN
   default: conda-forge
   description: A list of conda channels to get packages from. The job expects a Queue Environment to handle this.
 
