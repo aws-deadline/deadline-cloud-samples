@@ -1,0 +1,55 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  packaging_version: "0.1.0"
+  htoa_version: "6.4.4.1"
+  build_id: "rd99f711"
+  houdini_version: "20.0.896"
+
+package:
+  name: htoa
+  version: ${{ packaging_version }}
+
+source:
+  - if: linux
+    then:
+      url: file://archive_files/htoa-${{ htoa_version }}_${{ build_id }}_houdini-${{ houdini_version }}_gcc11.2_linux.run
+      sha256: ea9e5fcc41fb79b30731efd1e26b77040778a8b57c6e2d13c22598187173e33f
+      target_directory: installer
+
+build:
+  number: 0
+  string: htoa${{ htoa_version | replace(".", "_") }}
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  build:
+    - patchelf
+    - xorg-libxcb
+    - xorg-libx11
+    - xcb-util  # Provides libxcb-util.so.1
+    - xcb-util-wm  # Provides libxcb-icccm.so.4
+    - xcb-util-image  # Provides libxcb-image.so.0
+    - xcb-util-keysyms  # Provides libxcb-keysyms.so.1
+    - xcb-util-renderutil  # Provides libxcb-render-util.so.0
+    - libxkbcommon  # Provides libxkbcommon-x11.so.0
+    - fontconfig  # Provides libfontconfig.so.1
+    - wayland  # Provides libwayland-cursor.so.0
+    - harfbuzz  # Provides libharfbuzz.so.0
+    - qt-main  # Provides Qt platform plugins including offscreen
+  run_constraints:
+    - houdini >=20.0, <21
+
+about:
+  homepage: https://www.arnoldrenderer.com
+  license: LicenseRef-AutodeskEULA
+  summary: Houdini Arnold (HtoA) plugin repackaged for Houdini 20.0 (upstream 6.4.4.1)
