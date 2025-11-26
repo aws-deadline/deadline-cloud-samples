@@ -1,0 +1,251 @@
+specificationVersion: "environment-2023-09"
+parameterDefinitions:
+- name: CondaPackages
+  type: STRING
+  description: >
+    This is a space-separated list of Conda package match specifications to
+    install for the job. E.g. "blender=4.5" for a job that renders frames in
+    Blender 4.5.
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+- name: CondaChannels
+  type: STRING
+  description: >
+    This is a space-separated list of Conda channels from which to install
+    packages. Deadline Cloud SMF packages are installed from the
+    "deadline-cloud" channel that is configured by Deadline Cloud.
+
+    Add "conda-forge" to get packages from the https://conda-forge.org/
+    community, and "defaults" to get packages from Anaconda Inc (make sure
+    your usage complies with https://legal.anaconda.com/policies).
+  default: "deadline-cloud"
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+- name: ChannelPriority
+  type: STRING
+  description: >
+    Defines how channel priority functions during package solving. If "Strict",
+    the channel that a package is first found in will be used as the only
+    channel for that package. If "Disabled", packages can be retrieved from
+    any channel as package version takes precedence.
+  default: "Strict"
+  allowedValues: ["Strict", "Disabled"]
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Channel Priority
+
+environment:
+  name: Conda
+  script:
+    actions:
+      onEnter:
+        command: "python"
+        args:
+          - "{{Env.File.Enter}}"
+          - "{{Param.CondaPackages}}"
+          - "{{Param.CondaChannels}}"
+          - "{{Param.ChannelPriority}}"
+          - "{{Session.WorkingDirectory}}"
+          - "{{Env.File.OpenJDVarsCapture}}"
+    embeddedFiles:
+    - name: Enter
+      filename: conda-queue-env-enter.sh
+      type: TEXT
+      data: |
+        import asyncio
+        import json
+        import os
+        import shlex
+        import subprocess
+        import sys
+        import tempfile
+        import textwrap
+
+        # Collect the arguments
+        conda_packages = sys.argv[1].strip()
+        conda_channels = sys.argv[2].strip()
+        channel_priority = sys.argv[3].strip()
+        working_directory = sys.argv[4]
+        vars_capture_script = sys.argv[5]
+
+        # Exit quickly if there are no packages
+        if conda_packages == "":
+            print("Skipping conda env as the CondaPackages parameter was empty.")
+            sys.exit(0)
+
+        # Turn off multi-line buffering in stdout
+        sys.stdout = os.fdopen(sys.stdout.fileno(), "w", buffering=1)
+
+        # Import https://conda.github.io/rattler/py-rattler/, installing it in a cache dir if necessary
+        try:
+            import rattler
+            import yaml
+        except ModuleNotFoundError:
+            cache_dir = os.path.expanduser(
+                f"~/.cache/conda-queue-env/{'.'.join(str(v) for v in sys.version_info)}/site-packages/"
+            )
+            os.makedirs(cache_dir, exist_ok=True)
+            sys.path.insert(0, cache_dir)
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "--upgrade-strategy",
+                    "only-if-needed",
+                    "--target",
+                    cache_dir,
+                    "py-rattler>=0.16,<0.17",
+                    "pyyaml>=6,<7",
+                ]
+            )
+            import rattler
+            import yaml
+        import rattler.shell
+
+        def load_channel_aliases():
+            # py-rattler does not support loading and applying condarc configuration, so
+            # we must load it by hand.
+
+            # The following is only checking the global condarc locations used in Deadline Cloud
+            # service-managed fleets. If you need a more complete list, see the following docs:
+            # https://docs.conda.io/projects/conda/en/stable/user-guide/configuration/use-condarc.html#searching-for-condarc
+            channel_aliases = {}
+
+            for condarc in ["/etc/conda/condarc", "C:/ProgramData/conda/condarc"]:
+                try:
+                    with open(condarc, encoding="utf8") as f:
+                        config = yaml.safe_load(f)
+                        for channel, alias in config.get("custom_channels", {}).items():
+                            channel_aliases[channel] = f"{alias.rstrip('/')}/{channel}/"
+                except FileNotFoundError:
+                    # Skip any condarc that's missing
+                    pass
+
+            return channel_aliases
+
+
+        def save_env_snapshot(snapshot_file):
+            """Save the environment to a file for later diff capture."""
+            # Exclude the env var "_" as it has special meaning to shells
+            before = dict(os.environ)
+            if "_" in before:
+                del before["_"]
+
+            with open(snapshot_file, "w", encoding="utf8") as f:
+                json.dump(before, f)
+
+
+        async def main():
+            env_dir = tempfile.mkdtemp(prefix=".env-", dir=working_directory)
+
+            print("Creating a conda environment in the session directory...")
+
+            channel_aliases = load_channel_aliases()
+            channels = conda_channels.split()
+            specs = conda_packages.split()
+
+            print(f"channels:")
+            for channel in channels:
+                print(f"  - {channel}")
+            print(f"specs:")
+            for spec in specs:
+                print(f"  - {spec}")
+            print()
+
+            print("Solving the environment...")
+            # This list is copied from https://github.com/conda/rattler/blob/7d36fe334c14ddf6227dc0ec0982379d062c5915/crates/rattler-bin/src/commands/create.rs#L162-L172
+            middlewares = [
+                rattler.networking.AuthenticationMiddleware(),
+                ## OciMiddleware not available in py-rattler 0.16.0
+                # rattler.networking.OciMiddleware(),
+                rattler.networking.S3Middleware(),
+                rattler.networking.GCSMiddleware(),
+            ]
+            client = rattler.networking.Client(middlewares)
+            gateway = rattler.repo_data.Gateway(client=client)
+            solved_records = await rattler.solve(
+                channels=[channel_aliases.get(c, c) for c in channels],
+                specs=specs,
+                gateway=gateway,
+                virtual_packages=rattler.VirtualPackage.detect(),
+                channel_priority=getattr(rattler.ChannelPriority, channel_priority),
+            )
+
+            for record in solved_records:
+                print(f"  - {record.url}")
+            print()
+
+            print("Installing packages...")
+            await rattler.install(
+                records=solved_records,
+                target_prefix=env_dir,
+                client=client,
+            )
+
+            print("Installation complete")
+            print("Activating the environment...")
+
+            # We're using bash for activation on all operating systems, including Windows.
+            # This means the host machine needs bash installed, e.g. from Git for Windows.
+            shell = rattler.shell.Shell.bash
+
+            actvars = rattler.shell.ActivationVariables(
+                current_path=os.environ["PATH"].split(os.pathsep)
+            )
+            activation = rattler.shell.activate(env_dir, actvars, shell)
+
+            print("Running activation script:")
+            print(textwrap.indent(activation.script, prefix="  "))
+            print()
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                vars_file = os.path.join(tmpdir, "vars.json")
+                capture_script = os.path.join(tmpdir, "capture.sh")
+
+                save_env_snapshot(vars_file)
+                with open(capture_script, "w", encoding="utf8") as f:
+                    f.write(activation.script)
+                    f.write("\n")
+                    f.write(shlex.join([sys.executable, vars_capture_script, vars_file]))
+                    f.write("\n")
+
+                # This command will print out the environment variable changes from activation
+                env = dict(os.environ)
+                env["PATH"] = os.pathsep.join(str(p) for p in activation.path)
+                subprocess.check_call(["bash", capture_script], env=env)
+
+
+        asyncio.run(main())
+
+    - name: OpenJDVarsCapture
+      filename: openjd-vars-capture.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+        with open(sys.argv[1], "r", encoding="utf8") as f:
+            before = json.load(f)
+        after = dict(os.environ)
+        # Exclude the env var "_" as it has special meaning to shells
+        if "_" in after:
+            del after["_"]
+
+        # Identify the modified and deleted environment variables
+        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+        vars_to_delete = {k for k in before if k not in after}
+
+        # Print the env var changes following the Open Job Description specification
+        for k, v in vars_to_put.items():
+            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+            print(f"openjd_env: {kv}")
+        for k in vars_to_delete:
+            print(f"openjd_unset_env: {k}")

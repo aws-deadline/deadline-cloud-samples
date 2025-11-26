@@ -44,6 +44,7 @@ steps:
         set -euo pipefail
 
         echo 'Data Dir is {{Param.DataDir}}'
+        mkdir -p '{{Param.DataDir}}'
         cd '{{Param.DataDir}}'
 
         # Echo each command before running it.

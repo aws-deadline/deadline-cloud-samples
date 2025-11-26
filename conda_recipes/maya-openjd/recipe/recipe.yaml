@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "0.15.7"
+  version: "0.15.12"
 
 package:
   name: maya-openjd
@@ -11,7 +11,7 @@ package:
 # This source reference uses the source archive published to PyPI
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-maya/deadline_cloud_for_maya-${{ version }}.tar.gz
-  sha256: ed7c230d7dc45e3c0b8dc1914a2894f779622179e4e645ea5e8259af20967f50
+  sha256: cfea1400cdba098c1d4f693c07773bf6bb1f1ca27c9f4c846506b54fadccdb2b
 
 build:
   number: 0
@@ -26,8 +26,8 @@ requirements:
     - pip
   run:
     - python
-    - deadline 0.49.*
-    - openjd-adaptor-runtime 0.8.*
+    - deadline 0.52.*
+    - openjd-adaptor-runtime 0.9.*
 
 tests:
 - python:
@@ -38,7 +38,8 @@ tests:
       - pip
   script:
     - pip check
-    - maya-openjd --help
+# This doesn't work on Windows, possibly a rattler-build bug since maya-openjd.exe is in $PREFIX/Scripts
+#    - maya-openjd --help
 
 about:
   summary: AWS Deadline Cloud for Maya

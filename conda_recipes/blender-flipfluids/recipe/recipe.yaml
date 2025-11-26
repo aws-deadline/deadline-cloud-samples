@@ -13,12 +13,10 @@ package:
 source:
   - if: linux
     then:
-      # This zip file contains the FLIP Fluids Demo addon archive. Rattler build
-      # automatically extracts source files. In this case, we don't want the contents of the addon to
-      # be extracted, so we've placed the addon into it's own archive. 
-      url: file://archive_files/FLIP-Fluids.zip
-      sha256: d0afeb07d4ba19936eff3c040d5541b68202d1cd9b7ddfdf2da62d869f2d0f6c
-      target_directory: flipfluids
+      url: file://archive_files/FLIP_Fluids_addon_1.8.4_demo_.2025-07-17.zip
+      sha256: b11b520688f8e9042656d658cd87e1479cca0d804b14cf507a7cf0b1335684d9
+      # By specifying this filename directly, we prevent the contents of the addon from being extracted.
+      file_name: FLIP_Fluids_addon_1.8.4_demo_.2025-07-17.zip
 
 build:
   number: 0
@@ -34,17 +32,28 @@ build:
 
 requirements:
   run:
-    - blender
+    - blender 4.5.*
 
 tests:
   - script:
+    - blender --version
     - |
+      echo "Creating test.py"
       cat <<EOF > test.py
       import bpy
-      for addon in bpy.context.preferences.addons:
+      import sys
+      addon_names = [addon.module for addon in bpy.context.preferences.addons]
+      print("Installed addons:")
+      for addon in addon_names:
           print(addon)
+      if "flip_fluids_addon" in addon_names:
+          print("The flip_fluids_addon addon was found!")
+          sys.exit(0)
+      else:
+          print("ERROR: The flip_fluids_addon addon was not installed.")
+          sys.exit(1)
       EOF
-    - blender --background --python test.py | grep flip_fluids_addon
+    - blender --background --python-exit-code 1 --python test.py
 
 about:
   homepage: https://flipfluids.com/

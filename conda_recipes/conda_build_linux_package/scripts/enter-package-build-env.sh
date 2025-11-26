@@ -74,25 +74,27 @@ if conda env list | grep -q "^$ENV_NAME "; then
 
     # Activate the Conda environment, capturing the environment variables for the session to use
     python "$(dirname "$0")/openjd-vars-start.py" .vars
-    conda activate "$ENV_NAME"
-    python "$(dirname "$0")/openjd-vars-capture.py" .vars
+    conda run -n "$ENV_NAME" python "$(dirname "$0")/openjd-vars-capture.py" .vars
+
+    CONDA_PREFIX=~/.conda/envs/$ENV_NAME
 else
     echo "Creating the named Conda environment $ENV_NAME for running conda-build."
 
     conda create --yes --quiet -n "$ENV_NAME" \
-        -c conda-forge \
-        python=3.12 conda conda-build rattler-build conda-index boto3 pyyaml
+        --override-channels -c conda-forge \
+        python=3.13 conda conda-build "rattler-build>=0.48.1" "rattler-index>=0.26" boto3 pyyaml
 
     # Activate the Conda environment, capturing the environment variables for the session to use
     python "$(dirname "$0")/openjd-vars-start.py" .vars
-    conda activate "$ENV_NAME"
-    python "$(dirname "$0")/openjd-vars-capture.py" .vars
+    conda run -n "$ENV_NAME" python "$(dirname "$0")/openjd-vars-capture.py" .vars
+
+    CONDA_PREFIX=~/.conda/envs/$ENV_NAME
 
     # By default, Conda creates 32-bit .conda packages that are limited to 2GB.
     # We patch the file conda_package_handling/conda_fmt.py to change its constructor
     # from `conda_file.open(component, "w")` to
     # `conda_file.open(component, "w", force_zip64=True)`.
-    for CFP in "lib/python3.12/site-packages/conda_package_handling/conda_fmt.py" "lib/site-packages/conda_package_handling/conda_fmt.py"; do
+    for CFP in "lib/python3.13/site-packages/conda_package_handling/conda_fmt.py" "lib/site-packages/conda_package_handling/conda_fmt.py"; do
         if [ -f "$CONDA_PREFIX/$CFP" ]; then
             CONDA_FMT_PATH=$CFP
         fi
@@ -103,18 +105,6 @@ else
     else
         echo "Failed to patch conda_package_handling/conda_fmt.py for 64-bit .conda format"
         exit 1
-    fi
-
-    if [ "$(uname)" = Linux ]; then
-        echo "Installing Mountpoint-S3..."
-        ARCH=$(uname -m)
-        ARCH=${ARCH/aarch64/arm64}
-        pushd "$CONDA_PREFIX"
-        curl https://s3.amazonaws.com/mountpoint-s3-release/latest/$ARCH/mount-s3.tar.gz \
-            -Ls | tar -xvz "./bin/mount-s3"
-        popd
-    else
-        echo "Skipping Mountpoint-S3 installation, it is only for Linux."
     fi
 
 fi
@@ -130,7 +120,8 @@ fi
 # Create a .condarc to control the package build settings
 cat <<EOF > "$CONDA_PREFIX/.condarc"
 # Default to no channels. Specify channels in the conda build recipe's deadline-cloud.yaml file.
-channels: []
+channels:
+- nodefaults
 conda_build:
     # Build in the .conda package format
     pkg_format: '2'
@@ -138,4 +129,4 @@ conda_build:
     debug: false
 EOF
 
-conda info
+conda run -n "$ENV_NAME" conda info

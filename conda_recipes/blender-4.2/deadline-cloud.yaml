@@ -8,4 +8,4 @@ condaPlatforms:
     defaultSubmit: false
     sourceArchiveFilename: blender-4.2.9-windows-x64.zip
     sourceDownloadInstructions: 'Run "curl -LO https://download.blender.org/release/Blender4.2/blender-4.2.9-windows-x64.zip --output-dir archive_files"'
-    buildTool: conda-build
+    buildTool: rattler-build

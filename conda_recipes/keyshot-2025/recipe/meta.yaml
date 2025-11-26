@@ -1,0 +1,34 @@
+{% set name = "keyshot" %}
+{% set version_partial = "2025" %}
+{% set version_minor = "2" %}
+{% set version = version_partial + "." + version_minor %}
+{% set build_number = "14.1.1.8" %}
+
+{% set sha256 = "ea18bbc476b438dca4a9fdec578150a1d1675bcab503e47e666252fcdc08aa9b" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: file://archive_files/keyshot_studio_win64_{{ version }}_{{ build_number }}.exe
+  sha256: {{ sha256 }}
+  folder: installer
+
+build:
+  number: 0
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  # The binary is built to be relocatable, so can ignore the warnings about DSOs.
+  missing_dso_whitelist:
+  - "*"
+  ignore_prefix_files: True
+  script_env:
+  - BUILD_NUMBER = {{ build_number }}
+
+about:
+  home: https://www.keyshot.com
+  license: Commercial
+  summary: >
+    KeyShot is a suite of 3D visualization tools preferred by industrial designers, graphic designers, engineers, CG specialists, photographers, and marketing professionals around the world.
+    KeyShot's intuitive software breaks down the complexity of making photo-realistic images and animations from 3D digital data.

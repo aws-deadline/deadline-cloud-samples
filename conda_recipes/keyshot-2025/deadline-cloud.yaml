@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: win-64
+    defaultSubmit: true
+    sourceArchiveFilename: keyshot_studio_win64_2025.2_14.1.1.8.exe
+    sourceDownloadInstructions: 'Follow the instructions in README.md to construct the archive zip file.'
+    buildTool: conda-build
