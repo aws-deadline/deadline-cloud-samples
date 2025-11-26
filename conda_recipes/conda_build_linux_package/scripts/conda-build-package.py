@@ -97,7 +97,6 @@ def get_channel_options(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--recipe-dir", required=True)
-    parser.add_argument("--build-tool", required=True, choices=("conda-build", "rattler-build"))
     parser.add_argument("--conda-platform", required=True)
     parser.add_argument("--override-package-name")
     parser.add_argument("--conda-channels", default="")
@@ -120,8 +119,6 @@ def main():
         print(Path(args.variant_config_file).read_text())
         print()
 
-    s3_channel_bucket, s3_channel_prefix = parse_s3_channel_url(args.s3_conda_channel)
-
     # Make sure the package build starts with a clean conda-bld directory
     command = ["conda", "build", "purge"]
     print_command(command)
@@ -130,85 +127,44 @@ def main():
         shutil.rmtree(args.conda_bld_dir)
 
     # Create the "-c CHANNEL_NAME" options
+    s3_channel_bucket, s3_channel_prefix = parse_s3_channel_url(args.s3_conda_channel)
     channel_options = get_channel_options(
         s3_channel_bucket,
         s3_channel_prefix,
         args.conda_channels,
         s3_client,
     )
+
     variant_config_option = []
     if args.variant_config_file:
         variant_config_option = ["-m", args.variant_config_file]
 
     # Render the recipe, to substitute any jinja templating. We can take and modify literal
     # values from the rendered recipe to apply the customizations specified by job parameters.
-    if args.build_tool == "conda-build":
-        print("WARNING: The conda-build tool is deprecated in this tool. Recommended to switch to the rattler-build tool.")
-        recipe_file = f"{args.recipe_dir}/meta.yaml"
-        command = [
-            "conda",
-            "render",
-            *variant_config_option,
-            "--no-source",
-            "-f",
-            "rendered_meta.yaml",
-            *channel_options,
-            "--override-channels",
-            args.recipe_dir,
-        ]
-        print_command(command)
-        subprocess.check_call(command)
+    print("WARNING: The conda-build tool is deprecated in this tool. Recommended to switch to the rattler-build tool.")
+    command = [
+        "conda",
+        "render",
+        *variant_config_option,
+        "--no-source",
+        "-f",
+        "rendered_meta.yaml",
+        *channel_options,
+        "--override-channels",
+        args.recipe_dir,
+    ]
+    print_command(command)
+    subprocess.check_call(command)
 
-        rendered_meta_text = Path("rendered_meta.yaml").read_text()
-        print(rendered_meta_text)
-        rendered_recipe = yaml.safe_load(rendered_meta_text)
-
-        # When using conda-build, update the rendered recipe
-        updated_recipe = rendered_recipe
-    elif args.build_tool == "rattler-build":
-        recipe_file = f"{args.recipe_dir}/recipe.yaml"
-        updated_recipe_file = f"{args.recipe_dir}/updated_recipe.yaml"
-
-        command = [
-            "rattler-build",
-            "build",
-            "--color",
-            "never",
-            "--render-only",
-            "--recipe",
-            recipe_file,
-            *variant_config_option,
-            "--output-dir",
-            args.conda_bld_dir,
-            "--verbose",
-            *channel_options,
-        ]
-        print_command(command)
-        recipe_render_result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(recipe_render_result.stdout.decode(errors="replace").replace("\r\n", "\n"))
-        if recipe_render_result.returncode != 0:
-            print("stderr:")
-            print(recipe_render_result.stderr.decode(errors="replace").replace("\r\n", "\n"))
-            print(f"ERROR: Process exited with return code {recipe_render_result.returncode}")
-            sys.exit(1)
-        recipe_list = json.loads(recipe_render_result.stdout)
-        if len(recipe_list) != 1:
-            print(f"ERROR: The options selected resulted in more than one rendered recipe, ensure only one variant is specified.")
-            sys.exit(1)
-        rendered_recipe = recipe_list[0]["recipe"]
-
-        # When using rattler-build, get values from the rendered recipe but update the original recipe
-        recipe_text = Path(recipe_file).read_text()
-        updated_recipe = yaml.safe_load(recipe_text)
-    else:
-        print(f"ERROR: Unsupported build tool {args.build_tool}")
-        sys.exit(1)
+    rendered_meta_text = Path("rendered_meta.yaml").read_text()
+    print(rendered_meta_text)
+    updated_recipe = yaml.safe_load(rendered_meta_text)
 
     # Replace values in the rendered recipe
     if args.override_package_name:
-        rendered_recipe["package"]["name"] = args.override_package_name
-    package_name = rendered_recipe["package"]["name"]
-    package_version = rendered_recipe["package"]["version"]
+        updated_recipe["package"]["name"] = args.override_package_name
+    package_name = updated_recipe["package"]["name"]
+    package_version = updated_recipe["package"]["version"]
 
     build_number = get_next_build_number(package_name, package_version, args.conda_platform, channel_options)
     updated_recipe["build"]["number"] = build_number
@@ -229,8 +185,8 @@ def main():
             sys.exit(1)
 
     # Substitute the override archives into the recipe
-    if "source" in rendered_recipe:
-        updated_recipe["source"] = rendered_recipe["source"]
+    if "source" in updated_recipe:
+        updated_recipe["source"] = updated_recipe["source"]
         # If the source is not in list form, turn it into a list
         if isinstance(updated_recipe["source"], dict):
             updated_recipe["source"] = [updated_recipe["source"]]
@@ -259,26 +215,17 @@ def main():
                         source_entry["url"] = f"file://{source_entry['url']}"
 
     # Save the rendered recipe with modifications
-    if args.build_tool == "conda-build":
-        recipe_clobber = {
-            "package": {"name": updated_recipe["package"]["name"]},
-            "build": {"number": updated_recipe["build"]["number"]},
-            "source": updated_recipe["source"],
-        }
-        print("Clobber file:")
-        print(json.dumps(recipe_clobber, indent=1))
-        Path("recipe_clobber.yaml").write_text(json.dumps(recipe_clobber))
-    else:
-        print("Updated recipe.yaml:")
-        print(json.dumps(updated_recipe, indent=2))
-        with open(updated_recipe_file, "w") as fh:
-            json.dump(updated_recipe, fh)
+    recipe_clobber = {
+        "package": {"name": updated_recipe["package"]["name"]},
+        "build": {"number": updated_recipe["build"]["number"]},
+        "source": updated_recipe["source"],
+    }
+    print("Clobber file:")
+    print(json.dumps(recipe_clobber, indent=1))
+    Path("recipe_clobber.yaml").write_text(json.dumps(recipe_clobber))
 
     prefix_length_option = []
     if args.override_prefix_length and args.override_prefix_length != "0":
-        if args.build_tool == "rattler-build":
-            print("ERROR: The rattler-build package build tool does not support overriding the prefix length.")
-            sys.exit(1)
         prefix_length_option = ["--prefix-length", f"{args.override_prefix_length}"]
 
     # Check for fast build optimization from CLI argument
@@ -289,48 +236,23 @@ def main():
     if args.extra_build_tool_args:
         extra_build_tool_args = shlex.split(args.extra_build_tool_args)
 
-    # Run the package build tool
-    if args.build_tool == "conda-build":
-        fast_build_opts = ["--zstd-compression-level", "1"] if enable_fast_build else []
+    fast_build_opts = ["--zstd-compression-level", "1"] if enable_fast_build else []
 
-        command = [
-            "conda",
-            "build",
-            "--no-anaconda-upload",
-            *prefix_length_option,
-            *variant_config_option,
-            *channel_options,
-            "--clobber-file",
-            "recipe_clobber.yaml",
-            *fast_build_opts,
-            *extra_build_tool_args,
-            args.recipe_dir,
-        ]
-    else:
-        fast_build_opts = ["--package-format", "conda:min"] if enable_fast_build else []
-
-        command = [
-            "rattler-build",
-            "build",
-            "--color",
-            "never",
-            "--recipe",
-            updated_recipe_file,
-            *variant_config_option,
-            "--output-dir",
-            args.conda_bld_dir,
-            "--verbose",
-            *fast_build_opts,
-            *extra_build_tool_args,
-            *prefix_length_option,
-            *channel_options,
-        ]
+    command = [
+        "conda",
+        "build",
+        "--no-anaconda-upload",
+        *prefix_length_option,
+        *variant_config_option,
+        *channel_options,
+        "--clobber-file",
+        "recipe_clobber.yaml",
+        *fast_build_opts,
+        *extra_build_tool_args,
+        args.recipe_dir,
+    ]
     print_command(command)
     subprocess.check_call(command)
-
-    if args.build_tool == "rattler-build":
-        # Remove the recipe file created with modifications
-        os.unlink(updated_recipe_file)
 
     # Upload all the built packages
     for subdir in [args.conda_platform, "noarch"]:
@@ -340,6 +262,11 @@ def main():
             print(f"Package {package_name} is {Path(package).stat().st_size} bytes")
             print(f"openjd_status: Uploading the package {package_name} to s3://{s3_channel_bucket}/{package_key}...")
             s3_client.upload_file(package, s3_channel_bucket, package_key)
+
+    # Reindex the destination channel
+    command = ["rattler-index", "s3",  args.s3_conda_channel, "-vv"]
+    print_command(command)
+    subprocess.check_call(command)
 
 
 if __name__ == "__main__":

@@ -100,7 +100,7 @@ environment:
                     "only-if-needed",
                     "--target",
                     cache_dir,
-                    "py-rattler>=0.16,<0.17",
+                    "py-rattler>=0.18,<0.19",
                     "pyyaml>=6,<7",
                 ]
             )
