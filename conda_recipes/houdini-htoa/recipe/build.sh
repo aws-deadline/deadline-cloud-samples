@@ -85,43 +85,14 @@ for so_file in $(find "$HTOA_ROOT" -name "*.so" -o -name "*.so.*"); do
     fi
 done
 
-# Create Houdini package file for HtoA plugin
-# This tells Houdini where to find the Arnold plugin
-# https://www.sidefx.com/docs/houdini/ref/plugins.html
+# Install the Houdini package definition bundled with HtoA.
+# The upstream file points to _TARGET_DIR_; substitute the conda prefix path.
 mkdir -p "$PREFIX/opt/houdini/packages"
-cat <<'EOF' > "$PREFIX/opt/houdini/packages/htoa.json"
-{
-    "env": [
-        {
-            "HTOA": "$HTOA_ROOT"
-        },
-        {
-            "ARNOLD_LOCATION": "$HTOA_ROOT"
-        },
-        {
-            "PATH": {
-                "value": "$HTOA_ROOT/bin",
-                "method": "prepend"
-            }
-        },
-        {
-            "HOUDINI_PATH": {
-                "value": "$HTOA_ROOT:&",
-                "method": "prepend"
-            }
-        },
-        {
-            "PYTHONPATH": {
-                "value": "$HTOA_ROOT/python",
-                "method": "prepend"
-            }
-        }
-    ]
-}
-EOF
-
-# Replace $HTOA_ROOT with actual path in the JSON file
-sed -i "s|\$HTOA_ROOT|$HTOA_ROOT|g" "$PREFIX/opt/houdini/packages/htoa.json"
+if [ -f "$HTOA_ROOT/htoa.json" ]; then
+    sed "s|_TARGET_DIR_|$HTOA_ROOT|g" "$HTOA_ROOT/htoa.json" > "$PREFIX/opt/houdini/packages/htoa.json"
+else
+    echo "WARNING: $HTOA_ROOT/htoa.json not found; Houdini may not discover the plugin" >&2
+fi
 
 # Script to set environment variables during conda activation
 mkdir -p "$PREFIX/etc/conda/activate.d"
@@ -129,6 +100,9 @@ cat <<EOF > "$PREFIX/etc/conda/activate.d/houdini-htoa-$PKG_VERSION-vars.sh"
 export HTOA="$HTOA_ROOT"
 export ARNOLD_LOCATION="$HTOA_ROOT"
 export HOUDINI_DSO_ERROR=2
+
+# Ensure Arnold shared libraries are discoverable at runtime
+export LD_LIBRARY_PATH="$HTOA_ROOT/lib:\${LD_LIBRARY_PATH:-}"
 
 # Add Arnold's Python module path
 if [ -d "$HTOA_ROOT/python" ]; then
@@ -151,6 +125,9 @@ cat <<EOF > "$PREFIX/etc/conda/deactivate.d/houdini-htoa-$PKG_VERSION-vars.sh"
 unset HTOA
 unset ARNOLD_LOCATION
 unset HOUDINI_DSO_ERROR
+if [ -n "\${LD_LIBRARY_PATH:-}" ]; then
+    export LD_LIBRARY_PATH=\$(echo "\$LD_LIBRARY_PATH" | sed "s|$HTOA_ROOT/lib:||g")
+fi
 unset HOUDINI_VERSION
 
 # Remove Arnold Python path from PYTHONPATH
