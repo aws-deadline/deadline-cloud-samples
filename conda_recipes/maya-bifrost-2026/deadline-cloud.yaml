@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: Bifrost_2.14.1.0_Maya2026_Linux.run
+    sourceDownloadInstructions: 'Download the Bifrost_2.14.1.0_Maya2026_Linux.run installer from Autodesk. You will need an Autodesk account and appropriate licensing to access the Bifrost downloads.'
+    buildTool: rattler-build
