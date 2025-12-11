@@ -205,7 +205,7 @@ steps:
             # Calculate the bounds for the tile. Two adjacent tiles could have
             # "minX=0, maxX=63, minY=0, maxY=63" and then "minX=64, maxX=127, minY=0, maxY=63"
             minX = deltaX * (tileNumX - 1)
-            maxX = (deltaX * tileNumX)l
+            maxX = (deltaX * tileNumX)
             minY = deltaY * (tileNumY - 1)
             maxY = (deltaY * tileNumY)
 
