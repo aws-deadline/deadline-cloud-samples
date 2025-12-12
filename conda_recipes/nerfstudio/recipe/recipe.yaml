@@ -62,6 +62,8 @@ requirements:
     - ${{ compiler('cxx') }}
     - ${{ stdlib("c") }}
     - cuda-toolkit
+    - scikit-build-core
+    - cmake
 
     # The old pycolmap dependency of gsplat simple_trainer is not compatible with NumPy 2
     - numpy <2

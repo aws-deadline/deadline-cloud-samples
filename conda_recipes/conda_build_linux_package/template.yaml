@@ -232,24 +232,53 @@ steps:
         #!/bin/env bash
         set -xeuo pipefail
 
-        python '{{Param.JobScriptDir}}/build-package.py' \
-            --build-tool '{{Param.BuildTool}}' \
-            --conda-bld-dir '{{Session.WorkingDirectory}}/conda-bld' \
-            --conda-platform '{{Param.CondaPlatform}}' \
-            --conda-channels '{{Param.CondaChannels}}' \
-            --s3-conda-channel '{{Param.S3CondaChannel}}' \
-            --override-prefix-length '{{Param.OverridePrefixLength}}' \
-            --recipe-dir '{{Param.RecipeDir}}' \
-            --override-package-name '{{Param.OverridePackageName}}' \
-            --override-source-archive1 '{{Param.OverrideSourceArchive1}}' \
-            --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
-            --override-source-dir '{{Param.OverrideSourceDir}}' \
-            --variant-config-file '{{Param.VariantConfigFile}}' \
-            --enable-fast-build '{{Param.EnableFastBuild}}' \
-            --extra-build-tool-args '{{Param.ExtraBuildToolArgs}}'
+        if [ '{{Param.BuildTool}}' == "rattler-build" ]; then
 
-        # Versions 0.26.0 and later protect against concurrent indexing.
-        rattler-index s3 '{{Param.S3CondaChannel}}' -vv
+          if [ '{{Param.OverridePrefixLength}}' != "0" ]; then
+              echo "ERROR: The rattler-build package build tool does not support overriding the prefix length."
+              exit 1
+          fi
+
+          EXTRA_BUILD_TOOL_ARGS='{{Param.ExtraBuildToolArgs}}'
+          if [ '{{Param.EnableFastBuild}}' == "true" ]; then
+              EXTRA_BUILD_TOOL_ARGS="$EXTRA_BUILD_TOOL_ARGS --package-format conda:min"
+          fi
+
+          python '{{Param.JobScriptDir}}/rattler-build-package.py' \
+              --conda-bld-dir '{{Session.WorkingDirectory}}/conda-bld' \
+              --conda-platform '{{Param.CondaPlatform}}' \
+              --conda-channels '{{Param.CondaChannels}}' \
+              --s3-conda-channel '{{Param.S3CondaChannel}}' \
+              --recipe-dir '{{Param.RecipeDir}}' \
+              --override-package-name '{{Param.OverridePackageName}}' \
+              --override-source-archive1 '{{Param.OverrideSourceArchive1}}' \
+              --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
+              --override-source-dir '{{Param.OverrideSourceDir}}' \
+              --variant-config-file '{{Param.VariantConfigFile}}' \
+              --extra-build-tool-args "$EXTRA_BUILD_TOOL_ARGS"
+
+        elif [ '{{Param.BuildTool}}' == "conda-build" ]; then
+
+          python '{{Param.JobScriptDir}}/conda-build-package.py' \
+              --conda-bld-dir '{{Session.WorkingDirectory}}/conda-bld' \
+              --conda-platform '{{Param.CondaPlatform}}' \
+              --conda-channels '{{Param.CondaChannels}}' \
+              --s3-conda-channel '{{Param.S3CondaChannel}}' \
+              --override-prefix-length '{{Param.OverridePrefixLength}}' \
+              --recipe-dir '{{Param.RecipeDir}}' \
+              --override-package-name '{{Param.OverridePackageName}}' \
+              --override-source-archive1 '{{Param.OverrideSourceArchive1}}' \
+              --override-source-archive2 '{{Param.OverrideSourceArchive2}}' \
+              --override-source-dir '{{Param.OverrideSourceDir}}' \
+              --variant-config-file '{{Param.VariantConfigFile}}' \
+              --enable-fast-build '{{Param.EnableFastBuild}}' \
+              --extra-build-tool-args '{{Param.ExtraBuildToolArgs}}'
+
+        else
+          echo 'ERROR: Unsupported build tool {{Param.BuildTool}}'
+          exit 1
+
+        fi
 
   hostRequirements:
     # Host requirements for the linux-64 conda platform

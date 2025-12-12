@@ -21,7 +21,30 @@ The package you build from this recipe will include the following:
 The specific versions built are selected from recent git commits of the projects. The recipe implementation
 [recipe.yaml](recipe/recipe.yaml) and [build.sh](recipe/build.sh) includes comments to explain what it does.
 
-## Building the package
+## Building the package locally
+
+You can use the [rattler-build publish](https://rattler.build/dev/publish/) command to build the recipe
+on a Linux host and publish it to a conda channel in one step. See [rattler-build Installation](https://rattler.build/latest/#installation)
+for options on installation.
+
+If your machine has CUDA, run the following from the `conda_recipes` directory:
+
+```
+rattler-build publish nerfstudio/recipe/recipe.yaml \
+    --to s3://amzn-s3-demo-bucket/Conda/Default
+    -c conda-forge \
+    --build-number=+1
+```
+
+If your machine has no CUDA GPU, you can override the CUDA detection and build the package anyway.
+You will need a GPU to run NeRF Studio itself, but you can get the package built without one.
+Run the following before the above `rattler-build` command:
+
+```
+export CONDA_OVERRIDE_CUDA="12.6"
+```
+
+## Building the package on Deadline Cloud
 
 You can build this package on a Deadline Cloud farm that is configured for package build jobs that update
 the S3 conda channel and has a CUDA fleet to run the build. This document focuses on building with Deadline

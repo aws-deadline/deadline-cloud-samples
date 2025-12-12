@@ -1,0 +1,36 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2026.2.14.1.0"
+  major_version: "2026"
+  minor_version: "2.14.1.0"
+
+package:
+  name: maya-bifrost
+  version: ${{ version }}
+
+source:
+  url: file://archive_files/Bifrost_${{minor_version}}_Maya${{ major_version }}_Linux.run
+  sha256: a482868c3269be8afdf8dc59c08d88b072fa38e17ccf29b4442fc0e05567fbfb
+  target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  run:
+    - maya ${{ major_version }}.*
+
+about:
+  homepage: https://help.autodesk.com/view/BIFROST/ENU/
+  license: LicenseRef-AutodeskEULA
+  summary: Autodesk Bifrost is a procedural platform that enables artists to create complex simulations and effects for Maya.

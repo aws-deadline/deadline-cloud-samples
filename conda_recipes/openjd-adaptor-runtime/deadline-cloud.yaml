@@ -2,16 +2,10 @@ condaPlatforms:
   - platform: linux-64
     variant: py313
     defaultSubmit: true
-    variantConfig:
-      python:
-      - 3.13
     buildTool: rattler-build
   - platform: win-64
     variant: py313
     defaultSubmit: true
-    variantConfig:
-      python:
-      - 3.13
     buildTool: rattler-build
 jobParameters:
 - name: CondaChannels
