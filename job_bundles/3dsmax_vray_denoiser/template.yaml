@@ -1,0 +1,151 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: 3ds Max V-Ray Render
+description: |
+  This job bundle renders a 3ds Max scene using V-Ray with frame chunking support.
+  
+  Features:
+  - Frame chunking for efficient parallel rendering
+  - VRIMG to EXR conversion with denoising preservation
+  - Automatic cleanup of temporary files
+  - Error handling and validation
+  
+  Requirements:
+  - 3ds Max 2025 installed on Windows worker hosts
+  - V-Ray plugin for 3ds Max
+
+parameterDefinitions:
+
+# Render Parameters
+- name: SceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: 3ds Max Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: 3ds Max Scene Files
+      patterns: ["*.max"]
+    - label: All Files
+      patterns: ["*"]
+  description: Choose the 3ds Max scene file you want to render.
+
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  default: "0-10"
+  description: Frame range to render (e.g., 1-100, 1,5,10-20)
+
+- name: OutputDirectory
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Choose the render output directory.
+
+- name: FramesPerTask
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Frames Per Task
+    groupLabel: Render Parameters
+  default: 1
+  minValue: 1
+  description: Number of frames to render per task
+steps:
+- name: Render EXRs
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}:{{Param.FramesPerTask}}"
+  script:
+    embeddedFiles:
+    - name: render_script
+      filename: render.bat
+      type: TEXT
+      runnable: true
+      data: |
+        @echo off
+        setlocal enabledelayedexpansion
+        echo Starting 3ds Max render...
+        echo Scene: {{Param.SceneFile}}
+        echo Original Frame Range: {{Param.Frames}}
+        
+        set /a taskStart={{Task.Param.Frame}}
+        
+        REM Check if this is a non-contiguous range (contains commas)
+        echo {{Param.Frames}} | findstr "," >nul
+        if !errorlevel! equ 0 (
+          REM Non-contiguous range - always render single frame
+          set /a taskEnd=!taskStart!
+          echo Non-contiguous range detected - rendering single frame: !taskStart!
+        ) else (
+          REM Contiguous range - check if we need to limit the end frame
+          set /a taskEnd=!taskStart!+{{Param.FramesPerTask}}-1
+          
+          REM Extract the actual end frame from the range to avoid going beyond it
+          for /f "tokens=2 delims=-" %%a in ("{{Param.Frames}}") do set maxFrame=%%a
+          if !taskEnd! gtr !maxFrame! set taskEnd=!maxFrame!
+          
+          echo Contiguous range - rendering frames !taskStart! to !taskEnd!
+        )
+        
+        REM Validate output directory
+        mkdir "{{Param.OutputDirectory}}" 2>nul
+        echo test > "{{Param.OutputDirectory}}\test.tmp" 2>nul || (
+          echo ERROR: Cannot write to output directory
+          exit /b 1
+        )
+        del "{{Param.OutputDirectory}}\test.tmp" 2>nul
+        
+        REM Check vrimg2exr exists
+        if not exist "C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\bin\vrimg2exr.exe" (
+          echo ERROR: vrimg2exr.exe not found
+          exit /b 1
+        )
+        
+        REM Render frame range for this chunk
+        "C:\Program Files\Autodesk\3ds Max 2025\3dsmaxcmd.exe" -start:!taskStart! -end:!taskEnd! "{{Param.SceneFile}}"
+        if %ERRORLEVEL% NEQ 0 (
+          echo ERROR: 3dsmaxcmd failed with exit code %ERRORLEVEL%
+          exit /b %ERRORLEVEL%
+        )
+        
+        if !taskStart! equ !taskEnd! (
+          echo 3ds Max render completed successfully for frame !taskStart!
+        ) else (
+          echo 3ds Max render completed successfully for frames !taskStart! to !taskEnd!
+        )
+        echo Converting .vrimg files to .exr and moving to output...
+        set converted=0
+        for %%f in ("C:\temp\*.vrimg") do (
+          if exist "{{Param.OutputDirectory}}\%%~nf.exr" (
+            echo Skipping %%~nxf - EXR exists
+          ) else (
+            echo Converting %%~nxf...
+            "C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\bin\vrimg2exr.exe" "%%f" "{{Param.OutputDirectory}}\%%~nf.exr"
+            if !errorlevel! equ 0 (
+              echo Converted %%~nxf to EXR
+              del "%%f" >nul 2>&1
+              set /a converted+=1
+            ) else (
+              echo Failed to convert %%~nxf
+            )
+          )
+        )
+        echo Converted !converted! files to EXR
+        del "C:\temp\*.vrimg" >nul 2>&1
+        dir "{{Param.OutputDirectory}}\*.exr" /b 2>nul || echo No EXR files
+    actions:
+      onRun:
+        command: "{{Task.File.render_script}}"
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
