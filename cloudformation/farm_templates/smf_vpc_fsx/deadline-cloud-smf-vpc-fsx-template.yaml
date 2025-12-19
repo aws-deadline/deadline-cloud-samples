@@ -166,6 +166,7 @@ Resources:
                   Options:
                     - rw
                     - crossmnt
+                    # 'insecure' allows NFS connections from non-privileged ports (>1024), required for NAT
                     - insecure
 
   # VPC Lattice Resources
