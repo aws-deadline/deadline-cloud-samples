@@ -37,7 +37,7 @@ Start-Process "C:\3dsmax_setup\$3DS_MAX_FOLDER_NAME\Setup.exe" -ArgumentList '-q
 
 Write-Host ' --- Installing V-Ray for 3dsMax 2025 --- '
 
-aws s3 cp "s3://$BUCKET_NAME/$VRAY_FOR_3DSMAX2025_INSTALLER_FILE" C:\3dsmax_setup\
+aws s3 cp --no-progress "s3://$BUCKET_NAME/$VRAY_FOR_3DSMAX2025_INSTALLER_FILE" C:\3dsmax_setup\
 @"
 <DefValues>
 <Value Name="INSTALL_TYPE" DataType="value">1</Value>
@@ -55,7 +55,7 @@ Start-Process "C:\3dsmax_setup\$VRAY_FOR_3DSMAX2025_INSTALLER_FILE" -ArgumentLis
 
 Write-Host ' --- Installing tyFlow Plugin --- '
 
-aws s3 cp "s3://$BUCKET_NAME/$TYFLOW_PLUGIN_FILE" C:\3dsmax_setup\
+aws s3 cp --no-progress "s3://$BUCKET_NAME/$TYFLOW_PLUGIN_FILE" C\3dsmax_setup\
 $pluginsDir = "C:\Program Files\Autodesk\3ds Max 2025\plugins"
 New-Item -ItemType Directory -Path $pluginsDir -Force
 Copy-Item "C:\3dsmax_setup\$TYFLOW_PLUGIN_FILE" "$pluginsDir\"

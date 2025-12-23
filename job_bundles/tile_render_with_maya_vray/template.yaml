@@ -1,0 +1,271 @@
+specificationVersion: jobtemplate-2023-09
+name: Maya/V-Ray Tiled Render assembled with OpenImageIO
+parameterDefinitions:
+  # Render Parameters
+  - name: MayaSceneFile
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: Maya Scene File
+      groupLabel: Maya Settings
+      fileFilters:
+        - label: Maya Scene Files
+          patterns:
+            - '*.mb'
+            - '*.ma'
+        - label: All Files
+          patterns:
+            - '*'
+    description: The Maya scene file to render.
+  - name: Frames
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Frames
+      groupLabel: Maya Settings
+    description: The frames to render. E.g. 1-3,8,11-15
+    default: '1'
+    minLength: 1
+  - name: RenderLayer
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Render Layer
+      groupLabel: Maya Settings
+    description: The name of the layer to render.
+    default: masterLayer
+  - name: Camera
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      groupLabel: Maya Settings
+    description: The camera to render.
+    default: RenderCamera
+  - name: OutputFilePrefix
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Output File Prefix
+      groupLabel: Maya Settings
+    description: The output filename prefix.
+    default: <Scene>
+  - name: ProjectPath
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: NONE
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Project Path
+      groupLabel: Maya Settings
+    description: The Maya project path.
+    default: .
+  - name: OutputFilePath
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Output File Path
+      groupLabel: Maya Settings
+    description: The render output path.
+    default: output
+  - name: RenderSetupIncludeLights
+    type: STRING
+    userInterface:
+      control: CHECK_BOX
+      label: Include All Lights
+      groupLabel: Maya Settings
+    description: Include all lights in the render.
+    default: 'true'
+    allowedValues:
+      - 'true'
+      - 'false'
+  - name: StrictErrorChecking
+    type: STRING
+    userInterface:
+      control: CHECK_BOX
+      label: Strict Error Checking
+      groupLabel: Maya Settings
+    description: Fail when errors occur.
+    default: 'false'
+    allowedValues:
+      - 'true'
+      - 'false'
+  - name: ImageWidth
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Image Width
+      groupLabel: Maya Settings
+    minValue: 1
+    description: The image width of the output.
+  - name: ImageHeight
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Image Height
+      groupLabel: Maya Settings
+    minValue: 1
+    description: The image height of the output.
+
+  # Tile Render Parameters
+  - name: NumXTiles
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Tiles across width
+      groupLabel: Tile Rendering Settings
+    minValue: 1
+    description: The number of tiles across the x axis.
+    default: 3
+  - name: NumYTiles
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Tiles across height
+      groupLabel: Tile Rendering Settings
+    minValue: 1
+    description: The number of tiles across the y axis.
+    default: 3
+
+steps:
+  - name: Render Regions
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: INT
+          range: '{{Param.Frames}}'
+        - name: TileNumberX
+          type: INT
+          range: 1-{{Param.NumXTiles}}
+        - name: TileNumberY
+          type: INT
+          range: 1-{{Param.NumYTiles}}
+    stepEnvironments:
+      - name: Maya
+        description: Runs Maya in the background.
+        script:
+          embeddedFiles:
+            - name: initData
+              filename: init-data.yaml
+              type: TEXT
+              data: |
+                renderer: vray
+                render_layer: '{{Param.RenderLayer}}'
+                scene_file: '{{Param.MayaSceneFile}}'
+                camera: '{{Param.Camera}}'
+                project_path: '{{Param.ProjectPath}}'
+                output_file_path: '{{Param.OutputFilePath}}'
+                render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+                strict_error_checking: {{Param.StrictErrorChecking}}
+                image_width: {{Param.ImageWidth}}
+                image_height: {{Param.ImageHeight}}
+          actions:
+            onEnter:
+              command: maya-openjd
+              args:
+                - daemon
+                - start
+                - '--path-mapping-rules'
+                - file://{{Session.PathMappingRulesFile}}
+                - '--connection-file'
+                - '{{Session.WorkingDirectory}}/connection.json'
+                - '--init-data'
+                - file://{{Env.File.initData}}
+              cancelation:
+                mode: NOTIFY_THEN_TERMINATE
+            onExit:
+              command: maya-openjd
+              args:
+                - daemon
+                - stop
+                - '--connection-file'
+                - '{{ Session.WorkingDirectory }}/connection.json'
+              cancelation:
+                mode: NOTIFY_THEN_TERMINATE
+    script:
+      embeddedFiles:
+        - name: RenderTile
+          filename: render-tile.py
+          type: TEXT
+          data: |
+            import subprocess
+
+            # Tile num uses 1 based indexing. First tile (top left) is x=1, y=1
+            tileNumX = {{Task.Param.TileNumberX}}
+            tileNumY = {{Task.Param.TileNumberY}}
+            numXTiles = {{Param.NumXTiles}}
+            numYTiles = {{Param.NumYTiles}}
+
+            deltaX, widthRemainder = divmod({{Param.ImageWidth}}, numXTiles)
+            deltaY, heightRemainder = divmod({{Param.ImageHeight}}, numYTiles)
+
+            # Calculate the bounds for the tile. Two adjacent tiles could have
+            # "minX=0, maxX=63, minY=0, maxY=63" and then "minX=64, maxX=127, minY=0, maxY=63"
+            minX = deltaX * (tileNumX - 1)
+            maxX = (deltaX * tileNumX)
+            minY = deltaY * (tileNumY - 1)
+            maxY = (deltaY * tileNumY)
+
+            # Add any remainder to the last row and column
+            if tileNumX == numXTiles:
+                maxX += widthRemainder
+            if tileNumY == numYTiles:
+                maxY += heightRemainder
+
+            prefix = r"{{Param.OutputFilePrefix}}"
+
+            with open("run-data.yaml", "w") as fh:
+                fh.write("frame: {{Task.Param.Frame}}\n")
+                fh.write(f"region_min_x: {minX}\n")
+                fh.write(f"region_max_x: {maxX}\n")
+                fh.write(f"region_min_y: {minY}\n")
+                fh.write(f"region_max_y: {maxY}\n")
+                fh.write(f"output_file_prefix: '{prefix}_tile_{tileNumY}x{tileNumX}_{numYTiles}x{numXTiles}'\n")
+            subprocess.check_call(["cat", "run-data.yaml"])
+
+            subprocess.check_call(["maya-openjd", "daemon", "run", "--run-data", "file://run-data.yaml"])
+
+      actions:
+        onRun:
+          command: python
+          args:
+            - '{{Task.File.RenderTile}}'
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+    hostRequirements:
+      attributes:
+        - name: attr.worker.os.family
+          anyOf:
+            - linux
+
+  - name: Tile Assembly
+    dependencies:
+      - dependsOn: Render Regions
+    script:
+      actions:
+        onRun:
+          command: bash
+          args:
+            - '{{Task.File.Encode}}'
+      embeddedFiles:
+        - name: Encode
+          type: TEXT
+          runnable: true
+          data: |
+            #!/bin/env bash
+
+            set -xeuo pipefail
+
+            echo "Installing oiiotool"
+            pip install OpenImageIO
+
+            echo "Assembling tiles"
+            filepath="{{Param.MayaSceneFile}}"
+            OUTPUT_FILENAME=$(basename "${filepath%.*}")
+
+            cd "{{Param.OutputFilePath}}"
+
+            oiiotool -v *.exr -paste:mergeroi=1:all=1 +0+0 -o "$OUTPUT_FILENAME.exr"

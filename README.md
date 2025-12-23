@@ -44,6 +44,11 @@ sample [queue environments](https://docs.aws.amazon.com/deadline-cloud/latest/us
 you can attach to your Deadline Cloud queue, to provide software applications to your jobs from
 [Conda](https://docs.conda.io/projects/conda/) or [Rez](https://rez.readthedocs.io/).
 
+## Utility scripts
+
+The [utility_scripts](utility_scripts) directory contains sample scripts to help you work with
+AWS Deadline Cloud. This directory contains command-line tools assist with common tasks like managing job attachments, working with queues, and automating workflows.
+
 ## Additional resources
 
 * [AWS Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/index.html)
