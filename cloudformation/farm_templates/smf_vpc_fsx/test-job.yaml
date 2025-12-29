@@ -1,0 +1,32 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: NFS Read Write Test
+steps:
+- name: NFSReadWriteTest
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/bin/bash
+        set -e
+        
+        echo "Verifying NFS mount at /mnt/fsx"
+        if ! mountpoint -q /mnt/fsx; then
+            echo "ERROR: /mnt/fsx is not mounted"
+            exit 1
+        fi
+        
+        echo "Writing test file..."
+        echo "Hello from $(hostname) at $(date)" > /mnt/fsx/test-$(hostname).txt
+        
+        echo "Reading test file..."
+        cat /mnt/fsx/test-$(hostname).txt
+        
+        echo "Listing /mnt/fsx:"
+        ls -la /mnt/fsx/
+        
+        echo "Test completed successfully"
