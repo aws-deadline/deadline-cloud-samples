@@ -1,0 +1,36 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2026.2.1_2202748377"
+
+package:
+  name: maya-redshift
+  version: ${{ version }}
+
+source:
+  - url: file://archive_files/redshift_${{ version }}_linux_x64.run
+    sha256: 7453cb05614c3356d00960ee57e287f064a741242545e1bbc1f5f118e1a07963
+    target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  run:
+    - maya >=2025, <2027
+
+
+about:
+  homepage: https://www.maxon.net/en/redshift
+  license: LicenseRef-MaxonEULA
+  summary: Redshift is a powerful 3D rendering software that helps visualize your 3D designs, models, animations, and scenes.
