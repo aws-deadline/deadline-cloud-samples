@@ -1,0 +1,7 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - redshift_2026.2.1_2202748377_linux_x64.run
+    sourceDownloadInstructions: 'Download the redshift_2026.2.1_2202748377_linux_x64.run file.'
+    buildTool: rattler-build
