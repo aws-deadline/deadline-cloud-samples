@@ -11,6 +11,13 @@ reconstruct 3D scenes, or transform your data in custom ways. Sample jobs to sub
 provides many integrated submitter plugins for applications, and you can build your own jobs. The deployed farm includes the ability to
 [build custom conda packages](../conda_recipes/README.md) for providing additional application support.
 
+## Service-managed fleet with VPC resource endpoint
+
+The [smf_vpc_fsx](farm_templates/smf_vpc_fsx/) sample CloudFormation template demonstrates how to connect
+a service-managed fleet to private VPC resources using VPC Lattice. It deploys an FSx for OpenZFS file system
+and configures workers to mount it via a VPC resource endpoint. This pattern is useful for accessing shared
+storage, license servers, or other private resources from Deadline Cloud workers.
+
 ## Budget events notification
 
 The [budget_events_notification](notification_templates/budget_events_notification/) CloudFormation template sets up an integration

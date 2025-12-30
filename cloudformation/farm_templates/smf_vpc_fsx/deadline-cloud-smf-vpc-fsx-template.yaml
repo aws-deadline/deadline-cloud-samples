@@ -1,0 +1,363 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  AWS Deadline Cloud service-managed fleet with FSx for OpenZFS storage accessed via VPC resource endpoint.
+  This template demonstrates how to connect Deadline Cloud workers to private VPC resources using VPC Lattice.
+
+  See the README.md included with the CloudFormation template to learn more.
+
+Parameters:
+  FarmName:
+    Type: String
+    Default: SMF VPC FSx Farm
+    Description: Display name for the Deadline Cloud farm.
+  FleetName:
+    Type: String
+    Default: SMF VPC Fleet
+    Description: Display name for the Deadline Cloud fleet.
+  QueueName:
+    Type: String
+    Default: FSx Job Queue
+    Description: Display name for the Deadline Cloud queue.
+  FSxClusterIP:
+    Type: String
+    Default: 10.0.1.100
+    Description: >
+      IP address of the FSx cluster. After initial deployment, update this parameter with the
+      actual IP address from the FSx network interface. See the README for instructions.
+  MaxWorkerCount:
+    Type: Number
+    Default: 5
+    Description: Maximum number of worker hosts in the fleet.
+  MinVcpu:
+    Type: Number
+    Default: 1
+    Description: Minimum number of vCPUs for fleet instances.
+  MaxVcpu:
+    Type: Number
+    Default: 4
+    Description: Maximum number of vCPUs for fleet instances.
+  MinMemoryMiB:
+    Type: Number
+    Default: 512
+    Description: Minimum MiB RAM for fleet instances.
+  MaxMemoryMiB:
+    Type: Number
+    Default: 8192
+    Description: Maximum MiB RAM for fleet instances.
+  InstanceMarketType:
+    Type: String
+    Default: on-demand
+    Description: Whether to use on-demand or spot instances.
+    AllowedValues:
+      - on-demand
+      - spot
+
+Resources:
+  # VPC Infrastructure
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-vpc
+
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-subnet-1
+
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-subnet-2
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-igw
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-rt
+
+  Route:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet1
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet2
+      RouteTableId: !Ref RouteTable
+
+  # Security Group for FSx and VPC Lattice
+  FSxSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for FSx OpenZFS and VPC Lattice resource gateway
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+
+  FSxSecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref FSxSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref FSxSecurityGroup
+      Description: Allow all traffic from same security group
+
+  # FSx for OpenZFS File System
+  FSxFileSystem:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: OPENZFS
+      StorageCapacity: 64
+      SubnetIds:
+        - !Ref Subnet1
+      SecurityGroupIds:
+        - !Ref FSxSecurityGroup
+      OpenZFSConfiguration:
+        DeploymentType: SINGLE_AZ_1
+        ThroughputCapacity: 64
+        RootVolumeConfiguration:
+          NfsExports:
+            - ClientConfigurations:
+                - Clients: "*"
+                  Options:
+                    - rw
+                    - crossmnt
+                    # 'insecure' allows NFS connections from non-privileged ports (>1024), required for NAT
+                    - insecure
+
+  # VPC Lattice Resources
+  VPCLatticeResourceGateway:
+    Type: AWS::VpcLattice::ResourceGateway
+    Properties:
+      Name: !Sub ${AWS::StackName}-resource-gateway
+      IpAddressType: IPV4
+      VpcIdentifier: !Ref VPC
+      SubnetIds:
+        - !Ref Subnet1
+        - !Ref Subnet2
+      SecurityGroupIds:
+        - !Ref FSxSecurityGroup
+
+  VPCLatticeResourceConfiguration:
+    Type: AWS::VpcLattice::ResourceConfiguration
+    Properties:
+      Name: !Sub ${AWS::StackName}-resource-config
+      AllowAssociationToSharableServiceNetwork: true
+      ResourceConfigurationType: SINGLE
+      ProtocolType: TCP
+      PortRanges:
+        - 1-65535
+      ResourceGatewayId: !GetAtt VPCLatticeResourceGateway.Id
+      ResourceConfigurationDefinition:
+        IpResource: !Ref FSxClusterIP
+
+  # Deadline Cloud Resources
+  DeadlineFarm:
+    Type: AWS::Deadline::Farm
+    Properties:
+      DisplayName: !Ref FarmName
+
+  FleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: credentials.deadline.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn: !Ref DeadlineFarm
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AWSDeadlineCloud-FleetWorker
+      Policies:
+        - PolicyName: FleetWorkerLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${DeadlineFarm.FarmId}/*
+                Condition:
+                  ForAnyValue:StringEquals:
+                    aws:CalledVia:
+                      - deadline.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                  - logs:GetLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${DeadlineFarm.FarmId}/*
+
+  QueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: credentials.deadline.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn: !Ref DeadlineFarm
+      Policies:
+        - PolicyName: QueuePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: JobLogsReadOnly
+                Effect: Allow
+                Action:
+                  - logs:GetLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/deadline/${DeadlineFarm.FarmId}/*
+              - Sid: DeadlineServiceManagedFleetSoftwareAccess
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource: "*"
+                Condition:
+                  ArnLike:
+                    s3:DataAccessPointArn:
+                      - arn:aws:s3:*:*:accesspoint/deadline-software-*
+                  StringEquals:
+                    s3:AccessPointNetworkOrigin: VPC
+
+  DeadlineFleet:
+    Type: AWS::Deadline::Fleet
+    Properties:
+      DisplayName: !Ref FleetName
+      FarmId: !GetAtt DeadlineFarm.FarmId
+      RoleArn: !GetAtt FleetRole.Arn
+      MaxWorkerCount: !Ref MaxWorkerCount
+      MinWorkerCount: 0
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            VCpuCount:
+              Min: !Ref MinVcpu
+              Max: !Ref MaxVcpu
+            MemoryMiB:
+              Min: !Ref MinMemoryMiB
+              Max: !Ref MaxMemoryMiB
+            OsFamily: LINUX
+            CpuArchitectureType: x86_64
+          InstanceMarketOptions:
+            Type: !Ref InstanceMarketType
+          VpcConfiguration:
+            ResourceConfigurationArns:
+              - !GetAtt VPCLatticeResourceConfiguration.Arn
+      HostConfiguration:
+        ScriptBody: !Sub
+          - |
+            #!/bin/bash
+            set -e
+
+            sudo mkdir -p /mnt/fsx
+
+            NFS_DNS="${ResourceConfigId}.resource-endpoints.deadline.${AWS::Region}.amazonaws.com"
+
+            sudo mount -t nfs -o nfsvers=4.1 $NFS_DNS:/fsx /mnt/fsx
+
+            echo "NFS mount successful at /mnt/fsx"
+          - ResourceConfigId: !GetAtt VPCLatticeResourceConfiguration.Id
+        ScriptTimeoutSeconds: 300
+
+  DeadlineQueue:
+    Type: AWS::Deadline::Queue
+    Properties:
+      DisplayName: !Ref QueueName
+      FarmId: !GetAtt DeadlineFarm.FarmId
+      DefaultBudgetAction: NONE
+      RoleArn: !GetAtt QueueRole.Arn
+
+  QueueFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Properties:
+      FarmId: !GetAtt DeadlineFarm.FarmId
+      QueueId: !GetAtt DeadlineQueue.QueueId
+      FleetId: !GetAtt DeadlineFleet.FleetId
+
+  # RAM Resource Share to allow Deadline service access to VPC Lattice resource
+  ResourceShare:
+    Type: AWS::RAM::ResourceShare
+    Properties:
+      Name: !Sub ${AWS::StackName}-VPCLattice-Share
+      ResourceArns:
+        - !GetAtt VPCLatticeResourceConfiguration.Arn
+      Principals:
+        - fleets.deadline.amazonaws.com
+      Sources:
+        - !Ref AWS::AccountId
+
+Outputs:
+  FarmId:
+    Description: Deadline Farm ID
+    Value: !Ref DeadlineFarm
+  FleetId:
+    Description: Deadline Fleet ID
+    Value: !Ref DeadlineFleet
+  QueueId:
+    Description: Deadline Queue ID
+    Value: !Ref DeadlineQueue
+  FSxFileSystemId:
+    Description: FSx File System ID
+    Value: !Ref FSxFileSystem
+  FSxDNSName:
+    Description: FSx DNS Name for direct NFS mount
+    Value: !GetAtt FSxFileSystem.DNSName
+  VPCLatticeEndpoint:
+    Description: VPC Lattice endpoint for NFS access via Deadline workers
+    Value: !Sub ${VPCLatticeResourceConfiguration.Id}.resource-endpoints.deadline.${AWS::Region}.amazonaws.com

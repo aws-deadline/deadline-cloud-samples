@@ -1,0 +1,8 @@
+condaPlatforms:
+  - platform: win-64
+    variant: py313
+    defaultSubmit: true
+    buildTool: rattler-build
+jobParameters:
+- name: CondaChannels
+  value: conda-forge

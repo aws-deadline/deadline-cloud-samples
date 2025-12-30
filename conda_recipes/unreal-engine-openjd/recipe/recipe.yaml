@@ -1,0 +1,45 @@
+
+context:
+  version: 0.6.5
+  # build_number: Used for both version ordering (number) and filename (string).
+  # Increment when rebuilding the same version. Output: unrealengine-openjd-0.6.5-{build_number}.conda
+  build_number: 1
+
+package:
+  name: unrealengine-openjd
+  version: ${{ version }}
+
+source:
+- url: https://pypi.org/packages/source/d/deadline-cloud-for-unreal-engine/deadline_cloud_for_unreal_engine-${{ version }}.tar.gz
+  sha256: 36d3bd1b86ea8556ecb19e26b78c9bd152b544ac38ceaff7274c23035e8c8197
+
+build:
+  number: ${{ build_number }}
+  string: ${{ build_number }}
+  script: ${{ PYTHON }} -m pip install .
+  python:
+    entry_points:
+    - unreal-engine-openjd = deadline.unreal_adaptor.UnrealAdaptor:main
+    - unreal-engine-p4-utils = deadline.unreal_perforce_utils.cli:main
+
+requirements:
+  host:
+  - python >=3.9
+  - hatchling
+  - hatch-vcs
+  - pip
+  run:
+  - python >=3.9
+  - deadline <0.54,>=0.51
+  - openjd-adaptor-runtime <0.10,>=0.8.1
+  - openjd-model <0.9,>=0.8.1
+  - psutil >=5.9.0
+
+
+about:
+  summary: AWS Deadline Cloud for Unreal Engine
+  homepage: https://github.com/aws-deadline/deadline-cloud-for-unreal-engine
+  license: Apache-2.0
+  license_file:
+    - LICENSE
+    - NOTICE
