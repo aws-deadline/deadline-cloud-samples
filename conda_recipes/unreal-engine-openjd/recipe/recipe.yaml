@@ -23,6 +23,10 @@ build:
     - unreal-engine-p4-utils = deadline.unreal_perforce_utils.cli:main
 
 requirements:
+  # rattler-build automatically adds python and python_abi as runtime dependencies in the generated repodata.json file.
+  # Since this is an OpenJD adaptor package that will be installed into environments where Python is already present (and managed separately), 
+  # we don't want rattler-build to inject these dependencies automatically. 
+  # The ignore_run_exports directive prevents rattler-build from adding these implicit runtime dependencies while still allowing us to use them as build-time host dependencies.
   ignore_run_exports:
     by_name:
       - python_abi
