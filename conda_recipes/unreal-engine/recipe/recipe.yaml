@@ -11,13 +11,15 @@ package:
   version: ${{ version }}
 
 source:
-  - path: 'C:\Program Files\Epic Games\UE_5.6\Engine'
+  - path: 'C:\Program Files\Epic Games\UE_${{ version }}\Engine'
 
 build:
   number: ${{ build_number }}
   string: ${{ build_number }}
   script:
+    # Creating the Engine directory structure in the conda prefix dir
     - if not exist "%PREFIX%\Engine" mkdir "%PREFIX%\Engine"
+    # Using robocopy to efficiently copy files while preserving attributes
     - robocopy "%SRC_DIR%" "%PREFIX%\Engine" /E /COPY:DAT /R:1 /W:1 & if %ERRORLEVEL% LEQ 7 (exit /b 0) else (exit /b %ERRORLEVEL%)
   files:
     exclude:
@@ -55,6 +57,10 @@ build:
       - "**/*.manifest"
       - "**/*.pdb"
       - "**/*.lib"
+
+tests:
+  - script:
+    - if not exist "%PREFIX%\Engine\Binaries\Win64\UnrealEditor.exe" exit 1
 
 about:
   homepage: https://www.unrealengine.com/
