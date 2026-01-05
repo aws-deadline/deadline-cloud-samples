@@ -2,7 +2,7 @@
 
 ## Overview
 
-This recipe packages Unreal Engine for use in AWS Deadline Cloud ecosystem. It uses UE 5.6 as an example, but you can adapt it for any UE version, including custom source builds.
+This recipe packages Unreal Engine for use in the AWS Deadline Cloud ecosystem. It uses UE 5.6 as an example, but you can adapt it for any UE version, including custom source builds.
 
 Unlike other recipes in this repository, this one is designed to be built **locally** on a machine where Unreal Engine is already installed.
 
@@ -42,13 +42,13 @@ Before building, update `recipe/recipe.yaml` to match your Unreal Engine install
    ```yaml
    context:
      name: "unrealengine"
-     version: "5.4"  # Your UE version
+     version: "5.6"  # Your UE version
    ```
 
 2. **Update the source path**:
    ```yaml
    source:
-     - path: 'C:\Program Files\Epic Games\UE_5.4\Engine'  # Your UE Engine path
+     - path: 'C:\Program Files\Epic Games\UE_5.6\Engine'  # Your UE Engine path
    ```
 
    For custom source builds:
@@ -57,7 +57,7 @@ Before building, update `recipe/recipe.yaml` to match your Unreal Engine install
      - path: 'D:\UnrealEngine\Engine'  # Your custom build path
    ```
 
-## Building the Package Locally
+## Publishing the Package
 
 1. Publish a conda package by running rattler-build:
    ```
@@ -67,7 +67,7 @@ Before building, update `recipe/recipe.yaml` to match your Unreal Engine install
    The build process will:
    - Copy the Engine directory from your UE installation
    - Exclude non-essential files (documentation, source code, build artifacts, etc.)
-   - Create a conda package in the channel
+   - Create a conda package in the channel and re-index the channel
    - For building a test package, use the `package-format` option to reduce compression level and speed up the build process. 
    ```
    --package-format conda:0
@@ -77,25 +77,20 @@ Before building, update `recipe/recipe.yaml` to match your Unreal Engine install
 
    > **Note:** The build may take up to 90 minutes depending on your disk speed.
 
-## Uploading to Your S3 Conda Channel
+### Uploading a locally built conda package to S3
 
-If not published to an S3 conda channel in the step above, upload the package manually:
+The `rattler-build publish` command can upload directly to S3 and handle indexing automatically. If you need to upload a pre-built package manually:
 
-1. Locate the built package in <publish-conda-channel>
-
-2. Upload to your S3 channel:
+1. Upload to your S3 channel:
    ```
-   aws s3 cp <path-to-generated-conda-package> <s3-conda-channel>
+   aws s3 cp <path-to-conda-package> s3://<bucket>/<channel-path>
    ```
 
-3. Update the channel index using [rattler-index](https://prefix.dev/channels/conda-forge/packages/rattler-index):
+2. Update the channel index using [rattler-index](https://prefix.dev/channels/conda-forge/packages/rattler-index):
    ```
-   # Install rattler-index if not already installed
    conda install -c conda-forge rattler-index
-
-   # Reindex your conda channel, then sync to S3
-   rattler-index <conda-channel-path>
-   aws s3 sync <conda-channel-path> <s3-conda-channel>
+   rattler-index <local-channel-path>
+   aws s3 sync <local-channel-path> s3://<bucket>/<channel-path>
    ```
 
 ## Recipe Details
