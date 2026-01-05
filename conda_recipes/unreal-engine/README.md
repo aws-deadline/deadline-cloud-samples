@@ -80,17 +80,8 @@ Before building, update `recipe/recipe.yaml` to match your Unreal Engine install
 ### Uploading a locally built conda package to S3
 
 The `rattler-build publish` command can upload directly to S3 and handle indexing automatically. If you need to upload a pre-built package manually:
-
-1. Upload to your S3 channel:
    ```
-   aws s3 cp <path-to-conda-package> s3://<bucket>/<channel-path>
-   ```
-
-2. Update the channel index using [rattler-index](https://prefix.dev/channels/conda-forge/packages/rattler-index):
-   ```
-   conda install -c conda-forge rattler-index
-   rattler-index <local-channel-path>
-   aws s3 sync <local-channel-path> s3://<bucket>/<channel-path>
+   rattler-build publish <path-to-conda-package>.conda --to s3://...
    ```
 
 ## Recipe Details
