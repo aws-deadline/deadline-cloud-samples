@@ -1,6 +1,6 @@
 # AWS Deadline Cloud Font Installation
 
-This script installs fonts from an S3 bucket on AWS Deadline Cloud service managed fleet instances, making them available to applications like Nuke.
+This script installs fonts from an S3 bucket on AWS Deadline Cloud Linux service managed fleet instances, making them available to applications like Nuke.
 
 Be aware that fonts may render differently from operating system to operating system.
 
