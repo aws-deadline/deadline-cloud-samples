@@ -1,0 +1,347 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: V-Ray Region Render
+
+parameterDefinitions:
+
+# Render Parameters
+- name: VraySceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Vray Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: Vray Scene Files
+      patterns: ["*.vrscene"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the Vray scene file you want to render. Use the 'Job Attachments' tab
+    to add textures and other files that the job needs.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  default: "./output"
+  description: Choose the render output directory.
+- name: OutputFilename
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Name
+    groupLabel: Render Parameters
+  default: "output.png"
+  description: Enter the output filename (with extension of choice).
+- name: ImageWidth
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Width
+    groupLabel: Render Parameters
+  default: 1920
+  description: Width of the output image in pixels.
+- name: ImageHeight
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Height
+    groupLabel: Render Parameters 
+  default: 1080
+  description: Height of the output image in pixels.
+- name: RegionColumns
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Region Columns
+    groupLabel: Region Settings
+  default: 2
+  minValue: 1
+  maxValue: 10
+  description: Number of columns to divide the image into.
+- name: RegionRows
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Region Rows
+    groupLabel: Region Settings
+  default: 2
+  minValue: 1
+  maxValue: 10
+  description: Number of rows to divide the image into.
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  default: "1"
+  description: Frame range to render (e.g., "1", "1-10", "1,5,10").
+- name: CreateMovie
+  type: STRING
+  userInterface:
+    control: CHECK_BOX
+    label: Create Movie
+    groupLabel: Render Parameters
+  default: "false"
+  allowedValues: ["true", "false"]
+  description: Create a movie file from the rendered frames using ffmpeg.
+- name: MovieFilename
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Movie Filename
+    groupLabel: Render Parameters
+  default: "output.mp4"
+  description: Output movie filename (only used if Create Movie is enabled).
+- name: FrameRate
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Frame Rate
+    groupLabel: Render Parameters
+  default: 24
+  minValue: 1
+  maxValue: 120
+  description: Frame rate for the output movie (only used if Create Movie is enabled).
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+  default: vray imagemagick ffmpeg
+  description: >
+    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this will
+    tell it to install vray, imagemagick, and ffmpeg.
+
+steps:
+- name: RenderRegions
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+    - name: RegionCol
+      type: INT
+      range: "1-{{Param.RegionColumns}}"
+    - name: RegionRow
+      type: INT
+      range: "1-{{Param.RegionRows}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          set -xeuo pipefail
+          FRAME={{Task.Param.Frame}}
+          COL=$(({{Task.Param.RegionCol}} - 1))
+          ROW=$(({{Task.Param.RegionRow}} - 1))
+          COLS={{Param.RegionColumns}}
+          ROWS={{Param.RegionRows}}
+          IMG_WIDTH={{Param.ImageWidth}}
+          IMG_HEIGHT={{Param.ImageHeight}}
+          REGION_WIDTH=$((IMG_WIDTH / COLS))
+          REGION_HEIGHT=$((IMG_HEIGHT / ROWS))
+          LEFT=$((COL * REGION_WIDTH))
+          TOP=$((ROW * REGION_HEIGHT))
+          RIGHT=$(((COL + 1) * REGION_WIDTH))
+          BOTTOM=$(((ROW + 1) * REGION_HEIGHT))
+          if [ $COL -eq $((COLS - 1)) ]; then RIGHT=$IMG_WIDTH; fi
+          if [ $ROW -eq $((ROWS - 1)) ]; then BOTTOM=$IMG_HEIGHT; fi
+          echo "Rendering frame $FRAME, region (col=$COL, row=$ROW): [$LEFT,$TOP,$RIGHT,$BOTTOM]"
+          FILENAME="{{Param.OutputFilename}}"
+          BASE="${FILENAME%.*}"
+          EXT="${FILENAME##*.}"
+          # Enable case-sensitive path remapping in V-Ray
+          export VRAY_PATH_REMAPPING_CASE_SENSITIVE=1
+          
+          VRAY_CMD="vray -sceneFile='{{Param.VraySceneFile}}' -imgFile=\"{{Param.OutputDir}}/${BASE}_f${FRAME}_region_r${ROW}_c${COL}.${EXT}\" -display=0 -imgWidth=$IMG_WIDTH -imgHeight=$IMG_HEIGHT -frames=$FRAME -crop=$LEFT\;$TOP\;$RIGHT\;$BOTTOM"
+          
+          if [ -f "{{Session.PathMappingRulesFile}}" ]; then
+            echo "Path mapping rules file contents:"
+            cat "{{Session.PathMappingRulesFile}}"
+            echo ""
+            
+            echo "Listing contents of mapped destination paths:"
+            if command -v jq &> /dev/null; then
+              jq -r '.path_mapping_rules[].destination_path' "{{Session.PathMappingRulesFile}}" | while read dest_path; do
+                if [ -d "$dest_path" ]; then
+                  echo "Contents of $dest_path:"
+                  ls -laR "$dest_path" || echo "Failed to list $dest_path"
+                  echo ""
+                fi
+              done
+            else
+              python3 -c "import json; f=open('{{Session.PathMappingRulesFile}}'); d=json.load(f); f.close(); [print(r['destination_path']) for r in d.get('path_mapping_rules',[]) if r.get('destination_path')]" | while read dest_path; do
+                if [ -d "$dest_path" ]; then
+                  echo "Contents of $dest_path:"
+                  ls -laR "$dest_path" || echo "Failed to list $dest_path"
+                  echo ""
+                fi
+              done
+            fi
+            
+            echo "Building V-Ray remapPath arguments"
+            if command -v jq &> /dev/null; then
+              REMAP_PATHS=$(jq -r '.path_mapping_rules[] | "-remapPath=\"" + .source_path + "=" + .destination_path + "\""' "{{Session.PathMappingRulesFile}}" | tr '\n' ' ')
+            else
+              REMAP_PATHS=$(python3 -c "import json; f=open('{{Session.PathMappingRulesFile}}'); d=json.load(f); f.close(); print(' '.join(['-remapPath=\"'+r['source_path']+'='+r['destination_path']+'\"' for r in d.get('path_mapping_rules',[]) if r.get('source_path') and r.get('destination_path')]))")
+            fi
+            if [ -n "$REMAP_PATHS" ]; then
+              VRAY_CMD="$VRAY_CMD $REMAP_PATHS"
+              echo "Added path remapping: $REMAP_PATHS"
+            fi
+          fi
+          
+          eval $VRAY_CMD
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+
+- name: MergeRegions
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  dependencies:
+  - dependsOn: RenderRegions
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          set -xeuo pipefail
+          FRAME={{Task.Param.Frame}}
+          echo "Merging regions for frame $FRAME into final image..."
+          COLS={{Param.RegionColumns}}
+          ROWS={{Param.RegionRows}}
+          FILENAME="{{Param.OutputFilename}}"
+          BASE="${FILENAME%.*}"
+          EXT="${FILENAME##*.}"
+          OUTPUT_DIR="{{Param.OutputDir}}"
+          
+          # V-Ray appends frame number as 4-digit suffix (e.g., .0001.png)
+          FRAME_SUFFIX=$(printf "%04d" $FRAME)
+          
+          echo "Looking for region files with pattern: ${BASE}_f${FRAME}_region_r*_c*.${FRAME_SUFFIX}.${EXT}"
+          
+          # Check if all region files exist
+          MISSING_FILES=0
+          for ((row=0; row<ROWS; row++)); do
+            for ((col=0; col<COLS; col++)); do
+              REGION_FILE="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${FRAME_SUFFIX}.${EXT}"
+              if [ ! -f "$REGION_FILE" ]; then
+                echo "ERROR: Missing region file: $REGION_FILE"
+                MISSING_FILES=$((MISSING_FILES + 1))
+              else
+                echo "Found: $REGION_FILE"
+              fi
+            done
+          done
+          
+          if [ $MISSING_FILES -gt 0 ]; then
+            echo "ERROR: $MISSING_FILES region files are missing for frame $FRAME. Cannot merge."
+            echo "Available files in output directory:"
+            ls -la "${OUTPUT_DIR}/" 2>/dev/null || echo "No files found"
+            exit 1
+          fi
+          
+          if command -v convert &> /dev/null; then
+            for ((row=0; row<ROWS; row++)); do
+              ROW_FILES=""
+              for ((col=0; col<COLS; col++)); do
+                ROW_FILES="$ROW_FILES ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${FRAME_SUFFIX}.${EXT}"
+              done
+              convert $ROW_FILES +append "${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
+              echo "Created row $row for frame $FRAME"
+            done
+            ALL_ROWS=""
+            for ((row=0; row<ROWS; row++)); do
+              ALL_ROWS="$ALL_ROWS ${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
+            done
+            # Use zero-padded frame number for proper sorting
+            PADDED_FRAME=$(printf "%04d" $FRAME)
+            convert $ALL_ROWS -append "${OUTPUT_DIR}/${BASE}.${PADDED_FRAME}.${EXT}"
+            for ((row=0; row<ROWS; row++)); do
+              rm -f "${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
+            done
+            echo "Merged image created: ${OUTPUT_DIR}/${BASE}.${PADDED_FRAME}.${EXT}"
+          else
+            echo "Warning: ImageMagick not found. Region files are available but not merged."
+            echo "Region files: ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_*.${FRAME_SUFFIX}.${EXT}"
+          fi
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+
+- name: CreateMovieFile
+  dependencies:
+  - dependsOn: MergeRegions
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          set -xeuo pipefail
+          
+          if [ "{{Param.CreateMovie}}" != "true" ]; then
+            echo "Movie creation disabled, skipping"
+            exit 0
+          fi
+          
+          echo "Creating movie from rendered frames..."
+          FILENAME="{{Param.OutputFilename}}"
+          BASE="${FILENAME%.*}"
+          EXT="${FILENAME##*.}"
+          OUTPUT_DIR="{{Param.OutputDir}}"
+          MOVIE_FILE="{{Param.MovieFilename}}"
+          FRAME_RATE={{Param.FrameRate}}
+          
+          if command -v ffmpeg &> /dev/null; then
+            # Create movie from frame sequence using proper frame pattern
+            # Pattern: output.%04d.png matches output.0001.png, output.0002.png, etc.
+            ffmpeg -framerate $FRAME_RATE -i "${OUTPUT_DIR}/${BASE}.%04d.${EXT}" \
+                   -c:v libx264 -pix_fmt yuv420p -crf 18 \
+                   "${OUTPUT_DIR}/${MOVIE_FILE}"
+            
+            echo "Movie created: ${OUTPUT_DIR}/${MOVIE_FILE}"
+          else
+            echo "Error: ffmpeg not found. Cannot create movie file."
+            exit 1
+          fi
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
