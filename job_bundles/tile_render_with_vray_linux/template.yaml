@@ -3,7 +3,7 @@ name: V-Ray Region Render
 
 parameterDefinitions:
 
-# Render Parameters
+# Render Parameters: V-Ray scene, output location, and image dimensions
 - name: VraySceneFile
   type: PATH
   objectType: FILE
@@ -54,6 +54,8 @@ parameterDefinitions:
     groupLabel: Render Parameters 
   default: 1080
   description: Height of the output image in pixels.
+
+# Region Settings: Controls how the image is divided into tiles for parallel rendering
 - name: RegionColumns
   type: INT
   userInterface:
@@ -74,6 +76,8 @@ parameterDefinitions:
   minValue: 1
   maxValue: 10
   description: Number of rows to divide the image into.
+
+# Frame and Animation Settings: Frame range specification and movie output options
 - name: Frames
   type: STRING
   userInterface:
@@ -110,7 +114,7 @@ parameterDefinitions:
   maxValue: 120
   description: Frame rate for the output movie (only used if Create Movie is enabled).
 
-# Software Environment
+# Software Environment: Conda packages required for rendering, merging, and movie creation
 - name: CondaPackages
   type: STRING
   userInterface:
@@ -123,6 +127,7 @@ parameterDefinitions:
     tell it to install vray, imagemagick, and ffmpeg.
 
 steps:
+# Step 1: Render each region of each frame in parallel across workers
 - name: RenderRegions
   parameterSpace:
     taskParameterDefinitions:
@@ -214,6 +219,7 @@ steps:
       anyOf:
       - linux
 
+# Step 2: Merge region tiles into complete frames using ImageMagick
 - name: MergeRegions
   parameterSpace:
     taskParameterDefinitions:
@@ -243,16 +249,13 @@ steps:
           EXT="${FILENAME##*.}"
           OUTPUT_DIR="{{Param.OutputDir}}"
           
-          # V-Ray appends frame number as 4-digit suffix (e.g., .0001.png)
-          FRAME_SUFFIX=$(printf "%04d" $FRAME)
-          
-          echo "Looking for region files with pattern: ${BASE}_f${FRAME}_region_r*_c*.${FRAME_SUFFIX}.${EXT}"
+          echo "Looking for region files with pattern: ${BASE}_f${FRAME}_region_r*_c*.${EXT}"
           
           # Check if all region files exist
           MISSING_FILES=0
           for ((row=0; row<ROWS; row++)); do
             for ((col=0; col<COLS; col++)); do
-              REGION_FILE="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${FRAME_SUFFIX}.${EXT}"
+              REGION_FILE="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${EXT}"
               if [ ! -f "$REGION_FILE" ]; then
                 echo "ERROR: Missing region file: $REGION_FILE"
                 MISSING_FILES=$((MISSING_FILES + 1))
@@ -273,7 +276,7 @@ steps:
             for ((row=0; row<ROWS; row++)); do
               ROW_FILES=""
               for ((col=0; col<COLS; col++)); do
-                ROW_FILES="$ROW_FILES ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${FRAME_SUFFIX}.${EXT}"
+                ROW_FILES="$ROW_FILES ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${EXT}"
               done
               convert $ROW_FILES +append "${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
               echo "Created row $row for frame $FRAME"
@@ -299,6 +302,7 @@ steps:
       anyOf:
       - linux
 
+# Step 3: Create movie from frame sequence (optional)
 - name: CreateMovieFile
   dependencies:
   - dependsOn: MergeRegions
