@@ -22,7 +22,7 @@ echo "Downloading fonts from S3..."
 if aws s3 cp "$S3_FONTS_URI" "/home/$JOB_USER/.fonts" --recursive; then
     echo "Fonts downloaded successfully"
 else
-    echo "ERROR: Failed to download fonts from S3"
+    echo "ERROR: Failed to download fonts from S3. Ensure the fleet role has access to the S3 bucket"
     exit 1
 fi
 
