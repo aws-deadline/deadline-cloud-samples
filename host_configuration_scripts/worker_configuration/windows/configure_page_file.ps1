@@ -197,4 +197,4 @@ New-Item $MARKER_FILE_PATH -ItemType File | Out-Null
 Write-Host "=== Configuration Complete - Rebooting ==="
 Restart-Computer -Force
 Start-Sleep 60
-exit 0
+exit 1
