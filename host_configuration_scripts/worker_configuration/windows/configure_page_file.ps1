@@ -111,34 +111,35 @@ if ($selectedDisk) {
    Write-Host "Selected disk: Disk $($selectedDisk.Number) ($([math]::Round($selectedDisk.Size / 1GB, 2))GB)"
    
    if ($selectedDisk.PartitionStyle -eq 'RAW') {
-   Write-Host "Disk $($selectedDisk.Number) is RAW - initializing and formatting..."
-   
-   # Find available drive letter (prefer D, then E, F, etc.)
-   $usedLetters = Get-PSDrive -PSProvider FileSystem | Select-Object -ExpandProperty Name
-   $availableLetters = 68..90 | ForEach-Object { [char]$_ } | Where-Object { $_ -notin $usedLetters }
-   $driveLetter = $availableLetters[0]
-   
-   Write-Host "Using drive letter: ${driveLetter}:"
-   
-   Initialize-Disk -Number $selectedDisk.Number -PartitionStyle GPT -Confirm:$false
-   $partition = New-Partition -DiskNumber $selectedDisk.Number -UseMaximumSize -DriveLetter $driveLetter
-   Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel "PageFile" -Confirm:$false
-   Write-Host "Disk formatted successfully as ${driveLetter}:"
-} else {
-   Write-Host "Disk already initialized - checking for drive letter..."
-   $partition = Get-Partition -DiskNumber $selectedDisk.Number | Where-Object { $_.Type -eq 'Basic' } | Select-Object -First 1
-   
-   if ($partition.DriveLetter) {
-       $driveLetter = $partition.DriveLetter
-       Write-Host "Using existing drive letter: ${driveLetter}:"
-   } else {
-       # Assign drive letter
+       Write-Host "Disk $($selectedDisk.Number) is RAW - initializing and formatting..."
+       
+       # Find available drive letter (prefer D, then E, F, etc.)
        $usedLetters = Get-PSDrive -PSProvider FileSystem | Select-Object -ExpandProperty Name
        $availableLetters = 68..90 | ForEach-Object { [char]$_ } | Where-Object { $_ -notin $usedLetters }
        $driveLetter = $availableLetters[0]
        
-       Write-Host "Assigning drive letter: ${driveLetter}:"
-       Set-Partition -DiskNumber $selectedDisk.Number -PartitionNumber $partition.PartitionNumber -NewDriveLetter $driveLetter
+       Write-Host "Using drive letter: ${driveLetter}:"
+       
+       Initialize-Disk -Number $selectedDisk.Number -PartitionStyle GPT -Confirm:$false
+       $partition = New-Partition -DiskNumber $selectedDisk.Number -UseMaximumSize -DriveLetter $driveLetter
+       Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel "PageFile" -Confirm:$false
+       Write-Host "Disk formatted successfully as ${driveLetter}:"
+   } else {
+       Write-Host "Disk already initialized - checking for drive letter..."
+       $partition = Get-Partition -DiskNumber $selectedDisk.Number | Where-Object { $_.Type -eq 'Basic' } | Select-Object -First 1
+       
+       if ($partition.DriveLetter) {
+           $driveLetter = $partition.DriveLetter
+           Write-Host "Using existing drive letter: ${driveLetter}:"
+       } else {
+           # Assign drive letter
+           $usedLetters = Get-PSDrive -PSProvider FileSystem | Select-Object -ExpandProperty Name
+           $availableLetters = 68..90 | ForEach-Object { [char]$_ } | Where-Object { $_ -notin $usedLetters }
+           $driveLetter = $availableLetters[0]
+           
+           Write-Host "Assigning drive letter: ${driveLetter}:"
+           Set-Partition -DiskNumber $selectedDisk.Number -PartitionNumber $partition.PartitionNumber -NewDriveLetter $driveLetter
+       }
    }
 }
 
@@ -149,10 +150,23 @@ Write-Host "Disabling automatic page file management..."
 $cs.AutomaticManagedPagefile = $false
 $cs.Put() | Out-Null
 
+# Show page file settings after disabling automatic management
+Write-Host "=== Page File Settings After Disabling Automatic Management ==="
+$pageFilesAfterDisable = Get-WmiObject Win32_PageFileSetting
+if ($pageFilesAfterDisable) {
+   foreach ($pf in $pageFilesAfterDisable) {
+       Write-Host "  Location: $($pf.Name)"
+       Write-Host "  Initial Size: $($pf.InitialSize)MB"
+       Write-Host "  Maximum Size: $($pf.MaximumSize)MB"
+   }
+} else {
+   Write-Host "  No page files configured"
+}
+
 # Remove existing page files
 Write-Host "Removing existing page files..."
-if ($existingPageFiles) {
-   foreach ($pf in $existingPageFiles) {
+if ($pageFilesAfterDisable) {
+   foreach ($pf in $pageFilesAfterDisable) {
        Write-Host "  Removing: $($pf.Name)"
        $pf.Delete()
    }
