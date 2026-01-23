@@ -13,4 +13,4 @@ New-Item "C:\deadline-rebooted" -ItemType File | Out-Null
 Write-Host "Rebooting host..."
 Restart-Computer -Force
 Start-Sleep 60
-exit 0
+exit 1
