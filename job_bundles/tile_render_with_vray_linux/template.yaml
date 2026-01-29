@@ -3,6 +3,23 @@ name: V-Ray Region Render
 
 parameterDefinitions:
 
+# Script Files
+- name: RenderRegionScript
+  type: PATH
+  default: scripts/render_region.sh
+  dataFlow: IN
+  objectType: FILE
+- name: MergeRegionsScript
+  type: PATH
+  default: scripts/merge_regions.sh
+  dataFlow: IN
+  objectType: FILE
+- name: SetupVrayPathMappingScript
+  type: PATH
+  default: scripts/setup_vray_path_mapping.py
+  dataFlow: IN
+  objectType: FILE
+
 # Render Parameters: V-Ray scene, output location, and image dimensions
 - name: VraySceneFile
   type: PATH
@@ -55,7 +72,7 @@ parameterDefinitions:
   default: 1080
   description: Height of the output image in pixels.
 
-# Region Settings: Controls how the image is divided into tiles for parallel rendering
+# Region Settings
 - name: RegionColumns
   type: INT
   userInterface:
@@ -77,7 +94,7 @@ parameterDefinitions:
   maxValue: 10
   description: Number of rows to divide the image into.
 
-# Frame and Animation Settings: Frame range specification and movie output options
+# Frame and Animation Settings
 - name: Frames
   type: STRING
   userInterface:
@@ -114,7 +131,7 @@ parameterDefinitions:
   maxValue: 120
   description: Frame rate for the output movie (only used if Create Movie is enabled).
 
-# Software Environment: Conda packages required for rendering, merging, and movie creation
+# Software Environment
 - name: CondaPackages
   type: STRING
   userInterface:
@@ -127,7 +144,7 @@ parameterDefinitions:
     tell it to install vray, imagemagick, and ffmpeg.
 
 steps:
-# Step 1: Render each region of each frame in parallel across workers
+# Step 1: Render each region of each frame in parallel
 - name: RenderRegions
   parameterSpace:
     taskParameterDefinitions:
@@ -143,83 +160,30 @@ steps:
   script:
     actions:
       onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
+        command: /bin/bash
+        args:
+        - "{{Param.RenderRegionScript}}"
+        - "{{Param.SetupVrayPathMappingScript}}"
+        - "{{Param.VraySceneFile}}"
+        - "{{Param.OutputDir}}"
+        - "{{Param.OutputFilename}}"
+        - "{{Session.PathMappingRulesFile}}"
+        - "{{Task.Param.Frame}}"
+        - "{{Task.Param.RegionCol}}"
+        - "{{Task.Param.RegionRow}}"
+        - "{{Param.RegionColumns}}"
+        - "{{Param.RegionRows}}"
+        - "{{Param.ImageWidth}}"
+        - "{{Param.ImageHeight}}"
         cancelation:
           mode: NOTIFY_THEN_TERMINATE
-    embeddedFiles:
-      - name: Run
-        type: TEXT
-        data: |
-          set -xeuo pipefail
-          FRAME={{Task.Param.Frame}}
-          COL=$(({{Task.Param.RegionCol}} - 1))
-          ROW=$(({{Task.Param.RegionRow}} - 1))
-          COLS={{Param.RegionColumns}}
-          ROWS={{Param.RegionRows}}
-          IMG_WIDTH={{Param.ImageWidth}}
-          IMG_HEIGHT={{Param.ImageHeight}}
-          REGION_WIDTH=$((IMG_WIDTH / COLS))
-          REGION_HEIGHT=$((IMG_HEIGHT / ROWS))
-          LEFT=$((COL * REGION_WIDTH))
-          TOP=$((ROW * REGION_HEIGHT))
-          RIGHT=$(((COL + 1) * REGION_WIDTH))
-          BOTTOM=$(((ROW + 1) * REGION_HEIGHT))
-          if [ $COL -eq $((COLS - 1)) ]; then RIGHT=$IMG_WIDTH; fi
-          if [ $ROW -eq $((ROWS - 1)) ]; then BOTTOM=$IMG_HEIGHT; fi
-          echo "Rendering frame $FRAME, region (col=$COL, row=$ROW): [$LEFT,$TOP,$RIGHT,$BOTTOM]"
-          FILENAME="{{Param.OutputFilename}}"
-          BASE="${FILENAME%.*}"
-          EXT="${FILENAME##*.}"
-          # Enable case-sensitive path remapping in V-Ray
-          export VRAY_PATH_REMAPPING_CASE_SENSITIVE=1
-          
-          VRAY_CMD="vray -sceneFile='{{Param.VraySceneFile}}' -imgFile=\"{{Param.OutputDir}}/${BASE}_f${FRAME}_region_r${ROW}_c${COL}.${EXT}\" -display=0 -imgWidth=$IMG_WIDTH -imgHeight=$IMG_HEIGHT -frames=$FRAME -crop=$LEFT\;$TOP\;$RIGHT\;$BOTTOM"
-          
-          if [ -f "{{Session.PathMappingRulesFile}}" ]; then
-            echo "Path mapping rules file contents:"
-            cat "{{Session.PathMappingRulesFile}}"
-            echo ""
-            
-            echo "Listing contents of mapped destination paths:"
-            if command -v jq &> /dev/null; then
-              jq -r '.path_mapping_rules[].destination_path' "{{Session.PathMappingRulesFile}}" | while read dest_path; do
-                if [ -d "$dest_path" ]; then
-                  echo "Contents of $dest_path:"
-                  ls -laR "$dest_path" || echo "Failed to list $dest_path"
-                  echo ""
-                fi
-              done
-            else
-              python3 -c "import json; f=open('{{Session.PathMappingRulesFile}}'); d=json.load(f); f.close(); [print(r['destination_path']) for r in d.get('path_mapping_rules',[]) if r.get('destination_path')]" | while read dest_path; do
-                if [ -d "$dest_path" ]; then
-                  echo "Contents of $dest_path:"
-                  ls -laR "$dest_path" || echo "Failed to list $dest_path"
-                  echo ""
-                fi
-              done
-            fi
-            
-            echo "Building V-Ray remapPath arguments"
-            if command -v jq &> /dev/null; then
-              REMAP_PATHS=$(jq -r '.path_mapping_rules[] | "-remapPath=\"" + .source_path + "=" + .destination_path + "\""' "{{Session.PathMappingRulesFile}}" | tr '\n' ' ')
-            else
-              REMAP_PATHS=$(python3 -c "import json; f=open('{{Session.PathMappingRulesFile}}'); d=json.load(f); f.close(); print(' '.join(['-remapPath=\"'+r['source_path']+'='+r['destination_path']+'\"' for r in d.get('path_mapping_rules',[]) if r.get('source_path') and r.get('destination_path')]))")
-            fi
-            if [ -n "$REMAP_PATHS" ]; then
-              VRAY_CMD="$VRAY_CMD $REMAP_PATHS"
-              echo "Added path remapping: $REMAP_PATHS"
-            fi
-          fi
-          
-          eval $VRAY_CMD
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
       anyOf:
       - linux
 
-# Step 2: Merge region tiles into complete frames using ImageMagick
+# Step 2: Merge region tiles into complete frames
 - name: MergeRegions
   parameterSpace:
     taskParameterDefinitions:
@@ -231,71 +195,16 @@ steps:
   script:
     actions:
       onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
+        command: /bin/bash
+        args:
+        - "{{Param.MergeRegionsScript}}"
+        - "{{Param.OutputDir}}"
+        - "{{Param.OutputFilename}}"
+        - "{{Task.Param.Frame}}"
+        - "{{Param.RegionColumns}}"
+        - "{{Param.RegionRows}}"
         cancelation:
           mode: NOTIFY_THEN_TERMINATE
-    embeddedFiles:
-      - name: Run
-        type: TEXT
-        data: |
-          set -xeuo pipefail
-          FRAME={{Task.Param.Frame}}
-          echo "Merging regions for frame $FRAME into final image..."
-          COLS={{Param.RegionColumns}}
-          ROWS={{Param.RegionRows}}
-          FILENAME="{{Param.OutputFilename}}"
-          BASE="${FILENAME%.*}"
-          EXT="${FILENAME##*.}"
-          OUTPUT_DIR="{{Param.OutputDir}}"
-          
-          echo "Looking for region files with pattern: ${BASE}_f${FRAME}_region_r*_c*.${EXT}"
-          
-          # Check if all region files exist
-          MISSING_FILES=0
-          for ((row=0; row<ROWS; row++)); do
-            for ((col=0; col<COLS; col++)); do
-              REGION_FILE="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${EXT}"
-              if [ ! -f "$REGION_FILE" ]; then
-                echo "ERROR: Missing region file: $REGION_FILE"
-                MISSING_FILES=$((MISSING_FILES + 1))
-              else
-                echo "Found: $REGION_FILE"
-              fi
-            done
-          done
-          
-          if [ $MISSING_FILES -gt 0 ]; then
-            echo "ERROR: $MISSING_FILES region files are missing for frame $FRAME. Cannot merge."
-            echo "Available files in output directory:"
-            ls -la "${OUTPUT_DIR}/" 2>/dev/null || echo "No files found"
-            exit 1
-          fi
-          
-          if command -v convert &> /dev/null; then
-            for ((row=0; row<ROWS; row++)); do
-              ROW_FILES=""
-              for ((col=0; col<COLS; col++)); do
-                ROW_FILES="$ROW_FILES ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${EXT}"
-              done
-              convert $ROW_FILES +append "${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
-              echo "Created row $row for frame $FRAME"
-            done
-            ALL_ROWS=""
-            for ((row=0; row<ROWS; row++)); do
-              ALL_ROWS="$ALL_ROWS ${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
-            done
-            # Use zero-padded frame number for proper sorting
-            PADDED_FRAME=$(printf "%04d" $FRAME)
-            convert $ALL_ROWS -append "${OUTPUT_DIR}/${BASE}.${PADDED_FRAME}.${EXT}"
-            for ((row=0; row<ROWS; row++)); do
-              rm -f "${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
-            done
-            echo "Merged image created: ${OUTPUT_DIR}/${BASE}.${PADDED_FRAME}.${EXT}"
-          else
-            echo "Warning: ImageMagick not found. Region files are available but not merged."
-            echo "Region files: ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_*.${FRAME_SUFFIX}.${EXT}"
-          fi
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

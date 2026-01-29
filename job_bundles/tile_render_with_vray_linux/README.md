@@ -9,6 +9,7 @@ This job bundle renders a V-Ray scene by dividing the image into configurable re
 - **Automatic Merging**: Merges all regions into the complete image using ImageMagick
 - **Optional Movie Creation**: Creates an MP4 movie from rendered frames using ffmpeg
 - **Path Remapping**: Automatically handles asset path translation between workstation and workers
+- **Standalone Scripts**: Render and merge logic in separate script files for easy customization
 
 ## How It Works
 
@@ -25,13 +26,23 @@ This job bundle renders a V-Ray scene by dividing the image into configurable re
    - Uses ffmpeg to encode frames into an MP4 video
    - Only runs if `CreateMovie` parameter is set to `true`
 
+## Bundle Structure
+
+```
+tile_render_with_vray_linux/
+├── template.yaml                    # Job template definition
+├── scripts/
+│   ├── render_region.sh            # Renders a single region tile
+│   ├── merge_regions.sh            # Merges region tiles into complete frame
+│   └── setup_vray_path_mapping.py  # Generates V-Ray path remapping args
+└── README.md
+```
+
 ## Prerequisites
 
 ### 1. Build the V-Ray Conda Package
 
 Follow the instructions in the [V-Ray conda recipe README](../../conda_recipes/vray/README.md) to build and publish the V-Ray conda package to your S3 channel.
-
-Read more about creating V-Ray conda package [here](../../conda_recipes/vray/README.md).
 
 ### 2. Set Up the Queue Environment
 
@@ -51,8 +62,23 @@ Update the `CondaChannels` default in the queue environment to include both your
 ```yaml
 default: "s3://<job-attachments-bucket>/Conda/Default conda-forge"
 ```
+
 ### 3. Sample Scene Files
-You'll need a `.vrscene` file and its dependencies. The [Chaos ENVISION documentation samples](https://docs.chaos.com/display/ENVISION/Sample+Scenes) include vrscene files you can use for testing.
+
+## Exporting from 3ds Max
+
+To export a `.vrscene` file from 3ds Max for use with this job bundle:
+
+1. Open your scene in 3ds Max with V-Ray as the active renderer
+2. Open the V-Ray Scene Exporter:
+   - **V-Ray 6+**: Go to the top menu bar: `V-Ray > .vrscene exporter`
+   - **V-Ray 5 & Older**: Right-click in any viewport and select `.vrscene exporter` from the Quad menu
+3. Configure export settings:
+   - Set the **Export path**
+   - For animation, select the correct frame range (e.g., "Single File" or "File Per Frame")
+4. Click **Export**
+
+Refer to the [Chaos V-Ray documentation](https://documentation.chaos.com/space/VMAX/113575461/V-Ray+Scene+Exporter) for detailed export options.
 
 ## Parameters
 
@@ -92,11 +118,22 @@ deadline bundle submit job_bundles/tile_render_with_vray_linux \
 
 ## Path Remapping
 
-This job bundle automatically handles path remapping for assets using the session's path mapping rules. When you add files via Job Attachments, the paths are automatically translated from your local workstation to the worker machines, and V-Ray's `-remapPath` parameter is configured accordingly.
+This job bundle automatically handles path remapping for assets using the session's path mapping rules.
 
-For example, if your `.vrscene` file references textures at `/shared/projects/project1/textures/`, and Job Attachments maps this to `/mnt/projects/project1/textures/` on the workers, V-Ray will automatically use the correct paths.
+### How It Works
 
-The job also sets `VRAY_PATH_REMAPPING_CASE_SENSITIVE=1` to ensure proper path matching on Linux workers when source paths come from Windows.
+1. The `setup_vray_path_mapping.py` script reads the session's path mapping rules from `{{Session.PathMappingRulesFile}}`
+2. Generates V-Ray `-remapPath` arguments for each source→destination mapping
+3. Saves the arguments to `/tmp/vray_remap_paths.txt`
+4. The render script applies these arguments to the V-Ray command
+
+### Example
+
+When you add files via Job Attachments, paths are automatically translated:
+
+- **Source path** (your workstation): `C:\Projects\MyProject\textures\`
+- **Destination path** (worker): `/sessions/.../assetroot-.../textures/`
+- **V-Ray argument**: `-remapPath='C:\Projects\MyProject\textures\=/sessions/.../assetroot-.../textures/'`
 
 ## Example Usage
 
@@ -117,6 +154,10 @@ For a 1920×1080 image with 2 columns and 2 rows:
 
 ## Customization
 
-All V-Ray command line flags can be found in the [Chaos V-Ray Standalone documentation](https://docs.chaos.com/display/VNS/V-Ray+Standalone+Command+Line+Options).
+The scripts in the `scripts/` folder can be modified to customize behavior:
 
-Additional flags can be added to the `vray` command in the template's embedded script.
+- `render_region.sh`: Modify V-Ray command line options
+- `merge_regions.sh`: Change merge behavior or add post-processing
+- `setup_vray_path_mapping.py`: Customize path mapping logic
+
+All V-Ray command line flags can be found in the [Chaos V-Ray Standalone documentation](https://docs.chaos.com/display/VNS/V-Ray+Standalone+Command+Line+Options).
