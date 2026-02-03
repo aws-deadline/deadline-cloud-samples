@@ -1,0 +1,190 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: FLUX.2 Klein LoRA Training
+description: Train a LoRA adapter for FLUX.2 Klein using diffusers and peft
+
+parameterDefinitions:
+- name: ModelVersion
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Model Version
+    groupLabel: Model Settings
+  default: "flux.2-klein-base-4b"
+  allowedValues:
+  - "flux.2-klein-base-4b"
+  - "flux.2-klein-4b"
+  description: FLUX.2 Klein model variant to use
+
+- name: DatasetPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Training Images Directory
+    groupLabel: Training Data
+  description: Directory containing training images (.jpg, .png, .jpeg)
+
+- name: InstancePrompt
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Instance Prompt
+    groupLabel: Training Data
+  description: Prompt describing the training images (e.g., "a photo of ohwx dog")
+  default: "a photo of ohwx dog"
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Settings
+  description: Directory to save the trained LoRA weights
+
+- name: Resolution
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution
+    groupLabel: Training Settings
+  description: Image resolution for training (512 recommended for 24GB VRAM)
+  default: 512
+  minValue: 256
+  maxValue: 1024
+
+- name: MaxTrainSteps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Max Training Steps
+    groupLabel: Training Settings
+  description: Maximum number of training steps
+  default: 1500
+  minValue: 100
+  maxValue: 10000
+
+- name: LearningRate
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Learning Rate
+    groupLabel: Training Settings
+  description: Learning rate for training
+  default: "1e-4"
+
+- name: NetworkDim
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Network Dim (Rank)
+    groupLabel: Training Settings
+  description: LoRA network dimension (rank)
+  default: 16
+  minValue: 4
+  maxValue: 128
+
+- name: NetworkAlpha
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Network Alpha
+    groupLabel: Training Settings
+  description: LoRA network alpha (scaling factor)
+  default: 16
+  minValue: 1
+  maxValue: 128
+
+- name: NumRepeats
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Dataset Repeats
+    groupLabel: Training Settings
+  description: Number of times to repeat the dataset per epoch
+  default: 10
+  minValue: 1
+  maxValue: 100
+
+- name: TrainScript
+  description: Training script
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: train_lora.py
+
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: conda-forge
+  description: Conda channels to use
+
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: "python=3.11 safetensors pillow pyyaml huggingface_hub"
+  description: Conda packages to install
+
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+- name: InstallDeps
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ['{{Env.File.Enter}}']
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      filename: install_deps.sh
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        echo "Installing PyTorch with CUDA support..."
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+        echo "Installing diffusers from git (for Flux2KleinPipeline)..."
+        pip install git+https://github.com/huggingface/diffusers.git peft transformers accelerate bitsandbytes
+
+steps:
+- name: TrainLoRA
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      filename: run_training.sh
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        python -u "{{Param.TrainScript}}" \
+          --model-version "{{Param.ModelVersion}}" \
+          --dataset-path "{{Param.DatasetPath}}" \
+          --instance-prompt "{{Param.InstancePrompt}}" \
+          --resolution {{Param.Resolution}} \
+          --max-train-steps {{Param.MaxTrainSteps}} \
+          --learning-rate {{Param.LearningRate}} \
+          --network-dim {{Param.NetworkDim}} \
+          --network-alpha {{Param.NetworkAlpha}} \
+          --num-repeats {{Param.NumRepeats}} \
+          --output-dir "{{Param.OutputDir}}"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
