@@ -1,0 +1,42 @@
+specificationVersion: 'jobtemplate-2023-09'
+extensions:
+- TASK_CHUNKING
+name: V-Ray with Non-contiguous Chunks
+parameterDefinitions:
+  - name: VRSceneFile
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+  - name: Frames
+    type: STRING
+    default: "1-60:2"
+steps:
+  - name: Render
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: CHUNK[INT]
+          range: "{{Param.Frames}}"
+          chunks:
+            defaultTaskCount: 10
+            targetRuntimeSeconds: 600
+            ## NONCONTIGUOUS means {{Task.Param.Frame}} expands to
+            ## an arbitrary integer range expression, e.g. "1-3,5,7-20:2".
+            rangeConstraint: NONCONTIGUOUS
+    script:
+       actions:
+        onRun:
+          command: bash
+          args: ["{{Task.File.RenderChunk}}"]
+      embeddedFiles:
+        - name: RenderChunk
+          filename: render.sh
+          type: TEXT
+          ## Because a NONCONTIGUOUS chunk is an arbitrary integer range expression,
+          ## and the V-Ray -frame option accepts a similar syntax with different characters,
+          ## this code can use the tr command to transform it into the V-Ray format.
+          data: |
+            # E.g. "1-3,5,7-20:2" becomes "1-3;5;7-20,2" for V-Ray
+            FRAMES=$(echo '{{Task.Param.Frame}}' | tr ',:' ';,')
+            vray -sceneFile='{{Param.VRSceneFile}}' \
+                 -frames="$FRAMES"
