@@ -1,5 +1,7 @@
 # Sequential Software Installation Script
-# Downloads installers from S3 and installs Adobe After Effects, Red Giant, and Universe in order
+# Downloads installers from S3 and installs Adobe After Effects, Red Giant, Universe, Boris Sapphire (optional), and Lenscare (optional) in order
+
+# Stop after first failing command
 $ErrorActionPreference = "Stop"
 
 # Script Configuration Variables - Update these for your environment
@@ -8,13 +10,24 @@ $vpc_endpoint = "<vpc_endpoint>"  # Replace with actual VPC endpoint for CMF Red
 $AE_VERSION = "2025"  # After Effects version year
 $INSTALLER_S3_BUCKET = "<your-installer-bucket>"  # Your S3 bucket name
 $AE_INSTALLER = "After Effects_en_US_WIN_64.zip"
-$REDGIANT_INSTALLER = "RedGiant-2025.6.0-Win.exe"
-$UNIVERSE_INSTALLER = "Universe-2025.3.3_Win.exe"
-$MAXON_APP_INSTALLER = "Maxon_App_2025.4.2_Win.exe"
+$REDGIANT_INSTALLER = "RedGiant-2026.3.0-Win.exe"
+$UNIVERSE_INSTALLER = "Universe-2026.0.1_Win.exe"
+$MAXON_APP_INSTALLER = "Maxon_App_2026.1.0_Win.exe"
 $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+
+# Optional Plugin Configuration
+$INSTALL_BORIS_SAPPHIRE = $false  # Set to $true to install Boris FX Sapphire
+$BORIS_SAPPHIRE_INSTALLER = "sapphire-ae-install-2026.exe"
+# custom licensing is required for Boris FX, as it is not currently supported by Deadline Cloud Usage Based Licensing
+$BORIS_LICENSE_SERVER = "5053@<license-server-hostname>"
+
+$INSTALL_LENSCARE = $false  # Set to $true to install Frischluft Lenscare
+$LENSCARE_INSTALLER = "lenscare_ae_v1.5.5(win).zip"
+$LENSCARE_LICENSE = "Lenscare_ae.key"
 
 # Derived paths (do not modify)
 $AE_LOCATION = "C:\Program Files\Adobe\Adobe After Effects $AE_VERSION\Support Files"
+$AE_PLUGIN_LOCATION = "C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore"
 $downloadsPath = "C:\Temp"
 
 # Start overall timing
@@ -38,6 +51,19 @@ aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$UNIVERSE_INSTALLER
 if (-not (Test-Path "$downloadsPath\$UNIVERSE_INSTALLER")) { throw "Universe download failed" }
 aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$WEBVIEW2_INSTALLER $downloadsPath\$WEBVIEW2_INSTALLER
 if (-not (Test-Path "$downloadsPath\$WEBVIEW2_INSTALLER")) { throw "WebView2 Runtime download failed" }
+
+if ($INSTALL_BORIS_SAPPHIRE) {
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$BORIS_SAPPHIRE_INSTALLER $downloadsPath\$BORIS_SAPPHIRE_INSTALLER
+    if (-not (Test-Path "$downloadsPath\$BORIS_SAPPHIRE_INSTALLER")) { throw "Boris Sapphire download failed" }
+}
+
+if ($INSTALL_LENSCARE) {
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$LENSCARE_INSTALLER $downloadsPath\$LENSCARE_INSTALLER
+    if (-not (Test-Path "$downloadsPath\$LENSCARE_INSTALLER")) { throw "Lenscare download failed" }
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$LENSCARE_LICENSE $downloadsPath\$LENSCARE_LICENSE
+    if (-not (Test-Path "$downloadsPath\$LENSCARE_LICENSE")) { throw "Lenscare license download failed" }
+}
+
 $downloadEndTime = Get-Date
 $downloadDuration = $downloadEndTime - $downloadStartTime
 Write-Host "Downloads completed in: $($downloadDuration.ToString('hh\:mm\:ss'))"
@@ -77,6 +103,12 @@ $rgEndTime = Get-Date
 $rgDuration = $rgEndTime - $rgStartTime
 Write-Host "Red Giant installation completed in: $($rgDuration.ToString('hh\:mm\:ss'))"
 
+# Set Red Giant license servers for Customer Managed Fleets (CMF)
+if ($is_cmf) {
+    Write-Host "Setting Red Giant license server for CMF..."
+    [System.Environment]::SetEnvironmentVariable("redshift_LICENSE", "7055@$vpc_endpoint", [System.EnvironmentVariableTarget]::Machine)
+}
+
 # Universe Installation
 $universeStartTime = Get-Date
 Write-Host "Starting Universe installation..."
@@ -85,10 +117,36 @@ $universeEndTime = Get-Date
 $universeDuration = $universeEndTime - $universeStartTime
 Write-Host "Universe installation completed in: $($universeDuration.ToString('hh\:mm\:ss'))"
 
-# Set Red Giant license server for Customer Managed Fleet (CMF)
-if ($is_cmf) {
-    Write-Host "Setting Red Giant license server for CMF..."
-    [System.Environment]::SetEnvironmentVariable("redshift_LICENSE", "7055@$vpc_endpoint", [System.EnvironmentVariableTarget]::Machine)
+if ($INSTALL_BORIS_SAPPHIRE) {
+    # Boris FX Sapphire Installation
+    $bsStartTime = Get-Date
+    Write-Host "Starting Boris Sapphire installation..."
+    if (-not (Test-Path "$downloadsPath\$BORIS_SAPPHIRE_INSTALLER")) { throw "Boris Sapphire installer not found" }
+    Start-Process -FilePath "$downloadsPath\$BORIS_SAPPHIRE_INSTALLER" -ArgumentList "/VERYSILENT" -Wait
+
+    Write-Host "Setting Boris FX license server..."
+    [System.Environment]::SetEnvironmentVariable("genarts_LICENSE", $BORIS_LICENSE_SERVER, [System.EnvironmentVariableTarget]::Machine)
+
+    $bsEndTime = Get-Date
+    $bsDuration = $bsEndTime - $bsStartTime
+    Write-Host "Boris Sapphire installation completed in: $($bsDuration.ToString('hh\:mm\:ss'))"
+}
+
+if ($INSTALL_LENSCARE) {
+    # Lenscare Installation
+    $lenscareStartTime = Get-Date
+    Write-Host "Extracting Lenscare zip file..."
+    if (-not (Test-Path "$downloadsPath\$LENSCARE_INSTALLER")) { throw "Lenscare zip file not found" }
+    $lenscareTempExtract = "$downloadsPath\lenscare_temp"
+    Expand-Archive -Path "$downloadsPath\$LENSCARE_INSTALLER" -DestinationPath $lenscareTempExtract -Force
+    Write-Host "Starting Lenscare installation..."
+    Copy-Item -Path "$lenscareTempExtract\*" -Destination "$AE_PLUGIN_LOCATION" -Recurse -Force
+    Write-Host "Copying Lenscare license file..."
+    if (-not (Test-Path "$downloadsPath\$LENSCARE_LICENSE")) { throw "Lenscare license file not found" }
+    Copy-Item -Path "$downloadsPath\$LENSCARE_LICENSE" -Destination "$AE_PLUGIN_LOCATION\$LENSCARE_LICENSE" -Force
+    $lenscareEndTime = Get-Date
+    $lenscareDuration = $lenscareEndTime - $lenscareStartTime
+    Write-Host "Lenscare installation completed in: $($lenscareDuration.ToString('hh\:mm\:ss'))"
 }
 
 # Calculate and display total time
@@ -101,5 +159,11 @@ Write-Host "After Effects: $($aeDuration.ToString('hh\:mm\:ss'))"
 Write-Host "Maxon App: $($maxonDuration.ToString('hh\:mm\:ss'))"
 Write-Host "Red Giant: $($rgDuration.ToString('hh\:mm\:ss'))"
 Write-Host "Universe: $($universeDuration.ToString('hh\:mm\:ss'))"
+if ($INSTALL_BORIS_SAPPHIRE) {
+    Write-Host "Boris Sapphire: $($bsDuration.ToString('hh\:mm\:ss'))"
+}
+if ($INSTALL_LENSCARE) {
+    Write-Host "Lenscare: $($lenscareDuration.ToString('hh\:mm\:ss'))"
+}
 Write-Host "Total Time: $($totalDuration.ToString('hh\:mm\:ss'))"
 Write-Host "All installations completed!"
