@@ -10,11 +10,11 @@ Render jobs often spend significant time loading applications and scene files be
 
 ### 1. Basic Contiguous Chunks (`basic_contiguous_chunks/`)
 
-A minimal example using `rangeConstraint: CONTIGUOUS`. Each chunk expands to a range like `"1-10"` or `"11-20"`.
+A minimal example using `rangeConstraint: CONTIGUOUS`. Each chunk expands to a range like `"1-10"` or `"11-20"`. The script parses and prints the start and end frame numbers.
 
 ### 2. Basic Non-Contiguous Chunks (`basic_non_contiguous_chunks/`)
 
-A V-Ray example using `rangeConstraint: NONCONTIGUOUS`. Chunks can be arbitrary frame sets like `"1-3,5,7-20:2"`.
+A minimal example using `rangeConstraint: NONCONTIGUOUS`. Chunks can be arbitrary frame sets like `"1-3,5,7-20:2"`. The script prints the frames assigned by the scheduler.
 
 ### 3. Blender Render with Contiguous Chunks (`blender_render_with_contiguous_chunks/`)
 
