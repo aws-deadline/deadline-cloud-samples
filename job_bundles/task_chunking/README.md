@@ -18,13 +18,16 @@ A minimal example using `rangeConstraint: NONCONTIGUOUS`. Chunks can be arbitrar
 
 ### 3. Blender Render with Contiguous Chunks (`blender_render_with_contiguous_chunks/`)
 
-A real-world example converted from the existing [blender_render](../blender_render/template.yaml) job bundle.
+A real-world example converted from the existing [blender_render](../blender_render/template.yaml) job bundle to render job with contiguous chunks.
+
+### 4. Blender Render with Non-Contiguous Chunks (`blender_render_with_non_contiguous_chunks/`)
+
+A real-world example converted from the existing [blender_render](../blender_render/template.yaml) job bundle to render job with non-contiguous chunks.
 
 Changes from the original:
 1. Added `extensions: [TASK_CHUNKING]`
 2. Added `ChunkSize` parameter (default: 5)
 3. Changed `Frame` from `type: INT` to `type: CHUNK[INT]` with `rangeConstraint: CONTIGUOUS` and `targetRuntimeSeconds: 600`
-4. Updated script to render by frame range
 
 ## Template Structure
 
