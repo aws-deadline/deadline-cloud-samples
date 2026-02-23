@@ -2,9 +2,33 @@
 
 ## Background
 
-Husk is a CLI application provided with SideFX Houdini that renders Universal Scene Description(USD) files.
-By default Husk renders using the Houdini Karma renderer but Husk supports any Hydra-compatible USD render delegate. 
+Husk is a CLI application provided with SideFX Houdini that renders Universal Scene Description (USD) files.
+By default Husk renders using the Houdini Karma renderer but Husk supports any Hydra-compatible USD render delegate.
 
+## Task Chunking
+
+This job bundle uses the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension with `rangeConstraint: CONTIGUOUS` for efficient parallel rendering.
+
+```yaml
+extensions:
+  - TASK_CHUNKING
+
+steps:
+- name: HuskRender
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: CONTIGUOUS|NONCONTIGUOUS
+```
+
+Each chunk expands to a contiguous range like `"1-5"` or `"6-10"`, which maps to Husk's `-f` (start frame) and `-n` (frame count) arguments.
+
+Reference: [Husk Documentation](https://www.sidefx.com/docs/houdini/ref/utils/husk.html)
 
 ## Job Summary
 

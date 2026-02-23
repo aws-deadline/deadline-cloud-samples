@@ -1,8 +1,10 @@
 specificationVersion: jobtemplate-2023-09
-name: After Effects Render - one task
+extensions:
+  - TASK_CHUNKING
+name: After Effects Render with Contiguous Chunks
 description: >
-  A simple job bundle that allows a user to select
-  a project file and enter a comp to render with aerender.
+  A job bundle that renders an After Effects composition using aerender
+  with task chunking for efficient parallel rendering.
 
 parameterDefinitions:
 
@@ -55,32 +57,39 @@ parameterDefinitions:
     control: CHOOSE_DIRECTORY
     label: Output directory
     groupLabel: Inputs/outputs
-  description: The render output directory
+  description: The render output directory.
 
 # Frame range
-- name: StartFrame
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Frame range
+  default: "0-50"
+  description: The frame range to render (e.g., 0-100).
+- name: ChunkSize
   type: INT
   userInterface:
     control: SPIN_BOX
-    label: Start Frame
+    label: Chunk Size
     groupLabel: Frame range
-  default: 0
-  description: The first frame to render.
-- name: EndFrame
+  default: 10
+  minValue: 1
+  description: Number of frames per chunk.
+- name: TargetRuntime
   type: INT
   userInterface:
     control: SPIN_BOX
-    label: End Frame
+    label: Target Runtime (Seconds)
     groupLabel: Frame range
-  default: 50
-  description: The last frame to render.
+  default: 300
+  description: Target runtime per chunk (0 to disable adaptive chunking).
 
 # Software Environment
 - name: CondaPackages
   type: STRING
   userInterface:
-    # This parameter is for a queue environment, not used directly in the job,
-    # so leave the GUI for the queue environment to display.
     control: HIDDEN
   default: aftereffects
   description: >
@@ -89,37 +98,48 @@ parameterDefinitions:
 
 steps:
 - name: RenderComp
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        # After Effects aerender uses -s (start) and -e (end) for frame ranges
+        # https://helpx.adobe.com/after-effects/using/automated-rendering-network-rendering.html
+        rangeConstraint: CONTIGUOUS
   script:
     actions:
       onRun:
         command: python
         args:
           - "{{Task.File.Run}}"
-          - "{{Param.OutputDirectory}}"
-          - "aerender"
-          - "-project"
-          - "{{Param.ProjectFile}}"
-          - "-comp"
-          - "{{Param.CompName}}"
-          - "-output"
-          - "{{Param.OutputDirectory}}/output_[####].png"
-          - "-s"
-          - "{{Param.StartFrame}}"
-          - "-e"
-          - "{{Param.EndFrame}}"
     embeddedFiles:
       - name: Run
         type: TEXT
         data: |
           import os
-          import sys
           import subprocess
 
-          # Ensure the output directory exists
-          os.makedirs(sys.argv[1], exist_ok=True)
+          # Parse contiguous chunk range (e.g., "0-50" or "10-10")
+          chunk = "{{Task.Param.Frame}}"
+          start_frame, end_frame = chunk.split("-")
 
-          # Run the After Effects subprocess
-          subprocess.run(sys.argv[2:], check=True)
+          # Ensure the output directory exists (use raw string to avoid escape sequences)
+          os.makedirs(r"{{Param.OutputDirectory}}", exist_ok=True)
+
+          # Run aerender with the chunk's frame range
+          cmd = [
+              "aerender",
+              "-project", r"{{Param.ProjectFile}}",
+              "-comp", "{{Param.CompName}}",
+              "-output", r"{{Param.OutputDirectory}}/output_[####].png",
+              "-s", start_frame,
+              "-e", end_frame
+          ]
+          print(f"Rendering frames {start_frame} to {end_frame}")
+          subprocess.run(cmd, check=True)
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
