@@ -1,0 +1,176 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: FLUX.2 Klein Image Generation
+description: Generate images using FLUX.2 Klein with trained LoRA adapters
+
+parameterDefinitions:
+- name: LoRAPath
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: LoRA Weights
+    groupLabel: Model Settings
+  description: Path to trained LoRA weights .safetensors file
+
+- name: Prompt
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Prompt
+    groupLabel: Generation Settings
+  description: Text prompt for image generation
+  default: "a photo of ohwx dog sitting on a beach"
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Settings
+
+- name: NumImages
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Number of Images
+    groupLabel: Generation Settings
+  description: Total number of images to generate
+  default: 4
+  minValue: 1
+  maxValue: 100
+
+- name: Width
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Width
+    groupLabel: Generation Settings
+  default: 1024
+  minValue: 512
+  maxValue: 2048
+
+- name: Height
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Height
+    groupLabel: Generation Settings
+  default: 1024
+  minValue: 512
+  maxValue: 2048
+
+- name: NumInferenceSteps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Inference Steps
+    groupLabel: Generation Settings
+  description: Number of denoising steps
+  default: 50
+  minValue: 1
+  maxValue: 150
+
+- name: GuidanceScale
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Guidance Scale
+    groupLabel: Generation Settings
+  description: Classifier-free guidance scale
+  default: "4.0"
+
+- name: Seed
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Seed
+    groupLabel: Generation Settings
+  description: Random seed (-1 for random)
+  default: "-1"
+
+- name: GenerateScript
+  description: Generation script
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: generate_image.py
+
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: conda-forge
+  description: Conda channels to use
+
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: "python=3.11 safetensors pillow pyyaml huggingface_hub"
+
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+- name: InstallDeps
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ['{{Env.File.Enter}}']
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      filename: install_deps.sh
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        echo "Installing PyTorch with CUDA support..."
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+        echo "Installing diffusers from git..."
+        pip install git+https://github.com/huggingface/diffusers.git peft transformers accelerate bitsandbytes sentencepiece protobuf
+
+steps:
+- name: GenerateImages
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ImageIndex
+      type: INT
+      range: "1-{{Param.NumImages}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['-c', '{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+
+        python -u {{Param.GenerateScript}} \
+          --lora-path "{{Param.LoRAPath}}" \
+          --prompt "{{Param.Prompt}}" \
+          --width {{Param.Width}} \
+          --height {{Param.Height}} \
+          --num-inference-steps {{Param.NumInferenceSteps}} \
+          --guidance-scale {{Param.GuidanceScale}} \
+          --seed {{Param.Seed}} \
+          --image-index {{Task.Param.ImageIndex}} \
+          --output-dir "{{Param.OutputDir}}"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]
+    amounts:
+    - name: amount.worker.gpu
+      min: 1

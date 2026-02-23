@@ -16,3 +16,4 @@ conda_recipes/archive_files/vraystd_*
 **/*.pyc
 **/*.aex
 **/*.conda
+**/*.safetensors

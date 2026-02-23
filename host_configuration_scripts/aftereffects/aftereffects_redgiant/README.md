@@ -57,6 +57,28 @@ This is needed for the Maxon App installation to go smoothly. Download from Micr
 1. Visit the [Microsoft Edge WebView2 download page](https://developer.microsoft.com/en-us/microsoft-edge/webview2?form=MA13LH#download)
 2. Download `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` (x64 version) under the "Evergreen Standalone Installer" section
 
+### 6. Boris FX Sapphire (optional)
+
+Download from Boris FX:
+1. Log into your Boris FX account
+2. Navigate to the [Boris FX Downloads](https://borisfx.com/downloads/?product=sapphire&os=windows) section
+3. Download Sapphire 2026 (or latest version) for Adobe (Windows 64-Bit)
+
+For Boris FX Sapphire, you will need to bring your own licenses. We recommend setting the `genarts_LICENSE` environment variable to license the software. This can be set either inside the host config script by configuring the `$BORIS_LICENSE_SERVER` variable (e.g., `$BORIS_LICENSE_SERVER = "5053@<license-server-hostname>"`), or in a queue environment. See the "Install Floating Client License Using An Environment Variable" section of [this Boris FX article](https://support.borisfx.com/hc/en-us/articles/11198263161997-License-Instructions-Floating-Licenses) for more details on the format of the environment variable.
+
+To enable Boris FX Sapphire installation, set `$INSTALL_BORIS_SAPPHIRE = $true` in the script configuration section.
+
+### 7. Frischluft Lenscare (optional)
+
+Download from Frischluft:
+1. Go to https://www.frischluft.com/lenscare/
+2. Select download for After Effects on windows
+3. Upload your `Lenscare_ae.key` license file to the S3 bucket at `s3://<your-installer-bucket>/Installers/Lenscare_ae.key`
+
+For Frischluft Lenscare, you will need to bring your own licenses. Lenscare is licensed by copying the `Lenscare_ae.key` license file to the same folder as the plugin. In this sample host config script, you will upload your license file to S3 and the host config script will download the license file from S3 to `C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore\Lenscare_ae.key` on the worker. For more information about licensing Lenscare, review the "Install Key File" section of the `readme.txt` inside the downloaded Lenscare zip file.
+
+To enable Lenscare installation, set `$INSTALL_LENSCARE = $true` in the script configuration section.
+
 ## S3 Bucket Setup
 
 ### 1. Create S3 Bucket Structure

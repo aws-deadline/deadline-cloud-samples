@@ -149,3 +149,17 @@ The core enhancement of this queue environment is to use named Conda environment
 jobs. The default environment name uses the hash of the Conda channels and packages, or you can explicitly
 set the name in the job. It also includes a parameter for how long to use an environment without running a package
 update, so that most of the time it will take seconds to activate an environment that's being reused.
+
+### Disconnect UBL queue environment
+
+The file [disconnect_ubl_queue_env.yaml](disconnect_ubl_queue_env.yaml) unsets Deadline Cloud Usage Based
+License (UBL) environment variables. Use this queue environment if you want to turn off all connections to
+Deadline Cloud UBL for your queue and force the use of a custom license server (see the
+[Bring Your Own License documentation](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-byol.html)).
+
+This queue environment should be run before any other queue environments (for example, by setting the priority to 0)
+so that connections to your custom floating licenses (such as RLM) in other queue environments are not
+accidentally removed.
+
+Please note that this is a sample, additional UBL environment variables may be
+added in the future.
