@@ -6,7 +6,6 @@ This job bundle renders Blender scenes using the [Task Chunking](https://github.
 
 - **Non-Contiguous Chunking**: Uses `CHUNK[INT]` with `rangeConstraint: NONCONTIGUOUS` for arbitrary frame sets
 - **Adaptive Chunking**: Optional target runtime allows the scheduler to adjust chunk sizes dynamically
-- **Flexible Frame Ranges**: Supports ranges, steps, and individual frames (e.g., `1-10,15,20-100:2`)
 
 ## Parameters
 
@@ -15,7 +14,7 @@ This job bundle renders Blender scenes using the [Task Chunking](https://github.
 | Blender Scene File | Blender scene file (.blend) to render | - |
 | Frames | Frame range (e.g., `1-10,15,20-100:2`) | `1-10,15,20-100:2` |
 | Chunk Size | Number of frames per chunk | `5` |
-| Target Runtime | Target seconds per chunk (0 to disable) | `180` |
+| Target Runtime | Target seconds per chunk (0 to disable) | `600` |
 | Output Directory | Render output directory | `./output` |
 | Output File Pattern | Output filename pattern | `output_####` |
 | Output File Format | Image format | `JPEG` |

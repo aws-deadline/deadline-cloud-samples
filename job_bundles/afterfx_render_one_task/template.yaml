@@ -67,7 +67,7 @@ parameterDefinitions:
     label: Frames
     groupLabel: Frame range
   default: "0-50"
-  description: The frame range to render (e.g., 0-100).
+  description: The frame range to render (e.g., 0-50).
 - name: ChunkSize
   type: INT
   userInterface:

@@ -17,7 +17,7 @@ This job bundle renders After Effects compositions using aerender with the [Task
 | Output directory | Render output directory | - |
 | Frames | Frame range (e.g., `0-100`) | `0-50` |
 | Chunk Size | Number of frames per chunk | `10` |
-| Target Runtime | Target seconds per chunk (0 to disable) | `180` |
+| Target Runtime | Target seconds per chunk (0 to disable) | `300` |
 
 ## Task Chunking
 

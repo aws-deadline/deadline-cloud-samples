@@ -32,7 +32,7 @@ Each chunk expands to an arbitrary frame set like `"1-3,5,7-10:2"`. The Python s
 | KeyShotFile | KeyShot scene file (.bip) | - |
 | Frames | Frame range (e.g., `1-3,8,11-100:2`) | `1-3,8,11-100:2` |
 | ChunkSize | Number of frames per chunk | `5` |
-| TargetRuntime | Target seconds per chunk (0 to disable) | `180` |
+| TargetRuntime | Target seconds per chunk (0 to disable) | `300` |
 | OutputName | Output file name prefix | `KeyShotOutput` |
 | OutputDirectoryPath | Render output directory | - |
 | OutputFormat | Output format (PNG, JPEG, EXR, etc.) | `PNG` |
