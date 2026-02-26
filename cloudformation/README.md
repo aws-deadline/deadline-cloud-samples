@@ -18,6 +18,13 @@ a service-managed fleet to private VPC resources using VPC Lattice. It deploys a
 and configures workers to mount it via a VPC resource endpoint. This pattern is useful for accessing shared
 storage, license servers, or other private resources from Deadline Cloud workers.
 
+## Service-managed fleet capacity manager
+
+The [smf_capacity_manager](farm_templates/smf_capacity_manager/) sample CloudFormation template implements automated
+capacity management for hybrid fleet setups that combine Wait and Save and Spot fleets. It uses AWS Lambda and
+Amazon EventBridge Scheduler to dynamically balance fleet sizes while maintaining constant total capacity,
+optimizing for cost-effective Wait and Save capacity while ensuring any deficit is covered by Spot instances.
+
 ## Budget events notification
 
 The [budget_events_notification](notification_templates/budget_events_notification/) CloudFormation template sets up an integration
