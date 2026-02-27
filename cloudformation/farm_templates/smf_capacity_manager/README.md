@@ -11,7 +11,7 @@ Spot instances.
 Total Capacity = Wait and Save Workers + Spot Workers (adjusted automatically)
 ```
 
-For example, with a desired fleet size of 20 workers:
+For example, with a target max worker count of 20 workers:
 - Wait and Save has 15 workers → Spot fleet max is set to 5
 - Wait and Save scales down to 8 → Spot fleet max increases to 12
 - Wait and Save scales up to 18 → Spot fleet max decreases to 2
@@ -28,7 +28,7 @@ in the same region where you'll deploy the template:
    [AWS Deadline Cloud management console](https://console.aws.amazon.com/deadlinecloud/home).
 
 2. **Wait and Save Fleet**: A Wait and Save service-managed fleet with `maxWorkerCount` set to your
-   desired total fleet size (e.g., 20 workers). Copy the Fleet ID from the fleet details page.
+   target max worker count (e.g., 20 workers). Copy the Fleet ID from the fleet details page.
 
 3. **Spot Fleet**: A Spot service-managed fleet with the same worker capabilities as your Wait and Save fleet.
 
@@ -50,7 +50,7 @@ in the same region where you'll deploy the template:
    - **FarmId**: Your Deadline Cloud farm ID
    - **WaitAndSaveFleetId**: Your Wait and Save fleet ID
    - **SpotFleetId**: Your Spot fleet ID
-   - **DesiredFleetSize**: Total workers across both fleets (must match Wait and Save fleet's `maxWorkerCount`)
+   - **TargetMaxWorkerCount**: Target maximum total worker count across both fleets (must match Wait and Save fleet's `maxWorkerCount`). Note that actual worker count may briefly exceed this target during scaling operations.
    - **CapacityCheckRateMinutes**: Interval between capacity checks (default: 2 minutes)
 5. Check "I acknowledge that AWS CloudFormation might create IAM resources" and create the stack.
 
@@ -61,7 +61,7 @@ in the same region where you'll deploy the template:
    export FARM_ID=<your-farm-id>
    export WAIT_AND_SAVE_FLEET_ID=<your-wait-and-save-fleet-id>
    export SPOT_FLEET_ID=<your-spot-fleet-id>
-   export DESIRED_FLEET_SIZE=<total-desired-workers>
+   export TARGET_MAX_WORKER_COUNT=<total-target-workers>
    ```
 
 2. Deploy the Deadline Cloud capacity manager template with the parameters you specified in Step 1.
@@ -75,7 +75,7 @@ in the same region where you'll deploy the template:
        FarmId=$FARM_ID \
        WaitAndSaveFleetId=$WAIT_AND_SAVE_FLEET_ID \
        SpotFleetId=$SPOT_FLEET_ID \
-       DesiredFleetSize=$DESIRED_FLEET_SIZE
+       TargetMaxWorkerCount=$TARGET_MAX_WORKER_COUNT
    ```
 
 ## Monitoring and Management
