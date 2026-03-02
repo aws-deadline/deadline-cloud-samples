@@ -1,8 +1,34 @@
 # Nuke Render Job Bundle
 
+## Task Chunking
+
+This job bundle uses the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension with `rangeConstraint: NONCONTIGUOUS` to reduce scheduling overhead by grouping frames into chunks.
+
+```yaml
+extensions:
+  - TASK_CHUNKING
+
+steps:
+- name: NukeRender
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: NONCONTIGUOUS
+```
+
+Each chunk expands to an arbitrary frame set like `"1-3,5,7-20:2"`. The embedded bash script converts this to Nuke's `-F` flag syntax (e.g., `-F 1-3 -F 5 -F 7-20x2`).
+
+Reference: [Nuke Command Line Operations](https://learn.foundry.com/nuke/content/comp_environment/configuring_nuke/command_line_operations.html)
+
 ## Job summary
 
 This job bundle renders Nuke scripts using Nuke's headless rendering mode with the `nuke -x` command.
+Task chunking amortizes Nuke's startup and scene loading time by rendering multiple frames per invocation.
 
 To run it, you will need a Nuke installation available in the PATH in one of the following ways:
 * As a conda package when your queue has a conda queue environment set up to
@@ -11,22 +37,17 @@ To run it, you will need a Nuke installation available in the PATH in one of the
 * Installed on the worker hosts that run the job. You can customize your Deadline Cloud
   queues, fleets, and this job to fit your own production pipeline.
 
-The core of this job is an embedded bash script that runs the `nuke` command with these flags:
-* `-F {frame}` - Renders a specific frame number
-* `--sro` - Skip render output logging
+Nuke flags used:
+* `-F` - Frame range segments (converted from the chunk's range expression)
+* `--sro` - Forces render order of Write nodes
 * `-V 2` - Set verbosity level to 2
 * `-x` - Execute the script without opening the GUI
 
-The job creates one task per frame using Open Job Description's parameter space feature,
-where the Frames parameter (e.g. "1-10") gets expanded into individual frame tasks.
-The job is restricted to Linux workers through host requirements.
-
 ## What this sample does
 
-This job bundle takes a Nuke script file and renders it frame by frame using Nuke's command-line interface. The sample includes:
+This job bundle takes a Nuke script file and renders it using Nuke's command-line interface. The sample includes:
 
 - **MotionBlur3D Scene**: A pre-configured Nuke script that demonstrates 3D motion blur effects
-- **Frame-based rendering**: Supports single frames or frame ranges
 - **Flexible output**: Configurable output directory and project paths
 - **Environment support**: Works with both Conda and Rez package management systems
 
@@ -58,7 +79,9 @@ Submit with custom parameters:
 ```bash
 deadline bundle submit job_bundles/nuke_render \
   --name "My Nuke Render" \
-  -p Frames="1-10" \
+  -p Frames="1-3,5,6-20:2" \
+  -p ChunkSize=10 \
+  -p TargetRuntime=300 \
   -p NukeScript="/path/to/my/script.nk" \
   -p OutputDir="/path/to/output"
 ```
@@ -76,7 +99,9 @@ deadline bundle gui-submit job_bundles/nuke_render
 ### Render Parameters
 
 - **Nuke Script File**: Path to the .nk script file to render
-- **Frames**: Frame range (e.g., "1-10", "1,5,10", or "1")
+- **Frames**: Frame range expression (e.g., "1-3,5,6-20:2")
+- **Chunk Size**: Number of frames per chunk (default: 5)
+- **Target Runtime (Seconds)**: Target runtime per chunk (default: 180, set to 0 to use fixed chunk sizes)
 - **Project Directory**: Working directory containing the script and assets
 - **Output Directory**: Where rendered frames will be saved
 
@@ -98,5 +123,6 @@ To use this template with your own Nuke scripts:
 
 1. Replace the sample scene file or point to your own .nk file
 2. Adjust the frame range as needed
-3. Configure output paths and directories
-4. Add any additional assets via job attachments
+3. Tune the chunk size and target runtime based on your scene's render time per frame
+4. Configure output paths and directories
+5. Add any additional assets via job attachments

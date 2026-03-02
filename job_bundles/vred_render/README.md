@@ -1,5 +1,34 @@
 # VRED Renderer Job Bundle
 
+## Task Chunking
+
+This job bundle uses the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension with `rangeConstraint: CONTIGUOUS` to reduce scheduling overhead by grouping frames into chunks.
+
+```yaml
+extensions:
+  - TASK_CHUNKING
+
+steps:
+- name: VRED Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: CONTIGUOUS
+    - name: TileNumberX
+      type: INT
+      range: "1-{{Param.NumXTiles}}"
+    - name: TileNumberY
+      type: INT
+      range: "1-{{Param.NumYTiles}}"
+```
+
+Each chunk expands to a contiguous range like `"0-4"` or `"5-9"`. The Python render parameter script parses this into start/end frames for VRED's API.
+
 ## Overview
 
 This job bundle is for rendering VRED scenes using either VRED Core or VRED Pro in headless mode. It uses VRED's Python API through the `VRED_RenderScript_DeadlineCloud.py` script, which:
@@ -87,15 +116,9 @@ Note: All `PATH` type parameters must use relative paths from the current workin
 - **SSQuality**: Supersampling quality setting (Off, Low, Medium, High, Ultra High)
 
 ### Frame Control Settings
-- **StartFrame**: First frame to render (default: 0)
-- **EndFrame**: Last frame to render (default: 20)
-- **FrameStep**: Frame increment - e.g., 2 for rendering every second frame (default: 1)
-- **FramesPerTask**: Number of consecutive frames to render in a single Task (default: 1)
-    This can improve rendering efficiency by reducing overhead from task initialization.
-    Example with `FramesPerTask=5`:
-    - Task 1 renders frames 1-5
-    - Task 2 renders frames 6-10
-    - And so on...
+- **Frames**: Frame range to render (default: "0-20")
+- **ChunkSize**: Number of frames to render per chunk (default: 5)
+- **TargetRuntime**: Target runtime per chunk in seconds (default: 180, set to 0 to use fixed chunk sizes)
 
 ### Animation Settings
 - **RenderAnimation**: Enable animation rendering (true/false)
