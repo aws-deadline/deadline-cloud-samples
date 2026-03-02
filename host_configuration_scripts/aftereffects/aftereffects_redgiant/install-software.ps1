@@ -1,5 +1,5 @@
 # Sequential Software Installation Script
-# Downloads installers from S3 and installs Adobe After Effects, Red Giant, Universe, Boris Sapphire (optional), and Lenscare (optional) in order
+# Downloads installers from S3 and installs Adobe After Effects, Red Giant, Universe (optional), Boris Sapphire (optional), and Lenscare (optional) in order
 
 # Stop after first failing command
 $ErrorActionPreference = "Stop"
@@ -11,11 +11,13 @@ $AE_VERSION = "2025"  # After Effects version year
 $INSTALLER_S3_BUCKET = "<your-installer-bucket>"  # Your S3 bucket name
 $AE_INSTALLER = "After Effects_en_US_WIN_64.zip"
 $REDGIANT_INSTALLER = "RedGiant-2026.3.0-Win.exe"
-$UNIVERSE_INSTALLER = "Universe-2026.0.1_Win.exe"
 $MAXON_APP_INSTALLER = "Maxon_App_2026.1.0_Win.exe"
 $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 
 # Optional Plugin Configuration
+$INSTALL_UNIVERSE = $false  # Set to $true to install Universe (included by default in Red Giant 2026)
+$UNIVERSE_INSTALLER = "Universe-2026.0.1_Win.exe"
+
 $INSTALL_BORIS_SAPPHIRE = $false  # Set to $true to install Boris FX Sapphire
 $BORIS_SAPPHIRE_INSTALLER = "sapphire-ae-install-2026.exe"
 # custom licensing is required for Boris FX, as it is not currently supported by Deadline Cloud Usage Based Licensing
@@ -48,10 +50,13 @@ aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$REDGIANT_INSTALLER
 if (-not (Test-Path "$DOWNLOADS_PATH\$REDGIANT_INSTALLER")) { throw "Red Giant download failed" }
 aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$MAXON_APP_INSTALLER $DOWNLOADS_PATH\$MAXON_APP_INSTALLER
 if (-not (Test-Path "$DOWNLOADS_PATH\$MAXON_APP_INSTALLER")) { throw "Maxon App download failed" }
-aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$UNIVERSE_INSTALLER $DOWNLOADS_PATH\$UNIVERSE_INSTALLER
-if (-not (Test-Path "$DOWNLOADS_PATH\$UNIVERSE_INSTALLER")) { throw "Universe download failed" }
 aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$WEBVIEW2_INSTALLER $DOWNLOADS_PATH\$WEBVIEW2_INSTALLER
 if (-not (Test-Path "$DOWNLOADS_PATH\$WEBVIEW2_INSTALLER")) { throw "WebView2 Runtime download failed" }
+
+if ($INSTALL_UNIVERSE) {
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$UNIVERSE_INSTALLER $DOWNLOADS_PATH\$UNIVERSE_INSTALLER
+    if (-not (Test-Path "$DOWNLOADS_PATH\$UNIVERSE_INSTALLER")) { throw "Universe download failed" }
+}
 
 if ($INSTALL_BORIS_SAPPHIRE) {
     aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$BORIS_SAPPHIRE_INSTALLER $DOWNLOADS_PATH\$BORIS_SAPPHIRE_INSTALLER
@@ -110,13 +115,15 @@ if ($is_cmf) {
     [System.Environment]::SetEnvironmentVariable("redshift_LICENSE", "7055@$vpc_endpoint", [System.EnvironmentVariableTarget]::Machine)
 }
 
-# Universe Installation
-$universeStartTime = Get-Date
-Write-Host "Starting Universe installation..."
-Start-Process -FilePath "$DOWNLOADS_PATH\$UNIVERSE_INSTALLER" -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
-$universeEndTime = Get-Date
-$universeDuration = $universeEndTime - $universeStartTime
-Write-Host "Universe installation completed in: $($universeDuration.ToString('hh\:mm\:ss'))"
+if ($INSTALL_UNIVERSE) {
+    # Universe Installation
+    $universeStartTime = Get-Date
+    Write-Host "Starting Universe installation..."
+    Start-Process -FilePath "$DOWNLOADS_PATH\$UNIVERSE_INSTALLER" -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
+    $universeEndTime = Get-Date
+    $universeDuration = $universeEndTime - $universeStartTime
+    Write-Host "Universe installation completed in: $($universeDuration.ToString('hh\:mm\:ss'))"
+}
 
 if ($INSTALL_BORIS_SAPPHIRE) {
     # Boris FX Sapphire Installation
@@ -159,7 +166,9 @@ Write-Host "WebView2 Runtime: $($webview2Duration.ToString('hh\:mm\:ss'))"
 Write-Host "After Effects: $($aeDuration.ToString('hh\:mm\:ss'))"
 Write-Host "Maxon App: $($maxonDuration.ToString('hh\:mm\:ss'))"
 Write-Host "Red Giant: $($rgDuration.ToString('hh\:mm\:ss'))"
-Write-Host "Universe: $($universeDuration.ToString('hh\:mm\:ss'))"
+if ($INSTALL_UNIVERSE) {
+    Write-Host "Universe: $($universeDuration.ToString('hh\:mm\:ss'))"
+}
 if ($INSTALL_BORIS_SAPPHIRE) {
     Write-Host "Boris Sapphire: $($bsDuration.ToString('hh\:mm\:ss'))"
 }
