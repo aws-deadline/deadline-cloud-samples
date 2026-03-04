@@ -1,31 +1,60 @@
 # Sequential Software Installation Script
 # Downloads installers from S3 and installs Adobe After Effects, Red Giant, Universe (optional), Boris Sapphire (optional), and Lenscare (optional) in order
+Set-PSDebug -Trace 2
 
 # Stop after first failing command
 $ErrorActionPreference = "Stop"
 
-# Script Configuration Variables - Update these for your environment
-$is_cmf = $false  # Set to $true for Customer Managed Fleet (CMF), $false for Service Managed Fleet (SMF)
-$vpc_endpoint = "<vpc_endpoint>"  # Replace with actual VPC endpoint for CMF Red Giant license server
-$AE_VERSION = "2025"  # After Effects version year
+# SCRIPT CONFIGURATION VARIABLES - Update these for your environment
+# ------------------------------------------------------------------
+
 $INSTALLER_S3_BUCKET = "<your-installer-bucket>"  # Your S3 bucket name
+
+$AE_VERSION = "2025"  # After Effects version year
 $AE_INSTALLER = "After Effects_en_US_WIN_64.zip"
-$REDGIANT_INSTALLER = "RedGiant-2026.3.0-Win.exe"
-$MAXON_APP_INSTALLER = "Maxon_App_2026.1.0_Win.exe"
-$WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 
 # Optional Plugin Configuration
-$INSTALL_UNIVERSE = $false  # Set to $true to install Universe (included by default in Red Giant 2026)
-$UNIVERSE_INSTALLER = "Universe-2026.0.1_Win.exe"
+$INSTALL_RED_GIANT = $true  # Set to $true to install Red Giant, Maxon App, and WebView2 Runtime
+if ($INSTALL_RED_GIANT) {
+    $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+    $MAXON_APP_INSTALLER = "Maxon_App_2026.1.0_Win.exe"
+    $RED_GIANT_INSTALLER = "RedGiant-2026.3.0-Win.exe"
+
+    $is_cmf = $false  # Set to $true for Customer Managed Fleet (CMF), $false for Service Managed Fleet (SMF)
+    if ($is_cmf) {
+        $vpc_endpoint = "<vpc_endpoint>"  # Replace with actual VPC endpoint for CMF Red Giant license server
+    }
+}
+
+# Universe is included by default in Red Giant 2026.2.0, so no need to install separately for new versions of Red Giant
+$INSTALL_UNIVERSE = $false  # Set to $true to install standalone Universe
+if ($INSTALL_UNIVERSE) {
+    $UNIVERSE_INSTALLER = "Universe-2026.0.1_Win.exe"
+}
 
 $INSTALL_BORIS_SAPPHIRE = $false  # Set to $true to install Boris FX Sapphire
-$BORIS_SAPPHIRE_INSTALLER = "sapphire-ae-install-2026.exe"
-# custom licensing is required for Boris FX, as it is not currently supported by Deadline Cloud Usage Based Licensing
-$BORIS_LICENSE_SERVER = "5053@<license-server-hostname>"
+if ($INSTALL_BORIS_SAPPHIRE) {
+    $BORIS_SAPPHIRE_INSTALLER = "sapphire-ae-install-2026.exe"
+    # custom licensing is required for Boris FX, as it is not currently supported by Deadline Cloud Usage Based Licensing
+    $BORIS_LICENSE_SERVER = "5052@<license-server-hostname>"
+}
 
 $INSTALL_LENSCARE = $false  # Set to $true to install Frischluft Lenscare
-$LENSCARE_INSTALLER = "lenscare_ae_v1.5.5(win).zip"
-$LENSCARE_LICENSE = "Lenscare_ae.key"
+if ($INSTALL_LENSCARE) {
+    $LENSCARE_INSTALLER = "lenscare_ae_v1.5.5(win).zip"
+    $LENSCARE_LICENSE = "Lenscare_ae.key"
+}
+
+$INSTALL_RSMB = $false  # Set to $true to install RE:Vision Effects ReelSmart Motion Blur
+if ($INSTALL_RSMB) {
+    $RSMB_INSTALLER = "RSMB6AEInstaller.zip"
+    $RSMB_LICENSING = "FloatingLicensing.zip"
+    # custom licensing is required for RSMB, as it is not currently supported by Deadline Cloud Usage Based Licensing
+    $RSMB_LICENSE_SERVER = "<license-server-hostname>"
+}
+
+# END SCRIPT CONFIGURATION SECTION
+# ------------------------------------------------------------------
 
 $AE_PLUGIN_LOCATION = "C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore"
 $DOWNLOADS_PATH = "C:\Temp"
@@ -46,12 +75,14 @@ $downloadStartTime = Get-Date
 Write-Host "Downloading installers from S3..."
 aws s3 cp --no-progress "s3://$INSTALLER_S3_BUCKET/Installers/$AE_INSTALLER" "$DOWNLOADS_PATH\$AE_INSTALLER"
 if (-not (Test-Path "$DOWNLOADS_PATH\$AE_INSTALLER")) { throw "After Effects download failed" }
-aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$REDGIANT_INSTALLER $DOWNLOADS_PATH\$REDGIANT_INSTALLER
-if (-not (Test-Path "$DOWNLOADS_PATH\$REDGIANT_INSTALLER")) { throw "Red Giant download failed" }
-aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$MAXON_APP_INSTALLER $DOWNLOADS_PATH\$MAXON_APP_INSTALLER
-if (-not (Test-Path "$DOWNLOADS_PATH\$MAXON_APP_INSTALLER")) { throw "Maxon App download failed" }
-aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$WEBVIEW2_INSTALLER $DOWNLOADS_PATH\$WEBVIEW2_INSTALLER
-if (-not (Test-Path "$DOWNLOADS_PATH\$WEBVIEW2_INSTALLER")) { throw "WebView2 Runtime download failed" }
+if ($INSTALL_RED_GIANT) {
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$RED_GIANT_INSTALLER $DOWNLOADS_PATH\$RED_GIANT_INSTALLER
+    if (-not (Test-Path "$DOWNLOADS_PATH\$RED_GIANT_INSTALLER")) { throw "Red Giant download failed" }
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$MAXON_APP_INSTALLER $DOWNLOADS_PATH\$MAXON_APP_INSTALLER
+    if (-not (Test-Path "$DOWNLOADS_PATH\$MAXON_APP_INSTALLER")) { throw "Maxon App download failed" }
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$WEBVIEW2_INSTALLER $DOWNLOADS_PATH\$WEBVIEW2_INSTALLER
+    if (-not (Test-Path "$DOWNLOADS_PATH\$WEBVIEW2_INSTALLER")) { throw "WebView2 Runtime download failed" }
+}
 
 if ($INSTALL_UNIVERSE) {
     aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$UNIVERSE_INSTALLER $DOWNLOADS_PATH\$UNIVERSE_INSTALLER
@@ -70,17 +101,16 @@ if ($INSTALL_LENSCARE) {
     if (-not (Test-Path "$DOWNLOADS_PATH\$LENSCARE_LICENSE")) { throw "Lenscare license download failed" }
 }
 
+if ($INSTALL_RSMB) {
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$RSMB_INSTALLER $DOWNLOADS_PATH\$RSMB_INSTALLER
+    if (-not (Test-Path "$DOWNLOADS_PATH\$RSMB_INSTALLER")) { throw "RSMB download failed" }
+    aws s3 cp --no-progress s3://$INSTALLER_S3_BUCKET/Installers/$RSMB_LICENSING $DOWNLOADS_PATH\$RSMB_LICENSING
+    if (-not (Test-Path "$DOWNLOADS_PATH\$RSMB_LICENSING")) { throw "RSMB floating licensing download failed" }
+}
+
 $downloadEndTime = Get-Date
 $downloadDuration = $downloadEndTime - $downloadStartTime
 Write-Host "Downloads completed in: $($downloadDuration.ToString('hh\:mm\:ss'))"
-
-# Microsoft Edge WebView2 Runtime Installation
-$webview2StartTime = Get-Date
-Write-Host "Starting Microsoft Edge WebView2 Runtime installation..."
-Start-Process -FilePath "$DOWNLOADS_PATH\$WEBVIEW2_INSTALLER" -ArgumentList "/silent", "/install" -Wait
-$webview2EndTime = Get-Date
-$webview2Duration = $webview2EndTime - $webview2StartTime
-Write-Host "Microsoft Edge WebView2 Runtime installation completed in: $($webview2Duration.ToString('hh\:mm\:ss'))"
 
 # After Effects Installation
 $aeStartTime = Get-Date
@@ -93,26 +123,36 @@ $aeEndTime = Get-Date
 $aeDuration = $aeEndTime - $aeStartTime
 Write-Host "After Effects installation completed in: $($aeDuration.ToString('hh\:mm\:ss'))"
 
-# Maxon App Installation
-$maxonStartTime = Get-Date
-Write-Host "Starting Maxon App installation..."
-Start-Process -FilePath "$DOWNLOADS_PATH\$MAXON_APP_INSTALLER" -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
-$maxonEndTime = Get-Date
-$maxonDuration = $maxonEndTime - $maxonStartTime
-Write-Host "Maxon App installation completed in: $($maxonDuration.ToString('hh\:mm\:ss'))"
+if ($INSTALL_RED_GIANT) {
+    # Microsoft Edge WebView2 Runtime Installation
+    $webview2StartTime = Get-Date
+    Write-Host "Starting Microsoft Edge WebView2 Runtime installation..."
+    Start-Process -FilePath "$DOWNLOADS_PATH\$WEBVIEW2_INSTALLER" -ArgumentList "/silent", "/install" -Wait
+    $webview2EndTime = Get-Date
+    $webview2Duration = $webview2EndTime - $webview2StartTime
+    Write-Host "Microsoft Edge WebView2 Runtime installation completed in: $($webview2Duration.ToString('hh\:mm\:ss'))"
 
-# Red Giant Installation
-$rgStartTime = Get-Date
-Write-Host "Starting Red Giant installation..."
-Start-Process -FilePath "$DOWNLOADS_PATH\$REDGIANT_INSTALLER" -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
-$rgEndTime = Get-Date
-$rgDuration = $rgEndTime - $rgStartTime
-Write-Host "Red Giant installation completed in: $($rgDuration.ToString('hh\:mm\:ss'))"
+    # Maxon App Installation
+    $maxonStartTime = Get-Date
+    Write-Host "Starting Maxon App installation..."
+    Start-Process -FilePath "$DOWNLOADS_PATH\$MAXON_APP_INSTALLER" -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
+    $maxonEndTime = Get-Date
+    $maxonDuration = $maxonEndTime - $maxonStartTime
+    Write-Host "Maxon App installation completed in: $($maxonDuration.ToString('hh\:mm\:ss'))"
 
-# Set Red Giant license servers for Customer Managed Fleets (CMF)
-if ($is_cmf) {
-    Write-Host "Setting Red Giant license server for CMF..."
-    [System.Environment]::SetEnvironmentVariable("redshift_LICENSE", "7055@$vpc_endpoint", [System.EnvironmentVariableTarget]::Machine)
+    # Red Giant Installation
+    $rgStartTime = Get-Date
+    Write-Host "Starting Red Giant installation..."
+    Start-Process -FilePath "$DOWNLOADS_PATH\$RED_GIANT_INSTALLER" -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
+    $rgEndTime = Get-Date
+    $rgDuration = $rgEndTime - $rgStartTime
+    Write-Host "Red Giant installation completed in: $($rgDuration.ToString('hh\:mm\:ss'))"
+
+    # Set Red Giant license servers for Customer Managed Fleets (CMF)
+    if ($is_cmf) {
+        Write-Host "Setting Red Giant license server for CMF..."
+        [System.Environment]::SetEnvironmentVariable("redshift_LICENSE", "7055@$vpc_endpoint", [System.EnvironmentVariableTarget]::Machine)
+    }
 }
 
 if ($INSTALL_UNIVERSE) {
@@ -157,23 +197,56 @@ if ($INSTALL_LENSCARE) {
     Write-Host "Lenscare installation completed in: $($lenscareDuration.ToString('hh\:mm\:ss'))"
 }
 
+if ($INSTALL_RSMB) {
+    # RE:Vision Effects ReelSmart Motion Blur Installation
+    $rsmbStartTime = Get-Date
+    Write-Host "Extracting RSMB zip file..."
+    if (-not (Test-Path "$DOWNLOADS_PATH\$RSMB_INSTALLER")) { throw "RSMB zip file not found" }
+    $rsmbTempExtract = "$DOWNLOADS_PATH\rsmb_temp"
+    Expand-Archive -Path "$DOWNLOADS_PATH\$RSMB_INSTALLER" -DestinationPath $rsmbTempExtract -Force
+    Write-Host "Starting RSMB installation..."
+    $rsmbExe = Get-ChildItem -Path $rsmbTempExtract -Filter "*.exe" -Recurse | Select-Object -First 1
+    if (-not $rsmbExe) { throw "RSMB installer executable not found in zip" }
+    Start-Process -FilePath $rsmbExe.FullName -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none" -Wait
+
+    Write-Host "Extracting RSMB floating licensing..."
+    $rsmbLicenseTempExtract = "$DOWNLOADS_PATH\rsmb_licensing_temp"
+    Expand-Archive -Path "$DOWNLOADS_PATH\$RSMB_LICENSING" -DestinationPath $rsmbLicenseTempExtract -Force
+    Write-Host "Installing RSMB floating license client..."
+    $rsmbLicenseExe = Get-ChildItem -Path $rsmbLicenseTempExtract -Filter "*.exe" -Recurse | Select-Object -First 1
+    if (-not $rsmbLicenseExe) { throw "RSMB floating license installer not found in zip" }
+    Start-Process -FilePath $rsmbLicenseExe.FullName -ArgumentList "--mode", "unattended", "--unattendedmodeui", "none", "--acceptEULA", "1", "--clientOrServer", "client" -Wait
+
+    Write-Host "Setting RSMB license server..."
+    [System.Environment]::SetEnvironmentVariable("RVL_SERVER", $RSMB_LICENSE_SERVER, [System.EnvironmentVariableTarget]::Machine)
+
+    $rsmbEndTime = Get-Date
+    $rsmbDuration = $rsmbEndTime - $rsmbStartTime
+    Write-Host "RSMB installation completed in: $($rsmbDuration.ToString('hh\:mm\:ss'))"
+}
+
 # Calculate and display total time
 $scriptEndTime = Get-Date
 $totalDuration = $scriptEndTime - $scriptStartTime
 Write-Host "=== Installation Summary ==="
 Write-Host "Downloads: $($downloadDuration.ToString('hh\:mm\:ss'))"
-Write-Host "WebView2 Runtime: $($webview2Duration.ToString('hh\:mm\:ss'))"
-Write-Host "After Effects: $($aeDuration.ToString('hh\:mm\:ss'))"
-Write-Host "Maxon App: $($maxonDuration.ToString('hh\:mm\:ss'))"
-Write-Host "Red Giant: $($rgDuration.ToString('hh\:mm\:ss'))"
+Write-Host "Adobe After Effects: $($aeDuration.ToString('hh\:mm\:ss'))"
+if ($INSTALL_RED_GIANT) {
+    Write-Host "Microsoft WebView2 Runtime: $($webview2Duration.ToString('hh\:mm\:ss'))"
+    Write-Host "Maxon App: $($maxonDuration.ToString('hh\:mm\:ss'))"
+    Write-Host "Maxon Red Giant: $($rgDuration.ToString('hh\:mm\:ss'))"
+}
 if ($INSTALL_UNIVERSE) {
     Write-Host "Universe: $($universeDuration.ToString('hh\:mm\:ss'))"
 }
 if ($INSTALL_BORIS_SAPPHIRE) {
-    Write-Host "Boris Sapphire: $($bsDuration.ToString('hh\:mm\:ss'))"
+    Write-Host "Boris FX Sapphire: $($bsDuration.ToString('hh\:mm\:ss'))"
 }
 if ($INSTALL_LENSCARE) {
-    Write-Host "Lenscare: $($lenscareDuration.ToString('hh\:mm\:ss'))"
+    Write-Host "Frischluft Lenscare: $($lenscareDuration.ToString('hh\:mm\:ss'))"
+}
+if ($INSTALL_RSMB) {
+    Write-Host "Re:Vision Effects ReelSmart Motion Blur: $($rsmbDuration.ToString('hh\:mm\:ss'))"
 }
 Write-Host "Total Time: $($totalDuration.ToString('hh\:mm\:ss'))"
 Write-Host "All installations completed!"

@@ -9,8 +9,8 @@ This guide covers setting up the required software installers for the After Effe
 - AWS CLI configured with appropriate permissions
 - S3 bucket for storing installers (can use your job-attachments bucket)
 - Enterprise Adobe account with Admin access to Admin Console and Adobe After Effects license
-- Red Giant and Universe licenses
 - AWS Deadline Cloud farm, Windows GPU SMF (service-managed fleet) with latest driver, queue, and queue-fleet association set up. No need to add conda queue environment to your queue.
+- Licenses for any plugins being used
 
 ## Required Installers
 
@@ -29,12 +29,18 @@ Download from Adobe Admin Console (make sure you're using an enterprise account 
 
 See the [Adobe pre-generated packages documentation](https://helpx.adobe.com/enterprise/using/pre-generated-packages.html) for more information.
 
-### 2. Red Giant
+Make sure to update the `$AE_INSTALLER` variable with the name of the package zip file  in the script configuration section.
+
+### 2. Red Giant (Optional)
 
 Download from Red Giant:
 1. Log into your Maxon account
 2. Navigate to the [Maxon Downloads](https://www.maxon.net/en/downloads) section
 3. Download `RedGiant-2025.6.0-Win.exe` (or latest version) for Windows from the section Red Giant
+
+To enable Red Giant installation, set `$INSTALL_RED_GIANT = $true` in the script configuration section.
+
+Make sure to update the `$RED_GIANT_INSTALLER` variable with the name of the Red Giant installer.
 
 ### 3. Universe (Optional)
 
@@ -45,7 +51,11 @@ Download from Red Giant:
 2. Navigate to the [Maxon Downloads](https://www.maxon.net/en/downloads) section
 3. Download `Universe-2025.3.3_Win.exe` (or latest version) for Windows under the section Red Giant
 
-### 4. Maxon App
+To enable standalone Universe installation, set `$INSTALL_UNIVERSE = $true` in the script configuration section.
+
+Make sure to update the `$UNIVERSE_INSTALLER` variable with the name of the Universe installer.
+
+### 4. Maxon App (required for Red Giant)
 
 This is needed to support Red Giant + Universe licensing since it serves as a proxy between your licensing server and the plugins being run.
 Download from Maxon:
@@ -53,11 +63,15 @@ Download from Maxon:
 2. Navigate to the [Maxon App](https://www.maxon.net/en/downloads) section after you scroll down a bit
 2. Download `Maxon_App_2025.4.2_Win.exe` (or latest version) for Windows under the section Maxon App
 
-### 5. Microsoft Edge WebView2 Runtime
+Make sure to update the `$MAXON_APP_INSTALLER` variable with the name of the Maxon App installer.
+
+### 5. Microsoft Edge WebView2 Runtime (required for Red Giant)
 
 This is needed for the Maxon App installation to go smoothly. Download from Microsoft:
 1. Visit the [Microsoft Edge WebView2 download page](https://developer.microsoft.com/en-us/microsoft-edge/webview2?form=MA13LH#download)
 2. Download `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` (x64 version) under the "Evergreen Standalone Installer" section
+
+Make sure to update the `$WEBVIEW2_INSTALLER` variable with the name of the WebView2 installer.
 
 ### 6. Boris FX Sapphire (optional)
 
@@ -70,6 +84,8 @@ For Boris FX Sapphire, you will need to bring your own licenses. We recommend se
 
 To enable Boris FX Sapphire installation, set `$INSTALL_BORIS_SAPPHIRE = $true` in the script configuration section.
 
+Make sure to update the `$BORIS_SAPPHIRE_INSTALLER` variable with the name of the Boris FX Sapphire installer.
+
 ### 7. Frischluft Lenscare (optional)
 
 Download from Frischluft:
@@ -80,6 +96,23 @@ Download from Frischluft:
 For Frischluft Lenscare, you will need to bring your own licenses. Lenscare is licensed by copying the `Lenscare_ae.key` license file to the same folder as the plugin. In this sample host config script, you will upload your license file to S3 and the host config script will download the license file from S3 to `C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore\Lenscare_ae.key` on the worker. For more information about licensing Lenscare, review the "Install Key File" section of the `readme.txt` inside the downloaded Lenscare zip file.
 
 To enable Lenscare installation, set `$INSTALL_LENSCARE = $true` in the script configuration section.
+
+Make sure to update the `$LENSCARE_INSTALLER` variable with the name of the Lenscare installer.
+
+### 8. RE:Vision Effects ReelSmart Motion Blur
+
+Download from RE:Vision Effects:
+1. Go to https://revisionfx.com/products/rsmb/after-effects/
+2. Scroll down to the Download section on the page and download the Windows installer (`RSMB6AEInstaller.zip`)
+3. Go to https://revisionfx.com/faq/setting-up-your-site-for-floating-licenses/
+4. Download the floating license software for Windows (`FloatingLicensing.zip`)
+
+For ReelSmart Motion Blur, you will need to bring your own licenses. We recommend setting the `RVL_SERVER` environment variable to license the software. This can be set either inside the host config script by configuring the `$RVL_SERVER` variable (e.g., `$RVL_SERVER = "<license-server-hostname>"`), or in a queue environment. See the ["Setting up floating license clients" page from RE:Vision](https://revisionfx.com/faq/setting-floating-license-clients/#Windows) for more details on the format of the environment variable.
+
+To enable ReelSmart Motion Blur installation, set `$INSTALL_RSMB = $true` in the script configuration section.
+
+Make sure to update the `$RSMB_INSTALLER` variable with the name of the ReelSmart Motion Blur installer.
+
 
 ## S3 Bucket Setup
 
@@ -100,6 +133,8 @@ To upload the installers to S3, you can upload the `.zip` and `.exe` files to yo
 export INSTALLER_S3_BUCKET=your-installer-bucket
 
 aws s3 cp "After Effects_en_US_WIN_64.zip" s3://$INSTALLER_S3_BUCKET/Installers/
+
+# Optional, use if installing Red Giant
 aws s3 cp "RedGiant-2026.3.0-Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "Maxon_App_2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" s3://$INSTALLER_S3_BUCKET/Installers/
@@ -113,6 +148,10 @@ aws s3 cp "sapphire-ae-install-2026.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 # Optional, use if installing Frischluft Lenscare
 aws s3 cp "lenscare_ae_v1.5.5(win).zip" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "Lenscare_ae.key" s3://$INSTALLER_S3_BUCKET/Installers/
+
+# Optional, use if installing ReelSmart Motion Blur
+aws s3 cp "RSMB6AEInstaller.zip" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "FloatingLicensing.zip" s3://$INSTALLER_S3_BUCKET/Installers/
 ```
 
 ### 3. Update IAM Role Permissions
