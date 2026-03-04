@@ -4,7 +4,7 @@ extensions:
 name: After Effects Render with Contiguous Chunks
 description: >
   A job bundle that renders an After Effects composition using aerender
-  with task chunking for efficient parallel rendering.
+  with task chunking.
 
 parameterDefinitions:
 

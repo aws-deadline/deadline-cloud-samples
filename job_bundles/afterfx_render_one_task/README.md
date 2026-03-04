@@ -1,11 +1,10 @@
 # After Effects Render with Contiguous Chunks
 
-This job bundle renders After Effects compositions using aerender with the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension for efficient parallel rendering.
+This job bundle renders After Effects compositions using aerender with the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension.
 
-## Features
+## Task Chunking
 
-- **Task Chunking**: Uses `CHUNK[INT]` with contiguous frame ranges for parallel rendering across multiple workers
-- **Adaptive Chunking**: Optional target runtime allows the scheduler to adjust chunk sizes dynamically
+This job bundle uses the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension with `rangeConstraint: CONTIGUOUS` for efficient rendering. Chunking reduces scheduling overhead by grouping frames together, and the single `Frames` parameter accepts ranges (`1-50`), individual frames (`5,7,32`), stepped ranges (`1-100:2`), or combinations (`1-10,15,20-30:2`).
 
 ## Parameters
 

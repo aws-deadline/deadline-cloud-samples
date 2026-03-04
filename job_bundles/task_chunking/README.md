@@ -4,7 +4,9 @@ These samples demonstrate the [Task Chunking](https://github.com/OpenJobDescript
 
 ## Why Use Task Chunking?
 
-Render jobs often spend significant time loading applications and scene files before rendering each frame. Chunking amortizes this overhead by processing multiple frames or tasks per chunk, reducing total job runtime.
+- **Reduced Scheduling Overhead**: Grouping short-running frames into chunks can reduce the overhead of scheduling each frame individually
+- **Efficient Load Balancing**: Adaptive chunking mode automatically adjusts chunk sizes based on target runtime for optimal resource utilization
+- **Flexible Frame Specification**: A single `Frames` parameter accepts ranges (`1-50`), individual frames (`5,7,32`), stepped ranges (`1-100:2`), or combinations (`1-10,15,20-30:2`). Users can specify frames in any format regardless of DCC limitations and let the AWS Deadline Cloud submitter, scheduler and adaptor render the specified frames
 
 ## Samples
 

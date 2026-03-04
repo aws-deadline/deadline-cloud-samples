@@ -1,10 +1,10 @@
 # KeyShot Standalone with Non-Contiguous Chunks
 
-This is a Windows KeyShot job bundle that renders scenes using the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension for efficient parallel rendering.
+This is a Windows KeyShot job bundle that renders scenes using the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension.
 
 ## Task Chunking
 
-This template uses `rangeConstraint: NONCONTIGUOUS` to support arbitrary frame sets:
+This job bundle uses the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md) extension with `rangeConstraint: CONTIGUOUS` for efficient rendering. Chunking reduces scheduling overhead by grouping frames together, and the single `Frames` parameter accepts ranges (`1-50`), individual frames (`5,7,32`), stepped ranges (`1-100:2`), or combinations (`1-10,15,20-30:2`).
 
 ```yaml
 extensions:
