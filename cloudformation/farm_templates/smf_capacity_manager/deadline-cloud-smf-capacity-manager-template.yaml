@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deadline Cloud dynamic fleet capacity manager. Automatically balances fleet capacity between
+  Wait and Save and Spot fleets, optimizing for cost-effective Wait and Save while maintaining
+  constant total capacity.
+
+Parameters:
+  FarmId:
+    Type: String
+    Description: Deadline Cloud Farm ID
+  WaitAndSaveFleetId:
+    Type: String
+    Description: Wait and Save Fleet ID
+  SpotFleetId:
+    Type: String
+    Description: Spot Fleet ID
+  TargetMaxWorkerCount:
+    Type: Number
+    Description: Target maximum total worker count across both fleets. Note that actual worker count may briefly exceed this target during scaling operations.
+  CapacityCheckRateMinutes:
+    Type: Number
+    Description: How many minutes between each capacity adjustment check.
+    Default: 2
+
+Resources:
+  capacityManagerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: FleetCapacityManager
+      Handler: index.handler
+      Role: !GetAtt capacityManagerLambdaServiceRole.Arn
+      Timeout: 60
+      Runtime: python3.13
+      Code:
+        ZipFile: !Sub |
+          """
+          This lambda runs on a schedule to dynamically balance fleet capacity.
+          It gets the current worker count from the Wait and Save fleet,
+          then adjusts Spot fleet capacity to maintain a constant total fleet size of ${TargetMaxWorkerCount}.
+          This automatically optimizes for cost-effective Wait and Save capacity.
+          """
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          import boto3
+
+          farm_id = "${FarmId}"
+          wait_and_save_fleet_id = "${WaitAndSaveFleetId}"
+          spot_fleet_id = "${SpotFleetId}"
+          target_max_worker_count = ${TargetMaxWorkerCount}
+
+          session = boto3.Session()
+          deadline_client = session.client("deadline")
+          cloudwatch_client = boto3.client("cloudwatch")
+
+          def emit_worker_count_metrics(ws_workers, spot_workers):
+              """
+              Emit CloudWatch metrics for fleet worker counts.
+              This provides historical tracking of fleet scaling.
+              """
+              cloudwatch_client.put_metric_data(
+                  Namespace="AWS/DeadlineCloud",
+                  MetricData=[
+                      {
+                          "MetricName": "WaitAndSaveWorkerCount",
+                          "Dimensions": [
+                              {"Name": "FarmId", "Value": farm_id},
+                              {"Name": "FleetId", "Value": wait_and_save_fleet_id},
+                          ],
+                          "Unit": "Count",
+                          "Value": ws_workers,
+                      },
+                      {
+                          "MetricName": "SpotWorkerCount",
+                          "Dimensions": [
+                              {"Name": "FarmId", "Value": farm_id},
+                              {"Name": "FleetId", "Value": spot_fleet_id},
+                          ],
+                          "Unit": "Count",
+                          "Value": spot_workers,
+                      },
+                      {
+                          "MetricName": "TotalWorkerCount",
+                          "Dimensions": [
+                              {"Name": "FarmId", "Value": farm_id},
+                          ],
+                          "Unit": "Count",
+                          "Value": ws_workers + spot_workers,
+                      },
+                  ],
+              )
+
+          def handler(event, context):
+              logger.info(f"Starting capacity adjustment - Target max: {target_max_worker_count}")
+              
+              try:
+                  # Get current worker count for Wait and Save fleet
+                  ws_fleet = deadline_client.get_fleet(
+                      farmId=farm_id,
+                      fleetId=wait_and_save_fleet_id
+                  )
+                  ws_size = ws_fleet["workerCount"]
+                  logger.info(f"Wait and Save current workers: {ws_size}")
+                  
+                  # Calculate how many spot workers we need
+                  spot_fleet_size = target_max_worker_count - ws_size
+                  logger.info(f"Spot target capacity: {spot_fleet_size}")
+                  
+                  # Get current spot fleet configuration
+                  spot_fleet = deadline_client.get_fleet(
+                      farmId=farm_id,
+                      fleetId=spot_fleet_id
+                  )
+                  current_spot_max = spot_fleet["maxWorkerCount"]
+                  current_spot_workers = spot_fleet["workerCount"]
+                  logger.info(f"Spot current maxWorkerCount: {current_spot_max}")
+                  
+                  # Only update if capacity needs to change
+                  if current_spot_max == spot_fleet_size:
+                      logger.info(f"Spot fleet already at target capacity ({spot_fleet_size}), no update needed")
+                      emit_worker_count_metrics(ws_size, current_spot_workers)
+                      return {
+                          "ws_workers": ws_size,
+                          "spot_target": spot_fleet_size,
+                          "spot_current": current_spot_max,
+                          "total": target_max_worker_count,
+                          "updated": False
+                      }
+                  
+                  # Update the fleet's maximum worker count
+                  response = deadline_client.update_fleet(
+                      farmId=farm_id,
+                      fleetId=spot_fleet_id,
+                      maxWorkerCount=spot_fleet_size
+                  )
+                  
+                  logger.info(f"Spot fleet updated from {current_spot_max} to {spot_fleet_size}")
+                  
+                  emit_worker_count_metrics(ws_size, current_spot_workers)
+                  
+                  return {
+                      "ws_workers": ws_size,
+                      "spot_target": spot_fleet_size,
+                      "spot_previous": current_spot_max,
+                      "total": target_max_worker_count,
+                      "updated": True
+                  }
+                  
+              except Exception as e:
+                  logger.exception(f"Error adjusting fleet capacity: {e}")
+                  raise
+
+  capacityManagerSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: FleetCapacityManager
+      Description: Trigger fleet capacity adjustment
+      ScheduleExpression: !Sub "rate(${CapacityCheckRateMinutes} minutes)"
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt capacityManagerLambda.Arn
+        RoleArn: !GetAtt capacityManagerScheduleRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 3
+
+  capacityManagerScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FleetCapacityManagerScheduler
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: !Sub scheduler.${AWS::URLSuffix}
+      Policies:
+        - PolicyName: InvokeLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - lambda:InvokeFunction
+                Effect: Allow
+                Resource:
+                  - !GetAtt capacityManagerLambda.Arn
+
+  capacityManagerLambdaServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FleetCapacityManager
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+      Policies:
+        - PolicyName: CapacityManagerLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - deadline:GetFleet
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/${WaitAndSaveFleetId}
+                  - !Sub arn:${AWS::Partition}:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/${SpotFleetId}
+              - Action:
+                  - deadline:UpdateFleet
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/${SpotFleetId}
+              - Action:
+                  - cloudwatch:PutMetricData
+                Effect: Allow
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: AWS/DeadlineCloud
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Capacity Manager Lambda function
+    Value: !GetAtt capacityManagerLambda.Arn
+  LambdaFunctionName:
+    Description: Name of the Capacity Manager Lambda function
+    Value: !Ref capacityManagerLambda
+  ScheduleArn:
+    Description: ARN of the EventBridge Scheduler schedule
+    Value: !GetAtt capacityManagerSchedule.Arn

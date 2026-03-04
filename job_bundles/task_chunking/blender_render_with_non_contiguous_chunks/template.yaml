@@ -1,0 +1,142 @@
+specificationVersion: 'jobtemplate-2023-09'
+extensions:
+  - TASK_CHUNKING
+name: Blender Render with Non-Contiguous Chunks
+
+parameterDefinitions:
+- name: BlenderSceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Blender Scene File
+    fileFilters:
+    - label: Blender Scene Files
+      patterns: ["*.blend"]
+    - label: All Files
+      patterns: ["*"]
+  description: Choose the Blender scene file you want to render.
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+  default: "1-10,15,20-100:2"
+  description: "The frames to render. Supports ranges and steps, e.g. 1-10,15,20-100:2"
+- name: ChunkSize
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+  default: 5
+  minValue: 1
+  description: Number of frames per chunk.
+- name: TargetRuntime
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (Seconds)
+  default: 180
+  description: Enter the target runtime (0 to disable adaptive chunking).
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+  default: "./output"
+  description: Choose the render output directory.
+- name: OutputPattern
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Pattern
+  default: "output_####"
+  description: Enter the output filename pattern (without extension).
+- name: Format
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Output File Format
+  description: Choose the file format to render as.
+  default: JPEG
+  allowedValues: [TGA, RAWTGA, JPEG, IRIS, IRIZ, PNG, HDR, TIFF, OPEN_EXR, OPEN_EXR_MULTILAYER, CINEON, DPX, DDS, JP2, WEBP]
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: blender
+  description: Conda packages to install. Requires a Queue Environment to create the Conda Environment.
+
+steps:
+- name: RenderBlender
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: NONCONTIGUOUS
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+      - name: Frames2Blender
+        type: TEXT
+        filename: frames_2_blender.py
+        data: |
+          """
+          Converts an Open Job Description range expression into a --render-frame option for the Blender CLI.
+
+          $ FRAMES=$(python frames_2_blender.py "1-5:2,9-11,15")
+          $ echo $FRAMES
+          1,3,5,9..11,15
+
+          * https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#34111-intrangeexpr
+          * https://docs.blender.org/manual/en/latest/advanced/command_line/arguments.html
+          """
+
+          import sys, re
+
+          def range_expr_to_blender(range_expr):
+              # Regex that matches "<int>", "<int>-<int>", or "<int>-<int>:<int>"
+              int_pat = r"\s*(-?[0-9]+)\s*"
+              part_re = re.compile(f"^{int_pat}(?:-{int_pat}(?::{int_pat})?)?$")
+              blender_parts = []
+              for part in range_expr.split(","):
+                  if m := part_re.match(part):
+                      start, end, step = m.groups()
+                      if step is not None:
+                          # Linear sequence "3-7:2" means the values [3, 5, 7].
+                          blender_parts.extend(range(int(start), int(end) + (int(step)//abs(int(step))), int(step)))
+                      elif end is not None:
+                          # Interval "3-6" means the values [3, 4, 5, 6].
+                          blender_parts.append(f"{start}..{end}")
+                      else:
+                          # Integer "3" means the values [3].
+                          blender_parts.append(start)
+                  else:
+                      raise ValueError(f"Invalid frame range expression: {range_expr}")
+              return ",".join(str(part) for part in blender_parts)
+
+          print(range_expr_to_blender(sys.argv[1]))
+      - name: Run
+        type: TEXT
+        data: |
+          set -xeuo pipefail
+
+          mkdir -p '{{Param.OutputDir}}'
+
+          FRAMES="$(python '{{Task.File.Frames2Blender}}' '{{Task.Param.Frame}}')"
+
+          blender --background '{{Param.BlenderSceneFile}}' \
+                  --render-output '{{Param.OutputDir}}/{{Param.OutputPattern}}' \
+                  --render-format {{Param.Format}} \
+                  --use-extension 1 \
+                  --render-frame "$FRAMES"

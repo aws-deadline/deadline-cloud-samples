@@ -36,7 +36,9 @@ Download from Red Giant:
 2. Navigate to the [Maxon Downloads](https://www.maxon.net/en/downloads) section
 3. Download `RedGiant-2025.6.0-Win.exe` (or latest version) for Windows from the section Red Giant
 
-### 3. Universe
+### 3. Universe (Optional)
+
+Note that Universe is [now included in Red Giant 2026.2.0 and above by default](https://support.maxon.net/hc/en-us/articles/24114684657692-Red-Giant-2026-2-0-December-3-2025). For older versions of Red Giant, you can download Universe separately following the instructions below.
 
 Download from Red Giant:
 1. Log into your Maxon account
@@ -98,10 +100,19 @@ To upload the installers to S3, you can upload the `.zip` and `.exe` files to yo
 export INSTALLER_S3_BUCKET=your-installer-bucket
 
 aws s3 cp "After Effects_en_US_WIN_64.zip" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "RedGiant-2025.6.0-Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "Universe-2025.3.3_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "Maxon_App_2025.4.2_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "RedGiant-2026.3.0-Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "Maxon_App_2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+
+# Optional, Maxon Universe is now included in Red Giant 2026.2.0 and above
+aws s3 cp "Universe-2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+
+# Optional, use if installing Boris FX Sapphire
+aws s3 cp "sapphire-ae-install-2026.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+
+# Optional, use if installing Frischluft Lenscare
+aws s3 cp "lenscare_ae_v1.5.5(win).zip" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "Lenscare_ae.key" s3://$INSTALLER_S3_BUCKET/Installers/
 ```
 
 ### 3. Update IAM Role Permissions
