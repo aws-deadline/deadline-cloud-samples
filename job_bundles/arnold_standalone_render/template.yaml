@@ -1,15 +1,18 @@
 specificationVersion: 'jobtemplate-2023-09'
 name: Arnold Standalone Render
 description: |
-  This job renders Arnold .ass (Arnold Scene Source) files using the Arnold `kick`
+  This job renders Arnold .ass (Arnold Scene Source) files using the Arnold kick
   command-line renderer that ships with MtoA (Arnold for Maya).
 
   To run it, you need the maya-mtoa conda package available through a conda queue
   environment on your Deadline Cloud queue. On service-managed fleets, the
   "deadline-cloud" channel provides this package.
 
-  You can download sample .ass files such as cornell.ass from the Autodesk Arnold
-  learning scenes page:
+  For single-frame scenes (like the included cornell.ass), use the default Frames
+  value of "1". For animation sequences exported as per-frame .ass files, use ####
+  in the ArnoldFile path as a frame number placeholder (e.g. scene.####.ass).
+
+  You can download sample .ass files from the Autodesk Arnold learning scenes page:
   https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html
 
 parameterDefinitions:
@@ -31,8 +34,19 @@ parameterDefinitions:
   description: >
     Choose the Arnold .ass scene file to render.
 
+    For animation sequences with per-frame .ass files, use #### in the filename
+    as a frame number placeholder (e.g. scene.####.ass).
+
     Use the 'Job Attachments' tab to add textures and other files that the scene references.
   default: ./cornell.ass
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  description: The frames to render. E.g. 1-100, 1-100:2 (every other frame), or 1 for a single frame.
+  default: '1'
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY
@@ -43,22 +57,14 @@ parameterDefinitions:
     groupLabel: Render Parameters
   description: Choose the render output directory.
   default: ./output
-- name: OutputFileName
+- name: OutputFilePrefix
   type: STRING
   userInterface:
     control: LINE_EDIT
-    label: Output File Name
+    label: Output File Prefix
     groupLabel: Render Parameters
-  description: The output filename (with extension). The format is inferred from the extension.
-  default: output.exr
-- name: Message
-  type: STRING
-  userInterface:
-    control: LINE_EDIT
-    label: Message
-    groupLabel: Render Parameters
-  description: A message to display in the job log.
-  default: Welcome to Amazon Deadline Cloud!
+  description: The prefix for output filenames. Frame number and extension are appended automatically.
+  default: output
 
 # Software Environment
 - name: CondaPackages
@@ -67,7 +73,7 @@ parameterDefinitions:
     control: HIDDEN
   description: >
     Conda packages to install. Requires a conda queue environment to process the value.
-    The maya-mtoa package provides the Arnold `kick` renderer.
+    The maya-mtoa package provides the Arnold kick renderer.
   default: maya-mtoa
 - name: CondaChannels
   type: STRING
@@ -80,6 +86,11 @@ parameterDefinitions:
 
 steps:
 - name: Arnold Kick Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
   script:
     actions:
       onRun:
@@ -90,8 +101,6 @@ steps:
       type: TEXT
       data: |
         set -xeuo pipefail
-
-        echo "{{Param.Message}}"
 
         mkdir -p '{{Param.OutputDir}}'
 
@@ -111,9 +120,16 @@ steps:
 
         echo "Using kick from: $kick"
 
-        "$kick" -i '{{Param.ArnoldFile}}' -o '{{Param.OutputDir}}/{{Param.OutputFileName}}'
+        FRAME=$(printf %04d {{Task.Param.Frame}})
 
-        echo "Render complete. Output: {{Param.OutputDir}}/{{Param.OutputFileName}}"
+        # Substitute #### in the input path with the zero-padded frame number
+        INPUT_FILE='{{Param.ArnoldFile}}'
+        INPUT_FILE="${INPUT_FILE//####/$FRAME}"
+
+        "$kick" -i "$INPUT_FILE" \
+            -o "{{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
+
+        echo "Render complete: {{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

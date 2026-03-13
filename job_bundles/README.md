@@ -58,6 +58,7 @@ and a short script that substitutes job parameters and the Frame task parameter 
 * [blender_render](blender_render/template.yaml)
 * [keyshot_standalone](keyshot_standalone)
 * [afterfx_render_one_task](afterfx_render_one_task)
+* [maya_arnold_ass_export_render](maya_arnold_ass_export_render) - Export .ass from Maya and render with Arnold `kick`
 * [maya_cli_render](maya_cli_render)
 * [houdini_husk_usd_render](houdini_husk_usd_render)
 * [nuke_render](nuke_render)
@@ -76,6 +77,13 @@ The [arnold_standalone_render](arnold_standalone_render) job bundle renders Arno
 using the `kick` command-line renderer from MtoA. This is useful for batch rendering pre-exported Arnold scenes without
 requiring a full Maya session. It includes a sample Cornell box `.ass` file for testing. You can also download sample
 scenes from the [Autodesk Arnold learning scenes page](https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html).
+
+### Maya Arnold export and render
+
+The [maya_arnold_ass_export_render](maya_arnold_ass_export_render) job bundle is a two-step pipeline that exports
+`.ass` files from a Maya scene and renders them with Arnold `kick`. The export step opens the Maya scene once and
+exports all frames, then the render step distributes per-frame `kick` tasks across workers. This is useful when you
+want to render Arnold scenes directly from Maya files without pre-exporting.
 
 ### Turntable job with Maya/Arnold
 
