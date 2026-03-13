@@ -8,6 +8,11 @@ description: |
   environment on your Deadline Cloud queue. On service-managed fleets, the
   "deadline-cloud" channel provides this package.
 
+  For single-frame scenes (like the included cornell.ass), use the default Frames
+  value of "1". For animation sequences exported as per-frame .ass files
+  (e.g. scene.0001.ass, scene.0002.ass), set Frames to the range and use the
+  frame number token in the ArnoldFile path.
+
   You can download sample .ass files such as cornell.ass from the Autodesk Arnold
   learning scenes page:
   https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html
@@ -31,8 +36,20 @@ parameterDefinitions:
   description: >
     Choose the Arnold .ass scene file to render.
 
+    For single-frame renders, select the .ass file directly. For animation
+    sequences with per-frame .ass files, select any file in the sequence and
+    the frame number will be substituted automatically.
+
     Use the 'Job Attachments' tab to add textures and other files that the scene references.
   default: ./cornell.ass
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  description: The frames to render. E.g. 1-10, 1-100:2 (every other frame), or 1 for a single frame.
+  default: '1'
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY
@@ -43,22 +60,14 @@ parameterDefinitions:
     groupLabel: Render Parameters
   description: Choose the render output directory.
   default: ./output
-- name: OutputFileName
+- name: OutputFilePrefix
   type: STRING
   userInterface:
     control: LINE_EDIT
-    label: Output File Name
+    label: Output File Prefix
     groupLabel: Render Parameters
-  description: The output filename (with extension). The format is inferred from the extension.
-  default: output.exr
-- name: Message
-  type: STRING
-  userInterface:
-    control: LINE_EDIT
-    label: Message
-    groupLabel: Render Parameters
-  description: A message to display in the job log.
-  default: Welcome to Amazon Deadline Cloud!
+  description: The prefix for output filenames. Frame number and extension are appended automatically.
+  default: output
 
 # Software Environment
 - name: CondaPackages
@@ -80,6 +89,11 @@ parameterDefinitions:
 
 steps:
 - name: Arnold Kick Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
   script:
     actions:
       onRun:
@@ -90,8 +104,6 @@ steps:
       type: TEXT
       data: |
         set -xeuo pipefail
-
-        echo "{{Param.Message}}"
 
         mkdir -p '{{Param.OutputDir}}'
 
@@ -111,9 +123,11 @@ steps:
 
         echo "Using kick from: $kick"
 
-        "$kick" -i '{{Param.ArnoldFile}}' -o '{{Param.OutputDir}}/{{Param.OutputFileName}}'
+        FRAME=$(printf %04d {{Task.Param.Frame}})
+        "$kick" -i '{{Param.ArnoldFile}}' \
+            -o "{{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
 
-        echo "Render complete. Output: {{Param.OutputDir}}/{{Param.OutputFileName}}"
+        echo "Render complete: {{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

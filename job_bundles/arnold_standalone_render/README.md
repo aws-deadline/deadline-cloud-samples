@@ -42,20 +42,33 @@ deadline bundle gui-submit arnold_standalone_render/
 
 ### CLI submission
 
+Single frame (e.g. the included cornell.ass):
+
 ```bash
 deadline bundle submit arnold_standalone_render/ \
-    -p ArnoldFile=/path/to/scene.ass \
+    -p ArnoldFile=cornell.ass \
+    -p OutputDir=./output
+```
+
+Animation sequence with per-frame .ass files:
+
+```bash
+deadline bundle submit arnold_standalone_render/ \
+    -p ArnoldFile=/path/to/scene.0001.ass \
+    -p Frames=1-100 \
     -p OutputDir=/path/to/output
 ```
 
 ## How it works
 
-The job has a single step that:
+The job has a single step with a parameter space that creates one task per frame.
+Each task:
 
 1. Locates the `kick` binary using the `$MTOA` environment variable set by the
-   `maya-mtoa` conda package.
-2. Prints the Arnold version for reference.
-3. Runs `kick -i <input> -o <output>` to render the scene.
+   `maya-mtoa` conda package, with a fallback to searching `$CONDA_PREFIX`.
+2. Runs `kick -i <input> -o <output>` to render the scene.
+3. Outputs files named `<OutputFilePrefix>.<frame>.exr` with zero-padded frame numbers.
 
-The output format is inferred from the `OutputFileName` extension (default: `.exr`).
-Arnold supports EXR, PNG, JPEG, TIFF, and other formats.
+For single-frame scenes like the included `cornell.ass`, the default `Frames` value
+of `1` creates a single task. For animation sequences, set `Frames` to a range
+like `1-100` and each frame will render as a separate task distributed across workers.
