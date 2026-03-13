@@ -4,13 +4,9 @@ description: |
   This job renders Arnold .ass (Arnold Scene Source) files using the Arnold kick
   command-line renderer that ships with MtoA (Arnold for Maya).
 
-  To run it, you need the maya-mtoa conda package available through a conda queue
-  environment on your Deadline Cloud queue. On service-managed fleets, the
-  "deadline-cloud" channel provides this package.
-
-  For single-frame scenes (like the included cornell.ass), use the default Frames
-  value of "1". For animation sequences exported as per-frame .ass files, use ####
-  in the ArnoldFile path as a frame number placeholder (e.g. scene.####.ass).
+  Point it at a directory containing .ass files with a naming pattern like
+  scene.####.ass, and it will render each frame as a separate task distributed
+  across workers.
 
   You can download sample .ass files from the Autodesk Arnold learning scenes page:
   https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html
@@ -18,25 +14,6 @@ description: |
 parameterDefinitions:
 
 # Render Parameters
-- name: ArnoldFile
-  type: PATH
-  objectType: FILE
-  dataFlow: IN
-  userInterface:
-    control: CHOOSE_INPUT_FILE
-    label: Arnold Scene File
-    groupLabel: Render Parameters
-    fileFilters:
-    - label: Arnold Scene Files
-      patterns: ["*.ass", "*.ass.gz"]
-    - label: All Files
-      patterns: ["*"]
-  description: >
-    Choose an Arnold .ass scene file to render. For single-frame renders, this
-    file is used directly. For animation sequences, this should be any file in
-    the sequence — set the SceneDirectory and FilePattern parameters to specify
-    the sequence location and naming pattern.
-  default: ./cornell.ass
 - name: SceneDirectory
   type: PATH
   objectType: DIRECTORY
@@ -46,9 +23,8 @@ parameterDefinitions:
     label: Scene Directory
     groupLabel: Render Parameters
   description: >
-    For animation sequences, choose the directory containing the per-frame .ass
-    files. Leave empty for single-frame renders using ArnoldFile directly.
-  default: ''
+    Choose the directory containing the .ass files to render.
+  default: ./scene
 - name: FilePattern
   type: STRING
   userInterface:
@@ -56,9 +32,9 @@ parameterDefinitions:
     label: File Name Pattern
     groupLabel: Render Parameters
   description: >
-    For animation sequences, the filename pattern using #### for the zero-padded
-    frame number (e.g. robot.####.ass). Leave empty for single-frame renders.
-  default: ''
+    The filename pattern using #### for the zero-padded frame number
+    (e.g. cornell.####.ass or robot.####.ass).
+  default: cornell.####.ass
 - name: Frames
   type: STRING
   userInterface:
@@ -141,15 +117,8 @@ steps:
         echo "Using kick from: $kick"
 
         FRAME=$(printf %04d {{Task.Param.Frame}})
-
-        # Determine input file: use SceneDirectory/FilePattern for sequences,
-        # or ArnoldFile directly for single-frame renders
         FILE_PATTERN='{{Param.FilePattern}}'
-        if [ -n "$FILE_PATTERN" ]; then
-            INPUT_FILE="{{Param.SceneDirectory}}/${FILE_PATTERN//####/$FRAME}"
-        else
-            INPUT_FILE='{{Param.ArnoldFile}}'
-        fi
+        INPUT_FILE="{{Param.SceneDirectory}}/${FILE_PATTERN//####/$FRAME}"
 
         "$kick" -i "$INPUT_FILE" \
             -o "{{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
