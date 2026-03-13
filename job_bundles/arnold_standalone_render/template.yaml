@@ -32,13 +32,33 @@ parameterDefinitions:
     - label: All Files
       patterns: ["*"]
   description: >
-    Choose the Arnold .ass scene file to render.
-
-    For animation sequences with per-frame .ass files, use #### in the filename
-    as a frame number placeholder (e.g. scene.####.ass).
-
-    Use the 'Job Attachments' tab to add textures and other files that the scene references.
+    Choose an Arnold .ass scene file to render. For single-frame renders, this
+    file is used directly. For animation sequences, this should be any file in
+    the sequence — set the SceneDirectory and FilePattern parameters to specify
+    the sequence location and naming pattern.
   default: ./cornell.ass
+- name: SceneDirectory
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Scene Directory
+    groupLabel: Render Parameters
+  description: >
+    For animation sequences, choose the directory containing the per-frame .ass
+    files. Leave empty for single-frame renders using ArnoldFile directly.
+  default: ''
+- name: FilePattern
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: File Name Pattern
+    groupLabel: Render Parameters
+  description: >
+    For animation sequences, the filename pattern using #### for the zero-padded
+    frame number (e.g. robot.####.ass). Leave empty for single-frame renders.
+  default: ''
 - name: Frames
   type: STRING
   userInterface:
@@ -122,9 +142,14 @@ steps:
 
         FRAME=$(printf %04d {{Task.Param.Frame}})
 
-        # Substitute #### in the input path with the zero-padded frame number
-        INPUT_FILE='{{Param.ArnoldFile}}'
-        INPUT_FILE="${INPUT_FILE//####/$FRAME}"
+        # Determine input file: use SceneDirectory/FilePattern for sequences,
+        # or ArnoldFile directly for single-frame renders
+        FILE_PATTERN='{{Param.FilePattern}}'
+        if [ -n "$FILE_PATTERN" ]; then
+            INPUT_FILE="{{Param.SceneDirectory}}/${FILE_PATTERN//####/$FRAME}"
+        else
+            INPUT_FILE='{{Param.ArnoldFile}}'
+        fi
 
         "$kick" -i "$INPUT_FILE" \
             -o "{{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"

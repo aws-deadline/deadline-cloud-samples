@@ -50,11 +50,12 @@ deadline bundle submit arnold_standalone_render/ \
     -p OutputDir=./output
 ```
 
-Animation sequence with per-frame .ass files:
+Animation sequence with per-frame .ass files in a directory:
 
 ```bash
 deadline bundle submit arnold_standalone_render/ \
-    -p ArnoldFile=scene.####.ass \
+    -p SceneDirectory=/path/to/ass_files \
+    -p FilePattern=robot.####.ass \
     -p Frames=1-100 \
     -p OutputDir=./output
 ```
@@ -66,7 +67,9 @@ Each task:
 
 1. Locates the `kick` binary using the `$MTOA` environment variable set by the
    `maya-mtoa` conda package, with a fallback to searching `$CONDA_PREFIX`.
-2. Substitutes `####` in the input path with the zero-padded frame number.
+2. For animation sequences, constructs the input path from `SceneDirectory` and
+   `FilePattern` with `####` replaced by the zero-padded frame number. For single
+   frames, uses `ArnoldFile` directly.
 3. Runs `kick -i <input> -o <output>` to render the scene.
 4. Outputs files named `<OutputFilePrefix>.<frame>.exr` with zero-padded frame numbers.
 
