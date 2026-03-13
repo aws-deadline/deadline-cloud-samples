@@ -1,0 +1,121 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Arnold Standalone Render
+description: |
+  This job renders Arnold .ass (Arnold Scene Source) files using the Arnold `kick`
+  command-line renderer that ships with MtoA (Arnold for Maya).
+
+  To run it, you need the maya-mtoa conda package available through a conda queue
+  environment on your Deadline Cloud queue. On service-managed fleets, the
+  "deadline-cloud" channel provides this package.
+
+  You can download sample .ass files such as cornell.ass from the Autodesk Arnold
+  learning scenes page:
+  https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html
+
+parameterDefinitions:
+
+# Render Parameters
+- name: ArnoldFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Arnold Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: Arnold Scene Files
+      patterns: ["*.ass", "*.ass.gz"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the Arnold .ass scene file to render.
+
+    Use the 'Job Attachments' tab to add textures and other files that the scene references.
+  default: ./cornell.ass
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Choose the render output directory.
+  default: ./output
+- name: OutputFileName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Name
+    groupLabel: Render Parameters
+  description: The output filename (with extension). The format is inferred from the extension.
+  default: output.exr
+- name: Message
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Message
+    groupLabel: Render Parameters
+  description: A message to display in the job log.
+  default: Welcome to Amazon Deadline Cloud!
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  description: >
+    Conda packages to install. Requires a conda queue environment to process the value.
+    The maya-mtoa package provides the Arnold `kick` renderer.
+  default: maya-mtoa
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  description: >
+    Space-separated list of Conda channels. Deadline Cloud SMF packages are installed
+    from the "deadline-cloud" channel.
+  default: deadline-cloud
+
+steps:
+- name: Arnold Kick Render
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        echo "{{Param.Message}}"
+
+        mkdir -p '{{Param.OutputDir}}'
+
+        # Find kick from MTOA env var, or by searching the conda prefix
+        if [ -n "${MTOA:-}" ] && [ -f "${MTOA}/bin/kick" ]; then
+            kick="${MTOA}/bin/kick"
+        elif [ -n "${CONDA_PREFIX:-}" ]; then
+            kick=$(find "${CONDA_PREFIX}" -name kick -type f -path "*/bin/kick" | head -1)
+        fi
+
+        if [ -z "${kick:-}" ] || [ ! -f "${kick}" ]; then
+            echo "ERROR: Could not find Arnold kick binary"
+            echo "MTOA=${MTOA:-unset}"
+            echo "CONDA_PREFIX=${CONDA_PREFIX:-unset}"
+            exit 1
+        fi
+
+        echo "Using kick from: $kick"
+
+        "$kick" -i '{{Param.ArnoldFile}}' -o '{{Param.OutputDir}}/{{Param.OutputFileName}}'
+
+        echo "Render complete. Output: {{Param.OutputDir}}/{{Param.OutputFileName}}"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

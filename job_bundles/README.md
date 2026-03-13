@@ -54,6 +54,7 @@ The step definition includes a parameter space to define a task for each frame f
 and a short script that substitutes job parameters and the Frame task parameter into a script command for each task.
 
 * [3dsmax_vray_denoiser_example](3dsmax_vray_denoiser_example) - 3ds Max V-Ray rendering with smart frame chunking and VRIMG to EXR conversion
+* [arnold_standalone_render](arnold_standalone_render) - Arnold standalone rendering of .ass files using `kick`
 * [blender_render](blender_render/template.yaml)
 * [keyshot_standalone](keyshot_standalone)
 * [afterfx_render_one_task](afterfx_render_one_task)
@@ -68,6 +69,13 @@ If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../
 
 The [gsplat_pipeline](gsplat_pipeline/README.md) job bundle can take a video file as input and train a 3D Gaussian Splatting point cloud.
 This example shows Deadline Cloud running a 3D reconstruction workload that uses CUDA GPUs for acceleration.
+
+### Arnold standalone render
+
+The [arnold_standalone_render](arnold_standalone_render) job bundle renders Arnold `.ass` (Arnold Scene Source) files
+using the `kick` command-line renderer from MtoA. This is useful for batch rendering pre-exported Arnold scenes without
+requiring a full Maya session. It includes a sample Cornell box `.ass` file for testing. You can also download sample
+scenes from the [Autodesk Arnold learning scenes page](https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html).
 
 ### Turntable job with Maya/Arnold
 
