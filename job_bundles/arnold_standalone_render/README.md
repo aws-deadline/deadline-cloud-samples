@@ -16,6 +16,9 @@ To run this job, you need:
 * A Deadline Cloud queue with a **conda queue environment** configured. The job's
   `CondaPackages` parameter defaults to `maya-mtoa`, which provides the `kick` binary.
   On service-managed fleets, the `deadline-cloud` channel provides this package.
+  If you need a specific MtoA version, see the
+  [maya-mtoa conda recipe](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes/maya-mtoa-2026)
+  for building a custom package.
 * A Linux fleet associated with the queue (the job specifies `attr.worker.os.family: linux`).
 
 ## Getting sample .ass files
