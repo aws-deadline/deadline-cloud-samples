@@ -101,6 +101,13 @@ S3 prefix, then distributes the hashing and data copies across a number of worke
 uses content-addressed storage for data files, users that later submit jobs with these files attached will not have to
 upload them.
 
+### SSH via SSM Managed Node
+
+The [ssh_to_smf](ssh_to_smf/README.md) job bundle registers a Deadline Cloud worker as an
+AWS Systems Manager hybrid managed node, enabling interactive SSH access via Session Manager for the duration of the job.
+A submit script handles creating the SSM hybrid activation and passing the credentials as job parameters. Requires
+one-time account setup (IAM role + advanced-instances tier). See the bundle's README for full setup instructions.
+
 ## Example Blender job submission
 
 With a job bundle in hand, the [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) provides ways for you
