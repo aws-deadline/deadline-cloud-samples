@@ -14,25 +14,17 @@ for BINARY in blender blender-launcher blender-softwaregl blender-thumbnailer; d
     ln -r -s $PREFIX/opt/blender/$BINARY $PREFIX/bin/$BINARY
 done
 
-# See https://docs.conda.io/projects/conda/en/latest/dev-guide/deep-dives/activation.html
-# for details on activation.
-
-mkdir -p $PREFIX/etc/conda/activate.d
-cat <<EOF > $PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh
-export "BLENDER_LOCATION=\$CONDA_PREFIX/opt/blender"
-export "BLENDER_VERSION=$BLENDER_VERSION"
-export "BLENDER_LIBRARY_PATH=\$BLENDER_LOCATION/lib"
-export "BLENDER_SCRIPTS_PATH=\$BLENDER_LOCATION/\$BLENDER_VERSION/scripts"
-export "BLENDER_PYTHON_PATH=\$BLENDER_LOCATION/\$BLENDER_VERSION/python"
-export "BLENDER_DATAFILES_PATH=\$BLENDER_LOCATION/\$BLENDER_VERSION/datafiles"
-EOF
-
-mkdir -p $PREFIX/etc/conda/deactivate.d
-cat <<EOF > $PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh
-unset BLENDER_DATAFILES_PATH
-unset BLENDER_PYTHON_PATH
-unset BLENDER_SCRIPTS_PATH
-unset BLENDER_LIBRARY_PATH
-unset BLENDER_VERSION
-unset BLENDER_LOCATION
+# Set environment variables using the JSON env_vars.d mechanism.
+# See https://rattler-build.prefix.dev/latest/special_files/ for details.
+# This is more portable than activation scripts and works with pixi trampolines.
+mkdir -p $PREFIX/etc/conda/env_vars.d
+cat > $PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json << EOF
+{
+  "BLENDER_LOCATION": "$PREFIX/opt/blender",
+  "BLENDER_VERSION": "$BLENDER_VERSION",
+  "BLENDER_LIBRARY_PATH": "$PREFIX/opt/blender/lib",
+  "BLENDER_SCRIPTS_PATH": "$PREFIX/opt/blender/$BLENDER_VERSION/scripts",
+  "BLENDER_PYTHON_PATH": "$PREFIX/opt/blender/$BLENDER_VERSION/python",
+  "BLENDER_DATAFILES_PATH": "$PREFIX/opt/blender/$BLENDER_VERSION/datafiles"
+}
 EOF
