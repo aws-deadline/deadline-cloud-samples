@@ -184,11 +184,22 @@ parameterDefinitions:
     - label: Maya Scene Files
       patterns: ["*.ma", "*.mb"]
 
+# Arnold
+- name: ErrorOnArnoldLicenseFail
+  description: When enabled, the render will fail if an Arnold license cannot be obtained instead of rendering with a watermark.
+  type: STRING
+  default: "true"
+  allowedValues: ["true", "false"]
+  userInterface:
+    control: CHECK_BOX
+    label: Error on Arnold License Fail
+    groupLabel: Advanced
+
 # Software Environment
 - name: CondaPackages
   type: STRING
   description: Choose which Conda packages to install for the render. Requires a conda queue environment to process the value.
-  default: maya>=2024 maya-mtoa maya-openjd=0.14 ffmpeg
+  default: maya>=2024 maya-mtoa maya-openjd=0.15 ffmpeg
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -365,6 +376,7 @@ steps:
           output_file_prefix: '{{Param.SceneName}}'
           image_width: {{Param.ImageWidth}}
           image_height: {{Param.ImageHeight}}
+          error_on_arnold_license_fail: {{Param.ErrorOnArnoldLicenseFail}}
       actions:
         onEnter:
           command: maya-openjd

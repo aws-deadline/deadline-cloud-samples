@@ -28,7 +28,7 @@ ln -r -s "$INSTALL_DIR/bin/maya$MAYA_VERSION" "$INSTALL_DIR/bin/maya"
 mkdir -p "$SRC_DIR/download"
 cd "$SRC_DIR/download"
 dnf download --resolve -y freetype alsa-lib fontconfig harfbuzz libbrotli graphite2 \
-    libxkbfile xcb-util-cursor xcb-util-wm xcb-util-keysyms libxkbcommon-x11 \
+    libxkbfile xcb-util-wm xcb-util-keysyms libxkbcommon-x11 \
     libva libvdpau pciutils-libs
 
 for RPM_FILE in *.rpm; do
@@ -89,34 +89,17 @@ cat <<EOF > "$INSTALL_DIR"/AdlmThinClientCustomEnv.xml
 </ADLMCUSTOMENV>
 EOF
 
-# See https://docs.conda.io/projects/conda/en/latest/dev-guide/deep-dives/activation.html
-# for details on activation.
-
-# Activation scripts to set/unset environment variables
-mkdir -p "$PREFIX/etc/conda/activate.d"
-cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
-export MAYA_LOCATION="\$CONDA_PREFIX/$MAYA_ROOT"
-export MAYA_VERSION="$MAYA_VERSION"
-
-# Turn off the Maya application home for the render farm
-export MAYA_NO_HOME=1
-
-# Set the Maya module path to include the virtual environment equivalent of the default system module paths
-export MAYA_MODULE_PATH="\$CONDA_PREFIX/usr/autodesk/maya$MAYA_VERSION/modules:\$CONDA_PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION:\$CONDA_PREFIX/usr/autodesk/modules/maya"
-
-# Set thin client mode to use the correct ProductInformation.pit file
-export AUTODESK_ADLM_THINCLIENT_ENV='$INSTALL_DIR/AdlmThinClientCustomEnv.xml'
-export MAYA_LEGACY_THINCLIENT=1
+# Set environment variables using the JSON env_vars.d mechanism.
+# See https://rattler-build.prefix.dev/latest/special_files/ for details.
+# This is more portable than activation scripts and works with pixi trampolines.
+mkdir -p "$PREFIX/etc/conda/env_vars.d"
+cat > "$PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json" << EOF
+{
+  "MAYA_LOCATION": "$PREFIX/$MAYA_ROOT",
+  "MAYA_VERSION": "$MAYA_VERSION",
+  "MAYA_NO_HOME": "1",
+  "MAYA_MODULE_PATH": "$PREFIX/usr/autodesk/maya$MAYA_VERSION/modules:$PREFIX/usr/autodesk/modules/maya/$MAYA_VERSION:$PREFIX/usr/autodesk/modules/maya",
+  "AUTODESK_ADLM_THINCLIENT_ENV": "$INSTALL_DIR/AdlmThinClientCustomEnv.xml",
+  "MAYA_LEGACY_THINCLIENT": "1"
+}
 EOF
-cat "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
-
-mkdir -p "$PREFIX/etc/conda/deactivate.d"
-cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
-unset MAYA_LEGACY_THINCLIENT
-unset AUTODESK_ADLM_THINCLIENT_ENV
-unset MAYA_MODULE_PATH
-unset MAYA_NO_HOME
-unset MAYA_VERSION
-unset MAYA_LOCATION
-EOF
-cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh"

@@ -11,7 +11,7 @@ package:
   version: ${{ version }}
 
 source:
-  url: file://archive_files/Autodesk_Maya_${{ major_version }}_Linux_64bit.tgz
+  path: ../../archive_files/Autodesk_Maya_${{ major_version }}_ML_Linux_64bit.tgz
   sha256: d3e8cc63ea573383eb02046398a9f49c26cb55708eb8fb6266d04c46a5d6a48e
   target_directory: installer
 
