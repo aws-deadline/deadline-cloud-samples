@@ -31,6 +31,13 @@ The [budget_events_notification](notification_templates/budget_events_notificati
 to receive notifications via email and Slack when a budget threshold is reached in the aws.deadline service. It creates an SNS topic,
 an EventBridge rule, and a Chatbot configuration to send the notifications.
 
+## Scheduled standby workers
+
+The [fleet_standby_scheduling](farm_templates/fleet_standby_scheduling/) sample CloudFormation template schedules
+standby worker count changes on a Deadline Cloud fleet based on a time schedule. It sets a warm standby pool
+during business hours and resets it outside business hours to save cost. Works with any existing fleet created
+via the console, CLI, or CloudFormation.
+
 ## Customer-managed fleet health checks
 
 The [cmf_templates](farm_templates/cmf_templates/) collection includes a fleet health check CloudFormation template that sets up
