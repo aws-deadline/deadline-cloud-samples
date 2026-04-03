@@ -3,6 +3,7 @@
 # and 'workspace' for inter-step communication and output.
 **/output/
 **/workspace/
+**/results/
 
 # The V-Ray source files do not have an extension to distinguish them
 conda_recipes/archive_files/vraystd_*
