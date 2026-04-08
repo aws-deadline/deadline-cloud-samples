@@ -1,8 +1,9 @@
 specificationVersion: 'jobtemplate-2023-09'
-name: Husk USD Render
+extensions:
+  - TASK_CHUNKING
+name: Husk USD Render with Contiguous Chunks
 
 parameterDefinitions:
-# Render Parameters
 - name: USDSceneFile
   type: PATH
   default: "sample.usda"
@@ -11,22 +12,34 @@ parameterDefinitions:
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: USD Scene File
-    groupLabel: Render Parameters
     fileFilters:
     - label: USD Scene Files
       patterns: ["*.usd", "*.usdc", "*.usda", "*.usdz"]
     - label: All Files
       patterns: ["*"]
-  description: >
-    Choose the USD scene file you want to render. Use the 'Job Attachments' tab
-    to add textures and other files that the job needs.
+  description: Choose the USD scene file you want to render.
 - name: Frames
   type: STRING
   userInterface:
     control: LINE_EDIT
     label: Frames
-    groupLabel: Render Parameters
-  default: "1"
+  default: "1-100"
+  description: The frame range to render (e.g., 1-100).
+- name: ChunkSize
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+  default: 5
+  minValue: 1
+  description: Number of frames per chunk.
+- name: TargetRuntime
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (Seconds)
+  default: 600
+  description: Target runtime per chunk (0 to disable adaptive chunking).
 - name: OutputDir
   type: PATH
   default: output/
@@ -35,14 +48,12 @@ parameterDefinitions:
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory
-    groupLabel: Render Parameters
   description: Choose the render output directory.
 - name: OutputPattern
   type: STRING
   userInterface:
     control: LINE_EDIT
     label: Output File Pattern
-    groupLabel: Render Parameters
   default: "output_$F4"
   # Husk Documentation: https://www.sidefx.com/docs/houdini/ref/utils/husk.html#:~:text=Current%20frame%20number%20with%20fixed%20number%20of
   description: Enter the output filename pattern (without extension). Please see the Husk documentation for formatting
@@ -51,7 +62,6 @@ parameterDefinitions:
   userInterface:
     control: DROPDOWN_LIST
     label: Output File Format
-    groupLabel: Render Parameters
   description: Choose the file format for the output render.
   default: exr
   allowedValues: ["exr"]
@@ -60,27 +70,22 @@ parameterDefinitions:
   userInterface:
     control: LINE_EDIT
     label: Resolution Width
-    groupLabel: Render Parameters
+  description: Enter the resolution width in pixels. The default is 1024.
   default: "1024"
-  description: >
-    Enter the resolution width in pixels. The default is 1024.
 - name: ResolutionY
   type: STRING
   userInterface:
     control: LINE_EDIT
     label: Resolution Height
-    groupLabel: Render Parameters
   default: "768"
-  description: >
-    Enter the resolution height in pixels. The default is 768.
+  description: Enter the resolution height in pixels. The default is 768.
 - name: Renderer
   type: STRING
   userInterface:
     control: DROPDOWN_LIST
     label: Husk Render Delegate
-    groupLabel: Render Parameters
-  description: Choose the renderer you wish to use. BRAY_HdKarma uses the CPU while BRAY_HdKarmaXPU requires a GPU fleet. If you select BRAY_HdKarmaXPU your queue must be associated with a GPU fleet.
   default: BRAY_HdKarma
+  description: Choose the renderer you wish to use. BRAY_HdKarma uses the CPU while BRAY_HdKarmaXPU requires a GPU fleet. If you select BRAY_HdKarmaXPU your queue must be associated with a GPU fleet.
   allowedValues: [BRAY_HdKarma, BRAY_HdKarmaXPU, HdVRayRendererPlugin, HdRedshiftRendererPlugin]
 - name: CondaPackages
   type: STRING
@@ -89,15 +94,20 @@ parameterDefinitions:
     # so leave the GUI for the queue environment to display.
     control: HIDDEN
   default: "houdini=20.5"
-  description: >
-    This parameter provides a default value Conda environment, specifying Houdini 20.5 to provide the husk executable.
+  description: This parameter provides a default value Conda environment, specifying Houdini 20.5 to provide the husk executable.
 steps:
 - name: HuskRender
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      type: INT
+      type: CHUNK[INT]
       range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        # Husk uses -f (start frame) and -n (frame count) for contiguous ranges
+        # https://www.sidefx.com/docs/houdini/ref/utils/husk.html
+        rangeConstraint: CONTIGUOUS
   script:
     actions:
       onRun:
@@ -109,19 +119,24 @@ steps:
         data: |
           set -xeuo pipefail
           mkdir -p '{{Param.OutputDir}}'
-          # The 'husk' executable exists on the path when using a Deadline Cloud-provided Houdini conda package
+
+          # Parse contiguous chunk range (e.g., "1-10" or "5-5")
+          START_FRAME="$(echo '{{Task.Param.Frame}}' | cut -d- -f1)"
+          END_FRAME="$(echo '{{Task.Param.Frame}}' | cut -d- -f2)"
+          FRAME_COUNT=$((END_FRAME - START_FRAME + 1))
+
+          echo "Rendering frames $START_FRAME to $END_FRAME ($FRAME_COUNT frames)"
+
+          # Husk uses -f for start frame and -n for frame count
+          # https://www.sidefx.com/docs/houdini/ref/utils/husk.html
           husk -r {{Param.ResolutionX}} {{Param.ResolutionY}} \
-          -R {{Param.Renderer}} \
-          -f {{Task.Param.Frame}} \
-          '{{Param.USDSceneFile}}' \
-          -o '{{Param.OutputDir}}/{{Param.OutputPattern}}.{{Param.Format}}'
+               -R {{Param.Renderer}} \
+               -f "$START_FRAME" \
+               -n "$FRAME_COUNT" \
+               '{{Param.USDSceneFile}}' \
+               -o '{{Param.OutputDir}}/{{Param.OutputPattern}}.{{Param.Format}}'
   hostRequirements:
-    # Add this requirement when rendering with the GPU to ensure the job is only scheduled on GPU-enabled fleets.
-    # amounts:
-    # - name: amount.worker.gpu
-    #   min: 1
     attributes:
-    # The Houdini package is currently only availabling on Linux in Deadline Cloud SMF
     - name: attr.worker.os.family
       anyOf:
       - linux

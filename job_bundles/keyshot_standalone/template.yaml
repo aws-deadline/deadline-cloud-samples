@@ -1,9 +1,10 @@
 specificationVersion: 'jobtemplate-2023-09'
-name: KeyShot Standalone
+extensions:
+  - TASK_CHUNKING
+name: KeyShot Standalone with Non-Contiguous Chunks
 description: |
-  A simple job bundle that allows the user to select a KeyShot scene file, the
-  frames to render, the output file path and render via the keyshot_headless
-  command on Windows.
+  A job bundle that renders KeyShot scenes with task chunking support.
+  Uses keyshot_headless command on Windows with non-contiguous frame ranges.
 
 parameterDefinitions:
 
@@ -16,7 +17,6 @@ parameterDefinitions:
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: KeyShot Scene File
-    groupLabel: KeyShot Scene Settings
     fileFilters:
     - label: KeyShot Scene Files
       patterns:
@@ -25,13 +25,28 @@ parameterDefinitions:
       patterns:
       - '*'
 - name: Frames
-  description: The frames to render. E.g. 1-3,8,11-15
+  description: The frames to render. E.g. 1-3,8,11-100:2
   type: STRING
   userInterface:
     control: LINE_EDIT
     label: Frames
-    groupLabel: KeyShot Scene Settings
+  default: "1-3,8,11-100:2"
   minLength: 1
+- name: ChunkSize
+  description: Number of frames per chunk.
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+  default: 5
+  minValue: 1
+- name: TargetRuntime
+  description: Target runtime per chunk in seconds (0 to disable adaptive chunking).
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (Seconds)
+  default: 300
 
 # KeyShot Output Settings
 - name: OutputName
@@ -40,7 +55,6 @@ parameterDefinitions:
   userInterface:
     control: LINE_EDIT
     label: Output File Name
-    groupLabel: KeyShot Output Settings
   default: KeyShotOutput
 - name: OutputDirectoryPath
   description: The render output directory
@@ -50,7 +64,6 @@ parameterDefinitions:
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory Path
-    groupLabel: KeyShot Output Settings
 - name: OutputFormat
   description: The render output format
   type: STRING
@@ -69,27 +82,27 @@ parameterDefinitions:
   userInterface:
     control: DROPDOWN_LIST
     label: Output Format
-    groupLabel: KeyShot Output Settings
 
 # Software Environment
 - name: CondaPackages
   type: STRING
   userInterface:
-    # This parameter is for a queue environment, not used directly in the job,
-    # so leave the GUI for the queue environment to display.
     control: HIDDEN
   default: keyshot
-  description: >
-    If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this
-    will set the default packages to use for the job.
+  description: Conda packages to install. Requires a Queue Environment to create the Conda Environment.
 
 steps:
 - name: Render
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      type: INT
+      type: CHUNK[INT]
       range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        # KeyShot renders frames via Python script, supports any frame list
+        rangeConstraint: NONCONTIGUOUS
   script:
     actions:
       onRun:
@@ -106,6 +119,28 @@ steps:
         filename: KeyShotScript.py
         type: TEXT
         data: |
+          import re
+
+          def parse_frame_range(range_expr):
+              """Parse OpenJD range expression into list of frames."""
+              int_pat = r"\s*(-?[0-9]+)\s*"
+              part_re = re.compile(f"^{int_pat}(?:-{int_pat}(?::{int_pat})?)?$")
+              frames = []
+              for part in range_expr.split(","):
+                  m = part_re.match(part)
+                  if m:
+                      start, end, step = m.groups()
+                      if step is not None:
+                          step = int(step)
+                          frames.extend(range(int(start), int(end) + (step // abs(step)), step))
+                      elif end is not None:
+                          frames.extend(range(int(start), int(end) + 1))
+                      else:
+                          frames.append(int(start))
+                  else:
+                      raise ValueError(f"Invalid frame range: {range_expr}")
+              return frames
+
           match "{{Param.OutputFormat}}":
             case "JPEG":
               extension = ".jpg"
@@ -120,12 +155,18 @@ steps:
 
           opts = lux.getRenderOptions()
           opts.setAddToQueue(False)
-          lux.setAnimationFrame(int("{{Task.Param.Frame}}"))
-          output_path = os.path.join(r"{{Param.OutputDirectoryPath}}", "{{Param.OutputName}}.{{Task.Param.Frame}}" + extension)
           output_format_code = lux.RENDER_OUTPUT_{{Param.OutputFormat}}
-          print(f"Output Path: {output_path}")
-          print(f"Output Format: {output_format_code}")
-          lux.renderImage(path=output_path, opts=opts, format=output_format_code)
+
+          # Parse non-contiguous chunk and render each frame
+          frames = parse_frame_range("{{Task.Param.Frame}}")
+          print(f"Rendering {len(frames)} frames: {frames}")
+
+          for frame in frames:
+              lux.setAnimationFrame(frame)
+              output_path = os.path.join(r"{{Param.OutputDirectoryPath}}", f"{{Param.OutputName}}.{frame}" + extension)
+              print(f"Rendering frame {frame} to {output_path}")
+              lux.renderImage(path=output_path, opts=opts, format=output_format_code)
+
           print("Finished Rendering")
   hostRequirements:
     attributes:
