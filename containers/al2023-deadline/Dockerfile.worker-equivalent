@@ -31,6 +31,7 @@ RUN dnf install -y \
     bind-utils \
     bzip2 \
     chkconfig \
+    cpio \
     cronie \
     cronie-anacron \
     crontabs \
@@ -39,6 +40,7 @@ RUN dnf install -y \
     dosfstools \
     ed \
     info \
+    jq \
     keyutils \
     logrotate \
     lsof \
@@ -52,6 +54,7 @@ RUN dnf install -y \
     screen \
     slang \
     strace \
+    sudo \
     sysstat \
     tcsh \
     time \
@@ -172,6 +175,8 @@ RUN dnf install -y \
     nss-softokn-freebl \
     nss-sysinit \
     nss-util \
+    openssh \
+    openssh-clients \
     openssl-fips-provider-latest \
     policycoreutils-python-utils \
     protobuf-c \
@@ -217,6 +222,7 @@ RUN dnf install -y \
 # Layer 10: Misc libraries present on the worker
 # ============================================================
 RUN dnf install -y \
+    awscli-2 \
     boost-filesystem \
     boost-system \
     boost-thread \
