@@ -54,6 +54,30 @@ parameterDefinitions:
   description: Choose the file format to render as.
   default: JPEG
   allowedValues: [TGA, RAWTGA, JPEG, IRIS, IRIZ, PNG, HDR, TIFF, OPEN_EXR, OPEN_EXR_MULTILAYER, CINEON, DPX, DDS, JP2, WEBP]
+- name: ResolutionX
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution X
+    groupLabel: Render Parameters
+  description: Override the render resolution width. Set to 0 to use the scene default.
+  default: 0
+- name: ResolutionY
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution Y
+    groupLabel: Render Parameters
+  description: Override the render resolution height. Set to 0 to use the scene default.
+  default: 0
+- name: Samples
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Render Samples
+    groupLabel: Render Parameters
+  description: Override the number of render samples (Cycles/EEVEE). Set to 0 to use the scene default.
+  default: 0
 
 # Software Environment
 - name: CondaPackages
@@ -98,8 +122,27 @@ steps:
 
           mkdir -p '{{Param.OutputDir}}'
 
+          # Build a Python expression to apply any overrides
+          PYTHON_OVERRIDES=""
+          if [ "{{Param.ResolutionX}}" -gt 0 ] 2>/dev/null && [ "{{Param.ResolutionY}}" -gt 0 ] 2>/dev/null; then
+            PYTHON_OVERRIDES="${PYTHON_OVERRIDES}bpy.context.scene.render.resolution_x={{Param.ResolutionX}}; "
+            PYTHON_OVERRIDES="${PYTHON_OVERRIDES}bpy.context.scene.render.resolution_y={{Param.ResolutionY}}; "
+            PYTHON_OVERRIDES="${PYTHON_OVERRIDES}bpy.context.scene.render.resolution_percentage=100; "
+          fi
+          if [ "{{Param.Samples}}" -gt 0 ] 2>/dev/null; then
+            PYTHON_OVERRIDES="${PYTHON_OVERRIDES}bpy.context.scene.cycles.samples={{Param.Samples}}; "
+            PYTHON_OVERRIDES="${PYTHON_OVERRIDES}bpy.context.scene.eevee.taa_render_samples={{Param.Samples}}; "
+            PYTHON_OVERRIDES="${PYTHON_OVERRIDES}bpy.context.scene.cycles.use_denoising=False; "
+          fi
+
+          OVERRIDE_ARGS=""
+          if [ -n "$PYTHON_OVERRIDES" ]; then
+            OVERRIDE_ARGS="--python-expr"
+          fi
+
           blender --background '{{Param.BlenderSceneFile}}' \
                   --render-output '{{Param.OutputDir}}/{{Param.OutputPattern}}' \
                   --render-format {{Param.Format}} \
                   --use-extension 1 \
+                  ${OVERRIDE_ARGS:+"$OVERRIDE_ARGS"} ${PYTHON_OVERRIDES:+"import bpy; $PYTHON_OVERRIDES"} \
                   --render-frame {{Task.Param.Frame}}
