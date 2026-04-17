@@ -1,0 +1,282 @@
+specificationVersion: jobtemplate-2023-09
+name: FFmpeg Movie from Job Output
+description: |
+  This job downloads the output of another completed job in the same queue and uses
+  FFmpeg to encode the image sequence into a video file.
+
+  It requires FFmpeg from conda-forge and the Deadline Cloud Python library (installed
+  via pip at runtime). On service-managed fleets, use "conda-forge" as the CondaChannels
+  parameter for a conda queue environment.
+
+parameterDefinitions:
+# Source Job
+- name: SourceJobId
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Source Job ID
+    groupLabel: Source Job
+  description: >
+    The Job ID of a completed job in the same queue whose output images will be
+    assembled into a movie. Example: job-0123456789abcdef0123456789abcdef
+- name: SourceStepId
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Source Step ID (optional)
+    groupLabel: Source Job
+  default: ''
+  description: >
+    Optionally restrict the download to a specific step ID from the source job.
+    Leave empty to download all outputs.
+
+# Movie Settings
+- name: FrameRate
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Frame Rate (fps)
+    groupLabel: Movie Settings
+  default: 24
+  minValue: 1
+  maxValue: 120
+  description: The frame rate of the output video.
+- name: PixelFormat
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Pixel Format
+    groupLabel: Movie Settings
+  default: yuv420p
+  allowedValues: [yuv420p, yuv444p]
+  description: >
+    The pixel format for the output video. yuv420p is widely compatible;
+    yuv444p preserves more color detail.
+- name: EncodingPreset
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Encoding Preset
+    groupLabel: Movie Settings
+  default: medium
+  allowedValues: [ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow]
+  description: Controls the encoding speed to compression ratio.
+- name: ConstantRateFactor
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Constant Rate Factor (CRF)
+    groupLabel: Movie Settings
+  default: 18
+  minValue: 0
+  maxValue: 51
+  description: >
+    Quality setting for H.264 encoding. 0 is lossless, 51 is worst quality.
+    17-18 is nearly visually lossless.
+- name: Resolution
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output Resolution (optional)
+    groupLabel: Movie Settings
+  default: ''
+  description: >
+    Optional output resolution as WIDTHxHEIGHT (e.g. 1920x1080). Leave empty
+    to use the source image resolution.
+- name: OutputFilename
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output Filename
+    groupLabel: Movie Settings
+  default: output.mp4
+  description: The filename for the output video.
+
+# Output
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+  default: output
+  description: The directory where the output video will be saved.
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: ffmpeg
+  description: >
+    Conda packages required by this job. Requires a conda queue environment.
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: conda-forge
+  description: >
+    Conda channels to get packages from. Requires a conda queue environment.
+
+# Injected by pre-submission hook (inject_s3_settings.py)
+- name: S3SettingsFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  default: s3_settings.json
+  description: >
+    JSON file with S3 bucket settings. Created by the pre-submission hook.
+
+jobEnvironments:
+- name: InstallDeadline
+  description: Installs the Deadline Cloud Python library via pip.
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ['{{Env.File.Setup}}']
+    embeddedFiles:
+    - name: Setup
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+        pip install deadline
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+steps:
+- name: EncodeMovie
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Download
+      filename: download_outputs.py
+      type: TEXT
+      data: |
+        """Download output files from a source job using the job attachments API."""
+        import json
+        import os
+        import sys
+
+        from deadline.job_attachments.download import OutputDownloader
+        from deadline.job_attachments.models import (
+            FileConflictResolution,
+            JobAttachmentS3Settings,
+        )
+
+        farm_id = os.environ["DEADLINE_FARM_ID"]
+        queue_id = os.environ["DEADLINE_QUEUE_ID"]
+        job_id = "{{Param.SourceJobId}}"
+        download_dir = sys.argv[1]
+
+        with open("{{Param.S3SettingsFile}}") as f:
+            s3_cfg = json.load(f)
+        s3_settings = JobAttachmentS3Settings(
+            s3BucketName=s3_cfg["s3BucketName"],
+            rootPrefix=s3_cfg["rootPrefix"],
+        )
+
+        step_id = "{{Param.SourceStepId}}" or None
+
+        downloader = OutputDownloader(
+            s3_settings=s3_settings,
+            farm_id=farm_id,
+            queue_id=queue_id,
+            job_id=job_id,
+            step_id=step_id,
+        )
+        output_roots = list(downloader.get_output_paths_by_root().keys())
+        for root in output_roots:
+            downloader.set_root_path(root, download_dir)
+        stats = downloader.download_job_output(
+            file_conflict_resolution=FileConflictResolution.OVERWRITE,
+        )
+        print(f"Downloaded {stats.processed_files} files ({stats.processed_bytes} bytes)")
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env bash
+        set -xeuo pipefail
+
+        DOWNLOAD_DIR="$(mktemp -d)"
+        mkdir -p '{{Param.OutputDir}}'
+
+        # --- Download outputs from source job ---
+        echo "Downloading outputs from source job {{Param.SourceJobId}}..."
+        python3 '{{Task.File.Download}}' "$DOWNLOAD_DIR"
+
+        # --- Find images ---
+        # Auto-detect the most common image extension
+        IMAGE_EXTS="png exr jpg jpeg tga tiff tif dpx hdr bmp"
+        BEST_EXT=""
+        BEST_COUNT=0
+        for ext in $IMAGE_EXTS; do
+          COUNT=$(find "$DOWNLOAD_DIR" -type f -name "*.$ext" | wc -l)
+          if [ "$COUNT" -gt "$BEST_COUNT" ]; then
+            BEST_COUNT=$COUNT
+            BEST_EXT=$ext
+          fi
+        done
+
+        if [ "$BEST_COUNT" -eq 0 ]; then
+          echo "ERROR: No image files found. Available files:"
+          find "$DOWNLOAD_DIR" -type f | head -20
+          exit 1
+        fi
+        echo "Detected $BEST_COUNT .$BEST_EXT files"
+
+        # --- Build sorted file list and encode ---
+        CONCAT_FILE="$(mktemp)"
+        find "$DOWNLOAD_DIR" -type f -name "*.$BEST_EXT" | sort | while IFS= read -r img; do
+          echo "file '$img'"
+        done > "$CONCAT_FILE"
+
+        echo "First images:"; head -3 "$CONCAT_FILE"
+        echo "Last images:"; tail -3 "$CONCAT_FILE"
+
+        # Build scale filter
+        SCALE_FILTER="scale=in_color_matrix=bt709:out_color_matrix=bt709"
+        RESOLUTION='{{Param.Resolution}}'
+        if [ -n "$RESOLUTION" ]; then
+          WIDTH="${RESOLUTION%%x*}"
+          HEIGHT="${RESOLUTION##*x}"
+          SCALE_FILTER="scale=${WIDTH}:${HEIGHT}:in_color_matrix=bt709:out_color_matrix=bt709"
+        fi
+
+        FFMPEG_ARGS=(
+          -y
+          -f concat -safe 0
+          -r {{Param.FrameRate}}
+          -i "$CONCAT_FILE"
+          -pix_fmt {{Param.PixelFormat}}
+          -vf "$SCALE_FILTER"
+          -c:v libx264
+          -preset {{Param.EncodingPreset}}
+          -crf {{Param.ConstantRateFactor}}
+          -color_range tv
+          -colorspace bt709
+          -color_primaries bt709
+          -color_trc iec61966-2-1
+          -movflags faststart
+          '{{Param.OutputDir}}/{{Param.OutputFilename}}'
+        )
+
+        echo "Encoding video..."
+        ffmpeg "${FFMPEG_ARGS[@]}"
+        echo "Video saved to {{Param.OutputDir}}/{{Param.OutputFilename}}"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
