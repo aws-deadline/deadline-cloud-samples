@@ -1,0 +1,248 @@
+# Dockerfile.worker-equivalent
+#
+# Replicates an April 2026 snapshot of the AWS Deadline Cloud service-managed
+# fleet (SMF) worker AMI environment on top of the base Amazon Linux 2023 image.
+# This is a point-in-time capture, not a continuously synchronized version —
+# the actual worker AMI may drift as packages are added or updated.
+#
+# Use this for building and testing conda packages locally with the same
+# GLIBC version, system libraries, and runtime environment as the real workers.
+#
+# Based on a diff of 768 installed packages on a live SMF worker vs the
+# 289-package AL2023 Minimal AMI baseline (April 2026).
+#
+# NOTE:
+#
+# For NVIDIA GPU support, add the NVIDIA container toolkit repo:
+#   dnf config-manager --add-repo \
+#     https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+#   dnf install -y nvidia-container-toolkit
+
+FROM amazonlinux:2023
+
+# ============================================================
+# Layer 1: Core system tools and utilities
+# ============================================================
+RUN dnf install -y \
+    acl \
+    attr \
+    bash-completion \
+    bc \
+    bind-utils \
+    bzip2 \
+    chkconfig \
+    cronie \
+    cronie-anacron \
+    crontabs \
+    cryptsetup \
+    dnf-utils \
+    dosfstools \
+    ed \
+    info \
+    keyutils \
+    logrotate \
+    lsof \
+    make \
+    nano \
+    newt \
+    ntsysv \
+    parted \
+    pigz \
+    rsync \
+    screen \
+    slang \
+    strace \
+    sysstat \
+    tcsh \
+    time \
+    traceroute \
+    unzip \
+    vim-enhanced \
+    wget \
+    words \
+    xfsdump \
+    xxd \
+    zip \
+    && dnf clean all
+
+# ============================================================
+# Layer 2: Build toolchain (GCC, binutils, kernel headers)
+# ============================================================
+RUN dnf install -y \
+    binutils \
+    cpp \
+    gcc \
+    gcc-c++ \
+    glibc-devel \
+    glibc-gconv-extra \
+    glibc-headers-x86 \
+    kernel-devel \
+    kernel-headers \
+    libstdc++-devel \
+    libxcrypt-compat \
+    libxcrypt-devel \
+    pkgconf \
+    pkgconf-m4 \
+    pkgconf-pkg-config \
+    zlib-devel \
+    && dnf clean all
+
+# ============================================================
+# Layer 3: X11, Mesa/OpenGL, Wayland — headless rendering deps
+# ============================================================
+RUN dnf install -y \
+    libICE \
+    libSM \
+    libX11 \
+    libX11-common \
+    libX11-xcb \
+    libXau \
+    libXcomposite \
+    libXcursor \
+    libXdamage \
+    libXext \
+    libXfixes \
+    libXi \
+    libXinerama \
+    libXmu \
+    libXpm \
+    libXrandr \
+    libXrender \
+    libXt \
+    libXtst \
+    libXxf86vm \
+    libdrm \
+    libglvnd \
+    libglvnd-egl \
+    libglvnd-glx \
+    libglvnd-opengl \
+    libpciaccess \
+    libwayland-client \
+    libwayland-server \
+    libxcb \
+    libxkbcommon \
+    libxshmfence \
+    llvm-libs \
+    mesa-dri-drivers \
+    mesa-filesystem \
+    mesa-libEGL \
+    mesa-libGL \
+    mesa-libGLU \
+    mesa-libgbm \
+    mesa-libglapi \
+    mesa-va-drivers \
+    xkeyboard-config \
+    && dnf clean all
+
+# ============================================================
+# Layer 4: Image/media libraries
+# ============================================================
+RUN dnf install -y \
+    jbigkit-libs \
+    libjpeg-turbo \
+    libpng \
+    libtiff \
+    libwebp \
+    && dnf clean all
+
+# ============================================================
+# Layer 5: Networking, NFS, SSSD, security
+# ============================================================
+RUN dnf install -y \
+    c-ares \
+    container-selinux \
+    cyrus-sasl-plain \
+    fstrm \
+    iptables-libs \
+    iptables-nft \
+    libcgroup \
+    libmaxminddb \
+    libnetfilter_conntrack \
+    libnfnetlink \
+    libnfsidmap \
+    libnftnl \
+    libnl3 \
+    libnsl \
+    libpcap \
+    libtirpc \
+    nfs-utils \
+    nspr \
+    nss \
+    nss-softokn \
+    nss-softokn-freebl \
+    nss-sysinit \
+    nss-util \
+    openssl-fips-provider-latest \
+    policycoreutils-python-utils \
+    protobuf-c \
+    rpcbind \
+    rsyslog \
+    rsyslog-logrotate \
+    sssd-client \
+    sssd-common \
+    sssd-kcm \
+    sssd-nfs-idmap \
+    && dnf clean all
+
+# ============================================================
+# Layer 6: Git and Perl (git dependency)
+# ============================================================
+RUN dnf install -y \
+    git \
+    perl \
+    perl-Git \
+    && dnf clean all
+
+# ============================================================
+# Layer 8: Python 3.11
+# ============================================================
+RUN dnf install -y \
+    python3.11 \
+    python3.11-libs \
+    python3.11-pip \
+    python3.11-setuptools \
+    && dnf clean all
+
+# ============================================================
+# Layer 9: Docker + containerd (Docker-in-Docker not enabled
+# by default — mount the host socket or use --privileged)
+# ============================================================
+RUN dnf install -y \
+    containerd \
+    docker \
+    runc \
+    && dnf clean all
+
+# ============================================================
+# Layer 10: Misc libraries present on the worker
+# ============================================================
+RUN dnf install -y \
+    boost-filesystem \
+    boost-system \
+    boost-thread \
+    dyninst \
+    jemalloc \
+    libaio \
+    libdatrie \
+    libev \
+    libevent \
+    libibverbs \
+    libldb \
+    libmetalink \
+    libmpc \
+    libstoragemgmt \
+    libtalloc \
+    libtdb \
+    libtevent \
+    libthai \
+    libtool-ltdl \
+    libuv \
+    lm_sensors-libs \
+    lmdb-libs \
+    mpdecimal \
+    sombok \
+    tbb \
+    xxhash-libs \
+    && dnf clean all
+
+CMD ["/bin/bash"]
