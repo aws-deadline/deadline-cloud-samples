@@ -117,22 +117,21 @@ Follow the style of `3dsmax-2025-and-vray/README.md`. Include:
 - Note that config changes only affect Workers launched after the update
 - CloudWatch log group: `/aws/deadline/farm-<farm-id>/fleet-<fleet-id>`
 
-### Step 6: Test the script locally
+### Step 6: Test the script locally and on a fleet worker
 
 Before considering the script done:
-1. Run the generated `.ps1` locally on a Windows machine to verify the install succeeds
+1. Run the generated `.ps1` locally on a fresh Windows machine to verify the install succeeds end-to-end
 2. Verify 3ds Max installed correctly:
    ```powershell
    & "C:\Program Files\Autodesk\3ds Max <YEAR>\3dsmaxbatch.exe" -help
    ```
-3. If the script includes V-Ray, use the `sunflower_sphere` test bundle in
-   `host_configuration_scripts/3dsmax/3dsmax-2025-and-vray/sunflower_sphere/` to verify rendering works:
+3. Configure a Service Managed Fleet with the script, set min worker count to 1, and wait for a worker to start
+4. If the script includes V-Ray, submit the `sunflower_sphere` test bundle against the fleet to verify rendering works end-to-end:
    ```
    deadline bundle submit host_configuration_scripts/3dsmax/3dsmax-2025-and-vray/sunflower_sphere
    ```
    The job should complete and produce a rendered sphere with a sunflower texture.
-4. For other plugin combinations, verify the plugin loads by opening 3ds Max and checking
-   the plugin is available, or run a minimal batch render with a scene that uses the plugin.
+5. For other plugin combinations, create a minimal job bundle that exercises the plugin and submit it to the fleet to confirm the setup is good before production use.
 
 ### Step 7: Update the top-level README
 
