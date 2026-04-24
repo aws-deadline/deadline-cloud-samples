@@ -29,6 +29,14 @@ $ deadline bundle gui-submit job_bundles/gui_control_showcase
 
 ![deadline bundle gui-submit showcase](.images/deadline-bundle-gui-submit-showcase.png)
 
+## Container samples
+
+The [containers](containers) directory contains Dockerfiles for building
+container images compatible with Deadline Cloud worker environments. The
+[al2023-deadline](containers/al2023-deadline/) sample replicates the
+service-managed fleet worker AMI package set on Amazon Linux 2023, useful for
+building and testing conda packages or other software locally.
+
 ## Conda recipes
 
 The [conda_recipes](conda_recipes) directory contains samples and tooling for building conda packages for your
