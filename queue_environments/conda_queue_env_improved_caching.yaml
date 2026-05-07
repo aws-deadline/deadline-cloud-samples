@@ -41,33 +41,6 @@ parameterDefinitions:
   userInterface:
     control: DROPDOWN_LIST
     label: Conda Channel Priority
-- name: PersitentEnvDir
-  type: STRING
-  description: >
-    The directory where reusable hash named environments are stored.
-
-    Environments will be stored as <PersitentEnvDir>/hashname_<hash>, where the hash
-    is computed from the channels and requested packages.
-  default: "~/.hashed_envs"
-  userInterface:
-    control: LINE_EDIT
-    label:  Persistent Environment Directory
-- name: UpdateAfterMinutes
-  type: INT
-  description: |
-    How long before a peristent environment is re-solved and updated.
-  default: "600"
-  userInterface:
-    control: SPIN_BOX
-    label: Conda Environment Update After (Minutes)
-- name: CleanupAfterHours
-  type: INT
-  description: |
-    How long before stale persisted environments are removed.
-  default: "96"
-  userInterface:
-    control: SPIN_BOX
-    label: Conda Environment Cleanup After (Hours)
 
 environment:
   name: Conda
@@ -84,11 +57,9 @@ environment:
         - "--channel-priority"
         - "{{Param.ChannelPriority}}"
         - "--persist-envs-hashed"
-        - "{{Param.PersitentEnvDir}}"
-        - "--update-after-minutes"
-        - "{{Param.UpdateAfterMinutes}}"
+        - "~/.persisted_envs"
       onExit:
         command: "conda-queue-env-exit"
         args:
-        - "--cleanup-after-hours"
-        - "{{Param.CleanupAfterHours}}"
+        - "--persist-envs-hashed"
+        - "~/.persisted_envs"

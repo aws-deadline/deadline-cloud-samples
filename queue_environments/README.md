@@ -152,6 +152,14 @@ the same virtual environments to be reused across multiple jobs via additional c
 and `conda-queue-env-exit` commands provided on service-managed fleets. This can give significant performance improvements when
 running many jobs with the same package requirements.
 
+The queue environment is configured to store persistent environments under `~/.persistent_envs`. To store persistent environments
+under a different directory, the `onEnter` and `onExit` actions can be modified to reference a different path.
+
+The `conda-queue-env-enter` command has an option `--update-after-minutes <minutes>`, which controls how long before a persisted environment is re-solved and updated.
+to use a different value than the default of 600 minutes, the `onEnter` action can be modified to add this option. The `conda-queue-env-exit` command also
+has an option `--cleanup-after-hours <hours>` which controls when stale persisted environments are removed. The `onExit` action can be modified to use a different
+value than the default 96 hours.
+
 To get environment reuse functionality on customer-managed fleets, you can use the following sample.
 
 ### Conda queue environment with improved caching using Conda written inline
