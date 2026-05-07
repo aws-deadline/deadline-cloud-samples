@@ -48,7 +48,7 @@ For Conda you must also apply the following setup steps so that `conda activate`
 are available within non-interactive bash shells. The scripts assume an `/opt/conda` install location
 on Linux and `C:\Programs\Conda` install location on Windows.
 
-Here is example bash script that does this for Amazon Linux 2023:
+Here is an example bash script that does this for Amazon Linux 2023:
 
 ```bash
 # Turn on pam_env so that `/etc/environment` is used in non-interactive scripts
@@ -58,14 +58,14 @@ echo 'BASH_ENV=/etc/bash_env' >> /etc/environment
 echo 'source /opt/conda/etc/profile.d/conda.sh' > /etc/bash_env
 ```
 
-Here is example bash script that does this for Ubuntu:
+Here is an example bash script that does this for Ubuntu:
 
 ```bash
 # Enable `conda activate <env>` in non-interactive scripts,
 echo 'source /opt/conda/etc/profile.d/conda.sh' >> /usr/share/modules/init/bash
 ```
 
-Here is example powershell script that does this for Windows:
+Here is an example PowerShell script that does this for Windows:
 
 ```bash
 # Set BASH_ENV so that it sources the conda command
@@ -101,17 +101,17 @@ the correct binaries.
 The file [conda_queue_env_from_console.yaml](conda_queue_env_from_console.yaml) is a copy of the queue environment
 added by Deadline Cloud console onboarding flows. Its onEnter and onExit actions run the commands
 `conda-queue-env-enter` and `conda-queue-env-exit` respectively. These commands are provided on
-Deadline Cloud service-managed fleets. They are written using [Rattler](https://github.com/conda/rattler), which will
-create nearly identical environments, but generally runs faster than equivalent operations with Conda.
+the workers of Deadline Cloud service-managed fleets. They are written using [Rattler](https://github.com/conda/rattler), which
+generally runs faster than equivalent operations with Conda.
 
-The `conda-queue-env` commands on service-managed fleets support creating persitent environments that can be reused accross
-multiple jobs, but this functionality is not enabled by default on the console queue environment. See the `conda_queue_env_persistent_envs` 
+The `conda-queue-env` commands on service-managed fleets support creating persistent environments that can be reused across
+multiple jobs, but this functionality is not enabled by default on the console queue environment. See the `conda_queue_env_improved_caching.yaml` 
 queue environment for a sample that enables this functionality.
 
 To get similar functionality as the `conda_queue_env_from_console.yaml` environment on customer-managed fleets,
-you can look at the next sample that provides equivalent functionality.
+see the next sample `conda_queue_env_inline.yaml`.
 
-### Console-equivalent Conda queue environment
+### Conda queue environment using Conda written inline
 
 The file [conda_queue_env_inline.yaml](conda_queue_env_inline.yaml) has nearly the same behavior
 as the console Conda queue environment, but it does not use Rattler and directly runs Conda to create the virtual environment.
@@ -122,7 +122,8 @@ The behavior of this queue environment is to create a new Conda virtual environm
 Description session that runs on a worker host, and then delete the environment when it is done.
 Conda keeps a cache of the downloaded packages, and the expanded form of those packages, so it will not
 repeatedly re-download the same applications, but each session will have the overhead of linking all
-packages into the virtual environment. Look at the sample with improved caching to reuse virtual
+packages into the virtual environment. Look at the samples `conda_queue_env_improved_caching.yaml` and
+`conda_queue_env_inline_improved_caching.yaml` for queue environments that can reuse virtual
 environments across multiple jobs.
 
 ### Conda queue environment using the py-rattler library
@@ -147,15 +148,15 @@ farm using customer-managed fleets that have a shared file system for the Rez pa
 ### Conda queue environment with improved caching
 
 The file [conda_queue_env_improved_caching.yaml](conda_queue_env_improved_caching.yaml) enables
-the same virtual environments to be reused accross multiple jobs via additional command line arguments to the `conda-queue-env-enter`,
-and `conda-queue-env-exit` commands provided on service managed fleets. This can give significant performance improvements when
+the same virtual environments to be reused across multiple jobs via additional command line arguments to the `conda-queue-env-enter`,
+and `conda-queue-env-exit` commands provided on service-managed fleets. This can give significant performance improvements when
 running many jobs with the same package requirements.
 
 To get environment reuse functionality on customer-managed fleets, you can use the following sample.
 
-### Conda queue environment with improved caching
+### Conda queue environment with improved caching using Conda written inline
 
-The file [conda_queue_env_inline_improved_caching.yaml](conda_queue_env_improved_caching.yaml) extends the
+The file [conda_queue_env_inline_improved_caching.yaml](conda_queue_env_inline_improved_caching.yaml) extends the
 capabilities of the Conda queue environment with a mechanism to reuse Conda virtual environments
 across multiple jobs. This additional cache management is more complex, but the performance benefits
 from environment reuse can be significant when running many jobs with the same package requirements.

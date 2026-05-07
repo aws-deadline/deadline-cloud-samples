@@ -63,7 +63,7 @@ parameterDefinitions:
 - name: CleanupAfterHours
   type: INT
   description: |
-    How long before stale persisted environments are removed
+    How long before stale persisted environments are removed.
   default: "96"
   userInterface:
     control: SPIN_BOX
