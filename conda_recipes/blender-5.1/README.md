@@ -83,7 +83,9 @@ blender-5.1/
 └── recipe/
     ├── recipe.yaml         # rattler-build package recipe
     ├── build.sh            # Linux build script
-    └── build_win.sh        # Windows build script
+    ├── build_win.sh        # Windows build script
+    ├── 999-blender-plugins-activate.sh    # Simple plugin delivery activate script
+    └── 999-blender-plugins-deactivate.sh  # Simple plugin delivery deactivate script
 ```
 
 ## License
