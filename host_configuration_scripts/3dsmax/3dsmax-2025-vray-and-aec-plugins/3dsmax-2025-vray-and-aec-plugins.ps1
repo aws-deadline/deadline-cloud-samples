@@ -85,8 +85,6 @@ Write-Host ' --- Installing RailClone --- '
 # Install RailClone Pro in render node mode
 Start-Process "C:\3dsmax_setup\railclone.exe" -ArgumentList "/S", "/LICMODE=rendernode" -Wait
 
-Write-Host ' --- Installing Additional Plugins --- '
-
 Write-Host ' --- Configuring environment for 3ds Max 2025 --- '
 
 [Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\Autodesk\3ds Max 2025;' + [Environment]::GetEnvironmentVariable('Path', 'Machine'), 'Machine')

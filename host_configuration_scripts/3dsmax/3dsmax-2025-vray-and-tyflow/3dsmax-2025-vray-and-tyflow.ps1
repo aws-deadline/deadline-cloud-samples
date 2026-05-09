@@ -17,8 +17,8 @@ $3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket-name/path/to/3ds-max-2025.zip"
 # TODO: Replace the below value with your S3 URI from your bucket
 $VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI="s3://your-bucket-name/path/to/vray_adv_71000_max2025_x64.exe"
 
-# TODO: Replace this with your tyFlow plugin file name
-$TYFLOW_PLUGIN_S3_URI="tyFlow_2025_render.dlo"
+# TODO: Replace the below value with your S3 URI from your bucket
+$TYFLOW_PLUGIN_S3_URI="s3://your-bucket-name/path/to/tyFlow_2025_render.dlo"
 
 # Optional: Replace this with your preferred V-Ray for 3dsMax 2025 installation root
 $VRAY_FOR_3DSMAX2025_INSTALL_ROOT="C:\Program Files\Chaos\V-Ray\3ds Max 2025"
