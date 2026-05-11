@@ -103,3 +103,16 @@ cat > "$PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json" << EOF
   "MAYA_LEGACY_THINCLIENT": "1"
 }
 EOF
+
+# --- Plugin Sync ---
+# Copies the plugin delivery scripts into the conda activate.d/deactivate.d
+# directories. These run AFTER the main Maya env vars are set via env_vars.d.
+#
+# See zzz-maya-plugin-sync-activate.sh for the full implementation.
+mkdir -p "$PREFIX/etc/conda/activate.d"
+cp $RECIPE_DIR/zzz-maya-plugin-sync-activate.sh \
+    $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-plugin-sync.sh
+
+mkdir -p "$PREFIX/etc/conda/deactivate.d"
+cp $RECIPE_DIR/zzz-maya-plugin-sync-deactivate.sh \
+    $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-plugin-sync.sh
