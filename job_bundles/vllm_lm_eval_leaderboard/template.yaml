@@ -119,6 +119,12 @@ steps:
 
 # Each task evaluates one model. The task script starts vLLM for the model,
 # runs all benchmarks against it sequentially, then stops vLLM.
+#
+# Models live in the parameterSpace rather than as a job parameter because
+# OpenJD doesn't currently expose a multi-select dropdown control (LIST[STRING]
+# exists as a type but submitter UIs don't render it as a multi-select), so a
+# job parameter would only let users pick one model at a time. Editing this
+# range list is the supported way to change which models the job evaluates.
 - name: EvalModels
   parameterSpace:
     taskParameterDefinitions:
