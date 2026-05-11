@@ -1,9 +1,9 @@
 #!/bin/bash
-# Simple Plugin Delivery cleanup for Blender
+# Plugin Sync cleanup for Blender
 # Removes downloaded plugin files and unsets env vars.
 
 if [ -n "${_SP_PLUGIN_DIR:-}" ] && [ -d "$_SP_PLUGIN_DIR" ]; then
-    echo "Simple Plugins: Cleaning up $_SP_PLUGIN_DIR"
+    echo "Plugin Sync: Cleaning up $_SP_PLUGIN_DIR"
     rm -rf "$_SP_PLUGIN_DIR"
 fi
 

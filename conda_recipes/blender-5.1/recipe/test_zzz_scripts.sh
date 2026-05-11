@@ -2,7 +2,7 @@
 # Unit tests for zzz-blender-plugins-activate.sh and zzz-blender-plugins-deactivate.sh
 # Uses an AWS CLI stub to test without real S3 access.
 #
-# Run: bash test_999_scripts.sh
+# Run: bash test_zzz_scripts.sh
 # All tests should print PASS. Any FAIL indicates a bug.
 
 set -eo pipefail
@@ -136,13 +136,13 @@ test_activate_with_plugins() {
         fail "Addon __init__.py exists in addons/"
     fi
 
-    if [ -f "${BLENDER_USER_SCRIPTS:-}/startup/simple_plugins_auto_enable.py" ]; then
+    if [ -f "${BLENDER_USER_SCRIPTS:-}/startup/plugin_sync_auto_enable.py" ]; then
         pass "Auto-enable startup script generated"
     else
         fail "Auto-enable startup script generated"
     fi
 
-    if grep -q "test_addon" "${BLENDER_USER_SCRIPTS:-}/startup/simple_plugins_auto_enable.py" 2>/dev/null; then
+    if grep -q "test_addon" "${BLENDER_USER_SCRIPTS:-}/startup/plugin_sync_auto_enable.py" 2>/dev/null; then
         pass "Auto-enable script contains addon name"
     else
         fail "Auto-enable script contains addon name"
@@ -312,7 +312,7 @@ STUBEOF
 # ============================================================
 # Run all tests
 # ============================================================
-echo "=== Running 999 script unit tests ==="
+echo "=== Running plugin sync unit tests ==="
 echo
 
 test_skip_no_bucket

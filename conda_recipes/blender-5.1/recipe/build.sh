@@ -29,9 +29,9 @@ cat > $PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json << VAREOF
 }
 VAREOF
 
-# --- Simple Plugin Delivery (Option D: per-DCC recipe activate script) ---
+# --- Plugin Sync ---
 # Copies the plugin delivery scripts into the conda activate.d/deactivate.d
-# directories. These run AFTER the main blender env vars are set (999- prefix
+# directories. These run AFTER the main blender env vars are set (zzz- prefix
 # ensures lexicographic ordering).
 #
 # See zzz-blender-plugins-activate.sh for the full implementation.
