@@ -26,11 +26,31 @@ Evaluate **multiple LLMs × multiple benchmarks** in a single Deadline Cloud job
 
 Each task in `EvalModels` runs one model end-to-end: starts a local [vLLM](https://github.com/vllm-project/vllm) server, runs every benchmark via [EleutherAI's lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) against the local endpoint, then stops vLLM. Models load directly from HuggingFace Hub — no job attachments needed.
 
-## Prerequisites
+## Set up your farm
 
-- GPU fleet (CUDA 12.x)
-- Queue with a Conda queue environment configured — see the [queue environment samples](../../queue_environments) and the [create a queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html) docs. The bundle passes `CondaPackages` and `CondaChannels` parameters to it.
-- HuggingFace token for gated models (optional)
+The fastest way to get a compatible farm is to deploy the [`cuda_farm`](../../cloudformation/farm_templates/cuda_farm) CloudFormation template. It provisions an NVIDIA-GPU service-managed fleet (A10G/L4) plus a queue with the Conda queue environment this bundle relies on. Once the stack reaches `CREATE_COMPLETE`, point the CLI at it:
+
+```bash
+deadline config set defaults.farm_id <FarmId from stack outputs>
+deadline config set defaults.queue_id <CUDAQueueId from stack outputs>
+```
+
+This bundle has been verified end-to-end against the queue environment provisioned by `cuda_farm` with no modifications required.
+
+**Already have a farm?** You need:
+- An SMF fleet with NVIDIA GPUs, ≥32 GB RAM, ≥4 vCPU
+- A queue with a Conda queue environment attached that reads `CondaPackages` and `CondaChannels` job parameters (any of the templates in [`queue_environments/`](../../queue_environments) named `conda_queue_env_*.yaml`)
+
+A HuggingFace token is only needed for gated models (Llama, etc.).
+
+### Service quotas
+
+EC2 GPU instances are gated by per-region vCPU quotas, which often default to **0 in a fresh AWS region**. In the [Service Quotas console](https://console.aws.amazon.com/servicequotas/home/services/ec2/quotas), under **EC2**, request increases for:
+
+- **Running On-Demand G and VT instances** — vCPU count, not instance count. The default 3-model run on `g5.xlarge` (4 vCPU each) needs ≥12 vCPU running concurrently.
+- **All G and VT Spot Instance Requests** — only if your fleet uses spot.
+
+Quota increases for these can take anywhere from minutes to a couple of business days, so request them before you submit.
 
 ## Quick start
 
