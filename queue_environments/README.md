@@ -104,6 +104,47 @@ added by Deadline Cloud console onboarding flows. Its onEnter and onExit actions
 the workers of Deadline Cloud service-managed fleets. They are written using [Rattler](https://github.com/conda/rattler), which
 generally runs faster than equivalent operations with Conda.
 
+Here are the CLI options the enter and exit commands provide:
+```
+Usage: conda-queue-env-enter [OPTIONS] [ENV_DIR]
+
+Arguments:
+  [ENV_DIR]  The location of the environment to be created
+
+Options:
+  -p, --packages <PACKAGES>
+          Space-separated list of Conda packages to install
+  -c, --channels <CHANNELS>
+          Space-separated list of Conda channels
+      --channel-priority <CHANNEL_PRIORITY>
+          Channel priority: "strict" or "disabled" [default: strict]
+      --persist-envs-hashed <PERSIST_ENVS_HASHED>
+          Persist environments in hash-named subdirectories under this root dir. Enables environment reuse across jobs
+      --update-after-minutes <UPDATE_AFTER_MINUTES>
+          Minutes before updating a persisted environment (default: 600 = 10 hours) [default: 600]
+  -v, --verbose...
+          Increase logging verbosity (-v for debug, -vv for trace)
+      --windows-activation-shell <WINDOWS_ACTIVATION_SHELL>
+          Shell to use for conda activation on Windows: "bash" (default) or "cmd" [default: bash]
+      --print-env0
+          Print all environment variables as null-delimited KEY=VALUE pairs and exit. Used internally by bash activation to capture native OS paths
+  -h, --help
+          Print help
+```
+```
+Usage: conda-queue-env-exit [OPTIONS]
+
+Options:
+      --persist-envs-hashed <PERSIST_ENVS_HASHED>
+          Root directory containing hash-named persisted environments
+      --cleanup-after-hours <CLEANUP_AFTER_HOURS>
+          Remove persisted environments not updated within this many hours (default: 96) [default: 96]
+  -v, --verbose...
+          Increase logging verbosity (-v for debug, -vv for trace)
+  -h, --help
+          Print help
+```
+
 The `conda-queue-env` commands on service-managed fleets support creating persistent environments that can be reused across
 multiple jobs, but this functionality is not enabled by default on the console queue environment. See the `conda_queue_env_improved_caching.yaml` 
 queue environment for a sample that enables this functionality.
@@ -154,11 +195,6 @@ running many jobs with the same package requirements.
 
 The queue environment is configured to store persistent environments under `~/.persistent_envs`. To store persistent environments
 under a different directory, the `onEnter` and `onExit` actions can be modified to reference a different path.
-
-The `conda-queue-env-enter` command has an option `--update-after-minutes <minutes>`, which controls how long before a persisted environment is re-solved and updated.
-to use a different value than the default of 600 minutes, the `onEnter` action can be modified to add this option. The `conda-queue-env-exit` command also
-has an option `--cleanup-after-hours <hours>` which controls when stale persisted environments are removed. The `onExit` action can be modified to use a different
-value than the default 96 hours.
 
 To get environment reuse functionality on customer-managed fleets, you can use the following sample.
 
