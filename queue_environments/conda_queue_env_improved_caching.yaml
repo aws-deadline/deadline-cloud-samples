@@ -49,7 +49,6 @@ environment:
       onEnter:
         command: "conda-queue-env-enter"
         args:
-        - "{{Session.WorkingDirectory}}/.env"
         - "--packages"
         - "{{Param.CondaPackages}}"
         - "--channels"
