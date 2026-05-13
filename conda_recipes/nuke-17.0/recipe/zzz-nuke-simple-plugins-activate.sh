@@ -25,7 +25,7 @@ fi
 _SP_PLUGIN_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/deadline-plugins/nuke"
 mkdir -p "$_SP_PLUGIN_DIR"
 
-# Download generic plugins to the session working directory
+# Download generic plugins
 _SP_GENERIC_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/deadline-plugins/generic"
 _SP_GENERIC_SRC="s3://${DEADLINE_JA_S3_BUCKET}/${_SP_PREFIX}plugins/generic/"
 if aws s3 ls "$_SP_GENERIC_SRC" >/dev/null 2>&1; then

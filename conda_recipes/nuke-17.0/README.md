@@ -6,7 +6,7 @@ This directory contains a conda build recipe for Nuke 17.0.1, specifically confi
 
 ## Package Information
 
-- **Application**: Nuke 17.0.1
+- **Application**: Nuke 17.0v1
 - **Supported Platforms**: linux-64
 - **Source**: Foundry website downloads
 - **License**: Commercial
@@ -33,8 +33,8 @@ Before building this package, ensure you have:
 1. Download the `Nuke17.0v1-linux-x86_64.tgz` from the Foundry website.
 2. You will need a Foundry account to access the Nuke downloads.
 3. Place the downloaded file in the `conda_recipes/archive_files` directory.
-4. Conda uses the a checksum to verify the integrity of the source file. The SHA256 hash should match: `61b570ea6d4f8a7e2f0647952c8e039fc02df6f6649e9de1d2ee0543398ed92f`.
-   In bash, you can compute the checksum by running this command `sha256sum Nuke16.0v1-linux-x86_64.tgz`.
+4. Conda uses the a checksum to verify the integrity of the source file. The SHA256 hash should match: `c76ec0cd3f881f41553878240618a983e936e543a5fd19ceea6c5c6765cc88a3`.
+   In bash, you can compute the checksum by running this command `sha256sum Nuke17.0v1-linux-x86_64.tgz`.
 
 ## Plugins
 
