@@ -92,9 +92,9 @@ EOF
 # ensures lexicographic ordering).
 
 mkdir -p $PREFIX/etc/conda/activate.d
-cp $RECIPE_DIR/zzz-nuke-simple-plugins-activate.sh \
-   $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-simple-plugins.sh
+cp $RECIPE_DIR/zzz-nuke-plugin-sync-activate.sh \
+   $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh
 
 mkdir -p $PREFIX/etc/conda/deactivate.d
-cp $RECIPE_DIR/zzz-nuke-simple-plugins-deactivate.sh \
-   $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-simple-plugins.sh
+cp $RECIPE_DIR/zzz-nuke-plugin-sync-deactivate.sh \
+   $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh

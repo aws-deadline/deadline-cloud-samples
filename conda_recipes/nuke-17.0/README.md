@@ -92,8 +92,8 @@ nuke-17.0/
 └── recipe/
     ├── recipe.yaml                             # Conda package metadata
     ├── build.sh                                # Linux build script
-    ├── zzz-nuke-simple-plugins-activate.sh     # activate script for Plugin Sync feature
-    └── zzz-nuke-simple-plugins-deactivate.sh   # deactivate script for Plugin Sync feature
+    ├── zzz-nuke-plugin-sync-activate.sh     # activate script for Plugin Sync feature
+    └── zzz-nuke-plugin-sync-deactivate.sh   # deactivate script for Plugin Sync feature
 ```
 
 ## Resources

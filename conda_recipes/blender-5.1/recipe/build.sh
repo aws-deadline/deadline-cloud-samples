@@ -37,9 +37,9 @@ VAREOF
 # See zzz-blender-plugins-activate.sh for the full implementation.
 
 mkdir -p $PREFIX/etc/conda/activate.d
-cp $RECIPE_DIR/zzz-blender-plugins-activate.sh \
-   $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugins.sh
+cp $RECIPE_DIR/zzz-blender-plugin-sync-activate.sh \
+   $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh
 
 mkdir -p $PREFIX/etc/conda/deactivate.d
-cp $RECIPE_DIR/zzz-blender-plugins-deactivate.sh \
-   $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugins.sh
+cp $RECIPE_DIR/zzz-blender-plugin-sync-deactivate.sh \
+   $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh
