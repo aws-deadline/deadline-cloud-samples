@@ -25,7 +25,7 @@ if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -n "${OS:-}"
 fi
 
 # Determine plugin download directory
-_SP_PLUGIN_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/.maya-plugins"
+_SP_PLUGIN_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/deadline-plugins"
 mkdir -p "$_SP_PLUGIN_DIR"
 
 # Download generic plugins to the session working directory
@@ -33,7 +33,7 @@ _SP_GENERIC_SRC="s3://${DEADLINE_JA_S3_BUCKET}/${_SP_PREFIX}plugins/generic/"
 if [ -n "${OPENJD_SESSION_WORKING_DIR:-}" ]; then
     if aws s3 ls "$_SP_GENERIC_SRC" >/dev/null 2>&1; then
         echo "Plugin Sync: Downloading plugins from $_SP_GENERIC_SRC"
-        aws s3 cp "$_SP_GENERIC_SRC" "$OPENJD_SESSION_WORKING_DIR/" --recursive --quiet 2>/dev/null || true
+        aws s3 cp "$_SP_GENERIC_SRC" "$_SP_PLUGIN_DIR/generic/" --recursive --quiet 2>/dev/null || true
     fi
 fi
 

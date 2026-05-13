@@ -1,0 +1,111 @@
+Here's the full tidy-up list for making conda_recipes/nuke-17.1 ready for public publishing:
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  Files That Should Not Be Committed
+  
+  ┌───────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ File                          │ Issue                                                                                                                                                                                                                │
+  ├───────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ recipe/repodata.json          │ Full channel index containing all internal packages (blender, houdini, maya, cinema4d, vredcore, etc.). This is a build artifact, not a recipe source file. The nuke-16.0 recipe doesn't have this. Remove from git. │
+  ├───────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ recipe/queue_environment.yaml │ Contains an internal AWS account ID (529920871242) and a specific internal S3 bucket name (deadline-vfscmf-ja-529920871242). This is environment-specific config, not part of the recipe. Remove from git.           │
+  └───────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  Version Mismatches (README.md)
+  
+  The README.md is byte-for-byte identical to the nuke-16.0 README. Every reference still says "Nuke 16.0":
+  
+  1. Title: "# Nuke 16.0 Conda Recipe for AWS Deadline Cloud" → should be 17.0
+  2. Overview: "recipe for Nuke 16.0.1" → 17.0.1
+  3. Package Information: "Nuke 16.0.1" → 17.0.1
+  4. Archive filename: Nuke16.0v1-linux-x86_64.tgz → Nuke17.0v1-linux-x86_64.tgz
+  5. SHA256 hash: still shows the 16.0 hash (61b570ea...) → should be c76ec0cd3f881f41553878240618a983e936e543a5fd19ceea6c5c6765cc88a3
+  6. Recipe structure tree: shows nuke-16.0/ → should be nuke-17.1/
+  7. Footer note: "configured for Nuke 16.0.1" → 17.0.1
+  8. The "Adapting to Other Versions" section references meta.yaml which doesn't exist — the file is recipe.yaml
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  Version Mismatches (deadline-cloud.yaml)
+  
+  The file is identical to nuke-16.0:
+  
+  - sourceArchiveFilename: Nuke16.0v1-linux-x86_64.tgz → should be Nuke17.0v1-linux-x86_64.tgz
+  - sourceDownloadInstructions references "Nuke16.0v1-linux-x86_64" → should be 17.0v1
+  - Missing trailing newline
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  Directory Naming Confusion
+  
+  - The directory is named nuke-17.1 but recipe.yaml sets version_partial: "17.0" and version_minor: "1", producing package version 17.0.1. The directory name implies version 17.1.x. Consider renaming to nuke-17.0 for consistency with the actual package version.
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  build.sh Issues
+  
+  1. Blender reference in comment (line 89-92): Comment says "These run AFTER the main blender env vars are set (999- prefix ensures lexicographic ordering)." and "See 999-blender-simple-plugins-activate.sh for the full implementation." — should reference Nuke, not Blender.
+  2. yumdownloader vs dnf download: The nuke-16.0 recipe uses dnf download --resolve -y, but nuke-17.1 uses yumdownloader --resolve --destdir=.... If the build fleet uses AL2023 (which has dnf), this may be intentional, but should be verified for consistency.
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  zzz-nuke-simple-plugins-activate.sh Issues
+  
+  1. Debug print statement (line 28): echo "PLUGGY FUGGY WUGGY DCC SRC: $_SP_DCC_SRC" — must be removed before publishing.
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  zzz-nuke-simple-plugins-deactivate.sh Issues
+  
+  1. Wrong DCC variable (line 20): unset BLENDER_USER_SCRIPTS — this is a Blender variable, not a Nuke variable. Should be removed or replaced with the correct Nuke variable.
+  2. Missing trailing newline at end of file.
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  recipe.yaml — Source Path Syntax
+  
+  - nuke-16.0 uses: url: file://archive_files/Nuke{{ version_partial }}v{{ version_minor }}-linux-x86_64.tgz
+  - nuke-17.1 uses: path: ../../archive_files/Nuke${{ version_partial }}v${{ version_minor }}-linux-x86_64.tgz
+  
+  The template syntax changed from {{ }} to ${{ }} (rattler-build Jinja vs conda-build Jinja). The path: vs url: change may be intentional for rattler-build, but verify this is the correct approach for the build system being used.
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  Commit Hygiene
+  
+  - All 3 commits have the message "wip" — these should be squashed into a single well-formed commit with a proper conventional commit message before merging.
+  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  
+  Summary of Priority Actions
+  
+  ┌─────────────┬────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Priority    │ Action                                                                                 │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🔴 Critical │ Remove repodata.json (leaks internal package inventory)                                │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🔴 Critical │ Remove queue_environment.yaml (leaks internal AWS account ID)                          │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🔴 Critical │ Remove debug print "PLUGGY FUGGY WUGGY"                                                │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🔴 Critical │ Remove unset BLENDER_USER_SCRIPTS from deactivate script                               │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟠 High     │ Update README.md with correct version (17.0.1) throughout                              │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟠 High     │ Update deadline-cloud.yaml with correct Nuke 17.0 filename                             │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟠 High     │ Fix Blender references in build.sh comments                                            │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟡 Medium   │ Resolve directory name (nuke-17.1) vs package version (17.0.1) mismatch                │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟡 Medium   │ Add trailing newlines to deadline-cloud.yaml and zzz-nuke-simple-plugins-deactivate.sh │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟡 Medium   │ Verify yumdownloader vs dnf download is intentional                                    │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟢 Low      │ Squash "wip" commits into a proper commit message                                      │
+  ├─────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 🟢 Low      │ Update README "Adapting to Other Versions" to reference recipe.yaml not meta.yaml      │
+  └─────────────┴────────────────────────────────────────────────────────────────────────────────────────┘
