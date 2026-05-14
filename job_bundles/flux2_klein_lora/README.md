@@ -25,6 +25,7 @@ Train custom LoRA adapters for FLUX.2 Klein models using your own image datasets
 
 **Fleet requirements:**
 - GPU with 13GB+ VRAM
+- 64 GiB+ system memory (Recommended)
 - Linux OS
 
 **Key Parameters:**
@@ -72,6 +73,7 @@ Generate images using FLUX.2 Klein with your trained LoRA adapter.
 
 **Fleet requirements:**
 - GPU with 13GB+ VRAM
+- 64 GiB+ system memory (Recommended)
 - Linux OS
 - Trained LoRA adapter from lora_training job
 
