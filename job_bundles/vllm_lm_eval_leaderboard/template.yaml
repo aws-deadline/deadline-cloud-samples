@@ -1,0 +1,165 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: vLLM Leaderboard Matrix Evaluation
+description: |
+  Evaluates multiple LLMs on a set of benchmarks in a single Deadline Cloud job.
+
+  The `EvalModels` step has a parameter space over models — each task runs one
+  model. The task script starts vLLM for that model, runs every benchmark via
+  EleutherAI's lm-evaluation-harness against the local vLLM endpoint, then
+  stops vLLM. Tasks run in parallel across workers.
+
+  A final step aggregates per-model JSON results into a ranked leaderboard
+  (CSV + Markdown).
+
+  Dependencies (vLLM, PyTorch, transformers, lm_eval) are provided by the
+  queue's Conda queue environment via the `CondaPackages` parameter. Your
+  queue must have a Conda queue environment configured — see
+  https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html
+
+  To change the model list, edit the `range` of the `ModelName` task parameter.
+  To change benchmarks, edit the `Benchmarks` job parameter at submit time.
+
+parameterDefinitions:
+- name: Benchmarks
+  type: STRING
+  default: "hellaswag,arc_easy,arc_challenge,winogrande"
+  description: "Comma-separated lm-evaluation-harness task names to run against every model."
+  userInterface:
+    control: LINE_EDIT
+    label: Benchmarks
+    groupLabel: Evaluation Settings
+
+- name: ResultsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: leaderboard_results
+  description: "Output directory for per-model results and the final leaderboard."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Results Directory
+    groupLabel: Output
+
+- name: NumConcurrent
+  type: INT
+  default: 4
+  minValue: 1
+  maxValue: 64
+  description: "Number of concurrent requests lm_eval sends to vLLM."
+  userInterface:
+    control: SPIN_BOX
+    label: Concurrent Requests
+    groupLabel: Evaluation Settings
+
+- name: MaxModelLen
+  type: INT
+  default: 2048
+  minValue: 512
+  maxValue: 32768
+  description: "Max sequence length for vLLM. Set to the smallest context window among your models."
+  userInterface:
+    control: SPIN_BOX
+    label: Max Model Length
+    groupLabel: Server Settings
+
+- name: GpuMemoryUtilization
+  type: STRING
+  default: "0.90"
+  description: "Fraction of GPU memory for vLLM KV cache (0.0-1.0)."
+  userInterface:
+    control: LINE_EDIT
+    label: GPU Memory Utilization
+    groupLabel: Server Settings
+
+- name: HfToken
+  type: STRING
+  default: ""
+  description: "HuggingFace token for gated models (Llama, etc.). Leave empty if not needed."
+  userInterface:
+    control: LINE_EDIT
+    label: HuggingFace Token
+    groupLabel: Model Settings
+
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  userInterface:
+    control: HIDDEN
+
+# Dependencies resolved by the queue's Conda queue environment. Three groups:
+#   1. vLLM stack: vLLM (cuda build) transitively pulls PyTorch, transformers,
+#      tokenizers. cuda-toolkit provides the headers and libcuda.so stub that
+#      Triton needs for JIT kernel compilation on the worker.
+#   2. lm_eval[api] extras: conda-forge lm_eval doesn't declare these (they're
+#      a pip-only extra upstream), but local-completions needs them.
+#   3. typepy[datetime] extras: pytablewriter -> dataproperty -> typepy lazily
+#      imports pytz/dateutil when rendering the final markdown results table.
+#      conda-forge typepy hides these behind the [datetime] extra.
+- name: CondaPackages
+  type: STRING
+  default: "python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9 lm_eval=0.4.9 requests aiohttp tenacity tqdm tiktoken pytz python-dateutil"
+  userInterface:
+    control: HIDDEN
+
+- name: CondaChannels
+  type: STRING
+  default: "conda-forge"
+  userInterface:
+    control: HIDDEN
+
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+steps:
+
+# Each task evaluates one model. The task script starts vLLM for the model,
+# runs all benchmarks against it sequentially, then stops vLLM.
+- name: EvalModels
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ModelName
+      type: STRING
+      range:
+      - "Qwen/Qwen2.5-0.5B"
+      - "Qwen/Qwen2.5-1.5B"
+      - "EleutherAI/pythia-1.4b"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/eval-model.sh'
+        - '{{Task.Param.ModelName}}'
+        - '{{Param.Benchmarks}}'
+        - '{{Param.ResultsDir}}'
+        - '{{Param.NumConcurrent}}'
+        - '{{Param.GpuMemoryUtilization}}'
+        - '{{Param.MaxModelLen}}'
+        - '{{Param.HfToken}}'
+        - '{{Session.WorkingDirectory}}'
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    - {name: amount.worker.gpu, min: 1}
+    - {name: amount.worker.memory, min: 32768}
+
+- name: Aggregate
+  dependencies:
+  - dependsOn: EvalModels
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/aggregate_leaderboard.py'
+        - '--results-dir'
+        - '{{Param.ResultsDir}}'
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
