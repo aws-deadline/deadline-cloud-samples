@@ -1,4 +1,4 @@
-# Nuke 16.0 Conda Recipe for AWS Deadline Cloud
+# Nuke 17.0 Conda Recipe for AWS Deadline Cloud
 
 ## Overview
 
