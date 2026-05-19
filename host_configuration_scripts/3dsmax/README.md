@@ -6,7 +6,7 @@ Please see the README.md in each sample script for more steps on how to set it u
 ## 3ds Max
 3ds Max is a popular Digital Content Creation tool provided by Autodesk. 3ds Max runs on Windows, and requires administrative access to install onto a host. Because of the administrative requirement, Deadline Cloud recommends installing 3ds Max on to the worker host using Host Configuration Scripts.
 
-- Note: While the example installs 3ds Max 2024 and 2025, Deadline Cloud's submitter supports 3ds Max 2026 as well. The installation script should work equivalently for 3ds Max 2026.
+- Note: While the example installs 3ds Max 2024 and 2025, Deadline Cloud's submitter supports 3ds Max 2026 and 2027 as well. The installation script should work equivalently for 3ds Max 2026 and 2027.
 
 ## Generating a script for your version using Kiro
 

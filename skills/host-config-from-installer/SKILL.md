@@ -20,8 +20,6 @@ host configuration script for AWS Deadline Cloud Windows Service Managed Fleets.
 The generated `.ps1` is based on commands that were actually tested and confirmed working — not
 guesswork or templates.
 
-> **Note:** This skill currently covers Windows only. Linux support (`.sh` / `.rpm` / `.deb` installers) will be added in a follow-up.
-
 ## Usage
 
 Use this skill when:
@@ -182,7 +180,7 @@ Include:
 - Note about TODO variables to replace
 - Note that config changes only affect Workers launched after the update is applied
 - Recommendation to set min Worker count to 1 and check CloudWatch logs
-  (log group: `/aws/deadline/farm-<farm-id>/fleet-<fleet-id>`)
+  (log group: `/aws/deadline/<farm-id>/<fleet-id>`)
 
 ## Common Mistakes
 
