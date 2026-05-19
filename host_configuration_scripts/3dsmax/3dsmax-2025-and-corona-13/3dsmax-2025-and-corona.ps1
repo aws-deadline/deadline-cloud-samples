@@ -8,30 +8,24 @@ Requirements:
 - Your fleet role must have permissions to s3:GetObject both the installer files from your S3 bucket.
 #>
 
-# TODO: Replace the below value with your bucket name
-$BUCKET_NAME="your-bucket-name"
-
-# TODO: Replace this with your 3dsMax folder name
-$3DS_MAX_FOLDER_NAME="3ds Max 2025.2 Update - (EN)"
-
-# TODO: Replace this with your 3dsMax zip file name
-$3DS_MAX_ZIP_FILE="$3DS_MAX_FOLDER_NAME.zip"
-
-# TODO: Replace this with your Corona for 3dsMax 2025 installer file name
-$CORONA_FOR_3DS_MAX2025_INSTALLER_FILE="chaos-corona-13-3dsmax-hotfix1.exe"
+# TODO: Replace the below values with the S3 URIs from your bucket
+# Guide on how to create the 3ds Max installer zip file: https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/host_configuration_scripts/3dsmax/README.md
+$3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket-name/path/to/3ds-max-2025.zip"
+# TODO: Replace the below values with the S3 URIs from your bucket
+$CORONA_INSTALLER_EXE_S3_URI="s3://your-bucket-name/path/to/chaos-corona-13-3dsmax-hotfix1.exe"
 
 Write-Host " --- Installing 3dsMax 2025 --- "
 
 mkdir C:\3dsmax_setup -Force
-aws s3 cp --no-progress "s3://$BUCKET_NAME/$3DS_MAX_ZIP_FILE" C:\3dsmax_setup\3dsmax.zip
+aws s3 cp --no-progress "$3DS_MAX_INSTALLER_ZIP_S3_URI" C:\3dsmax_setup\3dsmax.zip
 Expand-Archive C:\3dsmax_setup\3dsmax.zip C:\3dsmax_setup\
-Start-Process -FilePath "C:\3dsmax_setup\$3DS_MAX_FOLDER_NAME\Setup.exe" -ArgumentList "-q" -Wait -PassThru
+Start-Process -FilePath "C:\3dsmax_setup\Setup.exe" -ArgumentList "-q" -Wait -PassThru
 
 Write-Host " --- Installing Corona --- " 
-aws s3 cp --no-progress "s3://$BUCKET_NAME/$CORONA_FOR_3DS_MAX2025_INSTALLER_FILE" C:\3dsmax_setup\ 
+aws s3 cp --no-progress "$CORONA_INSTALLER_EXE_S3_URI" C:\3dsmax_setup\corona.exe
 
 Write-Host " --- Starting Corona Install --- " 
-& "C:\3dsmax_setup\$CORONA_FOR_3DS_MAX2025_INSTALLER_FILE" -gui=0 -auto
+& "C:\3dsmax_setup\corona.exe" -gui=0 -auto
 
 $content = @"
 <VRLClient>
