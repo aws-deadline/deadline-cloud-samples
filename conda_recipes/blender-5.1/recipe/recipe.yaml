@@ -42,6 +42,8 @@ build:
 tests:
   - script:
     - blender -h
+    - ls $CONDA_PREFIX/etc/conda/activate.d/zzz-blender-*-plugins.sh
+    - ls $CONDA_PREFIX/etc/conda/deactivate.d/zzz-blender-*-plugins.sh
 
 about:
   homepage: https://www.blender.org/
