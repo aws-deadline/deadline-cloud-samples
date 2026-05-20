@@ -55,3 +55,12 @@ set C4D_LOCATION=
 set C4D_COMMANDLINE_EXECUTABLE=
 EOF
 cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
+
+# --- Plugin Sync ---
+# Copies the plugin delivery scripts into the conda activate.d/deactivate.d
+# directories. These run AFTER the main C4D env vars are set (zzz- prefix
+# ensures lexicographic ordering).
+cp $RECIPE_DIR/zzz-cinema4d-plugin-sync-activate.sh \
+    $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh
+cp $RECIPE_DIR/zzz-cinema4d-plugin-sync-deactivate.sh \
+    $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh
