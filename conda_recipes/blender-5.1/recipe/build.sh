@@ -18,7 +18,7 @@ done
 # See https://rattler-build.prefix.dev/latest/special_files/ for details.
 # This is more portable than activation scripts and works with pixi trampolines.
 mkdir -p $PREFIX/etc/conda/env_vars.d
-cat > $PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json << EOF
+cat > $PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json << VAREOF
 {
   "BLENDER_LOCATION": "$PREFIX/opt/blender",
   "BLENDER_VERSION": "$BLENDER_VERSION",
@@ -27,4 +27,19 @@ cat > $PREFIX/etc/conda/env_vars.d/$PKG_NAME-$PKG_VERSION.json << EOF
   "BLENDER_PYTHON_PATH": "$PREFIX/opt/blender/$BLENDER_VERSION/python",
   "BLENDER_DATAFILES_PATH": "$PREFIX/opt/blender/$BLENDER_VERSION/datafiles"
 }
-EOF
+VAREOF
+
+# --- Plugin Sync ---
+# Copies the plugin delivery scripts into the conda activate.d/deactivate.d
+# directories. These run AFTER the main blender env vars are set (zzz- prefix
+# ensures lexicographic ordering).
+#
+# See zzz-blender-plugins-activate.sh for the full implementation.
+
+mkdir -p $PREFIX/etc/conda/activate.d
+cp $RECIPE_DIR/zzz-blender-plugins-activate.sh \
+   $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugins.sh
+
+mkdir -p $PREFIX/etc/conda/deactivate.d
+cp $RECIPE_DIR/zzz-blender-plugins-deactivate.sh \
+   $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugins.sh
