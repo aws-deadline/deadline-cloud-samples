@@ -1,0 +1,131 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Arnold Standalone Render
+description: |
+  This job renders Arnold .ass (Arnold Scene Source) files using the Arnold kick
+  command-line renderer that ships with MtoA (Arnold for Maya).
+
+  Point it at a directory containing .ass files with a naming pattern like
+  scene.####.ass, and it will render each frame as a separate task distributed
+  across workers.
+
+  You can download sample .ass files from the Autodesk Arnold learning scenes page:
+  https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html
+
+parameterDefinitions:
+
+# Render Parameters
+- name: SceneDirectory
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Scene Directory
+    groupLabel: Render Parameters
+  description: >
+    Choose the directory containing the .ass files to render.
+  default: ./scene
+- name: FilePattern
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: File Name Pattern
+    groupLabel: Render Parameters
+  description: >
+    The filename pattern using #### for the zero-padded frame number
+    (e.g. cornell.####.ass or robot.####.ass).
+  default: cornell.####.ass
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  description: The frames to render. E.g. 1-100, 1-100:2 (every other frame), or 1 for a single frame.
+  default: '1'
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Choose the render output directory.
+  default: ./output
+- name: OutputFilePrefix
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Prefix
+    groupLabel: Render Parameters
+  description: The prefix for output filenames. Frame number and extension are appended automatically.
+  default: output
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  description: >
+    Conda packages to install. Requires a conda queue environment to process the value.
+    The maya-mtoa package provides the Arnold kick renderer.
+  default: maya-mtoa
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  description: >
+    Space-separated list of Conda channels. Deadline Cloud SMF packages are installed
+    from the "deadline-cloud" channel.
+  default: deadline-cloud
+
+steps:
+- name: Arnold Kick Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        mkdir -p '{{Param.OutputDir}}'
+
+        # Find kick from MTOA env var, or by searching the conda prefix
+        if [ -n "${MTOA:-}" ] && [ -f "${MTOA}/bin/kick" ]; then
+            kick="${MTOA}/bin/kick"
+        elif [ -n "${CONDA_PREFIX:-}" ]; then
+            kick=$(find "${CONDA_PREFIX}" -name kick -type f -path "*/bin/kick" | head -1)
+        fi
+
+        if [ -z "${kick:-}" ] || [ ! -f "${kick}" ]; then
+            echo "ERROR: Could not find Arnold kick binary"
+            echo "MTOA=${MTOA:-unset}"
+            echo "CONDA_PREFIX=${CONDA_PREFIX:-unset}"
+            exit 1
+        fi
+
+        echo "Using kick from: $kick"
+
+        FRAME=$(printf %04d {{Task.Param.Frame}})
+        FILE_PATTERN='{{Param.FilePattern}}'
+        INPUT_FILE="{{Param.SceneDirectory}}/${FILE_PATTERN//####/$FRAME}"
+
+        "$kick" -i "$INPUT_FILE" \
+            -o "{{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
+
+        echo "Render complete: {{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

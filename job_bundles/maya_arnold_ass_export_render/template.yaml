@@ -1,0 +1,194 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Maya Arnold Export and Render
+description: |
+  This job exports Arnold .ass files from a Maya scene and renders them using kick.
+
+  Step 1 opens the Maya scene once and exports all frames as .ass files using
+  arnoldExportAss. Step 2 renders each frame independently with kick, distributing
+  tasks across workers. Job attachments syncs the exported .ass files between steps.
+
+  Requires the maya-mtoa conda package, which provides both mayapy and kick.
+
+parameterDefinitions:
+
+# Scene Settings
+- name: MayaSceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Maya Scene File
+    groupLabel: Scene Settings
+    fileFilters:
+    - label: Maya Scene Files
+      patterns: ["*.ma", "*.mb"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the Maya scene file to export and render.
+
+    Use the 'Job Attachments' tab to add textures and other files that the scene references.
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Scene Settings
+  description: The frames to render. E.g. 1-100, 1-100:2 (every other frame), or 1 for a single frame.
+  default: '1'
+- name: Camera
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Camera
+    groupLabel: Scene Settings
+  description: >
+    The camera to render. Leave empty to use the scene's default renderable camera.
+  default: ''
+
+# Output Settings
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Settings
+  description: Choose the render output directory.
+  default: ./output
+- name: OutputFilePrefix
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output File Prefix
+    groupLabel: Output Settings
+  description: The prefix for output filenames. Frame number and extension are appended automatically.
+  default: output
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  description: >
+    Conda packages to install. Requires a conda queue environment to process the value.
+    The maya-mtoa package provides both mayapy (for export) and kick (for rendering).
+  default: maya-mtoa
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  description: >
+    Space-separated list of Conda channels. Deadline Cloud SMF packages are installed
+    from the "deadline-cloud" channel.
+  default: deadline-cloud
+
+steps:
+- name: Export ASS from Maya
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        mkdir -p '{{Param.OutputDir}}/ass'
+
+        mayapy '{{Task.File.ExportScript}}' \
+            '{{Param.MayaSceneFile}}' \
+            '{{Param.OutputDir}}/ass/{{Param.OutputFilePrefix}}' \
+            '{{Param.Frames}}' \
+            '{{Param.Camera}}'
+
+    - name: ExportScript
+      type: TEXT
+      filename: export_ass.py
+      data: |
+        import sys, re
+
+        scene_file = sys.argv[1]
+        out_prefix = sys.argv[2]
+        frame_spec = sys.argv[3]
+        camera = sys.argv[4] if len(sys.argv) > 4 else ""
+
+        # Parse frame spec: "1", "1-100", "1-100:2"
+        m = re.match(r"(\d+)(?:-(\d+))?(?::(\d+))?", frame_spec)
+        start = int(m.group(1))
+        end = int(m.group(2)) if m.group(2) else start
+        step = int(m.group(3)) if m.group(3) else 1
+
+        import maya.standalone
+        maya.standalone.initialize()
+        import maya.cmds as cmds
+        import maya.mel as mel
+
+        cmds.file(scene_file, open=True, force=True)
+        if not cmds.pluginInfo("mtoa", query=True, loaded=True):
+            cmds.loadPlugin("mtoa")
+
+        cam_flag = f'-cam "{camera}"' if camera else ""
+        cmd = f'arnoldExportAss -f "{out_prefix}" -sf {start} -ef {end} -fs {step} -mask 255 -lightLinks 1 -shadowLinks 1 {cam_flag}'
+        print(f"Running: {cmd}")
+        mel.eval(cmd)
+
+        print(f"Exported frames {start}-{end} (step {step}) to {out_prefix}.NNNN.ass")
+        maya.standalone.uninitialize()
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+
+- name: Arnold Kick Render
+  dependencies:
+  - dependsOn: Export ASS from Maya
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        mkdir -p '{{Param.OutputDir}}'
+
+        # Find kick from MTOA env var, or by searching the conda prefix
+        if [ -n "${MTOA:-}" ] && [ -f "${MTOA}/bin/kick" ]; then
+            kick="${MTOA}/bin/kick"
+        elif [ -n "${CONDA_PREFIX:-}" ]; then
+            kick=$(find "${CONDA_PREFIX}" -name kick -type f -path "*/bin/kick" | head -1)
+        fi
+
+        if [ -z "${kick:-}" ] || [ ! -f "${kick}" ]; then
+            echo "ERROR: Could not find Arnold kick binary"
+            echo "MTOA=${MTOA:-unset}"
+            echo "CONDA_PREFIX=${CONDA_PREFIX:-unset}"
+            exit 1
+        fi
+
+        echo "Using kick from: $kick"
+
+        FRAME=$(printf %04d {{Task.Param.Frame}})
+        "$kick" -i "{{Param.OutputDir}}/ass/{{Param.OutputFilePrefix}}.${FRAME}.ass" \
+            -o "{{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
+
+        echo "Render complete: {{Param.OutputDir}}/{{Param.OutputFilePrefix}}.${FRAME}.exr"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

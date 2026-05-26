@@ -1,0 +1,47 @@
+specificationVersion: 'jobtemplate-2023-09'
+extensions:
+- TASK_CHUNKING
+name: Contiguous Chunks
+parameterDefinitions:
+  - name: Frames
+    type: STRING
+    default: 1,10-12,18-50, 60-100
+  - name: ChunkSize
+    type: INT
+    default: 10
+steps:
+  - name: Render
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          ## The CHUNK[INT] task parameter type is added by this proposal
+          type: CHUNK[INT]
+          range: "{{Param.Frames}}"
+          ## The chunks field must be provided for type CHUNK[INT]
+          chunks:
+            ## Required, is how big to make each chunk by default
+            defaultTaskCount: "{{Param.ChunkSize}}"
+            ## Optional and can be ignored by the scheduler. If supported,
+            ## the scheduler adjusts the task count for chunks to match
+            ## this runtime. The value is in seconds, so 900 is 15 minutes.
+            targetRuntimeSeconds: 600
+            ## Required, affects the script handling the onRun action.
+            ## CONTIGUOUS means {{Task.Param.Frame}} always expands to
+            ## "<startframe>-<endframe>", e.g. "1-1" or "11-20".
+            rangeConstraint: CONTIGUOUS
+    script:
+      actions:
+        onRun:
+          command: bash
+          args: ["{{Task.File.RenderChunk}}"]
+      embeddedFiles:
+        - name: RenderChunk
+          filename: render.sh
+          type: TEXT
+          ## Because a CONTIGUOUS chunk is always like "<startframe>-<endframe>",
+          ## this code can use the cut command to get the start and end values.
+          data: |
+            START_FRAME="$(echo '{{Task.Param.Frame}}' | cut -d- -f1)"
+            END_FRAME="$(echo '{{Task.Param.Frame}}' | cut -d- -f2)"
+            echo "Start frame: $START_FRAME"
+            echo "End frame: $END_FRAME"

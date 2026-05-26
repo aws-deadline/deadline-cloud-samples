@@ -1,0 +1,34 @@
+specificationVersion: 'jobtemplate-2023-09'
+extensions:
+- TASK_CHUNKING
+name: Non-contiguous Chunks
+parameterDefinitions:
+  - name: Frames
+    type: STRING
+    default: "1-3,5,7-20,21-100:2"
+steps:
+  - name: Render
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: CHUNK[INT]
+          range: "{{Param.Frames}}"
+          chunks:
+            defaultTaskCount: 10
+            targetRuntimeSeconds: 600
+            ## NONCONTIGUOUS means {{Task.Param.Frame}} expands to
+            ## an arbitrary integer range expression, e.g. "1-3,5,7-20:2".
+            rangeConstraint: NONCONTIGUOUS
+    script:
+      actions:
+        onRun:
+          command: bash
+          args: ["{{Task.File.RenderChunk}}"]
+      embeddedFiles:
+        - name: RenderChunk
+          filename: render.sh
+          type: TEXT
+          ## A NONCONTIGUOUS chunk is an arbitrary integer range expression.
+          ## Depends on what your DCC supports, you may need to transform the scheduler assigned frames.
+          data: |
+            echo "Frames: {{Task.Param.Frame}}"

@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Schedule standby worker count on a Deadline Cloud fleet. Sets a warm standby pool during
+  business hours and resets it outside business hours to save cost. Works with any existing
+  fleet created via the console, CLI, or CloudFormation.
+
+Parameters:
+  FarmId:
+    Type: String
+    Description: Deadline Cloud Farm ID (e.g. farm-0123456789abcdef0123456789abcdef).
+    AllowedPattern: ^farm-[0-9a-f]{32}$
+  FleetId:
+    Type: String
+    Description: Deadline Cloud Fleet ID (e.g. fleet-0123456789abcdef0123456789abcdef).
+    AllowedPattern: ^fleet-[0-9a-f]{32}$
+  BusinessHoursStandbyWorkerCount:
+    Type: Number
+    Description: Standby worker count to set during business hours.
+    Default: 2
+    MinValue: 0
+  OffHoursStandbyWorkerCount:
+    Type: Number
+    Description: Standby worker count to set outside business hours.
+    Default: 0
+    MinValue: 0
+  BusinessHoursStartCron:
+    Type: String
+    Description: >
+      Cron expression for when business hours start.
+      Default is 8:00 AM Monday through Friday.
+      See the ScheduleTimezone parameter to change the time zone (default: UTC).
+    Default: "cron(0 8 ? * MON-FRI *)"
+  BusinessHoursEndCron:
+    Type: String
+    Description: >
+      Cron expression for when business hours end.
+      Default is 5:00 PM Monday through Friday.
+      See the ScheduleTimezone parameter to change the time zone (default: UTC).
+    Default: "cron(0 17 ? * MON-FRI *)"
+  ScheduleTimezone:
+    Type: String
+    Description: Timezone for the schedule expressions (e.g. UTC, US/Pacific, Europe/London).
+    Default: UTC
+
+Resources:
+  StandbySchedulerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-StandbyScheduler
+      Description: Updates standby worker count on a Deadline Cloud fleet.
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 30
+      Runtime: python3.13
+      Code:
+        ZipFile: |
+          import os
+          import sys
+          import subprocess
+          import json
+          import logging
+
+          # Install the latest boto3 so that the autoScalingConfiguration API model is available.
+          # This is needed when the Lambda runtime's bundled SDK does not yet include it.
+          os.makedirs("/tmp/site-packages", exist_ok=True)
+          sys.path.insert(0, "/tmp/site-packages")
+          subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "--target", "/tmp/site-packages", "boto3"])
+
+          import boto3
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          deadline = boto3.client("deadline")
+
+          def handler(event, context):
+              farm_id = event["FarmId"]
+              fleet_id = event["FleetId"]
+              standby_count = event["StandbyWorkerCount"]
+
+              logger.info(f"Setting standbyWorkerCount={standby_count} on {fleet_id}")
+
+              try:
+                  fleet = deadline.get_fleet(farmId=farm_id, fleetId=fleet_id)
+
+                  # Determine fleet type and build the configuration update
+                  config = fleet["configuration"]
+                  if "serviceManagedEc2" in config:
+                      sme = config["serviceManagedEc2"]
+                      auto_scaling = sme.get("autoScalingConfiguration", {})
+                      auto_scaling["standbyWorkerCount"] = standby_count
+                      sme["autoScalingConfiguration"] = auto_scaling
+                      update_config = {"serviceManagedEc2": sme}
+                  elif "customerManaged" in config:
+                      cm = config["customerManaged"]
+                      auto_scaling = cm.get("autoScalingConfiguration", {})
+                      auto_scaling["standbyWorkerCount"] = standby_count
+                      cm["autoScalingConfiguration"] = auto_scaling
+                      update_config = {"customerManaged": cm}
+                  else:
+                      raise ValueError(f"Unsupported fleet configuration type: {list(config.keys())}")
+
+                  deadline.update_fleet(
+                      farmId=farm_id,
+                      fleetId=fleet_id,
+                      configuration=update_config,
+                  )
+
+                  logger.info(f"Successfully set standbyWorkerCount={standby_count}")
+                  return {"standbyWorkerCount": standby_count}
+
+              except Exception as e:
+                  logger.exception(f"Failed to update standby worker count: {e}")
+                  raise
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub lambda.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DeadlineFleetAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - deadline:GetFleet
+                  - deadline:UpdateFleet
+                Resource:
+                  - !Sub arn:${AWS::Partition}:deadline:${AWS::Region}:${AWS::AccountId}:farm/${FarmId}/fleet/${FleetId}
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub scheduler.${AWS::URLSuffix}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt StandbySchedulerLambda.Arn
+
+  BusinessHoursStartSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${AWS::StackName}-BusinessHoursStart
+      Description: Set standby worker count at the start of business hours.
+      ScheduleExpression: !Ref BusinessHoursStartCron
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt StandbySchedulerLambda.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub |
+          {
+            "FarmId": "${FarmId}",
+            "FleetId": "${FleetId}",
+            "StandbyWorkerCount": ${BusinessHoursStandbyWorkerCount}
+          }
+        RetryPolicy:
+          MaximumRetryAttempts: 3
+
+  BusinessHoursEndSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${AWS::StackName}-BusinessHoursEnd
+      Description: Reset standby worker count at the end of business hours.
+      ScheduleExpression: !Ref BusinessHoursEndCron
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt StandbySchedulerLambda.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub |
+          {
+            "FarmId": "${FarmId}",
+            "FleetId": "${FleetId}",
+            "StandbyWorkerCount": ${OffHoursStandbyWorkerCount}
+          }
+        RetryPolicy:
+          MaximumRetryAttempts: 3
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the standby scheduler Lambda function
+    Value: !GetAtt StandbySchedulerLambda.Arn
+  BusinessHoursStartScheduleArn:
+    Description: ARN of the business hours start schedule
+    Value: !GetAtt BusinessHoursStartSchedule.Arn
+  BusinessHoursEndScheduleArn:
+    Description: ARN of the business hours end schedule
+    Value: !GetAtt BusinessHoursEndSchedule.Arn

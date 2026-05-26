@@ -1,0 +1,141 @@
+specificationVersion: 'jobtemplate-2023-09'
+extensions:
+- TASK_CHUNKING
+name: "Pricing Financial Derivatives"
+description: |
+  Monte Carlo simulation for pricing a portfolio of autocallable structured notes
+  using QuantLib's Heston stochastic volatility model.
+  Ported from the AWS Batch FSI workshop:
+  https://ec2spotworkshops.com/monte-carlo-with-batch.html
+
+parameterDefinitions:
+- name: PortfolioFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: portfolio.json
+  description: "The input portfolio JSON file."
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Portfolio File
+    groupLabel: Input / Output
+    fileFilters:
+    - label: JSON Files
+      patterns: ["*.json"]
+    - label: All Files
+      patterns: ["*"]
+- name: ResultsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: results
+  description: "Directory for per-position results and final aggregate."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Results Directory
+    groupLabel: Input / Output
+- name: PositionRange
+  type: STRING
+  default: "0-47"
+  description: "Range of position indices to price (e.g. 0-47 for 48 positions)."
+  userInterface:
+    control: LINE_EDIT
+    label: Position Range
+    groupLabel: Simulation Settings
+- name: NumPaths
+  type: INT
+  default: 10000
+  description: "Number of Monte Carlo simulation paths per position."
+  userInterface:
+    control: SPIN_BOX
+    label: Monte Carlo Paths
+    groupLabel: Simulation Settings
+- name: ChunkSize
+  type: INT
+  default: 1
+  description: "Initial number of tasks per chunk. The scheduler grows this automatically based on ChunkTargetRuntime."
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Simulation Settings
+- name: ChunkTargetRuntime
+  type: INT
+  default: 180
+  description: "Target runtime in seconds per chunk. The scheduler adjusts chunk size to approach this target."
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Target Runtime (seconds)
+    groupLabel: Simulation Settings
+- name: CondaPackages
+  type: STRING
+  default: "python quantlib-python numpy scipy"
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+- name: CondaChannels
+  type: STRING
+  default: "conda-forge"
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+    groupLabel: Software Environment
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: "Directory containing the bundled Python scripts."
+  userInterface:
+    control: HIDDEN
+
+steps:
+- name: PricePositions
+  hostRequirements:
+    amounts:
+    - name: amount.worker.vcpu
+      min: 1
+    - name: amount.worker.memory
+      min: 8192
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: PositionIndex
+      type: "CHUNK[INT]"
+      range: "{{Param.PositionRange}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.ChunkTargetRuntime}}"
+        rangeConstraint: CONTIGUOUS
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/price_position.py"
+        - "--portfolio"
+        - "{{Param.PortfolioFile}}"
+        - "--results-dir"
+        - "{{Param.ResultsDir}}"
+        - "--position-range"
+        - "{{Task.Param.PositionIndex}}"
+        - "--num-paths"
+        - "{{Param.NumPaths}}"
+
+- name: AggregateResults
+  dependencies:
+  - dependsOn: PricePositions
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/aggregate_results.py"
+        - "--results-dir"
+        - "{{Param.ResultsDir}}"

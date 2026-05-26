@@ -18,3 +18,7 @@ From the `conda_recipes` directory, run the following command to submit a packag
 ```sh
 $ ./submit-package-job vray
 ```
+
+The `submit-package-job` command can be run from any platform (macOS, Windows, or Linux) - it submits a job to Deadline Cloud where a Linux worker builds the package and uploads it to your S3 conda channel.
+
+**Note**: The queue's IAM role needs `s3:PutObject` permission for the `Conda/*` prefix in the job attachments bucket to publish the built package.

@@ -25,6 +25,11 @@ rm -r $PREFIX/$MTOA_ROOT/docs
 # to never use LD_LIBRARY_PATH in Conda environments.
 patchelf --add-rpath '$ORIGIN/../../maya2026/lib' $PREFIX/$MTOA_ROOT/bin/libai_renderview.so
 
+# Add RPATH for libraries in $MTOA_ROOT/procedurals to $MAYA_LOCATION/plug-ins/xgen/lib for libAdskSeExpr.so
+for file in "$PREFIX/$MTOA_ROOT/procedurals"/*.so; do
+    patchelf --set-rpath '$ORIGIN/../../maya2026/plug-ins/xgen/lib' "$file"
+done
+
 # Create symlinks for utilities allowing them to be run directly from the command line
 mkdir -p $PREFIX/bin
 ln -r -s $PREFIX/$MTOA_ROOT/bin/kick $PREFIX/bin/kick

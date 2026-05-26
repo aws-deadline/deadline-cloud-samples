@@ -1,0 +1,186 @@
+specificationVersion: jobtemplate-2023-09
+name: FFmpeg Encode Video
+description: |
+  Encodes a numbered image sequence into a video file using FFmpeg.
+
+  This job is useful as a standalone utility or as a post-render step
+  in a pipeline. It takes a directory of sequentially numbered image
+  files (e.g. render.0001.png, render.0002.png, ...) and produces an
+  MP4 video using the H.264 codec.
+
+  The job needs FFmpeg to run. On Deadline Cloud service-managed fleets,
+  you can use "conda-forge" as the CondaChannels parameter for a conda
+  queue environment.
+
+parameterDefinitions:
+  # Input
+  - name: InputDir
+    description: >
+      Choose the directory containing the input image sequence.
+      The images must be sequentially numbered (e.g. render.0001.png).
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: IN
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Input Image Directory
+      groupLabel: Input
+
+  - name: InputFilePattern
+    description: >
+      The FFmpeg input pattern matching the image filenames.
+      Use printf-style numbering, e.g. "render.%04d.png" for
+      render.0001.png, render.0002.png, etc.
+    type: STRING
+    default: "output_####.png"
+    userInterface:
+      control: LINE_EDIT
+      label: Input File Pattern
+      groupLabel: Input
+
+  - name: StartFrame
+    description: The first frame number in the image sequence.
+    type: INT
+    default: 1
+    userInterface:
+      control: SPIN_BOX
+      label: Start Frame
+      groupLabel: Input
+
+  - name: EndFrame
+    description: The last frame number in the image sequence.
+    type: INT
+    default: 100
+    userInterface:
+      control: SPIN_BOX
+      label: End Frame
+      groupLabel: Input
+
+  # Output
+  - name: OutputDir
+    description: Choose the directory for the output video file.
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    default: output
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Output Directory
+      groupLabel: Output
+
+  - name: OutputFileName
+    description: The name of the output video file.
+    type: STRING
+    default: "output.mp4"
+    userInterface:
+      control: LINE_EDIT
+      label: Output File Name
+      groupLabel: Output
+
+  # Encoding Settings
+  - name: FrameRate
+    description: The playback frame rate of the output video.
+    type: INT
+    default: 24
+    userInterface:
+      control: SPIN_BOX
+      label: Frame Rate (fps)
+      groupLabel: Encoding Settings
+
+  - name: EncodingPreset
+    description: >
+      Controls the encoding speed to compression ratio.
+      Slower presets produce smaller files at the cost of encoding time.
+    type: STRING
+    default: slower
+    userInterface:
+      control: DROPDOWN_LIST
+      label: Encoding Preset
+      groupLabel: Encoding Settings
+    allowedValues:
+      [ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow]
+
+  - name: ConstantRateFactor
+    description: >
+      Controls output quality. Ranges from 0 (lossless) to 51 (worst).
+      Values of 17-18 are nearly visually lossless.
+    type: INT
+    default: 18
+    userInterface:
+      control: SPIN_BOX
+      label: Constant Rate Factor (CRF)
+      groupLabel: Encoding Settings
+    minValue: 0
+    maxValue: 51
+
+  # Software Environment
+  - name: CondaPackages
+    type: STRING
+    description: >
+      If you have a Queue Environment that creates a Conda environment
+      from a parameter called CondaPackages, this will set the default
+      packages to use for the job.
+    default: ffmpeg
+    userInterface:
+      control: HIDDEN
+
+  - name: CondaChannels
+    type: STRING
+    description: >
+      If you have a Queue Environment that creates a Conda environment
+      from a parameter called CondaChannels, this will set the channels
+      to use. FFmpeg is available from the conda-forge community channel.
+    default: conda-forge
+    userInterface:
+      control: HIDDEN
+
+steps:
+  - name: EncodeVideo
+    script:
+      actions:
+        onRun:
+          command: bash
+          args:
+            - "{{Task.File.Encode}}"
+      embeddedFiles:
+        - name: Encode
+          type: TEXT
+          runnable: true
+          data: |
+            #!/bin/env bash
+            set -xeuo pipefail
+
+            # Convert #### pattern to printf-style %04d pattern for FFmpeg
+            INPUT_PATTERN='{{Param.InputFilePattern}}'
+            FFMPEG_PATTERN=$(echo "$INPUT_PATTERN" | sed 's/####/%04d/g; s/###/%03d/g; s/##/%02d/g')
+            echo "Input pattern: $INPUT_PATTERN -> FFmpeg pattern: $FFMPEG_PATTERN"
+
+            echo "Input directory contents (first 10 files):"
+            ls '{{Param.InputDir}}/' | head -10
+            TOTAL_FILES=$(ls '{{Param.InputDir}}/' | wc -l)
+            echo "Total files in input directory: $TOTAL_FILES"
+
+            mkdir -p '{{Param.OutputDir}}'
+
+            FRAMES=$(({{Param.EndFrame}} - {{Param.StartFrame}} + 1))
+            echo "Encoding $FRAMES frames at {{Param.FrameRate}} fps..."
+
+            ffmpeg -y \
+              -r {{Param.FrameRate}} \
+              -start_number {{Param.StartFrame}} \
+              -i "{{Param.InputDir}}/$FFMPEG_PATTERN" \
+              -frames:v $FRAMES \
+              -pix_fmt yuv420p \
+              -vf "scale=in_color_matrix=bt709:out_color_matrix=bt709" \
+              -c:v libx264 \
+              -preset {{Param.EncodingPreset}} \
+              -crf {{Param.ConstantRateFactor}} \
+              -color_range tv \
+              -colorspace bt709 \
+              -color_primaries bt709 \
+              -color_trc iec61966-2-1 \
+              -movflags faststart \
+              '{{Param.OutputDir}}/{{Param.OutputFileName}}'
+
+            echo "Video encoding complete!"
+            ls -lh '{{Param.OutputDir}}/{{Param.OutputFileName}}'

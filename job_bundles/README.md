@@ -54,9 +54,11 @@ The step definition includes a parameter space to define a task for each frame f
 and a short script that substitutes job parameters and the Frame task parameter into a script command for each task.
 
 * [3dsmax_vray_denoiser_example](3dsmax_vray_denoiser_example) - 3ds Max V-Ray rendering with smart frame chunking and VRIMG to EXR conversion
+* [arnold_standalone_render](arnold_standalone_render) - Arnold standalone rendering of .ass files using `kick`
 * [blender_render](blender_render/template.yaml)
 * [keyshot_standalone](keyshot_standalone)
 * [afterfx_render_one_task](afterfx_render_one_task)
+* [maya_arnold_ass_export_render](maya_arnold_ass_export_render) - Export .ass from Maya and render with Arnold `kick`
 * [maya_cli_render](maya_cli_render)
 * [houdini_husk_usd_render](houdini_husk_usd_render)
 * [nuke_render](nuke_render)
@@ -68,6 +70,27 @@ If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../
 
 The [gsplat_pipeline](gsplat_pipeline/README.md) job bundle can take a video file as input and train a 3D Gaussian Splatting point cloud.
 This example shows Deadline Cloud running a 3D reconstruction workload that uses CUDA GPUs for acceleration.
+
+### LLM evaluation with vLLM and lm-evaluation-harness
+
+The [vllm_lm_eval_leaderboard](vllm_lm_eval_leaderboard/README.md) job bundle evaluates multiple LLMs on a set of benchmarks in a single Deadline Cloud job using
+[vLLM](https://github.com/vllm-project/vllm) for inference and [EleutherAI's lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for scoring.
+Models are a STRING parameter sweep — each task starts vLLM for one model, runs every benchmark against it, then stops vLLM. A final aggregation step
+produces a ranked leaderboard (CSV + Markdown).
+
+### Arnold standalone render
+
+The [arnold_standalone_render](arnold_standalone_render) job bundle renders Arnold `.ass` (Arnold Scene Source) files
+using the `kick` command-line renderer from MtoA. This is useful for batch rendering pre-exported Arnold scenes without
+requiring a full Maya session. It includes a sample Cornell box `.ass` file for testing. You can also download sample
+scenes from the [Autodesk Arnold learning scenes page](https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=arnold_for_maya_tutorials_am_Learning_Scenes_html).
+
+### Maya Arnold export and render
+
+The [maya_arnold_ass_export_render](maya_arnold_ass_export_render) job bundle is a two-step pipeline that exports
+`.ass` files from a Maya scene and renders them with Arnold `kick`. The export step opens the Maya scene once and
+exports all frames, then the render step distributes per-frame `kick` tasks across workers. This is useful when you
+want to render Arnold scenes directly from Maya files without pre-exporting.
 
 ### Turntable job with Maya/Arnold
 
@@ -92,6 +115,13 @@ job attachment S3 bucket with data files by copying them from where they are alr
 S3 prefix, then distributes the hashing and data copies across a number of workers you specify. Because job attachments
 uses content-addressed storage for data files, users that later submit jobs with these files attached will not have to
 upload them.
+
+### SSH via SSM Managed Node
+
+The [ssh_to_smf](ssh_to_smf/README.md) job bundle registers a Deadline Cloud worker as an
+AWS Systems Manager hybrid managed node, enabling interactive SSH access via Session Manager for the duration of the job.
+A submit script handles creating the SSM hybrid activation and passing the credentials as job parameters. Requires
+one-time account setup (IAM role + advanced-instances tier). See the bundle's README for full setup instructions.
 
 ## Example Blender job submission
 

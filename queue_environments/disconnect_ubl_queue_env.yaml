@@ -1,0 +1,42 @@
+specificationVersion: 'environment-2023-09'
+environment:
+  name: DisconnectUBL
+  description: |
+    Unsets Deadline Cloud Usage Based License (UBL) environment variables.
+
+    Use this queue environment if you would like to turn off all connection to
+    Deadline Cloud UBL for your queue and force the use of a custom license server.
+    (see https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-byol.html).
+
+    This queue environment should be run before any other queue environments
+    (for example, by setting the priority to 0) so that connections to your
+    custom licenses server (such as RLM) in other queue environments are not
+    accidentally removed.
+
+    Please note that this is a sample, additional UBL environment variables may
+    be added in the future.
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args:
+        - "{{Env.File.Enter}}"
+    embeddedFiles:
+    - name: Enter
+      filename: disconnect-ubl-enter.sh
+      type: TEXT
+      data: |
+        vars=(
+          ADSKFLEX_LICENSE_FILE
+          LUXION_LICENSE_FILE
+          PIXAR_LICENSE_FILE
+          SESI_LMHOST
+          VRAY_AUTH_CLIENT_SETTINGS
+          foundry_LICENSE
+          g_licenseServerRLM
+          redshift_LICENSE
+        )
+        
+        for var in "${vars[@]}"; do
+          echo "openjd_unset_env: $var"
+        done
