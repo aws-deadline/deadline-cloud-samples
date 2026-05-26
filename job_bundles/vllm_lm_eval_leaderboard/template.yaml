@@ -100,7 +100,7 @@ parameterDefinitions:
 #      conda-forge typepy hides these behind the [datetime] extra.
 - name: CondaPackages
   type: STRING
-  default: "python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9 lm_eval=0.4.9 requests aiohttp tenacity tqdm tiktoken pytz python-dateutil"
+  default: "python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9 lm_eval=0.4.11 requests aiohttp tenacity tqdm tiktoken pytz python-dateutil"
   userInterface:
     control: HIDDEN
 
