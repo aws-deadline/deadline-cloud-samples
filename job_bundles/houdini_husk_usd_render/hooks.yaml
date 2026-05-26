@@ -1,0 +1,5 @@
+version: "1.0"
+preSubmission:
+  - command: python3
+    args: [discover_usd_dependencies.py]
+    timeout: 120
