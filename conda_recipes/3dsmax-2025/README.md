@@ -1,5 +1,9 @@
 # Autodesk 3ds Max 2025 conda build recipe
 
+> **Autodesk Cloud Rights:** Autodesk 3ds Max has its own licensing requirements separate from AWS.
+> Confirm you have the appropriate licenses before proceeding. See additional details on
+> [Autodesk Cloud Rights for 3ds Max](https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Subscription-Benefits-FAQ-Cloud-Rights.html).
+
 ## Creating an archive file for Windows
 
 The Windows installer requires Administrator permissions that are not available in most conda package
@@ -7,7 +11,7 @@ build environments, such as on Deadline Cloud service-managed fleets. Follow the
 install 3ds Max 2025 on a freshly created EC2 instance as Administrator, and create an archive file
 for use by the conda build recipe.
 
-1. Launch a fresh Windows Server 2022 instance.
+1. Launch a fresh Windows Server 2022 instance (any current Windows Server AMI with enough vCPUs and RAM works).
    1. From the AWS EC2 management console, select the option to Launch instance.
    2. Enter instance name "Create Windows 3ds Max archive".
    3. Select "Microsoft Windows Server 2022 Base" for the AMI.
@@ -29,15 +33,18 @@ for use by the conda build recipe.
    1. Install or update the AWS CLI v2 from https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html.
    2. Install or update the Session Manager plugin from https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html.
    3. Run the following command, using AWS credentials that have suitable permissions, to start the SSM port forwarding. Replace INSTANCE_ID with the one you launched.
-      1. `aws ssm start-session --document-name AWS-StartPortForwardingSession --parameters "localPortNumber=33389,portNumber=3389" --target INSTANCE_ID`
+      1. `aws ssm start-session --document-name AWS-StartPortForwardingSession --parameters "localPortNumber=3389,portNumber=3389" --target INSTANCE_ID`
    4. Open RDP, and enter the following connection details:
-      1. Computer: `localhost:33389`
+      1. Computer: `localhost:3389`
       2. User name: `Administrator`
    5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
 3. Install 3ds Max 2025 on the instance.
    1. Download the 3ds Max 2025 installer for Windows from Autodesk (for example via Autodesk Access).
    2. Run the installer on the EC2 instance and complete installation using the default settings.
-   3. Optionally install the `deadline-cloud-for-3ds-max` Python package inside 3ds Max if you want the Deadline Cloud integration available on the workstation you use for archiving.
+   3. *(Optional)* Install the `deadline-cloud-for-3ds-max` Python package inside 3ds Max if you want the Deadline Cloud
+      integration baked into the package. Note that doing so pins the adaptor at archive-creation time and skips runtime
+      upgrades that the Deadline Cloud conda channel would otherwise provide; for production fleets, prefer letting the
+      channel deliver the adaptor at job-init time.
 4. From an Administrator PowerShell window, create the archive from the installed files and capture its hash.
    1. `Compress-Archive -Path 'C:\Program Files\Autodesk\3ds Max 2025' -DestinationPath Autodesk_3dsMax_2025_Windows_installation.zip`
    2. `(Get-FileHash -Path "Autodesk_3dsMax_2025_Windows_installation.zip" -Algorithm SHA256).Hash.ToLower()`
@@ -48,49 +55,43 @@ for use by the conda build recipe.
    [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for
    submitting package build jobs, and update the Windows source artifact hash in `meta.yaml`.
 
-The build script installs `pywin32` into 3ds Max's embedded Python to enable automation and sets environment
-variables (`ADSK_3DSMAX_*`, plus `3DSMAX_EXECUTABLE` in the Windows activation script) to simplify invoking
-`3dsmaxbatch.exe` from Deadline Cloud jobs.
+The build script installs `pywin32` into 3ds Max's embedded Python to enable automation and exports
+environment variables (`ADSK_3DSMAX_*`) so jobs can find both the GUI (`3dsmax.exe`) and batch
+(`3dsmaxbatch.exe`) executables. See the *Notes on environment variables* section below for details.
 
-## Required host dependencies
-3ds Max 2025 requires .NET 8 runtimes to be present on the host OS. Install them (with admin rights) before running jobs:
+## Build tool
 
-- .NET 8 SDK 8.0.416 (includes .NET, ASP.NET Core, and Desktop runtimes): `ods-sandbox/accounts/deadline/smf/fleets/ods-deadlinedemo-win-cpu-smf-3dsmax_dotnet.ps1`
-
-Run that PowerShell script during fleet/bootstrap setup to ensure the required runtimes are available on the worker.
-
-PowerShell snippet (for convenience if the repo isn’t available):
-
-```powershell
-# Install .NET 8 SDK (x64) which includes .NET Runtime, ASP.NET Core Runtime, and .NET Desktop Runtime 8.0.22
-$sdkDisplayPrefix = "Microsoft .NET SDK 8.0.416"
-$sdkDownloadUri   = "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.416/dotnet-sdk-8.0.416-win-x64.exe"
-$sdkInstaller     = Join-Path $env:TEMP ([IO.Path]::GetFileName($sdkDownloadUri))
-
-$sdkExisting = Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\* |
-    Where-Object { $_.DisplayName -like "$sdkDisplayPrefix*" }
-
-if (-not $sdkExisting) {
-    Write-Host "Downloading .NET 8 SDK from $sdkDownloadUri ..."
-    Invoke-WebRequest -Uri $sdkDownloadUri -OutFile $sdkInstaller -UseBasicParsing
-    Write-Host "Installing .NET 8 SDK silently (includes runtime, ASP.NET Core, and Desktop runtimes)..."
-    Start-Process -FilePath $sdkInstaller -ArgumentList "/install", "/quiet", "/norestart" -Wait
-    $sdkInstalled = Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\* |
-        Where-Object { $_.DisplayName -like "$sdkDisplayPrefix*" }
-    if ($sdkInstalled) {
-        Write-Host ".NET 8 SDK installed: $($sdkInstalled.DisplayName)"
-    } else {
-        Write-Host ".NET 8 SDK not detected after install." -ForegroundColor Red
-    }
-    Remove-Item $sdkInstaller -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Host ".NET 8 SDK already installed: $($sdkExisting.DisplayName)"
-}
-```
+This recipe uses `conda-build` to stay consistent with the existing 3ds Max test pipeline. Migration to
+[`rattler-build`](https://github.com/prefix-dev/rattler-build) (already adopted by `blender-5.1`,
+`maya-2026`, and others in this repository) is tracked as a follow-up — feel free to open an issue or PR.
 
 ## Notes on environment variables
-- POSIX shells cannot export variable names that start with a digit, so `3DSMAX_EXECUTABLE` cannot be set by the `.sh` activation script. The Windows `.bat` sets it, but bash activation relies on the ADSK-prefixed variables instead.
-- The adaptor’s `executable_handler.py` needs to be hotpatched in a Conda environment before the run to fall back to `ADSK_3DSMAX_EXECUTABLE` / `ADSK_3DSMAX_BATCH_EXE` when `3DSMAX_EXECUTABLE` is absent. Keep this in mind if you update or replace the handler.
+
+The activation script exports the following variables so jobs and the
+[`deadline-cloud-for-3ds-max`](https://github.com/aws-deadline/deadline-cloud-for-3ds-max) adaptor can
+locate the right executable:
+
+| Variable | Path | When to use |
+| --- | --- | --- |
+| `ADSK_3DSMAX_BATCH_EXE` | `…/3ds Max 2025/3dsmaxbatch.exe` | **Default.** Non-GUI batch render. Compliant with Autodesk Cloud Rights, which allow up to 10 batch render licenses per GUI subscription seat. |
+| `ADSK_3DSMAX_EXECUTABLE` | `…/3ds Max 2025/3dsmax.exe` | GUI executable. Use only if your Autodesk subscription's GUI seats cover the rendering workload. |
+| `3DSMAX_EXECUTABLE` (`.bat` only) | `…/3ds Max 2025/3dsmaxbatch.exe` | Legacy variable consumed by the current adaptor; kept pointing at the batch exe so existing jobs render with the safer default. |
+
+Limitations:
+
+- POSIX shells cannot export variable names that begin with a digit, so `3DSMAX_EXECUTABLE` is set
+  only by the `.bat` activation script. Bash activation relies on the `ADSK_*` variables.
+- The current adaptor reads `3DSMAX_EXECUTABLE` only. Until
+  [deadline-cloud-for-3ds-max#190](https://github.com/aws-deadline/deadline-cloud-for-3ds-max/issues/190)
+  ships, jobs that need to switch between batch and GUI explicitly will require either a small adaptor
+  hot-patch or a fleet-level override of `3DSMAX_EXECUTABLE`. Once that adaptor change lands, the
+  adaptor will read both `ADSK_3DSMAX_BATCH_EXE` and `ADSK_3DSMAX_EXECUTABLE` and pick the right one
+  for the job.
 
 ## Renderer plug-ins (e.g., Corona)
-If you intend to render with Corona or other third-party renderers, ensure their DLLs are present in the 3ds Max plug-in search path (e.g., `Autodesk/3ds Max 2025/Plugins`). The main 3dsmax package does not carry Corona binaries; use the `3dsmax-corona` package to place the real Corona DLLs into the environment. Without that package (or manually copied DLLs), Max will warn about missing plug-ins and the adaptor will fail.
+
+If you intend to render with Corona or other third-party renderers, ensure their DLLs are present in the
+3ds Max plug-in search path (e.g., `Autodesk/3ds Max 2025/Plugins`). The main `3dsmax` package does not
+carry Corona binaries; use the `3dsmax-corona` package to place the real Corona DLLs into the
+environment. Without that package (or manually copied DLLs), Max will warn about missing plug-ins and
+the adaptor will fail.

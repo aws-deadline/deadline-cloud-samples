@@ -19,11 +19,13 @@ if [ ! -f "$SRC_ROOT/3dsmax.exe" ]; then
 fi
 
 # Copy the extracted files into the install location (robust against read-only flags and file/dir collisions).
+# robocopy ships with Windows by default (in System32) so no extra install is required for conda-build on Windows.
+# /COPY:DAT /DCOPY:DAT skips ACL/owner copying which often fails in conda-build/CI; robocopy uses 0-7 for "success
+# with minor differences" so we treat exit codes < 8 as success.
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 cmd <<EOF
 setlocal
-rem Use robocopy without ACL/owner copying to avoid access denied; accept codes 0-7 as success.
 robocopy "$(cygpath -w "$SRC_ROOT")" "$(cygpath -w "$INSTALL_DIR")" /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /NFL /NDL >nul
 set RC=%ERRORLEVEL%
 echo Robocopy exit code: %RC%
@@ -48,12 +50,22 @@ mkdir -p "$PREFIX/etc/conda/deactivate.d"
 # for details on activation. The Deadline Cloud sample queue environments use bash
 # to activate environments on Windows, so always produce both .bat and .sh files.
 
+# Environment variables exposed to jobs.
+#
+# ADSK_3DSMAX_BATCH_EXE -> 3dsmaxbatch.exe (non-GUI, the safe default for cloud rendering;
+#                        Autodesk Cloud Rights allow ~10 batch render licenses per GUI seat).
+# ADSK_3DSMAX_EXECUTABLE -> 3dsmax.exe (GUI). Use only when your subscription's GUI seats
+#                        cover the rendering workload (see Autodesk Cloud Rights FAQ).
+# 3DSMAX_EXECUTABLE     -> 3dsmaxbatch.exe (legacy variable still consumed by the current
+#                        deadline-cloud-for-3ds-max adaptor; kept on the .bat side for now).
+# See https://github.com/aws-deadline/deadline-cloud-for-3ds-max/issues/190 for the
+# planned adaptor change that will let users select GUI vs batch explicitly.
 cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 export ADSK_3DSMAX_VERSION=$MAX_VERSION
 export ADSK_3DSMAX_LOCATION="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION"
 export ADSK_3DSMAX_PYTHON="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION/Python/python.exe"
 export ADSK_3DSMAX_BATCH_EXE="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION/3dsmaxbatch.exe"
-export ADSK_3DSMAX_EXECUTABLE="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION/3dsmaxbatch.exe"
+export ADSK_3DSMAX_EXECUTABLE="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION/3dsmax.exe"
 export ADSK_3DSMAX_ROOT="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION"
 export ADSK_3DSMAX_PLUGINS_ADDON_DIR="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION/Plugins"
 export ADSK_APPLICATION_PLUGINS="\$CONDA_PREFIX/Autodesk/3ds Max $MAX_VERSION/Plugins"
@@ -67,7 +79,7 @@ set "ADSK_3DSMAX_VERSION=$MAX_VERSION"
 set "ADSK_3DSMAX_LOCATION=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION"
 set "ADSK_3DSMAX_PYTHON=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION\\Python\\python.exe"
 set "ADSK_3DSMAX_BATCH_EXE=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION\\3dsmaxbatch.exe"
-set "ADSK_3DSMAX_EXECUTABLE=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION\\3dsmaxbatch.exe"
+set "ADSK_3DSMAX_EXECUTABLE=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION\\3dsmax.exe"
 set "ADSK_3DSMAX_ROOT=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION"
 set "ADSK_3DSMAX_PLUGINS_ADDON_DIR=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION\\Plugins"
 set "ADSK_APPLICATION_PLUGINS=%CONDA_PREFIX%\\Autodesk\\3ds Max $MAX_VERSION\\Plugins"
