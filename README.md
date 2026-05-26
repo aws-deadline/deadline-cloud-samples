@@ -57,6 +57,14 @@ you can attach to your Deadline Cloud queue, to provide software applications to
 The [utility_scripts](utility_scripts) directory contains sample scripts to help you work with
 AWS Deadline Cloud. This directory contains command-line tools assist with common tasks like managing job attachments, working with queues, and automating workflows.
 
+## Submission hook samples
+
+The [submission_hooks](submission_hooks) directory contains sample
+[submission hooks](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md)
+that run custom logic during job submission. The [license_limits](submission_hooks/license_limits/) sample
+demonstrates how to enforce fixed license limits (e.g., V-Ray) using Deadline Cloud's Limits feature
+combined with a pre-submission hook that automatically injects host requirements into job templates.
+
 ## Additional resources
 
 * [AWS Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/index.html)
