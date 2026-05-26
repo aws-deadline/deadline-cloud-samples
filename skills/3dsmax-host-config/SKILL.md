@@ -41,6 +41,9 @@ use the `host-config-from-installer` skill instead.
 - Scripts are PowerShell (`.ps1`) targeting Windows Service Managed Fleets
 - Each script downloads installers from a customer-owned S3 bucket using the AWS CLI (`aws s3 cp`)
 - All version-specific values are exposed as `$VARIABLES` at the top of the script, marked with `# TODO`
+- Each installer/plugin gets its own full S3 URI variable (e.g. `$3DS_MAX_INSTALLER_ZIP_S3_URI`) — do NOT use a shared `$BUCKET_NAME` + filename pattern
+- The 3ds Max installer variable MUST include a comment linking to the zip creation guide:
+  `# Guide on how to create the 3ds Max installer zip file: https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/host_configuration_scripts/3dsmax/README.md`
 - After installing 3ds Max, every script MUST set these environment variables at Machine scope:
   - `Path` — add `C:\Program Files\Autodesk\3ds Max <VERSION>`
   - `3DSMAX_EXECUTABLE` — path to `3dsmaxbatch.exe`
@@ -83,7 +86,7 @@ When in doubt, look at existing folder names in `host_configuration_scripts/3dsm
 
 Structure:
 1. Header comment block — what it installs, tested with, S3 requirements
-2. TODO variables — bucket name, folder names, zip names, installer file names, install roots
+2. TODO variables — one full S3 URI variable per installer/plugin file, each marked with `# TODO` and the zip guide comment for the 3ds Max installer
 3. Install 3ds Max — `mkdir C:\3dsmax_setup -Force`, `aws s3 cp`, `Expand-Archive`, `Start-Process Setup.exe -q -Wait`
 4. For each plugin — find its add-on in `skills/3dsmax-host-config/add-ons/`, download from S3 into `C:\3dsmax_setup\`, then run its silent installer
 5. Configure environment for 3ds Max
@@ -93,11 +96,15 @@ Structure:
 
 Key patterns:
 ```powershell
-# Download from S3
-aws s3 cp --no-progress "s3://$BUCKET_NAME/$ZIP_FILE" C:\3dsmax_setup\3dsmax.zip
+# TODO variables — one full S3 URI per installer/plugin
+# Guide on how to create the 3ds Max installer zip file: https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/host_configuration_scripts/3dsmax/README.md
+$3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket-name/path/to/3ds-max-<YEAR>.zip"
 
-# Install 3ds Max silently
-Start-Process "C:\3dsmax_setup\$FOLDER_NAME\Setup.exe" -ArgumentList '-q' -Wait
+# Download from S3 using the URI variable directly
+aws s3 cp --no-progress "$3DS_MAX_INSTALLER_ZIP_S3_URI" C:\3dsmax_setup\3dsmax.zip
+
+# Install 3ds Max silently — Setup.exe is at the root after extracting
+Start-Process "C:\3dsmax_setup\Setup.exe" -ArgumentList '-q' -Wait
 
 # Set env vars
 [Environment]::SetEnvironmentVariable('3DSMAX_EXECUTABLE', "C:\Program Files\Autodesk\3ds Max $VERSION\3dsmaxbatch.exe", 'Machine')
@@ -140,7 +147,8 @@ version or plugin not already listed.
 
 ## Common Mistakes
 
-- Forgetting `mkdir C:\3dsmax_setup -Force` before the first `aws s3 cp`
+- Using a shared `$BUCKET_NAME` variable — each installer must have its own full S3 URI variable instead
+- Using `$FOLDER_NAME\Setup.exe` — after `Expand-Archive`, `Setup.exe` is at the root of `C:\3dsmax_setup\`
 - Missing `Exit 0` at the end
 - Setting env vars before installing — always install first, then configure
 - Using `&&` as a command separator — PowerShell uses `;` or separate lines

@@ -42,9 +42,30 @@ if [[ "$1" == splatfacto-w* ]]; then
         --output_dir ./nerfstudio_workspace \
         --camera_idx 0
     mv ./nerfstudio_workspace/splat.ply "$OUTPUT_PLY_FILE"
+
+# WORKAROUND: nerfstudio's ns-export is incompatible with PyTorch 2.6+
+# which defaults torch.load to weights_only=True. The checkpoint contains
+# numpy globals that are safe but not allowlisted. We patch torch.load
+# to restore the pre-2.6 behavior. Remove this when nerfstudio is fixed.
+# See: https://github.com/nerfstudio-project/nerfstudio/pull/3711
+
+# TODO: Once the upstream fix is merged, replace the code below with:
+# else
+#     ns-export gaussian-splat \
+#         --load-config ./nerfstudio_workspace/splatfacto/*/config.yml \
+#         --output-dir "$(dirname "$OUTPUT_PLY_FILE")" \
+#         --output-filename "$(basename "$OUTPUT_PLY_FILE")"
+# fi
+
 else
-    ns-export gaussian-splat \
-        --load-config ./nerfstudio_workspace/splatfacto/*/config.yml \
-        --output-dir "$(dirname "$OUTPUT_PLY_FILE")" \
-        --output-filename "$(basename "$OUTPUT_PLY_FILE")"
+    python -c "
+import torch, glob
+_orig = torch.load
+torch.load = lambda *a, **kw: _orig(*a, **{**kw, 'weights_only': False})
+import sys
+cfg = glob.glob('./nerfstudio_workspace/splatfacto/*/config.yml')[0]
+sys.argv = ['ns-export', 'gaussian-splat', '--load-config', cfg, '--output-dir', '$(dirname "$OUTPUT_PLY_FILE")', '--output-filename', '$(basename "$OUTPUT_PLY_FILE")']
+from nerfstudio.scripts.exporter import entrypoint
+entrypoint()
+"
 fi

@@ -1,0 +1,8 @@
+{
+    "limits": {
+        "vray": {
+            "amount_requirement_name": "amount.vray",
+            "min": 1
+        }
+    }
+}

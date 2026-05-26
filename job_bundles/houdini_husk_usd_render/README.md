@@ -36,17 +36,43 @@ uses this metadata to generate its UI. Please note that if the USD file refers t
 these files must be made available to the job. When using a service-managed fleets you must use job attachments. 
 When using a customer-managed fleet you may use job attachments or alternatively use [storage profiles](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/storage-shared.html) to use shared storage.
 
-These job attachments may be attached manually or by using the included `generate_usd_job.py` script.
+### Automatic Dependency Discovery (Submission Hook)
 
-This script introspects the USD file and find all files required by the USD stage to render.
-To use this script you must have the usd-core and deadline python libraries available in your python installation.
-`pip3 install usd-core deadline` 
-Then run the script to find required files
-`python3 generate_usd_job.py my_scene.usd`
-This script will generate a new job bundle with job attachment references for required assets and will preset the input USD file to the file you selected.
-After running, this script will open the Deadline Cloud job submissions UI. You may select which queue to use and further adjust job parameters such as resolution before submitting.
+This job bundle includes a **pre-submission hook** (`hooks.yaml`) that automatically discovers all USD file dependencies (textures, materials, sublayers, references, etc.) and adds them as job attachments before submission. No manual file attachment is needed.
 
-Please note that husk will not render your scene if no camera is included. the `generate_usd_job.py` script will warn you if this is the case.
+To use the hook:
+
+1. Install the `usd-core` Python package:
+   ```
+   pip3 install usd-core
+   ```
+
+2. Enable bundle hooks in your Deadline Cloud configuration:
+   ```
+   deadline config set settings.allow_bundle_hooks true
+   ```
+
+3. Submit the job bundle directly:
+   ```
+   deadline bundle gui-submit job_bundles/houdini_husk_usd_render
+   ```
+   or
+   ```
+   deadline bundle submit job_bundles/houdini_husk_usd_render
+   ```
+
+The hook will introspect the USD scene file specified in the `USDSceneFile` parameter, find all dependent files, and add them as input attachments automatically. It will also warn if no camera is found in the scene.
+
+### Legacy Script (generate_usd_job.py)
+
+Alternatively, you can use the included `generate_usd_job.py` script to manually generate a job bundle with pre-resolved dependencies. This requires both `usd-core` and `deadline` Python packages:
+```
+pip3 install usd-core deadline
+python3 generate_usd_job.py my_scene.usd
+```
+This script will generate a new job bundle with job attachment references for required assets and open the submission UI.
+
+Please note that husk will not render your scene if no camera is included. Both the hook and the legacy script will warn you if this is the case.
 
 Only a few husk parameters are included for demonstration purpose. Please see the [husk documentation](https://www.sidefx.com/docs/houdini/ref/utils/husk.html) for reference.
 
