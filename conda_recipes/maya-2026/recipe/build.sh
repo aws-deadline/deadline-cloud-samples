@@ -111,8 +111,8 @@ EOF
 # See zzz-maya-plugin-sync-activate.sh for the full implementation.
 mkdir -p "$PREFIX/etc/conda/activate.d"
 cp $RECIPE_DIR/zzz-maya-plugin-sync-activate.sh \
-    $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-plugin-sync.sh
+    $PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh
 
 mkdir -p "$PREFIX/etc/conda/deactivate.d"
 cp $RECIPE_DIR/zzz-maya-plugin-sync-deactivate.sh \
-    $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-plugin-sync.sh
+    $PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh

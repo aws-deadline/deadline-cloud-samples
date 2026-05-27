@@ -8,8 +8,8 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ACTIVATE_SCRIPT="$SCRIPT_DIR/zzz-blender-plugins-activate.sh"
-DEACTIVATE_SCRIPT="$SCRIPT_DIR/zzz-blender-plugins-deactivate.sh"
+ACTIVATE_SCRIPT="$SCRIPT_DIR/zzz-blender-plugin-sync-activate.sh"
+DEACTIVATE_SCRIPT="$SCRIPT_DIR/zzz-blender-plugin-sync-deactivate.sh"
 
 PASS_COUNT=0
 FAIL_COUNT=0

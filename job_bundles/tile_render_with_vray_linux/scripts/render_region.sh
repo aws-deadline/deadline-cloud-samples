@@ -34,10 +34,11 @@ BOTTOM=$(( ROW == ROWS - 1 ? IMG_HEIGHT : (ROW + 1) * REGION_HEIGHT ))
 
 echo "Region (col=$COL, row=$ROW): [$LEFT,$TOP,$RIGHT,$BOTTOM]"
 
-# Prepare output filename
+# Prepare output filename - V-Ray appends frame number as .NNNN before extension
 BASE="${FILENAME%.*}"
 EXT="${FILENAME##*.}"
-OUT_FILE="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${ROW}_c${COL}.${EXT}"
+PADDED_FRAME=$(printf "%04d" $FRAME)
+OUT_FILE="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${ROW}_c${COL}.${PADDED_FRAME}.${EXT}"
 echo "Output: $OUT_FILE"
 
 # Enable case-sensitive path remapping
