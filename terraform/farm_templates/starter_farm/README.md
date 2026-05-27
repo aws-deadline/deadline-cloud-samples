@@ -163,7 +163,7 @@ You can also submit the sample job with a single command from your terminal as f
 $ deadline bundle submit cli_job \
     --name "Starter farm test job" \
     -p CondaPackages=imagemagick \
-    -p CondaChannels=conda-forge \
+    -p "CondaChannels=s3://your-s3-bucket-name/Conda/Default deadline-cloud conda-forge" \
     -p DataDir=./turntable_with_maya_arnold \
     -p 'BashScript=find . -type f -iname "*.png" -exec magick identify {} \; | tee identified_images.txt'
 ```

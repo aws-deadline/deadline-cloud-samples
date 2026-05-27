@@ -42,7 +42,7 @@ variable "farm_name" {
 
 variable "farm_description" {
   type    = string
-  default = "Deadline Cloud farm deployed from the starter_farm sample CloudFormation template."
+  default = "Deadline Cloud farm deployed from the starter_farm sample Terraform template."
 }
 
 variable "prod_queue_name" {
