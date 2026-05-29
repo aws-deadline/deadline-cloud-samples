@@ -82,6 +82,19 @@ a single value:
 openjd run --step RenderStep --tasks Frame=1 template.yaml
 ```
 
+If the job depends on a queue environment (e.g. for conda packages), pass it
+with `--environment` so the local run sets up the same software environment
+the farm would:
+
+```bash
+openjd run template.yaml \
+    --environment ../../queue_environments/conda_queue_env_pyrattler.yaml \
+    --step RenderStep --tasks Frame=1
+```
+
+See [`job_bundles/gsplat_pipeline/README.md`](../../job_bundles/gsplat_pipeline/README.md)
+("Run the job anywhere with the Open Job Description CLI") for a worked example.
+
 Once a single task succeeds locally, submit to Deadline Cloud with the full
 parameter range (e.g. `Frames=1-100`) so the farm fans the work out across
 workers in parallel.
@@ -112,7 +125,7 @@ Read these in order based on what you need.
 
 | Source | When to Read |
 |--------|--------------|
-| [Conda blog post](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/) | Overview of conda channels for Deadline Cloud |
+| [Configure jobs with an S3 conda channel](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html) | Setting up and using an S3 conda channel with Deadline Cloud |
 | [`conda_recipes/README.md`](../../conda_recipes/README.md) | Recipe structure and submission |
 | [`skills/conda-builder/SKILL.md`](../conda-builder/SKILL.md) | End-to-end recipe creation and local build/test workflow |
 
@@ -120,6 +133,11 @@ Read these in order based on what you need.
 
 ```yaml
 specificationVersion: 'jobtemplate-2023-09'
+# Opt into OpenJD extensions; see the "Extensions available for specification
+# version 2023-09" list in the spec for the full set:
+# https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#1-job-template
+extensions:
+  - REDACTED_ENV_VARS  # redact env var values from session logs
 name: "{{Param.JobName}}"  # Format strings use {{ }}
 
 parameterDefinitions:
@@ -135,6 +153,27 @@ parameterDefinitions:
   - name: Frames
     type: STRING
     default: "1-10"
+
+jobEnvironments:
+  # Fetch a secret once per session and expose it as $API_TOKEN to all steps.
+  # `openjd_redacted_env:` requires the REDACTED_ENV_VARS extension above; it
+  # sets the variable like `openjd_env:` but redacts the value to ******** in
+  # session logs. The variable is still readable by other processes on the
+  # host — this only protects log output.
+  - name: Credentials
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args: ['{{Env.File.Enter}}']
+      embeddedFiles:
+        - name: Enter
+          type: TEXT
+          data: |
+            set -euo pipefail
+            SECRET="$(aws secretsmanager get-secret-value \
+                --secret-id my/api/token --query SecretString --output text)"
+            echo "openjd_redacted_env: API_TOKEN=$SECRET"
 
 steps:
   - name: RenderStep
@@ -154,7 +193,7 @@ steps:
           type: TEXT
           data: |
             set -xeuo pipefail
-            echo "Rendering frame {{Task.Param.Frame}}"
+            echo "Rendering frame {{Task.Param.Frame}} (token: $API_TOKEN)"
 ```
 
 ## Dependency Management Options
