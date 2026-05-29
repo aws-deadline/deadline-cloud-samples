@@ -1,18 +1,18 @@
 ---
-name: openjd-template
+name: deadline-cloud-job
 description: >
-  Create Open Job Description (OpenJD) job bundle templates for AWS Deadline
-  Cloud, with optional conda packaging. Use when asked to "create a job bundle",
-  "write an OpenJD template", "add a new sample job", "create a render job for
-  <DCC>", or when a new workflow needs an OpenJD template with parameters,
-  steps, and environments.
-tags: [skill, openjd, job-bundle, deadline-cloud, template, conda]
+  Create AWS Deadline Cloud jobs as Open Job Description (OpenJD) job bundles, 
+  with optional conda packaging. Use when asked to "create a Deadline Cloud
+  job", "create a job bundle", "write an OpenJD template", "add a new sample
+  job", "create a render job for <DCC>", or when a new workflow needs a job
+  template with parameters, steps, and environments.
+tags: [skill, deadline-cloud, job-bundle, openjd, template, conda]
 ---
 
-# OpenJD Template Creation Skill
+# Deadline Cloud Job Skill
 
-Create Open Job Description (OpenJD) job bundle templates for AWS Deadline
-Cloud, with optional conda packaging.
+Create AWS Deadline Cloud jobs as Open Job Description (OpenJD) job bundles,
+with optional conda packaging.
 
 ## Overview
 
@@ -36,7 +36,7 @@ Use this skill when:
 
 1. **Design the job** — Define parameters, steps, environments, and dependencies
 2. **Write the template** — Create the OpenJD YAML template
-3. **Test locally** — Iterate with `openjd run --tasks <one>` until end-to-end success (see Testing section)
+3. **Test locally** (optional, recommended) — Iterate with `openjd run --tasks <one>` until end-to-end success (see Testing section). Skip if you prefer to iterate directly on Deadline Cloud.
 4. **Add a conda recipe** (optional) — For custom software dependencies
 5. **Submit to a farm** — Test on Deadline Cloud
 
@@ -103,15 +103,15 @@ workers in parallel.
 
 Read these in order based on what you need.
 
-### Core OpenJD Specification (READ FIRST for any template work)
+### Core OpenJD Specification
 
 | Source | When to Read |
 |--------|--------------|
-| [Template Schemas](https://raw.githubusercontent.com/OpenJobDescription/openjd-specifications/mainline/wiki/2023-09-Template-Schemas.md) | **Always** — complete schema reference for job templates |
+| [Template Schemas](https://raw.githubusercontent.com/OpenJobDescription/openjd-specifications/mainline/wiki/2023-09-Template-Schemas.md) | Complete schema reference for job templates |
 | [How Jobs Are Run](https://raw.githubusercontent.com/OpenJobDescription/openjd-specifications/mainline/wiki/How-Jobs-Are-Run.md) | Sessions, environments, path mapping, stdout messages |
 | [Introduction to Creating a Job](https://raw.githubusercontent.com/OpenJobDescription/openjd-specifications/mainline/wiki/Introduction-to-Creating-a-Job.md) | Step-by-step tutorial walkthrough |
 
-### Sample job bundles in this repo (READ for examples and patterns)
+### Sample job bundles in this repo
 
 | Source | When to Read |
 |--------|--------------|
@@ -121,7 +121,7 @@ Read these in order based on what you need.
 | [`job_bundles/gui_control_showcase/template.yaml`](../../job_bundles/gui_control_showcase/template.yaml) | All UI control types |
 | [`job_bundles/job_dev_progression/`](../../job_bundles/job_dev_progression/) | Progressive complexity examples |
 
-### Conda packaging (READ only if creating custom packages)
+### Conda packaging (only if creating custom packages)
 
 | Source | When to Read |
 |--------|--------------|

@@ -43,7 +43,7 @@ The `description` field tells you when to use each skill.
 
 | Skill | Use when |
 |-------|----------|
-| [`skills/openjd-template/`](./skills/openjd-template/SKILL.md) | Creating or updating an OpenJD job bundle template under `job_bundles/` |
+| [`skills/deadline-cloud-job/`](./skills/deadline-cloud-job/SKILL.md) | Creating or updating a Deadline Cloud job (OpenJD job bundle) under `job_bundles/` |
 | [`skills/conda-builder/`](./skills/conda-builder/SKILL.md) | Creating or updating a DCC conda recipe under `conda_recipes/` |
 | [`skills/3dsmax-host-config/`](./skills/3dsmax-host-config/SKILL.md) | Creating or updating a 3ds Max host configuration script |
 | [`skills/host-config-from-installer/`](./skills/host-config-from-installer/SKILL.md) | Creating a host configuration script from a vendor installer |
