@@ -98,3 +98,14 @@ to guide you.
 ## Licensing
 
 See the [LICENSE](LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
+
+## Contributing a 3ds Max Host Config Add-on
+
+The `skills/3dsmax-host-config/add-ons/` folder contains building blocks that Kiro uses to generate
+host configuration scripts for 3ds Max plugins. If you have tested a plugin combination that isn't
+covered yet, you can contribute a new add-on by:
+
+1. Create a new `.md` file in `skills/3dsmax-host-config/add-ons/` named after the plugin (e.g. `redshift.md`)
+2. Follow the structure of the existing add-ons — include a brief description, a reference script path, a "What to add to the script" section, and any important notes
+3. Add a working example `.ps1` script under `host_configuration_scripts/3dsmax/` that has been tested
+4. Open a pull request with both the add-on `.md` and the example script

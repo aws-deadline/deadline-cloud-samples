@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: Nuke17.0v1-linux-x86_64.tgz
+    sourceDownloadInstructions: 'Download the Nuke17.0v1-linux-x86_64 full download file from the Foundry. You will need a Foundry account to access the Nuke downloads.'
+    buildTool: rattler-build

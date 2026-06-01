@@ -42,6 +42,9 @@ build:
 tests:
   - script:
     - blender -h
+    - test -f $CONDA_PREFIX/etc/conda/activate.d/zzz-blender-5.0.1-plugin-sync.sh
+    - test -f $CONDA_PREFIX/etc/conda/deactivate.d/zzz-blender-5.0.1-plugin-sync.sh
+    - test -f $CONDA_PREFIX/share/blender-plugin-sync/plugin_sync_bootstrap.py
 
 about:
   homepage: https://www.blender.org/

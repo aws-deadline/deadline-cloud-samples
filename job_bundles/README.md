@@ -71,6 +71,13 @@ If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../
 The [gsplat_pipeline](gsplat_pipeline/README.md) job bundle can take a video file as input and train a 3D Gaussian Splatting point cloud.
 This example shows Deadline Cloud running a 3D reconstruction workload that uses CUDA GPUs for acceleration.
 
+### LLM evaluation with vLLM and lm-evaluation-harness
+
+The [vllm_lm_eval_leaderboard](vllm_lm_eval_leaderboard/README.md) job bundle evaluates multiple LLMs on a set of benchmarks in a single Deadline Cloud job using
+[vLLM](https://github.com/vllm-project/vllm) for inference and [EleutherAI's lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for scoring.
+Models are a STRING parameter sweep — each task starts vLLM for one model, runs every benchmark against it, then stops vLLM. A final aggregation step
+produces a ranked leaderboard (CSV + Markdown).
+
 ### Arnold standalone render
 
 The [arnold_standalone_render](arnold_standalone_render) job bundle renders Arnold `.ass` (Arnold Scene Source) files
