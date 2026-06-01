@@ -66,10 +66,22 @@ For other tools, point your assistant at the relevant `SKILL.md` directly
   `openjd check` and `openjd run --tasks <one>` to verify a single task end-
   to-end before submitting the full parameter range to a Deadline Cloud farm.
 
-## Before You Commit
+## Pre-PR checklist
 
-**Every commit title MUST use [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) syntax.**
-PRs without it will be blocked by CI. Use one of these types:
+Before opening a pull request, make sure every commit on the branch satisfies the following:
+
+- [ ] **Conventional commit title** — every commit title MUST use
+  [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) syntax
+  (see the type table below). PRs without it will be blocked by CI.
+- [ ] **Signed-off commits** — every commit MUST carry a `Signed-off-by` trailer
+  ([Developer Certificate of Origin](https://developercertificate.org/)). Create
+  commits with `git commit -s`, or add the trailer to an existing commit with
+  `git commit --amend -s`.
+- [ ] **Sample README updated** — if you changed a sample's behavior, prerequisites,
+  or parameters, update its `README.md`.
+- [ ] **Inclusive language** — no `master`/`slave`, `whitelist`/`blacklist`.
+
+### Conventional commit types
 
 | Type       | Use for                                                   |
 |------------|-----------------------------------------------------------|
