@@ -131,22 +131,24 @@ parameterDefinitions:
   description: >
     JSON file with S3 bucket settings. Created by the pre-submission hook.
 
+# Scripts directory
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
 jobEnvironments:
 - name: InstallDeadline
   description: Installs the Deadline Cloud Python library via pip.
   script:
     actions:
       onEnter:
-        command: bash
-        args: ['{{Env.File.Setup}}']
-    embeddedFiles:
-    - name: Setup
-      type: TEXT
-      runnable: true
-      data: |
-        #!/bin/env bash
-        set -euo pipefail
-        pip install deadline
+        command: pip
+        args: ['install', 'deadline']
 - name: UnbufferedOutput
   variables:
     PYTHONUNBUFFERED: "True"
@@ -156,125 +158,19 @@ steps:
   script:
     actions:
       onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-    - name: Download
-      filename: download_outputs.py
-      type: TEXT
-      data: |
-        """Download output files from a source job using the job attachments API."""
-        import json
-        import os
-        import sys
-
-        from deadline.job_attachments.download import OutputDownloader
-        from deadline.job_attachments.models import (
-            FileConflictResolution,
-            JobAttachmentS3Settings,
-        )
-
-        farm_id = os.environ["DEADLINE_FARM_ID"]
-        queue_id = os.environ["DEADLINE_QUEUE_ID"]
-        job_id = "{{Param.SourceJobId}}"
-        download_dir = sys.argv[1]
-
-        with open("{{Param.S3SettingsFile}}") as f:
-            s3_cfg = json.load(f)
-        s3_settings = JobAttachmentS3Settings(
-            s3BucketName=s3_cfg["s3BucketName"],
-            rootPrefix=s3_cfg["rootPrefix"],
-        )
-
-        step_id = "{{Param.SourceStepId}}" or None
-
-        downloader = OutputDownloader(
-            s3_settings=s3_settings,
-            farm_id=farm_id,
-            queue_id=queue_id,
-            job_id=job_id,
-            step_id=step_id,
-        )
-        output_roots = list(downloader.get_output_paths_by_root().keys())
-        for root in output_roots:
-            downloader.set_root_path(root, download_dir)
-        stats = downloader.download_job_output(
-            file_conflict_resolution=FileConflictResolution.OVERWRITE,
-        )
-        print(f"Downloaded {stats.processed_files} files ({stats.processed_bytes} bytes)")
-    - name: Run
-      type: TEXT
-      runnable: true
-      data: |
-        #!/bin/env bash
-        set -xeuo pipefail
-
-        DOWNLOAD_DIR="$(mktemp -d)"
-        mkdir -p '{{Param.OutputDir}}'
-
-        # --- Download outputs from source job ---
-        echo "Downloading outputs from source job {{Param.SourceJobId}}..."
-        python3 '{{Task.File.Download}}' "$DOWNLOAD_DIR"
-
-        # --- Find images ---
-        # Auto-detect the most common image extension
-        IMAGE_EXTS="png exr jpg jpeg tga tiff tif dpx hdr bmp"
-        BEST_EXT=""
-        BEST_COUNT=0
-        for ext in $IMAGE_EXTS; do
-          COUNT=$(find "$DOWNLOAD_DIR" -type f -name "*.$ext" | wc -l)
-          if [ "$COUNT" -gt "$BEST_COUNT" ]; then
-            BEST_COUNT=$COUNT
-            BEST_EXT=$ext
-          fi
-        done
-
-        if [ "$BEST_COUNT" -eq 0 ]; then
-          echo "ERROR: No image files found. Available files:"
-          find "$DOWNLOAD_DIR" -type f | head -20
-          exit 1
-        fi
-        echo "Detected $BEST_COUNT .$BEST_EXT files"
-
-        # --- Build sorted file list and encode ---
-        CONCAT_FILE="$(mktemp)"
-        find "$DOWNLOAD_DIR" -type f -name "*.$BEST_EXT" | sort | while IFS= read -r img; do
-          echo "file '$img'"
-        done > "$CONCAT_FILE"
-
-        echo "First images:"; head -3 "$CONCAT_FILE"
-        echo "Last images:"; tail -3 "$CONCAT_FILE"
-
-        # Build scale filter
-        SCALE_FILTER="scale=in_color_matrix=bt709:out_color_matrix=bt709"
-        RESOLUTION='{{Param.Resolution}}'
-        if [ -n "$RESOLUTION" ]; then
-          WIDTH="${RESOLUTION%%x*}"
-          HEIGHT="${RESOLUTION##*x}"
-          SCALE_FILTER="scale=${WIDTH}:${HEIGHT}:in_color_matrix=bt709:out_color_matrix=bt709"
-        fi
-
-        FFMPEG_ARGS=(
-          -y
-          -f concat -safe 0
-          -r {{Param.FrameRate}}
-          -i "$CONCAT_FILE"
-          -pix_fmt {{Param.PixelFormat}}
-          -vf "$SCALE_FILTER"
-          -c:v libx264
-          -preset {{Param.EncodingPreset}}
-          -crf {{Param.ConstantRateFactor}}
-          -color_range tv
-          -colorspace bt709
-          -color_primaries bt709
-          -color_trc iec61966-2-1
-          -movflags faststart
-          '{{Param.OutputDir}}/{{Param.OutputFilename}}'
-        )
-
-        echo "Encoding video..."
-        ffmpeg "${FFMPEG_ARGS[@]}"
-        echo "Video saved to {{Param.OutputDir}}/{{Param.OutputFilename}}"
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/encode_movie.py'
+        - '{{Param.SourceJobId}}'
+        - '{{Param.SourceStepId}}'
+        - '{{Param.S3SettingsFile}}'
+        - '{{Param.FrameRate}}'
+        - '{{Param.PixelFormat}}'
+        - '{{Param.EncodingPreset}}'
+        - '{{Param.ConstantRateFactor}}'
+        - '{{Param.Resolution}}'
+        - '{{Param.OutputDir}}'
+        - '{{Param.OutputFilename}}'
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
