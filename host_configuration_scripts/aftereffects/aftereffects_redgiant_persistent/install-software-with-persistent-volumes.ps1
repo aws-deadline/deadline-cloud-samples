@@ -1,6 +1,3 @@
-# Sequential Software Installation Script
-# Downloads installers from S3 and installs Adobe After Effects, Red Giant, Boris Sapphire (optional),
-# Lenscare (optional), and RSMB (optional) in order
 Set-PSDebug -Trace 2
 $ErrorActionPreference = "Stop"
 
@@ -56,6 +53,113 @@ $AE_PLUGIN_LOCATION = "C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore"
 $DOWNLOADS_PATH = "C:\Temp"
 $AE_LOCATION = "C:\Program Files\Adobe\Adobe After Effects $AE_VERSION\Support Files"
 
+# EBS Persistence - reads mount path set by EBS persistence script
+$MOUNT_PATH = [Environment]::GetEnvironmentVariable("DEADLINE_PERSISTENT_MOUNT", "Machine")
+if (-not $MOUNT_PATH) {
+    Write-Host "WARNING: DEADLINE_PERSISTENT_MOUNT not set - no persistence"
+    $PERSISTENCE_ENABLED = $false
+} else {
+    Write-Host "Persistent volume detected at: $MOUNT_PATH"
+    $PERSISTENCE_ENABLED = $true
+    $SW_PATH = "$MOUNT_PATH\Software"
+    $DATA_PATH = "$MOUNT_PATH\SoftwareData"
+    $SVC_BACKUP = "$MOUNT_PATH\SoftwareServices"
+    $INSTALL_MARKER = "$SW_PATH\.install-complete"
+}
+
+$junctions = @()
+if ($PERSISTENCE_ENABLED) {
+    $junctions = @(
+        @{ Link = "C:\Program Files\Adobe"; Target = "$SW_PATH\Adobe" }
+        @{ Link = "C:\ProgramData\Adobe"; Target = "$DATA_PATH\Adobe" }
+    )
+    if ($INSTALL_RED_GIANT) {
+        $junctions += @(
+            @{ Link = "C:\Program Files\Maxon"; Target = "$SW_PATH\Maxon" }
+            @{ Link = "C:\Program Files\Red Giant"; Target = "$SW_PATH\Red Giant" }
+            @{ Link = "C:\Program Files (x86)\Microsoft\EdgeWebView"; Target = "$SW_PATH\EdgeWebView" }
+            @{ Link = "C:\ProgramData\Maxon"; Target = "$DATA_PATH\Maxon" }
+            @{ Link = "C:\ProgramData\Red Giant"; Target = "$DATA_PATH\Red Giant" }
+        )
+    }
+    if ($INSTALL_BORIS_SAPPHIRE) {
+        $junctions += @(
+            @{ Link = "C:\Program Files\BorisFX"; Target = "$SW_PATH\BorisFX" }
+            @{ Link = "C:\ProgramData\BorisFX"; Target = "$DATA_PATH\BorisFX" }
+            @{ Link = "C:\ProgramData\GenArts"; Target = "$DATA_PATH\GenArts" }
+        )
+    }
+    if ($INSTALL_RSMB) {
+        $junctions += @(
+            @{ Link = "C:\Program Files\REVisionEffects"; Target = "$SW_PATH\REVisionEffects" }
+        )
+    }
+}
+
+function Setup-Junctions {
+    param([bool]$CreateTargets)
+    foreach ($j in $junctions) {
+        if (Test-Path $j.Link) {
+            $item = Get-Item $j.Link -Force
+            if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                Write-Host "Junction already exists: $($j.Link)"; continue
+            }
+            Remove-Item $j.Link -Recurse -Force
+        }
+        $parent = Split-Path $j.Link -Parent
+        if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+        if ($CreateTargets) { New-Item -ItemType Directory -Path $j.Target -Force | Out-Null }
+        New-Item -ItemType Junction -Path $j.Link -Target $j.Target
+        Write-Host "Junction: $($j.Link) -> $($j.Target)"
+    }
+}
+
+# Snapshots Red Giant Windows service registrations to JSON on the persistent volume.
+# Installers register services that are lost when a new worker boots with a fresh OS
+# but reuses the same EBS volume. We save each service's binary path, start mode, and
+# display name so Import-InstallerState can re-register them in seconds.
+function Export-InstallerState {
+    New-Item -ItemType Directory -Path $SVC_BACKUP -Force | Out-Null
+    $services = Get-WmiObject Win32_Service | Where-Object {
+        $_.PathName -like "*Red Giant*" -or $_.Name -like "*RedGiant*"
+    }
+    foreach ($svc in $services) {
+        @{ Name = $svc.Name; DisplayName = $svc.DisplayName; PathName = $svc.PathName
+           StartMode = $svc.StartMode; Description = $svc.Description
+        } | ConvertTo-Json | Out-File "$SVC_BACKUP\$($svc.Name).json"
+        Write-Host "Exported service: $($svc.Name)"
+    }
+}
+
+# Re-registers Windows services from the JSON snapshots saved by Export-InstallerState.
+# On subsequent boots the persistent volume already has the binaries, but the fresh OS
+# has no knowledge of the services. This reads each backup, creates the service via sc.exe,
+# and starts it if it was originally set to Auto start.
+function Import-InstallerState {
+    if (Test-Path $SVC_BACKUP) {
+        foreach ($file in Get-ChildItem "$SVC_BACKUP\*.json") {
+            try {
+                $svcInfo = Get-Content $file.FullName | ConvertFrom-Json
+                if ($svcInfo.Name -notlike "*Red Giant*") { Write-Host "Skipping service: $($svcInfo.Name)"; continue }
+                $existing = Get-Service -Name $svcInfo.Name -ErrorAction SilentlyContinue
+                if ($existing) { Write-Host "Service already registered: $($svcInfo.Name)" }
+                else {
+                    $startType = switch ($svcInfo.StartMode) { "Auto" { "auto" } "Manual" { "demand" } "Disabled" { "disabled" } default { "auto" } }
+                    sc.exe create $svcInfo.Name binPath= "$($svcInfo.PathName)" start= $startType DisplayName= "$($svcInfo.DisplayName)"
+                    if ($svcInfo.Description) { sc.exe description $svcInfo.Name "$($svcInfo.Description)" }
+                    Write-Host "Re-registered service: $($svcInfo.Name)"
+                }
+                if ($svcInfo.StartMode -eq "Auto") {
+                    Start-Service -Name $svcInfo.Name -ErrorAction SilentlyContinue
+                    Write-Host "Started service: $($svcInfo.Name)"
+                }
+            } catch {
+                Write-Host "WARNING: Failed to restore service $($file.Name): $_"
+            }
+        }
+    }
+}
+
 # MAIN LOGIC
 $scriptStartTime = Get-Date
 
@@ -64,6 +168,22 @@ Write-Host "Setting environment variables for rendering..."
 [System.Environment]::SetEnvironmentVariable("MAXON_RENDERONLY", "true", [System.EnvironmentVariableTarget]::Machine)
 if ($INSTALL_RED_GIANT -and $is_cmf) {
     [System.Environment]::SetEnvironmentVariable("redshift_LICENSE", "7055@$vpc_endpoint", [System.EnvironmentVariableTarget]::Machine)
+}
+
+if ($PERSISTENCE_ENABLED -and (Test-Path $INSTALL_MARKER)) {
+    Write-Host "=== SOFTWARE FOUND ON PERSISTENT VOLUME - SKIPPING INSTALL ==="
+    $restoreStart = Get-Date
+    Setup-Junctions -CreateTargets $false
+    Import-InstallerState
+    $restoreDuration = (Get-Date) - $restoreStart
+    Write-Host "=== Restore completed in $($restoreDuration.ToString('hh\:mm\:ss')) ==="
+    Write-Host "Total Time: $(((Get-Date) - $scriptStartTime).ToString('hh\:mm\:ss'))"
+    exit 0
+}
+
+if ($PERSISTENCE_ENABLED) {
+    Write-Host "=== FIRST BOOT - INSTALLING TO PERSISTENT VOLUME ==="
+    Setup-Junctions -CreateTargets $true
 }
 
 $downloadStartTime = Get-Date
@@ -162,6 +282,12 @@ if ($INSTALL_RSMB) {
         [System.Environment]::SetEnvironmentVariable("RVL_SERVER", $RSMB_LICENSE_SERVER, [System.EnvironmentVariableTarget]::Machine)
     }
     $rsmbDuration = (Get-Date) - $rsmbStartTime
+}
+
+if ($PERSISTENCE_ENABLED) {
+    Export-InstallerState
+    Get-Date -Format "yyyy-MM-dd HH:mm:ss" | Out-File $INSTALL_MARKER
+    Write-Host "Install marker written - subsequent boots will skip installation"
 }
 
 $totalDuration = (Get-Date) - $scriptStartTime
