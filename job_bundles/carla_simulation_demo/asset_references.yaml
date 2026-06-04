@@ -1,0 +1,7 @@
+assetReferences:
+  inputs:
+    directories:
+      - "./data"
+  outputs:
+    directories:
+      - "{{Param.OutputDir}}"
