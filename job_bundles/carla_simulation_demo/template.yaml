@@ -20,7 +20,7 @@ parameterDefinitions:
   - name: CarlaBootTown
     type: STRING
     default: "Town04"
-    allowedValues: ["Town04"]
+    allowedValues: ["Town04", "Town10HD_Opt"]
     description: |
       Town to run the scenario in. Must match the scenario file's set_map().
       Town04: multi-lane highway (lane change, overtake, cut-in scenarios).
@@ -239,8 +239,8 @@ steps:
             echo "Task output: $TASK_OUTPUT"
 
             # Generate scenario from template
-            export EGO_SPEED NPC_SPEED NPC_DISTANCE
-            envsubst '${EGO_SPEED} ${NPC_SPEED} ${NPC_DISTANCE}' \
+            export EGO_SPEED NPC_SPEED NPC_DISTANCE CARLA_BOOT_TOWN="{{Param.CarlaBootTown}}"
+            envsubst '${EGO_SPEED} ${NPC_SPEED} ${NPC_DISTANCE} ${CARLA_BOOT_TOWN}' \
                 < "$TEMPLATE" > "$DATA_DIR/change_lane_${TASK_NAME}.osc"
             SCENARIO_FILE="$DATA_DIR/change_lane_${TASK_NAME}.osc"
             echo ""
