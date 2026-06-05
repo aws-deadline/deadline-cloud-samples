@@ -1,6 +1,6 @@
 """Attach an RGB camera to the ego vehicle and save frames to disk.
 
-Runs as a background process alongside scenario_runner. Captures at ~1 FPS
+Runs as a background process alongside scenario_runner. Captures at ~24 FPS
 (configurable via CAPTURE_FPS env var). Stops when the ego vehicle is
 destroyed or when the process receives SIGTERM.
 
@@ -21,7 +21,7 @@ import carla
 import numpy as np
 
 OUTPUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "/outputs/frames"
-CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "1"))
+CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "24"))
 CARLA_HOST = os.environ.get("CARLA_HOST", "localhost")
 CARLA_PORT = int(os.environ.get("CARLA_PORT", "2000"))
 IMAGE_WIDTH = int(os.environ.get("CAPTURE_WIDTH", "1920"))
@@ -67,13 +67,13 @@ def save_image(image, output_dir):
         img = Image.fromarray(array[:, :, ::-1])
         img.save(filename)
     except ImportError:
-        import struct
-        import zlib
         _write_png(filename, array[:, :, ::-1])
 
 
 def _write_png(filename, rgb_array):
     """Minimal PNG writer when PIL is unavailable."""
+    import zlib
+
     h, w, _ = rgb_array.shape
     raw = b""
     for row in rgb_array:
@@ -144,13 +144,14 @@ def main():
     try:
         while running:
             time.sleep(1)
-    except Exception:
+    except KeyboardInterrupt:
         pass
     finally:
         try:
             camera.stop()
             camera.destroy()
-        except Exception:
+        except RuntimeError:
+            # Camera may already be destroyed if the ego vehicle was removed
             pass
         print(f"[capture_camera] Done. Captured {frame_count[0]} frames.")
 

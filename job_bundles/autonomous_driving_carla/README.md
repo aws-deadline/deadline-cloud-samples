@@ -1,4 +1,4 @@
-# CARLA Autonomous Driving Simulation Demo
+# Autonomous Driving Simulation Using CARLA
 
 ## Introduction
 
@@ -6,11 +6,12 @@ This job bundle runs a [CARLA](https://carla.org/) autonomous driving simulation
 on AWS Deadline Cloud with configurable multi-sensor capture. It demonstrates how to use
 Deadline Cloud to orchestrate GPU-accelerated simulation workloads with Docker containers.
 
-The job runs a lane-change cut-in scenario where an NPC vehicle overtakes the ego vehicle and
-cuts into its lane. It sweeps across configurable ego speeds, NPC speeds, and NPC starting
-distances, creating a task for each parameter combination (default 2×2×2 = 8 tasks). Each task
-captures multi-sensor data from user-selected camera viewpoints and produces per-camera videos
-plus a stitched grid video.
+The job runs a lane-change cut-in scenario where an NPC vehicle starts behind the ego vehicle,
+accelerates to position itself 20 meters ahead of the ego during a 15-second get-ahead phase,
+then cuts into the ego's lane. It sweeps across configurable ego speeds, NPC speeds, and NPC
+starting distances, creating a task for each parameter combination (default 2×2×2 = 8 tasks).
+Each task captures multi-sensor data from user-selected camera viewpoints and produces per-camera
+videos plus a stitched grid video.
 
 **Output per task:**
 - RGB frames from each selected camera viewpoint
@@ -63,7 +64,7 @@ The job runs inside a Docker container based on [`carlasim/carla:0.9.16`](https:
 2. **Build the image:**
 
        cd docker/
-       docker build -f Dockerfile.phase3 -t carla-deadline-poc:0.9.16-phase3-v2 .
+       docker build -t carla-deadline-poc:0.9.16-phase3-v2 .
 
    > **Note:** The Dockerfile pulls `carlasim/carla:0.9.16` from Docker Hub as the base image.
    > The first build will download ~8 GB.
@@ -82,7 +83,7 @@ The job runs inside a Docker container based on [`carlasim/carla:0.9.16`](https:
 
 From the `job_bundles` directory of this repository:
 
-    deadline bundle gui-submit carla_simulation_demo
+    deadline bundle gui-submit autonomous_driving_carla
 
 In the **Job-specific settings** tab:
 
@@ -92,7 +93,7 @@ In the **Job-specific settings** tab:
 
 Alternatively, submit via CLI:
 
-    deadline bundle submit carla_simulation_demo/ \
+    deadline bundle submit autonomous_driving_carla/ \
       --farm-id <FARM_ID> \
       --queue-id <QUEUE_ID> \
       --name "CARLA Lane Change Demo" \
@@ -137,7 +138,7 @@ The `docker/` directory contains the files needed to build the image:
 
 | File | Purpose |
 |------|---------|
-| `Dockerfile.phase3` | Builds the CARLA + scenario_runner + multi-sensor capture image |
+| `Dockerfile` | Builds the CARLA + scenario_runner + multi-sensor capture image |
 | `entrypoint_phase3.sh` | Container entrypoint: boots CARLA, runs scenario, captures sensors |
 | `capture_sensors.py` | Multi-sensor capture with configurable camera selection via `CAMERAS` env var |
 | `capture_camera.py` | Single-camera capture utility |
@@ -145,7 +146,6 @@ The `docker/` directory contains the files needed to build the image:
 ## Known Limitations
 
 - **x86_64 only**: The CARLA Docker image does not support ARM architectures.
-- **Town04 only**: The lane-change scenario requires a 3-lane highway. Only Town04 is supported.
+- **Town04 only**: The lane-change scenario requires a 2-lane highway. Only Town04 is supported.
 - **Traffic Manager port conflict**: If two tasks run simultaneously on the same worker, the second may fail with a port bind error. Retries resolve this.
-- **Non-deterministic scenarios**: At aggressive parameter combinations (high NPC speed, short distance), collisions may occur.
-- **Mosaic images**: The 2×3 RGB/semantic mosaic images are only generated when all 6 cameras are selected.
+- **Mosaic images**: The 2×3 RGB/semantic mosaic images are generated when all 6 cameras are selected. A grid video is generated for any multi-camera configuration.

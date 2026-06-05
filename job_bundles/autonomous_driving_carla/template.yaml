@@ -299,7 +299,7 @@ steps:
                 if [[ "$FRAME_COUNT" -gt 0 ]]; then
                     echo ""
                     echo "=== Generating video from $CAM camera ($FRAME_COUNT frames) ==="
-                    ffmpeg -y -framerate 7 -pattern_type glob \
+                    ffmpeg -y -framerate 24 -pattern_type glob \
                         -i "$FRAMES_DIR/frame_*.png" \
                         -c:v libx264 -pix_fmt yuv420p \
                         -movflags +faststart \

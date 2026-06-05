@@ -149,7 +149,7 @@ WATCHDOG_PID=$!
 
 # --- Background multi-sensor capture ------------------------------------------
 # Spawns 6 RGB cameras + 6 semantic seg cameras + 1 LiDAR on the ego vehicle,
-# plus computes 2D/3D bounding boxes per frame. All at ~1 FPS.
+# plus computes 2D/3D bounding boxes per frame. All at ~24 FPS.
 echo "[$(date -u +%FT%TZ)] Starting multi-sensor capture (6 RGB + 6 semantic + LiDAR + bbox)"
 PYTHONUNBUFFERED=1 "${CARLA_PYTHON:-/opt/venv/bin/python}" -u /opt/capture_sensors.py "$OUTPUT_DIR" \
     > "$OUTPUT_DIR/capture_sensors.log" 2>&1 &
@@ -279,7 +279,7 @@ if command -v ffmpeg &>/dev/null && [[ "$FRAME_COUNT" -gt 0 ]]; then
     RGB_MOSAIC_COUNT=$(find "$OUTPUT_DIR/rgb_mosaic" -name "*.png" 2>/dev/null | wc -l)
     if [[ "$RGB_MOSAIC_COUNT" -gt 0 ]]; then
         echo "[$(date -u +%FT%TZ)] Generating RGB mosaic video from $RGB_MOSAIC_COUNT frames..."
-        ffmpeg -y -framerate 1 -pattern_type glob \
+        ffmpeg -y -framerate 24 -pattern_type glob \
             -i "$OUTPUT_DIR/rgb_mosaic/frame_*.png" \
             -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
             "$OUTPUT_DIR/video/rgb_mosaic.mp4" 2>/dev/null && \
@@ -290,7 +290,7 @@ if command -v ffmpeg &>/dev/null && [[ "$FRAME_COUNT" -gt 0 ]]; then
     SEM_MOSAIC_COUNT=$(find "$OUTPUT_DIR/semantic_mosaic" -name "*.png" 2>/dev/null | wc -l)
     if [[ "$SEM_MOSAIC_COUNT" -gt 0 ]]; then
         echo "[$(date -u +%FT%TZ)] Generating semantic mosaic video from $SEM_MOSAIC_COUNT frames..."
-        ffmpeg -y -framerate 1 -pattern_type glob \
+        ffmpeg -y -framerate 24 -pattern_type glob \
             -i "$OUTPUT_DIR/semantic_mosaic/frame_*.png" \
             -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
             "$OUTPUT_DIR/video/semantic_mosaic.mp4" 2>/dev/null && \

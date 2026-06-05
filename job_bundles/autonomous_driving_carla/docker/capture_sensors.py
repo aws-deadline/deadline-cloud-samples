@@ -1,7 +1,7 @@
 """Multi-sensor capture: 6-camera RGB ring + 6 semantic segmentation + LiDAR + bounding boxes.
 
 Runs as a background process alongside scenario_runner. All sensors capture
-at ~1 FPS (configurable). Uses frame-synchronized collection: buffers
+at ~24 FPS (configurable). Uses frame-synchronized collection: buffers
 incoming images by CARLA frame ID, saves a complete set only when all 6 RGB
 cameras have reported for the same frame.
 
@@ -34,7 +34,7 @@ import carla
 import numpy as np
 
 OUTPUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "/outputs"
-CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "1"))
+CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "24"))
 CARLA_HOST = os.environ.get("CARLA_HOST", "localhost")
 CARLA_PORT = int(os.environ.get("CARLA_PORT", "2000"))
 IMAGE_WIDTH = int(os.environ.get("CAPTURE_WIDTH", "1280"))
@@ -428,14 +428,15 @@ def main():
                 except RuntimeError:
                     break
             time.sleep(0.05)
-    except Exception:
+    except KeyboardInterrupt:
         pass
     finally:
         for s in sensors:
             try:
                 s.stop()
                 s.destroy()
-            except Exception:
+            except RuntimeError:
+                # Sensor may already be destroyed if the ego vehicle was removed
                 pass
         print(f"[sensors] Done. Captured {frame_counter[0]} frame sets.")
 
