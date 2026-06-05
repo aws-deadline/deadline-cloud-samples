@@ -45,6 +45,13 @@ Your fleet role and queue role both need ECR pull permissions. Attach a policy l
       "Resource": "*"
     }
 
+### Fleet Host Configuration
+
+Your fleet workers need Docker and the NVIDIA Container Toolkit. Attach the
+[docker_nvidia_container_toolkit](../../host_configuration_scripts/docker_nvidia_container_toolkit)
+host configuration script to your fleet. See its
+[README](../../host_configuration_scripts/docker_nvidia_container_toolkit/README.md) for details.
+
 ## Building the Docker Image
 
 The job runs inside a Docker container based on [`carlasim/carla:0.9.16`](https://hub.docker.com/r/carlasim/carla).
