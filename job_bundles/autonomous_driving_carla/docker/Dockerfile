@@ -63,8 +63,8 @@ RUN sed -i '/^carla[<>=! ]/d' requirements.txt \
     && uv pip install --no-cache --python /opt/venv/bin/python \
         -r requirements.txt
 
-# Copy Phase 3 entrypoint + sensor capture scripts, make /outputs writable
-COPY entrypoint_phase3.sh /opt/entrypoint.sh
+# Copy entrypoint + sensor capture scripts, make /outputs writable
+COPY entrypoint.sh /opt/entrypoint.sh
 COPY capture_sensors.py /opt/capture_sensors.py
 COPY capture_camera.py /opt/capture_camera.py
 RUN chmod +x /opt/entrypoint.sh \

@@ -1,11 +1,10 @@
 specificationVersion: jobtemplate-2023-09
 name: CARLA Simulation Demo
 description: |
-  Run a driving scenario parameter sweep with configurable camera viewpoints.
-  Combines Phase 2 (parameter sweep across ego speed, NPC speed, NPC distance)
-  with Phase 3 (multi-sensor capture with selectable camera viewpoints).
-  Each parameter combination runs as a parallel task, capturing RGB frames
-  from the selected cameras and producing per-task videos.
+  Run a CARLA lane-change cut-in scenario where an NPC vehicle overtakes and
+  cuts into the ego vehicle's lane. Sweeps across ego speeds, NPC speeds, and
+  NPC distances to generate a parameter grid. Each combination runs as a
+  parallel task, capturing multi-camera RGB frames and producing per-task videos.
 
 parameterDefinitions:
   # --- Scenario Settings ---
@@ -131,8 +130,8 @@ parameterDefinitions:
   # --- Advanced ---
   - name: ImageURI
     type: STRING
-    description: ECR URI of the CARLA Phase 3 multi-sensor image
-    default: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16-phase3-v2"
+    description: ECR URI of the CARLA multi-sensor image
+    default: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16"
     userInterface:
       control: LINE_EDIT
       label: Container Image URI

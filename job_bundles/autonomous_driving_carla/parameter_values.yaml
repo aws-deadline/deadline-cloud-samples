@@ -2,7 +2,7 @@ parameterValues:
   - name: OutputDir
     value: ./outputs
   - name: ImageURI
-    value: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16-phase3-v2"
+    value: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16"
   - name: AwsRegion
     value: "us-east-2"
   - name: CarlaTimeoutSeconds
