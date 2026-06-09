@@ -12,7 +12,7 @@ cd $MAYA_VRAY_ROOT
 
 # Run the installer to extract the files
 chmod u+x $SRC_DIR/vray*
-$SRC_DIR/vray* -noCheckSum -unpackInstall .
+$SRC_DIR/vray* -unpackInstall .
 
 # Remove the samples, they're not needed on the farm
 rm -rf "$MAYA_VRAY_VRAY_ROOT/samples"
