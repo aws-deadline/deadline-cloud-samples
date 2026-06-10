@@ -29,10 +29,8 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 1. **Deadline Cloud farm** with a Linux SMF fleet (x86_64, Spot recommended).
 
-2. **Fleet host configuration script** — install AutoDock VINA and Open Babel on workers at boot. See `host-config-script.sh` in the sample data:
-   ```
-   https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/host-config-script.sh
-   ```
+2. **Fleet host configuration script** — install AutoDock VINA and Open Babel on workers at boot.
+   See [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/) in this repo.
 
 3. **Deadline CLI**:
    ```bash
@@ -45,7 +43,7 @@ Sample data is available for a quick test run — 50 FDA-approved drugs screened
 
 - **Receptor**: `https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/receptor.pdb`
 - **Compound library**: `https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/compound_library.sdf.gz`
-- **Host config script**: `https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/host-config-script.sh`
+- **Host config script**: See [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/)
 
 Download them locally before submitting:
 ```bash
@@ -90,28 +88,4 @@ Tested with 100,000 ChEMBL compounds against COVID-19 Main Protease:
 
 ## Host Configuration Script
 
-The fleet requires AutoDock VINA and Open Babel pre-installed. Use this host configuration script on your SMF fleet:
-
-```bash
-#!/bin/bash
-set -euo pipefail
-# Install VINA binary
-curl -sL "https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64" \
-  -o /usr/local/bin/vina
-chmod 755 /usr/local/bin/vina
-
-# Install Open Babel via micromamba
-curl -sL https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C /usr/local bin/micromamba
-/usr/local/bin/micromamba create -p /opt/openbabel -c conda-forge openbabel -y --quiet
-chmod -R a+rX /opt/openbabel
-
-# Create wrapper with correct library paths
-cat > /usr/local/bin/obabel << 'EOF'
-#!/bin/bash
-export LD_LIBRARY_PATH="/opt/openbabel/lib:${LD_LIBRARY_PATH:-}"
-export BABEL_DATADIR="/opt/openbabel/share/openbabel/3.1.0"
-exec /opt/openbabel/bin/obabel "$@"
-EOF
-chmod 755 /usr/local/bin/obabel
-echo "/opt/openbabel/lib" > /etc/ld.so.conf.d/openbabel.conf && ldconfig
-```
+The fleet requires AutoDock VINA and Open Babel pre-installed. Use the host configuration script from [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/) on your SMF fleet.

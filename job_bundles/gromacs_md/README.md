@@ -27,10 +27,8 @@ For multi-replica campaigns, all replicas run through the full pipeline independ
 
 1. **Deadline Cloud farm** with a Linux SMF fleet (x86_64, min 4 vCPU).
 
-2. **Fleet host configuration script** — install GROMACS on workers at boot. See `host-config-script.sh` in the sample data:
-   ```
-   https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/gromacs-host-config.sh
-   ```
+2. **Fleet host configuration script** — install GROMACS on workers at boot.
+   See [`host_configuration_scripts/gromacs/`](../../host_configuration_scripts/gromacs/) in this repo.
 
 3. **Deadline CLI**:
    ```bash
@@ -43,7 +41,7 @@ Sample data for a quick test — hen egg-white lysozyme (PDB: 1AKI), the standar
 
 - **Protein**: `https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/protein.pdb`
 - **MDP files**: `https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/minimization.mdp`
-- **Host config**: `https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/gromacs-host-config.sh`
+- **Host config**: See [`host_configuration_scripts/gromacs/`](../../host_configuration_scripts/gromacs/)
 
 Download them locally:
 ```bash
@@ -105,25 +103,7 @@ For longer simulations, consider larger instances (c5.4xlarge, 16 vCPU) or GPU i
 
 ## Host Configuration Script
 
-```bash
-#!/bin/bash
-set -euo pipefail
-# Install GROMACS via micromamba/conda-forge
-curl -sL https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C /usr/local bin/micromamba
-/usr/local/bin/micromamba create -p /opt/gromacs -c conda-forge gromacs -y --quiet
-chmod -R a+rX /opt/gromacs
-
-# Create wrapper with correct paths
-cat > /usr/local/bin/gmx << 'EOF'
-#!/bin/bash
-export LD_LIBRARY_PATH="/opt/gromacs/lib:${LD_LIBRARY_PATH:-}"
-export GMXDATA="/opt/gromacs/share/gromacs"
-export GMX_MAXBACKUP=-1
-exec /opt/gromacs/bin/gmx "$@"
-EOF
-chmod 755 /usr/local/bin/gmx
-echo "/opt/gromacs/lib" > /etc/ld.so.conf.d/gromacs.conf && ldconfig
-```
+The fleet requires GROMACS pre-installed. Use the host configuration script from [`host_configuration_scripts/gromacs/`](../../host_configuration_scripts/gromacs/) on your SMF fleet.
 
 ## Use Cases
 
