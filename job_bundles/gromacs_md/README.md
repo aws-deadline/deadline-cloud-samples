@@ -39,19 +39,26 @@ For multi-replica campaigns, all replicas run through the full pipeline independ
 
 Sample data for a quick test — hen egg-white lysozyme (PDB: 1AKI), the standard GROMACS tutorial system:
 
-- **Protein**: `https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/protein.pdb`
-- **MDP files**: `https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/minimization.mdp`
-- **Host config**: See [`host_configuration_scripts/gromacs/`](../../host_configuration_scripts/gromacs/)
+- **Protein**: Download directly from RCSB Protein Data Bank:
+  ```bash
+  curl -LO https://files.rcsb.org/download/1AKI.pdb
+  grep "^ATOM" 1AKI.pdb > protein.pdb  # strip to protein atoms only
+  ```
+- **MDP files**: Hosted on CDN:
+  ```bash
+  mkdir -p mdp
+  curl -Lo mdp/minimization.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/minimization.mdp
+  curl -Lo mdp/nvt.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/nvt.mdp
+  curl -Lo mdp/npt.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/npt.mdp
+  curl -Lo mdp/production.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/production.mdp
+  ```
 
-Download them locally:
-```bash
-mkdir -p sample_data/mdp && cd sample_data
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/protein.pdb
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/minimization.mdp
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/nvt.mdp
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/npt.mdp
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/production.mdp
-```
+### Data Attribution
+
+| File | Source | License |
+|------|--------|---------|
+| protein.pdb | [RCSB PDB 1AKI](https://www.rcsb.org/structure/1AKI) — Hen egg-white lysozyme (Diamond, 1974, J Mol Biol) | CC0 1.0 (Public Domain) |
+| mdp/*.mdp | Original work — standard GROMACS simulation parameters | Apache-2.0 (this repo) |
 
 ## Usage
 

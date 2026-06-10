@@ -39,25 +39,31 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 ## Sample Data
 
-Sample data is available for a quick test run — 50 FDA-approved drugs screened against the COVID-19 Main Protease (PDB: 6LU7):
+Sample data for a quick test — screen compounds against the COVID-19 Main Protease:
 
-- **Receptor**: `https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/receptor.pdb`
-- **Compound library**: `https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/compound_library.sdf.gz`
-- **Host config script**: See [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/)
+- **Receptor**: Download directly from RCSB Protein Data Bank:
+  ```bash
+  curl -LO https://files.rcsb.org/download/6LU7.pdb
+  grep "^ATOM" 6LU7.pdb > receptor.pdb  # strip to protein atoms only
+  ```
+- **Compound library**: Pre-processed subset hosted on CDN:
+  ```bash
+  curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/compound_library.sdf.gz
+  ```
 
-Download them locally before submitting:
-```bash
-mkdir -p sample_data && cd sample_data
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/receptor.pdb
-curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/compound_library.sdf.gz
-```
+### Data Attribution
+
+| File | Source | License |
+|------|--------|---------|
+| receptor.pdb | [RCSB PDB 6LU7](https://www.rcsb.org/structure/6LU7) — SARS-CoV-2 Main Protease (Jin et al., 2020, Nature) | CC0 1.0 (Public Domain) |
+| compound_library.sdf.gz | [ChEMBL 37](https://www.ebi.ac.uk/chembl/) — 100k drug-like compounds extracted from ChEMBL database (Zdrazil et al., 2024, Nucleic Acids Research) | CC BY-SA 3.0 |
 
 ## Usage
 
 ```bash
 deadline bundle submit path/to/virtual_screening_vina \
-  -p "ReceptorPdb=sample_data/receptor.pdb" \
-  -p "CompoundLibrary=sample_data/compound_library.sdf.gz" \
+  -p "ReceptorPdb=receptor.pdb" \
+  -p "CompoundLibrary=compound_library.sdf.gz" \
   -p "OutputDir=output" \
   -p "CompoundsPerChunk=100" \
   -p "MaxChunkIndex=499" \
