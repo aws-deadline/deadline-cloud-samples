@@ -155,4 +155,4 @@ The `docker/` directory contains the files needed to build the image:
 
 - **Linux only**: The CARLA Docker image requires a Linux host with NVIDIA GPU drivers. Workers must run on Linux fleets.
 - **x86_64 only**: The CARLA Docker image does not support ARM architectures.
-- **Mosaic images**: The 2×3 RGB/semantic mosaic images are generated when all 6 cameras are selected. A grid video is generated for any multi-camera configuration.
+- **Mosaic images**: RGB/semantic mosaic images are generated when 2 or more cameras are selected. The layout is 2×3 when all 6 are active, or a smaller grid otherwise.
