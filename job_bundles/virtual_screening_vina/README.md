@@ -18,6 +18,8 @@ This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vi
 
 ![Binding affinity distribution from screening 741 ChEMBL compounds against COVID-19 Main Protease](example_results.png)
 
+*Most compounds bind weakly (-4 to -6 kcal/mol), but 44 compounds cross the -7.0 threshold into "worth testing in the lab" territory — those are the drug candidates you'd synthesize and validate experimentally.*
+
 ## How It Works
 
 ```
@@ -57,44 +59,62 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 ## Sample Data
 
-Sample data for a quick test — screen compounds against the COVID-19 Main Protease:
+No pre-downloaded data required. The template can automatically download and filter compounds from [ChEMBL](https://www.ebi.ac.uk/chembl/).
 
-- **Receptor**: Download directly from RCSB Protein Data Bank:
-  ```bash
-  curl -LO https://files.rcsb.org/download/6LU7.pdb
-  grep "^ATOM" 6LU7.pdb > receptor.pdb  # strip to protein atoms only
-  ```
-- **Compound library**: Pre-processed subset hosted on CDN:
-  ```bash
-  curl -LO https://downloads.deadlinecloud.amazonaws.com/samples/virtual-screening-vina/compound_library.sdf.gz
-  ```
+**Receptor** — download any protein from the RCSB Protein Data Bank. Example with COVID-19 Main Protease:
+```bash
+curl -LO https://files.rcsb.org/download/6LU7.pdb
+grep "^ATOM" 6LU7.pdb > receptor.pdb  # strip to protein atoms only
+```
+
+**Compound library** — set `CompoundLibrary=chembl` (default) and the template will:
+1. Download ChEMBL chemical representations from EBI FTP
+2. Filter to drug-like molecules (configurable SMILES length, no salts/mixtures)
+3. Convert to SDF format for docking
+
+Or provide your own SDF/SDF.GZ file via the `CompoundLibrary` parameter.
 
 ### Data Attribution
 
-| File | Source | License |
-|------|--------|---------|
-| receptor.pdb | [RCSB PDB 6LU7](https://www.rcsb.org/structure/6LU7) — SARS-CoV-2 Main Protease (Jin et al., 2020, Nature) | CC0 1.0 (Public Domain) |
-| compound_library.sdf.gz | [ChEMBL 37](https://www.ebi.ac.uk/chembl/) — 100k drug-like compounds extracted from ChEMBL database (Zdrazil et al., 2024, Nucleic Acids Research) | CC BY-SA 3.0 |
+| Source | License | Used for |
+|--------|---------|----------|
+| [RCSB Protein Data Bank](https://www.rcsb.org/) | CC0 1.0 (Public Domain) | Receptor PDB structures |
+| [ChEMBL](https://www.ebi.ac.uk/chembl/) (Zdrazil et al., 2024, Nucleic Acids Research) | CC BY-SA 3.0 | Compound library (auto-downloaded) |
 
 ## Usage
 
 ```bash
+# Using ChEMBL (auto-download 100k drug-like compounds):
 deadline bundle submit path/to/virtual_screening_vina \
   -p "ReceptorPdb=receptor.pdb" \
-  -p "CompoundLibrary=compound_library.sdf.gz" \
-  -p "OutputDir=output" \
+  -p "CompoundLibrary=chembl" \
+  -p "ChEMBLVersion=37" \
+  -p "MaxCompounds=100000" \
   -p "CompoundsPerChunk=100" \
-  -p "MaxChunkIndex=499" \
+  -p "MaxChunkIndex=999" \
   -p "CenterX=-10.7" \
   -p "CenterY=12.4" \
   -p "CenterZ=68.8" \
   -p "Exhaustiveness=8"
+
+# Using your own compound library:
+deadline bundle submit path/to/virtual_screening_vina \
+  -p "ReceptorPdb=receptor.pdb" \
+  -p "CompoundLibrary=my_compounds.sdf.gz" \
+  -p "CompoundsPerChunk=100" \
+  -p "MaxChunkIndex=499" \
+  -p "CenterX=-10.7" \
+  -p "CenterY=12.4" \
+  -p "CenterZ=68.8"
 ```
 
 ### Key Parameters
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| CompoundLibrary | SDF file path, or `chembl` to auto-download | chembl |
+| ChEMBLVersion | ChEMBL release version (when using auto-download) | 37 |
+| MaxCompounds | Max compounds to extract from ChEMBL | 100000 |
 | CompoundsPerChunk | Molecules per parallel task | 1000 |
 | MaxChunkIndex | Last chunk index (num_chunks - 1) | 999 |
 | CenterX/Y/Z | Docking box center (Angstroms) | 0.0 |

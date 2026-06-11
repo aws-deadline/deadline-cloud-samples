@@ -17,7 +17,9 @@ This job bundle uses [GROMACS](https://www.gromacs.org/), the most widely-used o
 
 ## Example Output
 
-![Backbone RMSD of lysozyme over 20 ps production MD](example_rmsd.png)
+![Energy minimization of lysozyme — potential energy converges to -362,000 kJ/mol](example_energy_minimization.png)
+
+*The system starts with high energy (atoms clashing after solvation) and rapidly converges to a stable minimum — this confirms the simulation setup is physically valid before running the expensive dynamics.*
 
 ## How It Works
 
@@ -56,19 +58,12 @@ For multi-replica campaigns, all replicas run through the full pipeline independ
 
 Sample data for a quick test — hen egg-white lysozyme (PDB: 1AKI), the standard GROMACS tutorial system:
 
-- **Protein**: Download directly from RCSB Protein Data Bank:
+- **Protein**: Download from the RCSB Protein Data Bank:
   ```bash
   curl -LO https://files.rcsb.org/download/1AKI.pdb
   grep "^ATOM" 1AKI.pdb > protein.pdb  # strip to protein atoms only
   ```
-- **MDP files**: Hosted on CDN:
-  ```bash
-  mkdir -p mdp
-  curl -Lo mdp/minimization.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/minimization.mdp
-  curl -Lo mdp/nvt.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/nvt.mdp
-  curl -Lo mdp/npt.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/npt.mdp
-  curl -Lo mdp/production.mdp https://downloads.deadlinecloud.amazonaws.com/samples/gromacs-md/mdp/production.mdp
-  ```
+- **MDP files**: Included in this bundle under `sample_inputs/mdp/`.
 
 ### Data Attribution
 

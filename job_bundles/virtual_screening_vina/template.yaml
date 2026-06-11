@@ -30,14 +30,57 @@ parameterDefinitions:
     type: PATH
     objectType: FILE
     dataFlow: IN
-    description: "Compound library in SDF format"
+    default: "chembl"
+    description: "Compound library in SDF format, or 'chembl' to download from ChEMBL"
     userInterface:
       control: CHOOSE_INPUT_FILE
-      label: "Compound Library (SDF)"
+      label: "Compound Library (SDF or 'chembl')"
       groupLabel: "Inputs"
       fileFilters:
         - label: "SDF Files"
           patterns: ["*.sdf", "*.sdf.gz"]
+
+  - name: ChEMBLVersion
+    type: STRING
+    default: "37"
+    description: "ChEMBL database version to download (used when CompoundLibrary='chembl')"
+    userInterface:
+      control: LINE_EDIT
+      label: "ChEMBL Version"
+      groupLabel: "Data Source"
+
+  - name: MaxCompounds
+    type: INT
+    default: 100000
+    minValue: 100
+    maxValue: 2500000
+    description: "Maximum number of drug-like compounds to extract from ChEMBL"
+    userInterface:
+      control: SPIN_BOX
+      label: "Max Compounds"
+      groupLabel: "Data Source"
+
+  - name: MinSmilesLength
+    type: INT
+    default: 15
+    minValue: 5
+    maxValue: 50
+    description: "Minimum SMILES length filter (excludes fragments/salts)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Min SMILES Length"
+      groupLabel: "Data Source"
+
+  - name: MaxSmilesLength
+    type: INT
+    default: 120
+    minValue: 50
+    maxValue: 500
+    description: "Maximum SMILES length filter (excludes peptides/polymers)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Max SMILES Length"
+      groupLabel: "Data Source"
 
   - name: OutputDir
     type: PATH
@@ -197,6 +240,109 @@ jobEnvironments:
           timeout: 60
 
 steps:
+  - name: PrepareData
+    description: "Download and filter compound library from ChEMBL (skipped if user provides their own library)"
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 2
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "prepare_data.py"
+          runnable: true
+          data: |
+            #!/usr/bin/env python3
+            """Download compound library from ChEMBL and filter to drug-like molecules."""
+            import gzip
+            import os
+            import subprocess
+            import sys
+            import urllib.request
+
+            library_param = "{{Param.CompoundLibrary}}"
+            output_dir = "{{Param.OutputDir}}"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # If user provided their own library, just copy/link it and skip download
+            if not library_param.endswith("chembl"):
+                print(f"User-provided library: {library_param}")
+                dest = os.path.join(output_dir, "compound_library.sdf.gz")
+                if not os.path.exists(dest):
+                    os.symlink(os.path.abspath(library_param), dest)
+                print("Linked user library to output dir")
+                sys.exit(0)
+
+            # Download ChEMBL chemical representations
+            chembl_version = "{{Param.ChEMBLVersion}}"
+            max_compounds = {{Param.MaxCompounds}}
+            min_smi_len = {{Param.MinSmilesLength}}
+            max_smi_len = {{Param.MaxSmilesLength}}
+
+            url = f"https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_{chembl_version}/chembl_{chembl_version}_chemreps.txt.gz"
+            gz_path = os.path.join(output_dir, f"chembl_{chembl_version}_chemreps.txt.gz")
+            smi_path = os.path.join(output_dir, "compound_library.smi")
+            sdf_path = os.path.join(output_dir, "compound_library.sdf")
+
+            print(f"Downloading ChEMBL {chembl_version} from: {url}")
+            urllib.request.urlretrieve(url, gz_path)
+            print(f"Downloaded: {os.path.getsize(gz_path) / 1024 / 1024:.1f} MB")
+
+            # Filter to drug-like compounds
+            print(f"Filtering: SMILES length {min_smi_len}-{max_smi_len}, no mixtures, max {max_compounds}")
+            count = 0
+            with gzip.open(gz_path, 'rt') as f_in, open(smi_path, 'w') as f_out:
+                header = f_in.readline()
+                for line in f_in:
+                    if count >= max_compounds:
+                        break
+                    parts = line.strip().split('\t')
+                    if len(parts) < 2:
+                        continue
+                    chembl_id, smiles = parts[0], parts[1]
+                    smi_len = len(smiles)
+                    if smi_len < min_smi_len or smi_len > max_smi_len:
+                        continue
+                    if '.' in smiles:
+                        continue
+                    f_out.write(f"{smiles} {chembl_id}\n")
+                    count += 1
+
+            print(f"Extracted {count} drug-like compounds")
+
+            # Convert SMILES to SDF (2D, workers will add 3D during docking)
+            print("Converting to SDF format...")
+            result = subprocess.run(
+                ["obabel", smi_path, "-O", sdf_path, "-e"],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0 and not os.path.exists(sdf_path):
+                print(f"ERROR: {result.stderr[-500:]}", file=sys.stderr)
+                sys.exit(1)
+
+            # Compress
+            print("Compressing...")
+            subprocess.run(["gzip", sdf_path], check=True)
+
+            # Cleanup
+            os.remove(gz_path)
+            os.remove(smi_path)
+
+            final_path = sdf_path + ".gz"
+            print(f"Library ready: {final_path} ({os.path.getsize(final_path) / 1024 / 1024:.1f} MB)")
+            print(f"Compounds: {count}")
+      actions:
+        onRun:
+          command: "python3"
+          args: ["{{Task.File.Run}}"]
+          timeout: 1800
+
   - name: PrepareReceptor
     description: "Convert receptor PDB to PDBQT format for VINA"
     hostRequirements:
@@ -230,6 +376,7 @@ steps:
   - name: SplitLibrary
     description: "Split compound library into chunks for parallel docking"
     dependencies:
+      - dependsOn: PrepareData
       - dependsOn: PrepareReceptor
     hostRequirements:
       amounts:
@@ -248,8 +395,17 @@ steps:
           runnable: true
           data: |
             #!/usr/bin/env python3
-            import os, gzip
-            library_path = "{{Param.CompoundLibrary}}"
+            import os, gzip, glob
+            library_param = "{{Param.CompoundLibrary}}"
+            # Use PrepareData output if ChEMBL was selected, otherwise use user file
+            if library_param.endswith("chembl"):
+                candidates = glob.glob("{{Param.OutputDir}}/compound_library.sdf*")
+                if not candidates:
+                    candidates = glob.glob("/sessions/**/compound_library.sdf*", recursive=True)
+                library_path = candidates[0] if candidates else library_param
+            else:
+                library_path = library_param
+            print(f"Using library: {library_path}")
             output_dir = "{{Param.OutputDir}}/chunks"
             compounds_per_chunk = {{Param.CompoundsPerChunk}}
             os.makedirs(output_dir, exist_ok=True)
