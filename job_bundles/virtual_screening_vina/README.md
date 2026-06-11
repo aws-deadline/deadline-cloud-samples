@@ -1,6 +1,18 @@
 # Virtual Screening with AutoDock VINA
 
-Screens a compound library against a protein target to identify drug candidates using AutoDock VINA molecular docking. The job splits the library into chunks and docks them in parallel across a fleet of Spot workers — a common drug discovery pattern that scales from thousands to millions of compounds.
+[Virtual screening](https://en.wikipedia.org/wiki/Virtual_screening) is a computational drug discovery technique that searches large libraries of small molecules to find those most likely to bind a protein target (e.g., a viral enzyme or cancer receptor). By predicting binding affinity computationally, researchers narrow millions of candidates down to a few hundred for lab testing — drastically reducing cost and time in early-stage drug discovery.
+
+This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vina), one of the most widely-cited open-source docking engines. It splits a compound library into chunks and docks them in parallel across a fleet of workers.
+
+```
+    Protein Target              Compound Library (millions)         Top Hits
+    ┌─────────┐                ┌─┬─┬─┬─┬─┬─┬─┬─┬─┬─┐            ┌─────┐
+    │  ╭───╮  │   AutoDock     │ │ │ │ │ │ │ │ │ │ │   Ranked    │ ★ 1 │ -9.2 kcal/mol
+    │  │   │  │ ──── VINA ───→ │ │ │ │ │ │ │ │ │ │ │ ─── by ──→ │ ★ 2 │ -8.7 kcal/mol
+    │  ╰───╯  │   (parallel)   │ │ │ │ │ │ │ │ │ │ │  affinity   │ ★ 3 │ -8.4 kcal/mol
+    └─────────┘                └─┴─┴─┴─┴─┴─┴─┴─┴─┴─┘            └─────┘
+    (binding site)              (SDF/SMILES format)                (CSV output)
+```
 
 ## How It Works
 
@@ -29,8 +41,10 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 1. **Deadline Cloud farm** with a Linux SMF fleet (x86_64, Spot recommended).
 
-2. **Fleet host configuration script** — install AutoDock VINA and Open Babel on workers at boot.
-   See [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/) in this repo.
+2. **Conda queue environment** with `autodock-vina` and `openbabel` packages:
+   - Build `autodock-vina` from the recipe at [`conda_recipes/autodock-vina-1.2.5/`](../../conda_recipes/autodock-vina-1.2.5/) into your S3 conda channel.
+   - Add `openbabel` from conda-forge to your queue environment packages.
+   - Alternatively, use the host config script at [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/) as a fallback.
 
 3. **Deadline CLI**:
    ```bash

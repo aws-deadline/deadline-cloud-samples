@@ -1,6 +1,19 @@
 # GROMACS Molecular Dynamics
 
-Runs a complete molecular dynamics simulation pipeline using GROMACS: system preparation, energy minimization, equilibration (NVT + NPT), production MD, and structural analysis. Supports parallel fan-out across multiple independent replica simulations.
+[Molecular dynamics (MD)](https://en.wikipedia.org/wiki/Molecular_dynamics) simulates the physical movement of atoms in a protein over time, revealing how it folds, binds drugs, or changes shape. It's a foundational tool in computational chemistry and drug discovery — used to validate virtual screening hits, predict protein stability, and study binding mechanisms at atomic resolution.
+
+This job bundle uses [GROMACS](https://www.gromacs.org/), the most widely-used open-source MD engine. It runs the full simulation pipeline from raw protein structure to analyzed trajectory, and supports parallel fan-out across independent replica simulations.
+
+```
+    Input PDB          Simulation Trajectory              Analysis
+    ┌─────────┐       ┌─────────────────────┐           ┌──────────────┐
+    │ Protein │       │  ~~~   ~~~   ~~~    │           │ RMSD: 0.12 nm│
+    │ + Water │ ───→  │  Atoms moving over  │  ───→     │ RMSF per atom│
+    │ + Ions  │       │  nanoseconds (fs    │           │ Rg: 1.4 nm   │
+    └─────────┘       │  timestep)          │           │ H-bonds: 142 │
+                      └─────────────────────┘           └──────────────┘
+    (solvated box)    (.xtc trajectory file)            (.xvg plot data)
+```
 
 ## How It Works
 

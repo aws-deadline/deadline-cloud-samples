@@ -3,7 +3,6 @@ name: "VirtualScreening-{{Param.JobName}}"
 description: |
   AutoDock VINA virtual screening pipeline for drug discovery.
   Screens a compound library against a protein target to identify drug candidates.
-  Designed for massive parallelism on AWS Deadline Cloud with Spot instance support.
 
 parameterDefinitions:
   - name: JobName
