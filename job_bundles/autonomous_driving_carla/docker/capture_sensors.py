@@ -1,8 +1,8 @@
-"""Multi-sensor capture: 6-camera RGB ring + 6 semantic segmentation + LiDAR + bounding boxes.
+"""Multi-sensor capture: Up to 6-camera RGB ring + 6 semantic segmentation + LiDAR + bounding boxes.
 
 Runs as a background process alongside scenario_runner. All sensors capture
-at ~24 FPS (configurable). Uses frame-synchronized collection: buffers
-incoming images by CARLA frame ID, saves a complete set only when all 6 RGB
+at ~1 FPS (configurable). Uses frame-synchronized collection: buffers
+incoming images by CARLA frame ID, saves a complete set only when all RGB
 cameras have reported for the same frame.
 
 Usage (from entrypoint.sh):
@@ -34,13 +34,13 @@ import carla
 import numpy as np
 
 OUTPUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "/outputs"
-CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "24"))
+CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "1"))
 CARLA_HOST = os.environ.get("CARLA_HOST", "localhost")
 CARLA_PORT = int(os.environ.get("CARLA_PORT", "2000"))
 IMAGE_WIDTH = int(os.environ.get("CAPTURE_WIDTH", "1280"))
 IMAGE_HEIGHT = int(os.environ.get("CAPTURE_HEIGHT", "720"))
 
-_ALL_CAMS = ["front", "front_left", "front_right", "rear", "rear_left", "rear_right"]
+_ALL_CAMS = ["front_left", "front", "front_right", "rear_left", "rear", "rear_right"]
 _cameras_env = os.environ.get("CAMERAS", "").strip()
 CAM_NAMES = [c.strip() for c in _cameras_env.split(",") if c.strip() in _ALL_CAMS] if _cameras_env else _ALL_CAMS
 
@@ -179,19 +179,24 @@ def flush_complete_frames():
 
 
 def _make_mosaic(cam_data):
-    """Compose a 2×3 mosaic from camera data dict. Returns None if incomplete.
+    """Compose a compact mosaic from camera data in spatial order.
 
-    Layout matches the driver's spatial perspective:
-        [front_left]  [front]  [front_right]
-        [rear_left]   [rear]   [rear_right]
+    Order: front_left, front, front_right, rear_left, rear, rear_right.
+    Tiles into rows of 3 (or 2 if fewer than 3 cameras).
+    Returns None if fewer than 2 cameras have data.
     """
-    top_row = [cam_data.get(n) for n in ["front_left", "front", "front_right"]]
-    bot_row = [cam_data.get(n) for n in ["rear_left", "rear", "rear_right"]]
-    if any(x is None for x in top_row) or any(x is None for x in bot_row):
+    grid_order = ["front_left", "front", "front_right", "rear_left", "rear", "rear_right"]
+    imgs = [cam_data[n] for n in grid_order if n in cam_data]
+    if len(imgs) < 2:
         return None
-    top = np.concatenate(top_row, axis=1)
-    bot = np.concatenate(bot_row, axis=1)
-    return np.concatenate([top, bot], axis=0)
+    cols = 2 if len(imgs) <= 2 else 3
+    # Pad with black to fill the last row if needed
+    while len(imgs) % cols != 0:
+        imgs.append(np.zeros_like(imgs[0]))
+    rows = []
+    for i in range(0, len(imgs), cols):
+        rows.append(np.concatenate(imgs[i:i+cols], axis=1))
+    return np.concatenate(rows, axis=0)
 
 
 def _save_png(filename, rgb_array):

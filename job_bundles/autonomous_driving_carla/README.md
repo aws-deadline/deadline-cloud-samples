@@ -40,9 +40,13 @@ Your fleet role and queue role both need ECR pull permissions. Attach a policy l
       "Action": [
         "ecr:GetDownloadUrlForLayer",
         "ecr:BatchGetImage",
-        "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability"
       ],
+      "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/carla-deadline-poc"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
       "Resource": "*"
     }
 
@@ -145,7 +149,6 @@ The `docker/` directory contains the files needed to build the image:
 | `Dockerfile` | Builds the CARLA + scenario_runner + multi-sensor capture image |
 | `entrypoint.sh` | Container entrypoint: boots CARLA, runs scenario, captures sensors |
 | `capture_sensors.py` | Multi-sensor capture with configurable camera selection via `CAMERAS` env var |
-| `capture_camera.py` | Single-camera capture utility |
 
 ## Known Limitations
 

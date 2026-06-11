@@ -1,5 +1,5 @@
 # CARLA + scenario_runner image for Deadline Cloud
-# Multi-sensor capture: 6-cam RGB ring + 6-cam semantic seg + LiDAR + bounding boxes
+# Multi-sensor capture: Up to 6-cam RGB ring + up to 6-cam semantic seg + LiDAR + bounding boxes
 #
 # Base: carlasim/carla:0.9.16 (~8 GB compressed, ~25 GB on disk)
 #   - Ubuntu 20.04
@@ -66,7 +66,6 @@ RUN sed -i '/^carla[<>=! ]/d' requirements.txt \
 # Copy entrypoint + sensor capture scripts, make /outputs writable
 COPY entrypoint.sh /opt/entrypoint.sh
 COPY capture_sensors.py /opt/capture_sensors.py
-COPY capture_camera.py /opt/capture_camera.py
 RUN chmod +x /opt/entrypoint.sh \
     && mkdir -p /outputs \
     && chown -R carla:carla /outputs /opt/scenario_runner /opt/venv

@@ -203,11 +203,11 @@ steps:
 
             # Assemble camera list from checkboxes
             CAMERAS=""
-            [[ "{{Param.CamFront}}" == "True" ]] && CAMERAS="${CAMERAS}front,"
             [[ "{{Param.CamFrontLeft}}" == "True" ]] && CAMERAS="${CAMERAS}front_left,"
+            [[ "{{Param.CamFront}}" == "True" ]] && CAMERAS="${CAMERAS}front,"
             [[ "{{Param.CamFrontRight}}" == "True" ]] && CAMERAS="${CAMERAS}front_right,"
-            [[ "{{Param.CamRear}}" == "True" ]] && CAMERAS="${CAMERAS}rear,"
             [[ "{{Param.CamRearLeft}}" == "True" ]] && CAMERAS="${CAMERAS}rear_left,"
+            [[ "{{Param.CamRear}}" == "True" ]] && CAMERAS="${CAMERAS}rear,"
             [[ "{{Param.CamRearRight}}" == "True" ]] && CAMERAS="${CAMERAS}rear_right,"
             CAMERAS="${CAMERAS%,}"  # trim trailing comma
             if [[ -z "$CAMERAS" ]]; then
@@ -298,7 +298,7 @@ steps:
                 if [[ "$FRAME_COUNT" -gt 0 ]]; then
                     echo ""
                     echo "=== Generating video from $CAM camera ($FRAME_COUNT frames) ==="
-                    ffmpeg -y -framerate 24 -pattern_type glob \
+                    ffmpeg -y -framerate 7 -pattern_type glob \
                         -i "$FRAMES_DIR/frame_*.png" \
                         -c:v libx264 -pix_fmt yuv420p \
                         -movflags +faststart \
@@ -307,31 +307,32 @@ steps:
             done
 
             # Generate stitched grid video if multiple cameras selected
+            # Tiles cameras in spatial order (front_left, front, front_right,
+            # rear_left, rear, rear_right) into a compact grid.
             CAM_COUNT=$(echo "$CAMERAS" | tr ',' ' ' | wc -w)
             if [[ "$CAM_COUNT" -gt 1 ]]; then
                 echo ""
                 echo "=== Generating stitched grid video ($CAM_COUNT cameras) ==="
 
-                # Build per-camera video inputs for the grid (use the already-generated mp4s)
+                GRID_ORDER="front_left front front_right rear_left rear rear_right"
                 INPUTS=""
                 FILTER=""
                 IDX=0
-                for CAM in $(echo "$CAMERAS" | tr ',' ' '); do
-                    INPUTS="$INPUTS -i $VIDEO_DIR/${CAM}_scenario.mp4"
-                    FILTER="${FILTER}[${IDX}:v]scale=640:360[v${IDX}];"
-                    IDX=$((IDX + 1))
+                for SLOT in $GRID_ORDER; do
+                    if echo "$CAMERAS" | tr ',' ' ' | grep -qw "$SLOT"; then
+                        INPUTS="$INPUTS -i $VIDEO_DIR/${SLOT}_scenario.mp4"
+                        FILTER="${FILTER}[${IDX}:v]scale=640:360[v${IDX}];"
+                        IDX=$((IDX + 1))
+                    fi
                 done
 
-                # Determine grid layout
+                # Determine grid columns based on camera count
                 if [[ "$CAM_COUNT" -le 2 ]]; then
-                    COLS=2
-                elif [[ "$CAM_COUNT" -le 4 ]]; then
                     COLS=2
                 else
                     COLS=3
                 fi
 
-                # Build xstack layout string
                 LAYOUT=""
                 STACK_INPUTS=""
                 for ((i=0; i<CAM_COUNT; i++)); do

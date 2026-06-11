@@ -2,16 +2,12 @@
 # Container entrypoint:
 #   1. Start CARLA server (off-screen, background)
 #   2. Wait for it to accept connections on port 2000
-#   3. Run scenario_runner against the input scenario:
-#        - .osc                         → OpenSCENARIO 2.0 DSL (--openscenario2)
-#        - .xosc                        → OpenSCENARIO 1.0 XML (--openscenario)
-#        - PYTHON_SCENARIO_NAME env set → Python-defined (--scenario)
+#   3. Run scenario_runner against the input OpenSCENARIO 2.0 scenario
 #   4. Capture outputs (recording + log + console output)
 #   5. Cleanly stop CARLA
 #
 # Args:
-#   $1 - path to scenario inside container (typically /inputs/scenario.osc
-#        or /inputs/scenario.xosc; ignored if PYTHON_SCENARIO_NAME is set)
+#   $1 - path to .osc scenario inside container (typically /inputs/scenario.osc)
 #   $2 - output directory inside container (typically /outputs)
 
 set -euo pipefail
@@ -20,9 +16,7 @@ SCENARIO_FILE="${1:-/inputs/scenario.osc}"
 OUTPUT_DIR="${2:-/outputs}"
 CARLA_TIMEOUT_S="${CARLA_TIMEOUT_S:-120}"
 
-# Inputs that look like file paths (have an extension) must exist on disk.
-# Python scenario names (no extension) are passed through to --scenario.
-if [[ "$SCENARIO_FILE" == *.xosc || "$SCENARIO_FILE" == *.osc ]] && [[ ! -f "$SCENARIO_FILE" ]]; then
+if [[ ! -f "$SCENARIO_FILE" ]]; then
     echo "ERROR: Scenario file not found: $SCENARIO_FILE"
     exit 2
 fi
@@ -51,16 +45,10 @@ cd /workspace
 # CARLA_BOOT_TOWN: pass a town name (e.g. Town01) as the first positional
 # arg to CarlaUE4.sh. CARLA boots directly into that map and there is NO
 # `client.load_world(town)` call to crash. Town01-03 are simpler grid
-# maps and considered more stable than the default Town10HD per the IoT
-# team. Default: Town01 (small, stable, no rain assets).
+# maps and considered more stable than the default Town10HD.
+# Default: Town01 (small, stable, no rain assets).
 CARLA_BOOT_TOWN="${CARLA_BOOT_TOWN:-Town01}"
 echo "[$(date -u +%FT%TZ)] CARLA boot town: $CARLA_BOOT_TOWN"
-# -quality-level=Epic: CARLA's default. We previously ran Low for faster
-# PoC iteration, but for the diffusion-enhancement benchmark (carla_diffusion
-# bundle) we want maximum source-frame fidelity going INTO the upscalers —
-# better source quality means better photorealism after enhancement and a
-# fairer benchmark across rails. Epic enables full lighting, shadows, and
-# texture quality but adds CARLA boot time and per-frame render cost.
 xvfb-run -a --server-args="-screen 0 1280x720x24" \
     -- ./CarlaUE4.sh "/Game/Carla/Maps/$CARLA_BOOT_TOWN" \
        -RenderOffScreen -nosound -vulkan -quality-level=Epic \
@@ -148,9 +136,7 @@ echo "[$(date -u +%FT%TZ)] CARLA fully ready"
 WATCHDOG_PID=$!
 
 # --- Background multi-sensor capture ------------------------------------------
-# Spawns 6 RGB cameras + 6 semantic seg cameras + 1 LiDAR on the ego vehicle,
-# plus computes 2D/3D bounding boxes per frame. All at ~24 FPS.
-echo "[$(date -u +%FT%TZ)] Starting multi-sensor capture (6 RGB + 6 semantic + LiDAR + bbox)"
+echo "[$(date -u +%FT%TZ)] Starting multi-sensor capture (RGB + semantic + LiDAR + bbox)"
 PYTHONUNBUFFERED=1 "${CARLA_PYTHON:-/opt/venv/bin/python}" -u /opt/capture_sensors.py "$OUTPUT_DIR" \
     > "$OUTPUT_DIR/capture_sensors.log" 2>&1 &
 CAPTURE_PID=$!
@@ -184,56 +170,40 @@ fi
 # PYTHONUNBUFFERED=1 ensures we see progress in real time (otherwise Python
 # block-buffers stdout when piped to `tee`).
 set +e
-# Detect scenario type:
-#   PYTHON_SCENARIO_NAME env set → Python scenario via --scenario, overrides file
-#   .osc                          → OpenSCENARIO 2.0 DSL (--openscenario2) — primary
-#   .xosc                         → OpenSCENARIO 1.0 XML (--openscenario)  — fallback
-#   else                          → fall through to --scenario with the basename
-if [[ -n "${PYTHON_SCENARIO_NAME:-}" ]]; then
-    SCENARIO_ARGS=(--scenario "$PYTHON_SCENARIO_NAME")
-    echo "[$(date -u +%FT%TZ)] Mode: Python-defined scenario (--scenario $PYTHON_SCENARIO_NAME)"
-elif [[ "$SCENARIO_FILE" == *.osc ]]; then
-    # OSC2 quirk: scenario_runner's OSC2 preprocessor prepends its install
-    # dir to the input path (does string concat, not os.path.join). Absolute
-    # paths fail with "/opt/scenario_runner//inputs/...". Work around by
-    # staging the .osc files into a subdir of /opt/scenario_runner/ and
-    # passing a path relative to that.
-    #
-    # Also: OSC2 imports (e.g. `import basic.osc`) are resolved relative to
-    # the scenario file's directory. Stage scenario_runner's bundled stdlib
-    # alongside so common imports just work.
-    STAGING_DIR=/opt/scenario_runner/staging
-    rm -rf "$STAGING_DIR"
-    mkdir -p "$STAGING_DIR"
-    # 1. User-provided .osc files (the scenario itself, plus any local imports)
-    SCENARIO_DIR=$(dirname "$SCENARIO_FILE")
-    cp -f "$SCENARIO_DIR"/*.osc "$STAGING_DIR/" 2>/dev/null || true
-    # 2. scenario_runner's bundled OSC2 stdlib (basic.osc + helpers).
-    #    Don't overwrite user-provided versions if they exist.
-    cp -n /opt/scenario_runner/srunner/examples/*.osc "$STAGING_DIR/" 2>/dev/null || true
+# OSC2 quirk: scenario_runner's OSC2 preprocessor prepends its install
+# dir to the input path (does string concat, not os.path.join). Absolute
+# paths fail with "/opt/scenario_runner//inputs/...". Work around by
+# staging the .osc files into a subdir of /opt/scenario_runner/ and
+# passing a path relative to that.
+#
+# Also: OSC2 imports (e.g. `import basic.osc`) are resolved relative to
+# the scenario file's directory. Stage scenario_runner's bundled stdlib
+# alongside so common imports just work.
+STAGING_DIR=/opt/scenario_runner/staging
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR"
+# 1. User-provided .osc files (the scenario itself, plus any local imports)
+SCENARIO_DIR=$(dirname "$SCENARIO_FILE")
+cp -f "$SCENARIO_DIR"/*.osc "$STAGING_DIR/" 2>/dev/null || true
+# 2. scenario_runner's bundled OSC2 stdlib (basic.osc + helpers).
+#    Don't overwrite user-provided versions if they exist.
+cp -n /opt/scenario_runner/srunner/examples/*.osc "$STAGING_DIR/" 2>/dev/null || true
 
-    SCENARIO_REL="staging/$(basename "$SCENARIO_FILE")"
-    SCENARIO_ARGS=(--openscenario2 "$SCENARIO_REL")
-    echo "[$(date -u +%FT%TZ)] Mode: OpenSCENARIO 2.0 (--openscenario2)"
-    echo "[$(date -u +%FT%TZ)] Staged 2.0 scenario files into $STAGING_DIR"
-    ls -la "$STAGING_DIR"
-    # scenario_runner builds its recorder/criteria paths as:
-    #   "{SR_ROOT}/{--record}/{config.name}.log"
-    # with SR_ROOT defaulting to "./" and config.name including the staged
-    # subdir (e.g. "staging/change_lane.osc"). With --record=/outputs that
-    # produces ".//outputs/staging/change_lane.osc.json", which from CWD
-    # /opt/scenario_runner resolves to /opt/scenario_runner/outputs/staging/
-    # — NOT the mounted /outputs. Symlink so the relative path lands in the
-    # real output mount, and mkdir -p the staging subdir in advance.
-    ln -sfn /outputs /opt/scenario_runner/outputs
-    mkdir -p /opt/scenario_runner/outputs/staging
-elif [[ "$SCENARIO_FILE" == *.xosc ]]; then
-    SCENARIO_ARGS=(--openscenario "$SCENARIO_FILE")
-    echo "[$(date -u +%FT%TZ)] Mode: OpenSCENARIO 1.0 (--openscenario)"
-else
-    SCENARIO_ARGS=(--scenario "$SCENARIO_FILE")
-    echo "[$(date -u +%FT%TZ)] Mode: Python-defined scenario (--scenario)"
-fi
+SCENARIO_REL="staging/$(basename "$SCENARIO_FILE")"
+SCENARIO_ARGS=(--openscenario2 "$SCENARIO_REL")
+echo "[$(date -u +%FT%TZ)] Mode: OpenSCENARIO 2.0 (--openscenario2)"
+echo "[$(date -u +%FT%TZ)] Staged 2.0 scenario files into $STAGING_DIR"
+ls -la "$STAGING_DIR"
+# scenario_runner builds its recorder/criteria paths as:
+#   "{SR_ROOT}/{--record}/{config.name}.log"
+# with SR_ROOT defaulting to "./" and config.name including the staged
+# subdir (e.g. "staging/change_lane.osc"). With --record=/outputs that
+# produces ".//outputs/staging/change_lane.osc.json", which from CWD
+# /opt/scenario_runner resolves to /opt/scenario_runner/outputs/staging/
+# — NOT the mounted /outputs. Symlink so the relative path lands in the
+# real output mount, and mkdir -p the staging subdir in advance.
+ln -sfn /outputs /opt/scenario_runner/outputs
+mkdir -p /opt/scenario_runner/outputs/staging
 
 timeout --kill-after=10 "$SRUNNER_HARD_TIMEOUT_S" \
     env PYTHONUNBUFFERED=1 \
@@ -279,7 +249,7 @@ if command -v ffmpeg &>/dev/null && [[ "$FRAME_COUNT" -gt 0 ]]; then
     RGB_MOSAIC_COUNT=$(find "$OUTPUT_DIR/rgb_mosaic" -name "*.png" 2>/dev/null | wc -l)
     if [[ "$RGB_MOSAIC_COUNT" -gt 0 ]]; then
         echo "[$(date -u +%FT%TZ)] Generating RGB mosaic video from $RGB_MOSAIC_COUNT frames..."
-        ffmpeg -y -framerate 24 -pattern_type glob \
+        ffmpeg -y -framerate 7 -pattern_type glob \
             -i "$OUTPUT_DIR/rgb_mosaic/frame_*.png" \
             -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
             "$OUTPUT_DIR/video/rgb_mosaic.mp4" 2>/dev/null && \
@@ -290,7 +260,7 @@ if command -v ffmpeg &>/dev/null && [[ "$FRAME_COUNT" -gt 0 ]]; then
     SEM_MOSAIC_COUNT=$(find "$OUTPUT_DIR/semantic_mosaic" -name "*.png" 2>/dev/null | wc -l)
     if [[ "$SEM_MOSAIC_COUNT" -gt 0 ]]; then
         echo "[$(date -u +%FT%TZ)] Generating semantic mosaic video from $SEM_MOSAIC_COUNT frames..."
-        ffmpeg -y -framerate 24 -pattern_type glob \
+        ffmpeg -y -framerate 7 -pattern_type glob \
             -i "$OUTPUT_DIR/semantic_mosaic/frame_*.png" \
             -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
             "$OUTPUT_DIR/video/semantic_mosaic.mp4" 2>/dev/null && \
