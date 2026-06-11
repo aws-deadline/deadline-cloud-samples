@@ -433,8 +433,6 @@ def main():
                 except RuntimeError:
                     break
             time.sleep(0.05)
-    except KeyboardInterrupt:
-        pass
     finally:
         for s in sensors:
             try:

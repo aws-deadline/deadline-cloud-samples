@@ -24,7 +24,7 @@ fi
 mkdir -p "$OUTPUT_DIR"
 chmod 755 "$OUTPUT_DIR" 2>/dev/null || true
 
-echo "[$(date -u +%FT%TZ)] === CARLA OpenSCENARIO PoC ==="
+echo "[$(date -u +%FT%TZ)] === CARLA OpenSCENARIO Simulation ==="
 echo "Scenario file: $SCENARIO_FILE"
 echo "Output dir:    $OUTPUT_DIR"
 echo "CARLA timeout: ${CARLA_TIMEOUT_S}s"
@@ -42,12 +42,9 @@ cd /workspace
 # touch the X server during initialization. Without one, calls return
 # null and UE4 segfaults. xvfb-run -a auto-picks an unused DISPLAY.
 #
-# CARLA_BOOT_TOWN: pass a town name (e.g. Town01) as the first positional
-# arg to CarlaUE4.sh. CARLA boots directly into that map and there is NO
-# `client.load_world(town)` call to crash. Town01-03 are simpler grid
-# maps and considered more stable than the default Town10HD.
-# Default: Town01 (small, stable, no rain assets).
-CARLA_BOOT_TOWN="${CARLA_BOOT_TOWN:-Town01}"
+# CARLA_BOOT_TOWN: pass a town name as the first positional arg to
+# CarlaUE4.sh so CARLA boots directly into that map (no client.load_world call).
+CARLA_BOOT_TOWN="${CARLA_BOOT_TOWN:-Town04}"
 echo "[$(date -u +%FT%TZ)] CARLA boot town: $CARLA_BOOT_TOWN"
 xvfb-run -a --server-args="-screen 0 1280x720x24" \
     -- ./CarlaUE4.sh "/Game/Carla/Maps/$CARLA_BOOT_TOWN" \

@@ -33,7 +33,7 @@ videos plus a stitched grid video.
 
 ### IAM Permissions
 
-Your fleet role and queue role both need ECR pull permissions. Attach a policy like:
+Your queue role needs ECR pull permissions (the task script runs `docker pull` under queue role credentials). Attach a policy like:
 
     {
       "Effect": "Allow",
@@ -42,7 +42,7 @@ Your fleet role and queue role both need ECR pull permissions. Attach a policy l
         "ecr:BatchGetImage",
         "ecr:BatchCheckLayerAvailability"
       ],
-      "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/carla-deadline-poc"
+      "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/carla-deadline"
     },
     {
       "Effect": "Allow",
@@ -67,12 +67,12 @@ boot CARLA, execute the driving scenario, and record sensor data in a single con
 
 1. **Create an ECR repository** (if you don't have one):
 
-       aws ecr create-repository --repository-name carla-deadline-poc --region <REGION>
+       aws ecr create-repository --repository-name carla-deadline --region <REGION>
 
 2. **Build the image:**
 
        cd docker/
-       docker build -t carla-deadline-poc:0.9.16 .
+       docker build -t carla-deadline:0.9.16 .
 
    > **Note:** The Dockerfile pulls `carlasim/carla:0.9.16` from Docker Hub as the base image.
    > The first build will download ~8 GB.
@@ -82,30 +82,31 @@ boot CARLA, execute the driving scenario, and record sensor data in a single con
        aws ecr get-login-password --region <REGION> | \
          docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
 
-       docker tag carla-deadline-poc:0.9.16 \
-         <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16
+       docker tag carla-deadline:0.9.16 \
+         <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16
 
-       docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16
+       docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16
 
 ## Submit the Job
 
-From the `job_bundles` directory of this repository:
+From the bundle directory:
 
-    deadline bundle gui-submit autonomous_driving_carla
+    cd autonomous_driving_carla
+    deadline bundle gui-submit .
 
 In the **Job-specific settings** tab:
 
 1. **Scenario Settings** — Configure ego speeds, NPC speeds, and NPC distances (comma-separated integers). The cross-product creates your task grid.
 2. **Camera Viewpoints** — Select which cameras to capture (Front is enabled by default). Available positions: Front, Front Left, Front Right, Rear, Rear Left, Rear Right.
-3. **Advanced** — Set your Container Image URI to `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16` and the AWS Region where your ECR lives.
+3. **Advanced** — Set your Container Image URI to `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16` and the AWS Region where your ECR lives.
 
 Alternatively, submit via CLI:
 
-    deadline bundle submit autonomous_driving_carla/ \
+    deadline bundle submit . \
       --farm-id <FARM_ID> \
       --queue-id <QUEUE_ID> \
       --name "CARLA Lane Change Demo" \
-      -p ImageURI=<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16 \
+      -p ImageURI=<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16 \
       -p AwsRegion=<REGION>
 
 ## Monitor the Job
@@ -154,6 +155,4 @@ The `docker/` directory contains the files needed to build the image:
 
 - **Linux only**: The CARLA Docker image requires a Linux host with NVIDIA GPU drivers. Workers must run on Linux fleets.
 - **x86_64 only**: The CARLA Docker image does not support ARM architectures.
-- **Town04 only**: The lane-change scenario requires a 2-lane highway. Only Town04 is supported.
-- **Traffic Manager port conflict**: If two tasks run simultaneously on the same worker, the second may fail with a port bind error. Retries resolve this.
 - **Mosaic images**: The 2×3 RGB/semantic mosaic images are generated when all 6 cameras are selected. A grid video is generated for any multi-camera configuration.

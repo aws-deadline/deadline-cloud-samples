@@ -8,14 +8,6 @@ description: |
 
 parameterDefinitions:
   # --- Scenario Settings ---
-  - name: ScenarioType
-    type: STRING
-    default: "Lane Change Cut-In (change_lane.osc)"
-    description: "The scenario being executed. NPC overtakes ego and cuts into ego's lane."
-    userInterface:
-      control: LINE_EDIT
-      label: Scenario
-      groupLabel: Scenario Settings
   - name: CarlaBootTown
     type: STRING
     default: "Town04"
@@ -131,7 +123,7 @@ parameterDefinitions:
   - name: ImageURI
     type: STRING
     description: ECR URI of the CARLA multi-sensor image
-    default: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline-poc:0.9.16"
+    default: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16"
     userInterface:
       control: LINE_EDIT
       label: Container Image URI
@@ -155,6 +147,13 @@ parameterDefinitions:
       control: SPIN_BOX
       label: CARLA Boot Timeout (seconds)
       groupLabel: Advanced
+
+  - name: CondaChannels
+    type: STRING
+    default: conda-forge
+    description: Conda channels for the queue environment. ffmpeg requires conda-forge.
+    userInterface:
+      control: HIDDEN
 
   - name: CondaPackages
     type: STRING
