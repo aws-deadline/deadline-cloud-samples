@@ -14,6 +14,10 @@ This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vi
     (binding site)              (SDF/SMILES format)                (CSV output)
 ```
 
+## Example Output
+
+![Binding affinity distribution from screening 741 ChEMBL compounds against COVID-19 Main Protease](example_results.png)
+
 ## How It Works
 
 ```

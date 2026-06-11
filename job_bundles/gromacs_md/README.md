@@ -15,6 +15,10 @@ This job bundle uses [GROMACS](https://www.gromacs.org/), the most widely-used o
     (solvated box)    (.xtc trajectory file)            (.xvg plot data)
 ```
 
+## Example Output
+
+![Backbone RMSD of lysozyme over 20 ps production MD](example_rmsd.png)
+
 ## How It Works
 
 ```
