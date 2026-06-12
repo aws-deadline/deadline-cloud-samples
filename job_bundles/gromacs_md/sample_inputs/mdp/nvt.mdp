@@ -1,0 +1,50 @@
+; NVT equilibration parameters for GROMACS
+; Temperature equilibration at 300K with position restraints
+
+define      = -DPOSRES      ; Position restraints on protein
+
+; Run parameters
+integrator  = md            ; Leap-frog integrator
+nsteps      = 50000         ; 100 ps (2fs * 50000)
+dt          = 0.002         ; 2 fs timestep
+
+; Output control
+nstxout-compressed  = 5000  ; Write compressed coords every 10 ps
+nstlog              = 5000  ; Update log file every 10 ps
+nstenergy           = 5000  ; Save energies every 10 ps
+
+; Bond parameters
+continuation    = no        ; First dynamics run
+constraint_algorithm = lincs ; Holonomic constraints
+constraints     = h-bonds   ; Constrain H-bonds
+lincs_iter      = 1         ; Accuracy of LINCS
+lincs_order     = 4         ; Also related to accuracy
+
+; Neighbor searching
+nstlist         = 10        ; Frequency to update neighbor list
+cutoff-scheme   = Verlet
+ns_type         = grid
+rcoulomb        = 1.0
+rvdw            = 1.0
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.16
+
+; Temperature coupling
+tcoupl      = V-rescale             ; Modified Berendsen thermostat
+tc-grps     = Protein Non-Protein   ; Two coupling groups
+tau_t       = 0.1     0.1           ; Time constant (ps)
+ref_t       = 300     300           ; Reference temperature (K)
+
+; Pressure coupling
+pcoupl      = no                    ; No pressure coupling in NVT
+
+; Periodic boundary conditions
+pbc         = xyz
+
+; Velocity generation
+gen_vel     = yes           ; Assign velocities from Maxwell distribution
+gen_temp    = 300           ; Temperature for velocity generation
+gen_seed    = -1            ; Random seed
