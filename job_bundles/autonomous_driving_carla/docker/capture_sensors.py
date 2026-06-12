@@ -34,7 +34,7 @@ import carla
 import numpy as np
 
 OUTPUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "/outputs"
-CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "1"))
+CAPTURE_FPS = float(os.environ.get("CAPTURE_FPS", "7"))
 CARLA_HOST = os.environ.get("CARLA_HOST", "localhost")
 CARLA_PORT = int(os.environ.get("CARLA_PORT", "2000"))
 IMAGE_WIDTH = int(os.environ.get("CAPTURE_WIDTH", "1280"))
@@ -112,18 +112,12 @@ def save_lidar(point_cloud):
 
 
 def flush_complete_frames():
-    """Flush a frame set once the front camera has reported and 1s has elapsed.
-
-    Grabs the latest available frame from each camera's buffer — they may not
-    all share the same frame ID (async mode doesn't guarantee that), but they're
-    within 1-2 ticks of each other which is visually indistinguishable at 1 FPS.
-    """
+    """Flush a frame set once the trigger camera has reported and enough time has elapsed."""
     now = time.time()
     if now - last_save_time[0] < (1.0 / CAPTURE_FPS):
         return
 
     with buffer_lock:
-        # Trigger on whichever camera is first in CAM_NAMES
         trigger_cam = CAM_NAMES[0]
         if trigger_cam not in rgb_buffer or not rgb_buffer[trigger_cam]:
             return
@@ -439,7 +433,6 @@ def main():
                 s.stop()
                 s.destroy()
             except RuntimeError:
-                # Sensor may already be destroyed if the ego vehicle was removed
                 pass
         print(f"[sensors] Done. Captured {frame_counter[0]} frame sets.")
 

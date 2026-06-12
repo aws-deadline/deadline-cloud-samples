@@ -42,7 +42,7 @@ Your queue role needs ECR pull permissions (the task script runs `docker pull` u
         "ecr:BatchGetImage",
         "ecr:BatchCheckLayerAvailability"
       ],
-      "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/carla-deadline"
+      "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/*"
     },
     {
       "Effect": "Allow",

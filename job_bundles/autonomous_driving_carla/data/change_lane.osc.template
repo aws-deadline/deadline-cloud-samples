@@ -13,7 +13,7 @@ scenario top:
     event left
     event right
     do serial:
-        get_ahead: parallel(duration: 15s):
+        get_ahead: parallel(duration: 105s):
             ego_vehicle.drive(path) with:
                 speed(${EGO_SPEED}kph)
                 lane(1, at: start)
@@ -22,12 +22,12 @@ scenario top:
                 position(${NPC_DISTANCE}m, behind: ego_vehicle, at: start)
                 position(20m, ahead_of: ego_vehicle, at: end)
 
-        change_lane: parallel(duration: 5s):
+        change_lane: parallel(duration: 35s):
             ego_vehicle.drive(path)
             npc.drive(path) with:
                 change_lane(lane_changes:1, side: left)
 
-        slow: parallel(duration: 40s):
+        slow: parallel(duration: 280s):
             ego_vehicle.drive(path)
             npc.drive(path) with:
                 speed(${NPC_SPEED}kph)
