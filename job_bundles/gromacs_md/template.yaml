@@ -151,9 +151,27 @@ parameterDefinitions:
       label: "Max Replica Index"
       groupLabel: "Parallelism"
 
+  - name: CondaPackages
+    type: STRING
+    default: "gromacs"
+    description: "Packages to install via the queue's Conda environment."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Packages"
+      groupLabel: "Software Environment"
+
+  - name: CondaChannels
+    type: STRING
+    default: "conda-forge"
+    description: "Conda channels to resolve packages from."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Channels"
+      groupLabel: "Software Environment"
+
 jobEnvironments:
   - name: GromacsToolchain
-    description: "Verify pre-installed GROMACS toolchain from fleet host config script"
+    description: "Verify GROMACS is available from the Conda queue environment"
     script:
       embeddedFiles:
         - name: Setup

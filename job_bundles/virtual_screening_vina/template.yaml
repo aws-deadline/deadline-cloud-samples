@@ -216,9 +216,27 @@ parameterDefinitions:
       label: "Energy Range"
       groupLabel: "Docking Parameters"
 
+  - name: CondaPackages
+    type: STRING
+    default: "openbabel python"
+    description: "Packages to install via the queue's Conda environment. Add autodock-vina once built into your S3 channel."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Packages"
+      groupLabel: "Software Environment"
+
+  - name: CondaChannels
+    type: STRING
+    default: "conda-forge"
+    description: "Conda channels to resolve packages from. Add your S3 channel for autodock-vina."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Channels"
+      groupLabel: "Software Environment"
+
 jobEnvironments:
   - name: VinaToolchain
-    description: "Verify pre-installed VINA toolchain from fleet host config script"
+    description: "Verify VINA and OpenBabel are available from the Conda queue environment"
     script:
       embeddedFiles:
         - name: Setup

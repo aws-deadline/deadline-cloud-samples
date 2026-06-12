@@ -1,8 +1,8 @@
 # GROMACS Molecular Dynamics
 
-[Molecular dynamics (MD)](https://en.wikipedia.org/wiki/Molecular_dynamics) simulates the physical movement of atoms in a protein over time, revealing how it folds, binds drugs, or changes shape. It's a foundational tool in computational chemistry and drug discovery — used to validate virtual screening hits, predict protein stability, and study binding mechanisms at atomic resolution.
+[Molecular dynamics (MD)](https://en.wikipedia.org/wiki/Molecular_dynamics) simulates the physical movement of atoms in a protein over time, revealing how it folds, binds drugs, or changes shape. It's used to validate virtual screening hits, predict protein stability, and study binding mechanisms at atomic resolution.
 
-This job bundle uses [GROMACS](https://www.gromacs.org/), the most widely-used open-source MD engine. It runs the full simulation pipeline from raw protein structure to analyzed trajectory, and supports parallel fan-out across independent replica simulations.
+This job bundle uses [GROMACS](https://www.gromacs.org/), an open-source MD engine. It runs the full simulation pipeline from raw protein structure to analyzed trajectory, and supports parallel fan-out across independent replica simulations.
 
 ```
     Input PDB          Simulation Trajectory              Analysis
@@ -46,8 +46,9 @@ For multi-replica campaigns, all replicas run through the full pipeline independ
 
 1. **Deadline Cloud farm** with a Linux SMF fleet (x86_64, min 4 vCPU).
 
-2. **Fleet host configuration script** — install GROMACS on workers at boot.
-   See [`host_configuration_scripts/gromacs/`](../../host_configuration_scripts/gromacs/) in this repo.
+2. **Conda queue environment** with `gromacs` from conda-forge:
+   - Set your queue's `CondaChannels` to `conda-forge`
+   - Set `CondaPackages` to `gromacs`
 
 3. **Deadline CLI**:
    ```bash
@@ -120,9 +121,9 @@ Tested with lysozyme (1AKI) on c5d.xlarge (4 vCPU, Spot):
 
 For longer simulations, consider larger instances (c5.4xlarge, 16 vCPU) or GPU instances (g5.xlarge with CUDA-enabled GROMACS).
 
-## Host Configuration Script
+## Software Setup
 
-The fleet requires GROMACS pre-installed. Use the host configuration script from [`host_configuration_scripts/gromacs/`](../../host_configuration_scripts/gromacs/) on your SMF fleet.
+GROMACS is installed via the queue's Conda environment from conda-forge. No host configuration script or custom conda recipe needed — just add `gromacs` to your queue's Conda packages.
 
 ## Use Cases
 

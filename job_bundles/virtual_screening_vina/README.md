@@ -2,7 +2,7 @@
 
 [Virtual screening](https://en.wikipedia.org/wiki/Virtual_screening) is a computational drug discovery technique that searches large libraries of small molecules to find those most likely to bind a protein target (e.g., a viral enzyme or cancer receptor). By predicting binding affinity computationally, researchers narrow millions of candidates down to a few hundred for lab testing — drastically reducing cost and time in early-stage drug discovery.
 
-This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vina), one of the most widely-cited open-source docking engines. It splits a compound library into chunks and docks them in parallel across a fleet of workers.
+This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vina), an open-source docking engine. It splits a compound library into chunks and docks them in parallel across a fleet of workers.
 
 ```
     Protein Target              Compound Library (millions)         Top Hits
@@ -47,10 +47,15 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 1. **Deadline Cloud farm** with a Linux SMF fleet (x86_64, Spot recommended).
 
-2. **Conda queue environment** with `autodock-vina` and `openbabel` packages:
-   - Build `autodock-vina` from the recipe at [`conda_recipes/autodock-vina-1.2.5/`](../../conda_recipes/autodock-vina-1.2.5/) into your S3 conda channel.
-   - Add `openbabel` from conda-forge to your queue environment packages.
-   - Alternatively, use the host config script at [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/) as a fallback.
+2. **Software dependencies**:
+   - **OpenBabel**: Installed automatically via the queue's Conda environment from conda-forge (default `CondaPackages` includes `openbabel`).
+   - **AutoDock VINA**: Not available on conda-forge. Two options:
+     - **(Recommended)** Build the conda recipe at [`conda_recipes/autodock-vina-1.2.5/`](../../conda_recipes/autodock-vina-1.2.5/) into your S3 conda channel, then add `autodock-vina` to `CondaPackages` and your S3 channel to `CondaChannels`.
+     - **(Quick start)** Use a [fleet host configuration script](../../host_configuration_scripts/) to install the VINA binary at worker boot:
+       ```bash
+       curl -sL "https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64" -o /usr/local/bin/vina
+       chmod 755 /usr/local/bin/vina
+       ```
 
 3. **Deadline CLI**:
    ```bash
@@ -130,6 +135,12 @@ Tested with 100,000 ChEMBL compounds against COVID-19 Main Protease:
 - Best hit: -14.53 kcal/mol
 - 44 compounds with affinity < -7.0 kcal/mol (strong binders)
 
-## Host Configuration Script
+## Software Setup
 
-The fleet requires AutoDock VINA and Open Babel pre-installed. Use the host configuration script from [`host_configuration_scripts/autodock_vina/`](../../host_configuration_scripts/autodock_vina/) on your SMF fleet.
+| Tool | Source | Install method |
+|------|--------|----------------|
+| OpenBabel | conda-forge | Queue Conda environment (automatic) |
+| AutoDock VINA | [GitHub releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) | Conda recipe (build into S3 channel) or fleet host config |
+| Python | conda-forge | Queue Conda environment (automatic) |
+
+See [Prerequisites](#prerequisites) for setup details.
