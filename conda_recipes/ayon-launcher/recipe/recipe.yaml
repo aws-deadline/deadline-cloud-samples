@@ -23,7 +23,7 @@ source:
       path: ../../archive_files/AYON-${{ version }}-win.zip
 
 build:
-  number: 1
+  number: 2
   prefix_detection:
     ignore_binary_files: true
   dynamic_linking:
@@ -51,8 +51,20 @@ build:
         - cp -r ayon.exe ayon_console.exe common dependencies lib share shim vendor version.py LICENSE $PREFIX/opt/ayon-launcher/
         - cp *.dll $PREFIX/opt/ayon-launcher/ || true
         - mkdir -p $PREFIX/Scripts
-        - cp $PREFIX/opt/ayon-launcher/ayon.exe $PREFIX/Scripts/ayon.exe
+        - |
+          cat > $PREFIX/Scripts/ayon << 'WRAPPER'
+          #!/bin/bash
+          exec "$CONDA_PREFIX/opt/ayon-launcher/ayon_console.exe" "$@"
+          WRAPPER
+        - chmod +x $PREFIX/Scripts/ayon
         - mkdir -p $PREFIX/etc/conda/activate.d
+        - |
+          cat > $PREFIX/etc/conda/activate.d/ayon-launcher.sh << 'ACTIVATE'
+          #!/bin/bash
+          export AYON_LAUNCHER_DIR="$CONDA_PREFIX/opt/ayon-launcher"
+          export AYON_HEADLESS_MODE=1
+          ACTIVATE
+        - chmod +x $PREFIX/etc/conda/activate.d/ayon-launcher.sh
         - printf '@echo off\r\nset "AYON_LAUNCHER_DIR=%%CONDA_PREFIX%%\\opt\\ayon-launcher"\r\nset "AYON_HEADLESS_MODE=1"\r\n' > $PREFIX/etc/conda/activate.d/ayon-launcher.bat
 
 tests:
@@ -66,8 +78,11 @@ tests:
   - if: win
     then:
       script:
-        - test -f $PREFIX/Scripts/ayon.exe
-        - test -f $PREFIX/opt/ayon-launcher/ayon.exe
+        - test -x $PREFIX/Scripts/ayon
+        - test -f $PREFIX/opt/ayon-launcher/ayon_console.exe
+        - test -d $PREFIX/opt/ayon-launcher/dependencies
+        - test -d $PREFIX/opt/ayon-launcher/lib
+        - test -f $PREFIX/etc/conda/activate.d/ayon-launcher.sh
 
 about:
   summary: AYON Launcher for Deadline Cloud workers — provides the pipeline runtime for headless publishing.
