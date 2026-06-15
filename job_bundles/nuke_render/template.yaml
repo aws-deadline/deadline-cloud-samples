@@ -1,4 +1,6 @@
 specificationVersion: 'jobtemplate-2023-09'
+extensions:
+  - TASK_CHUNKING
 name: Nuke Render
 description: |
   This job bundle renders Nuke scripts using Nuke's headless rendering mode.
@@ -36,8 +38,24 @@ parameterDefinitions:
     control: LINE_EDIT
     label: Frames
     groupLabel: Render Parameters
-  default: "1"
-  description: Frame range to render (e.g., "1-10" or "1,5,10").
+  default: "1-3,5,6-20:2"
+  description: Frame range to render (e.g., "1-10", "1,5,10", or "1-100:2").
+- name: ChunkSize
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Render Parameters
+  default: 5
+  description: Number of frames to render per chunk.
+- name: TargetRuntime
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (Seconds)
+    groupLabel: Render Parameters
+  default: 180
+  description: Target runtime per chunk in seconds (0 to disable adaptive chunking).
 - name: ProjectPath
   type: PATH
   objectType: DIRECTORY
@@ -86,8 +104,12 @@ steps:
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      type: INT
+      type: CHUNK[INT]
       range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: NONCONTIGUOUS
   script:
     actions:
       onRun:
@@ -108,8 +130,16 @@ steps:
         # Create output directory if it doesn't exist
         mkdir -p '{{Param.OutputDir}}'
 
-        # Render the frame using Nuke
-        nuke -F {{Task.Param.Frame}} \
+        # Convert OpenJD range expression to Nuke -F flags.
+        # E.g. "1-3,5,7-20:2" becomes "-F 1-3 -F 5 -F 7-20x2"
+        NUKE_FRAMES=""
+        IFS=',' read -ra SEGMENTS <<< "{{Task.Param.Frame}}"
+        for seg in "${SEGMENTS[@]}"; do
+          NUKE_FRAMES="$NUKE_FRAMES -F $(echo "$seg" | tr ':' 'x')"
+        done
+
+        # Render the chunk using Nuke
+        nuke $NUKE_FRAMES \
              --sro -V 2 \
              -x '{{Param.NukeScript}}'
   hostRequirements:

@@ -1,4 +1,6 @@
 specificationVersion: jobtemplate-2023-09
+extensions:
+  - TASK_CHUNKING
 name: VRED Renderer
 description: |
   This render job template depends on Autodesk VRED Core (or optionally VRED Pro) to perform rendering and supports
@@ -212,39 +214,31 @@ parameterDefinitions:
       groupLabel: Render Options
     default: ""
     description: The name of the animation clip to render.
-  - name: StartFrame
-    type: INT
+  - name: Frames
+    type: STRING
     userInterface:
-      control: SPIN_BOX
-      label: Start Frame
+      control: LINE_EDIT
+      label: Frames
       groupLabel: Render Options
-    default: 0
-    description: The first frame of a range to render.
-  - name: EndFrame
+    default: "0-20"
+    description: The frame range to render (e.g., 0-20).
+  - name: ChunkSize
     type: INT
     userInterface:
       control: SPIN_BOX
-      label: End Frame
-      groupLabel: Render Options
-    default: 20
-    description: The last frame of a range to render.
-  - name: FrameStep
-    type: INT
-    userInterface:
-      control: SPIN_BOX
-      label: Frame Step
-      groupLabel: Render Options
-    default: 1
-    description: The frame step for the frame range (i.e. 2 for rendering every second frame).
-  - name: FramesPerTask
-    type: INT
-    userInterface:
-      control: SPIN_BOX
-      label: Frames Per Task
+      label: Chunk Size
       groupLabel: Render Options
     minValue: 1
-    default: 1
-    description: The number of frames that will be rendered at a time for each task within a render job.
+    default: 5
+    description: Number of frames to render per chunk.
+  - name: TargetRuntime
+    type: INT
+    userInterface:
+      control: SPIN_BOX
+      label: Target Runtime (Seconds)
+      groupLabel: Render Options
+    default: 180
+    description: Target runtime per chunk in seconds (0 to disable adaptive chunking).
   - name: IncludeAlphaChannel
     type: STRING
     userInterface:
@@ -363,9 +357,13 @@ steps:
   - name: VRED Render
     parameterSpace:
       taskParameterDefinitions:
-        - name: StartFrameFromCurrentChunk
-          type: INT
-          range: "{{Param.StartFrame}}-{{Param.EndFrame}}:{{Param.FramesPerTask}}"
+        - name: Frame
+          type: CHUNK[INT]
+          range: "{{Param.Frames}}"
+          chunks:
+            defaultTaskCount: "{{Param.ChunkSize}}"
+            targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+            rangeConstraint: CONTIGUOUS
         - name: TileNumberX
           type: INT
           range: "1-{{Param.NumXTiles}}"
@@ -393,20 +391,18 @@ steps:
                 :return: a dictionary containing appropriately-typed values (non-inferred) for use in VRED API calls.
                 """
 
-                # Depending on implementation, a frame chunk ID or an actual starting frame number that
-                # corresponds to that ID could be provided.
+                # Parse contiguous chunk range "START-END" (e.g., "0-4" or "5-5")
                 #
-                start_frame = int({{Task.Param.StartFrameFromCurrentChunk}})
-                frames_per_task = int({{Param.FramesPerTask}})
-                end_frame = min(start_frame + frames_per_task - 1, int({{Param.EndFrame}}))
+                chunk = "{{Task.Param.Frame}}"
+                start_frame, end_frame = (int(x) for x in chunk.split("-"))
                 return {
                     'AnimationClip': str('{{Param.AnimationClip}}'),
                     'AnimationType': str('{{Param.AnimationType}}'),
                     'DLSSQuality': str('{{Param.DLSSQuality}}'),
                     'DPI': int({{Param.DPI}}),
                     'EndFrame': int(end_frame),
-                    'FrameStep': int({{Param.FrameStep}}),
-                    'FramesPerTask': int(frames_per_task),
+                    'FrameStep': int(1),
+                    'FramesPerTask': int(end_frame - start_frame + 1),
                     'GPURaytracing': int(str_to_bool('{{Param.GPURaytracing}}')),
                     'ImageHeight': int({{Param.ImageHeight}}),
                     'ImageWidth': int({{Param.ImageWidth}}),

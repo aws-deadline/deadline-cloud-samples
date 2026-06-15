@@ -1,7 +1,11 @@
 specificationVersion: 'jobtemplate-2023-09'
+extensions:
+  - TASK_CHUNKING
 name: Maya CLI Render
 description: |
-  This job bundle renders a Maya software renderer scene with the Maya CLI `Render` command.
+  This job bundle renders a Maya software renderer scene with the Maya CLI `Render` command,
+  using contiguous task chunking to amortize Maya's startup and scene loading time across
+  multiple frames.
 
   To run it, you will need a Maya installation available in the PATH in one of the following ways:
     * As a conda package when your queue has a conda queue environment set up to
@@ -40,6 +44,22 @@ parameterDefinitions:
     label: Frames
     groupLabel: Render Parameters
   default: 1-60
+- name: ChunkSize
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Render Parameters
+  default: 10
+  description: Number of frames to render per chunk.
+- name: TargetRuntime
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (Seconds)
+    groupLabel: Render Parameters
+  default: 180
+  description: Target runtime per chunk in seconds (0 to disable adaptive chunking).
 - name: CameraName
   type: STRING
   userInterface:
@@ -97,8 +117,12 @@ steps:
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      type: INT
+      type: CHUNK[INT]
       range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: CONTIGUOUS
   script:
     embeddedFiles:
     - name: Render
@@ -109,12 +133,16 @@ steps:
 
         cd '{{Param.ProjectPath}}'
 
+        # Extract start and end frames from the contiguous chunk range "START-END"
+        START_FRAME="$(echo '{{Task.Param.Frame}}' | cut -d- -f1)"
+        END_FRAME="$(echo '{{Task.Param.Frame}}' | cut -d- -f2)"
+
         set -x
         Render -r sw \
             -proj '{{Param.ProjectPath}}' \
             -rd '{{Param.OutputDir}}' \
-            -s {{Task.Param.Frame}} \
-            -e {{Task.Param.Frame}} \
+            -s "$START_FRAME" \
+            -e "$END_FRAME" \
             -pad 4 \
             -fnc "name.#.ext" \
             -cam {{Param.CameraName}} \

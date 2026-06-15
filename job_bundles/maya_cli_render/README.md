@@ -1,24 +1,70 @@
-# Maya CLI Render
-
-## Job summary
+# Maya CLI Render with Contiguous Chunks
 
 This job bundle renders a Maya software renderer scene with the
-[Maya CLI `Render` command](https://help.autodesk.com/view/MAYAUL/2025/ENU/?guid=GUID-EB558BC0-5C2B-439C-9B00-F97BCB9688E4).
+[Maya CLI `Render` command](https://help.autodesk.com/view/MAYAUL/2025/ENU/?guid=GUID-EB558BC0-5C2B-439C-9B00-F97BCB9688E4)
+using the [Task Chunking](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0001-task-chunking.md)
+extension to reduce scheduling overhead by grouping frames into chunks.
+
+## Features
+
+- **Task Chunking**: Uses `CHUNK[INT]` with contiguous frame ranges to reduce scheduling overhead by rendering multiple frames per chunk
+- **Adaptive Chunking**: Optional target runtime allows the scheduler to adjust chunk sizes dynamically
+
+## Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| Maya Scene File | Maya scene file (.ma, .mb) to render | `fallinggears.ma` |
+| Frames | Frame range (e.g., `1-60`) | `1-60` |
+| Chunk Size | Number of frames per chunk | `10` |
+| Target Runtime | Target seconds per chunk (0 to use fixed chunk sizes) | `180` |
+| Camera Name | Camera to render | `persp` |
+| Image Width | Output image width | `960` |
+| Image Height | Output image height | `540` |
+| Output Directory | Render output directory | `output` |
+| Project Path | Maya project directory | `.` |
+
+## Task Chunking
+
+This template uses the `TASK_CHUNKING` extension with `rangeConstraint: CONTIGUOUS`:
+
+```yaml
+extensions:
+  - TASK_CHUNKING
+
+steps:
+- name: Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: "{{Param.Frames}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntime}}"
+        rangeConstraint: CONTIGUOUS
+```
+
+Each chunk expands to a contiguous range like `"1-10"` or `"11-20"`, which maps directly to Maya's `-s` (start) and `-e` (end) arguments.
+
+Reference: [Maya Common Renderer Flags](https://help.autodesk.com/view/MAYAUL/2025/ENU/?guid=GUID-0280AB86-8ABE-4F75-B1B9-D5B7DBB7E25A)
+
+## Usage
 
 To run it, you will need a Maya installation available in the PATH in one of the following ways:
 * As a conda package when your queue has a conda queue environment set up to
   provide virtual environments for jobs. For more information see the developer guide section
-  [Provide applications for yor jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/provide-applications.html).
+  [Provide applications for your jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/provide-applications.html).
 * Installed on the worker hosts that run the job. You can customize your Deadline Cloud
   queues, fleets, and this job to fit your own production pipeline.
 
 The core of this job is an embedded template file called `render.sh` that invokes
 the Maya CLI `Render` command. The command is a template that substitutes job parameters and the
-frame task parameter.
+frame chunk parameter.
 
-The `Render` command is part of an Open Job Description step. It expands to a task per frame by
-defining a parameter space using the Frames job parameter. It limits the fleets it will run on
-by including host requirements for Linux.
+The `Render` command is part of an Open Job Description step. It groups frames into contiguous
+chunks using the task chunking extension, and each chunk is rendered in a single Maya invocation.
+It limits the fleets it will run on by including host requirements for Linux.
 
 The rest of the job template consists of the parameter definitions. This metadata specifies
 the names, types, and descriptions of each parameter, along with information on what user
