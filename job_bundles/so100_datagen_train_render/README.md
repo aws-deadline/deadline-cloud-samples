@@ -61,9 +61,12 @@ re-generating data or re-training.
   config-schema drift (older ACT checkpoints lack the `type` field; newer pi0
   checkpoints carry fields the installed config rejects). Finetuning writes a
   checkpoint with the *same* LeRobot version we render with, so it always loads.
-- **Reproducible environment.** A Conda queue environment pins
-  `python=3.12 + ffmpeg` and the workers `pip install` the Strands package spec
-  at runtime — the same environment on every worker, every run.
+- **Reproducible environment.** The `CondaPackages` / `CondaChannels` job
+  parameters (default `python=3.12 pip git ffmpeg` on `conda-forge`) are consumed
+  by the **Conda queue environment attached to the queue** — the same job
+  parameters the repo's `conda_queue_env_*` templates read — which solves them
+  into the per-job environment. On top of that, each step `pip install`s the
+  Strands package spec at runtime, so every worker gets the same environment.
 
 ## About the instruction
 
@@ -88,7 +91,10 @@ next step but is out of scope for this single-task demo.
 - A Deadline Cloud farm and queue, with a **Linux x86_64 GPU** fleet (the steps
   render headless via `MUJOCO_GL=egl` and train on CUDA).
 - A [Conda queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/conda-queue-environment.html)
-  on the queue (this bundle passes `CondaPackages`/`CondaChannels` into it).
+  on the queue that consumes the `CondaPackages` / `CondaChannels` job
+  parameters (e.g. the repo's [`conda_queue_env_*`](../../queue_environments)
+  templates). This bundle supplies those parameters; the queue environment
+  solves them into the per-job environment.
 - The [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs.html)
   configured (`deadline config show` resolves your default farm/queue).
 
