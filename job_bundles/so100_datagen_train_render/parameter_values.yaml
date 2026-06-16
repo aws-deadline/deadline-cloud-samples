@@ -1,0 +1,33 @@
+parameterValues:
+  - name: Robot
+    value: so100
+  - name: Episodes
+    value: 150
+  - name: TrainSteps
+    value: 6000
+  - name: TrainBatchSize
+    value: 8
+  - name: Randomize
+    value: "true"
+  - name: Instruction
+    value: pick up the red cube
+  - name: Duration
+    value: 12.0
+  - name: Fps
+    value: 30
+  - name: CubeSize
+    value: 0.036
+  - name: DemoCameraPosition
+    value: 0.5,-0.45,0.12
+  - name: DemoCameraTarget
+    value: 0.22,0,0.1
+  - name: CameraPlacements
+    value: '{"top": {"position": [0.25, 0.0, 0.6], "target": [0.25, 0.0, 0.0]}, "wrist": {"position": [0.15, 0.0, 0.18], "target": [0.3, 0.0, 0.03]}}'
+  - name: StrandsPackageSpec
+    value: strands-robots[sim-mujoco,lerobot] @ git+https://github.com/strands-labs/robots.git@main
+  - name: CondaPackages
+    value: python=3.12 pip git ffmpeg
+  - name: CondaChannels
+    value: conda-forge
+  - name: OutputDir
+    value: output
