@@ -1,0 +1,40 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "1.2.5"
+
+package:
+  name: autodock-vina
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v${{ version }}/vina_${{ version }}_linux_x86_64
+      sha256: fa0126a28a9ea9162d1b161dfa92bc76e632416db28ca246278ea4b2dc6860cb
+      target_directory: vina
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - bash $RECIPE_DIR/build.sh
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+tests:
+  - script:
+    - vina --version
+
+about:
+  homepage: https://github.com/ccsb-scripps/AutoDock-Vina
+  license: Apache-2.0
+  summary: >
+    AutoDock Vina is a molecular docking program for computational drug discovery.
+    It predicts how small molecules (drug candidates) bind to a protein target.
