@@ -159,7 +159,7 @@ steps:
           --robot "{{Param.Robot}}" --repo-id local/so100_sim_pick \
           --episodes {{Param.Episodes}} --fps {{Param.Fps}} \
           --cameras "top,wrist" --camera-placements '{{Param.CameraPlacements}}' \
-          --task "{{Param.Instruction}}" --gripper-prefix so100/moving_jaw_pad \
+          --task "{{Param.Instruction}}" \
           --cube-size {{Param.CubeSize}} $RAND --output-dir "$OUT"
         echo "=== Datagen done -> $OUT/dataset ==="
         ls -la "$OUT/dataset/meta" || true

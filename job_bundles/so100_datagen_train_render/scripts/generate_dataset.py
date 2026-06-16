@@ -2,17 +2,18 @@
 """Generate a sim pick-and-place dataset for the so100 in MuJoCo.
 
 Records LeRobot-format episodes of a SCRIPTED joint-space pick of a cube, with
-per-episode domain randomization (cube position/color). Each episode is verified
-with the grasped() contact predicate and the success rate is reported, so a
-broken pick shows up as "0/N grasped" instead of silently producing a garbage
-dataset.
+per-episode domain randomization (cube position/color). Each episode is VERIFIED
+by checking that the cube actually rose off the floor (a height check on the
+cube geom); episodes that fail are discarded and retried, and the saved/attempt
+counts are reported, so a broken pick is dropped instead of silently producing a
+garbage dataset.
 
 Why: a policy finetuned on real-robot images can't drive this sim (real->sim
 appearance gap). Training on images rendered FROM THIS SIM closes that gap.
 
-Self-introspecting: joint names, gripper geom names, and home pose are read at
-runtime via get_robot_state / get_contacts and logged, because exact names vary
-by robot model and the grasp must be tuned against the actual so100.
+Self-introspecting: joint names and home pose are read at runtime via
+get_robot_state and logged, because exact names vary by robot model and the
+grasp must be tuned against the actual so100.
 """
 from __future__ import annotations
 
@@ -34,8 +35,6 @@ def parse_args():
     p.add_argument("--cameras", default="top,wrist")
     p.add_argument("--camera-placements", default="")
     p.add_argument("--task", default="pick up the red cube")
-    p.add_argument("--gripper-prefix", default="Jaw",
-                   help="Geom-name prefix identifying gripper geoms for grasped().")
     p.add_argument("--cube-size", type=float, default=0.025)
     p.add_argument("--randomize", action="store_true",
                    help="Jitter cube position/color per episode.")
@@ -94,8 +93,8 @@ def main():
         add_cameras()
         sim.step(n_steps=10)
         # Dump ALL geom names from the MuJoCo model so we can identify the
-        # gripper geoms (for --gripper-prefix) and the cube geom -- home-pose
-        # contacts are empty, so listing geoms is what actually tells us names.
+        # gripper pad geoms and the cube geom -- home-pose contacts are empty,
+        # so listing geoms is what actually tells us names.
         try:
             mj = sim._mj if hasattr(sim, "_mj") else __import__("mujoco")
             model = sim._world._model
@@ -129,27 +128,21 @@ def main():
 
     import mujoco as mj
 
-    PADS = ["so100/moving_jaw_pad_1", "so100/moving_jaw_pad_4",
-            "so100/fixed_jaw_pad_1", "so100/fixed_jaw_pad_2"]
-
     # add_object / remove_object RECOMPILE the model, so _model/_data references go
     # stale every episode. Always read them live from sim._world, never cache.
     def md():
         return sim._world._model, sim._world._data
 
     def geom(n):
+        # mj_name2id returns -1 for an unknown name; indexing geom_xpos with -1
+        # does NOT raise (numpy wraps to the last geom) and would silently return
+        # a wrong-but-plausible position, making the height-based grasp check
+        # meaningless. Fail loudly instead so a renamed/missing geom is caught.
         m, data = md()
-        return np.array(data.geom_xpos[mj.mj_name2id(m, mj.mjtObj.mjOBJ_GEOM, n)])
-
-    def tip_mid():
-        return np.mean([geom(p) for p in PADS], axis=0)
-
-    def jaw_quat():
-        m, data = md()
-        gb = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, "so100/Moving_Jaw")
-        q = np.zeros(4)
-        mj.mju_mat2Quat(q, np.array(data.xmat[gb]).flatten())
-        return q
+        gid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_GEOM, n)
+        if gid < 0:
+            raise RuntimeError(f"geom {n!r} not found in the MuJoCo model")
+        return np.array(data.geom_xpos[gid])
 
     # --- Reach-from-home grasp recipe (FORGIVING / error-tolerant) + verify-and-keep ---
     # Motion: start at HOME, sweep up to a HOVER directly above the cube, descend
@@ -243,6 +236,8 @@ def main():
         try:
             sim.remove_object("cube")
         except Exception:
+            # Expected on the first attempt (no cube exists yet) and harmless on
+            # later ones; we unconditionally re-add a fresh cube just below.
             pass
         sim.add_object(name="cube", shape="box", size=BLOCK_SIZE,
                        position=[cx, cy, BLOCK_Z], color=color, mass=BLOCK_MASS)
@@ -275,18 +270,31 @@ def main():
             print(f"[datagen] SAVED {saved}/{args.episodes} (attempt {attempts}) "
                   f"cube=({cx:.3f},{cy:.3f}) lift_z={z_top:.3f}", flush=True)
         else:
-            if hasattr(recorder, "clear_episode_buffer"):
-                recorder.clear_episode_buffer()
+            # Discard the failed attempt's frames. This reset is the core
+            # integrity guarantee -- without it the next attempt's frames append
+            # to this one and save_episode() writes a corrupted, over-length
+            # episode that starts with a failed grasp. Call the API directly (not
+            # a best-effort hasattr guard) so a missing method fails loudly here
+            # rather than silently corrupting the dataset.
+            recorder.clear_episode_buffer()
             print(f"[datagen] discard attempt {attempts} cube=({cx:.3f},{cy:.3f}) "
                   f"lift_z={z_top:.3f} (no hold)", flush=True)
 
     print(f"[datagen] {saved}/{args.episodes} verified pick-and-lift episodes "
           f"({attempts} attempts)", flush=True)
-    try:
-        recorder.consolidate() if hasattr(recorder, "consolidate") else None
-    except Exception as exc:
-        print(f"[datagen] consolidate skipped ({exc})", flush=True)
+    # Close parquet writers and flush dataset metadata. Call directly so a
+    # missing method fails loudly rather than leaving a half-written dataset.
+    recorder.finalize()
     print(f"[datagen] Done -> {out / 'dataset'}", flush=True)
+
+    # Under-production must not look like success: if we couldn't verify enough
+    # picks, the Train step would otherwise silently train on a short dataset.
+    # Exit non-zero so the pipeline surfaces the degraded run.
+    if saved < args.episodes:
+        print(f"[datagen] ERROR: only {saved}/{args.episodes} episodes verified "
+              f"after {attempts} attempts (grasp failed too often). Failing so a "
+              f"partial dataset is not mistaken for a complete one.", flush=True)
+        return 1
     return 0
 
 
