@@ -202,12 +202,12 @@ steps:
 
             # Assemble camera list from checkboxes
             CAMERAS=""
-            [[ "{{Param.CamFrontLeft}}" == "True" ]] && CAMERAS="${CAMERAS}front_left,"
-            [[ "{{Param.CamFront}}" == "True" ]] && CAMERAS="${CAMERAS}front,"
-            [[ "{{Param.CamFrontRight}}" == "True" ]] && CAMERAS="${CAMERAS}front_right,"
-            [[ "{{Param.CamRearLeft}}" == "True" ]] && CAMERAS="${CAMERAS}rear_left,"
-            [[ "{{Param.CamRear}}" == "True" ]] && CAMERAS="${CAMERAS}rear,"
-            [[ "{{Param.CamRearRight}}" == "True" ]] && CAMERAS="${CAMERAS}rear_right,"
+            if [[ "{{Param.CamFrontLeft}}" == "True" ]]; then CAMERAS="${CAMERAS}front_left,"; fi
+            if [[ "{{Param.CamFront}}" == "True" ]]; then CAMERAS="${CAMERAS}front,"; fi
+            if [[ "{{Param.CamFrontRight}}" == "True" ]]; then CAMERAS="${CAMERAS}front_right,"; fi
+            if [[ "{{Param.CamRearLeft}}" == "True" ]]; then CAMERAS="${CAMERAS}rear_left,"; fi
+            if [[ "{{Param.CamRear}}" == "True" ]]; then CAMERAS="${CAMERAS}rear,"; fi
+            if [[ "{{Param.CamRearRight}}" == "True" ]]; then CAMERAS="${CAMERAS}rear_right,"; fi
             CAMERAS="${CAMERAS%,}"  # trim trailing comma
             if [[ -z "$CAMERAS" ]]; then
                 CAMERAS="front"  # fallback if nothing selected
@@ -230,10 +230,11 @@ steps:
             DATA_DIR=$(dirname "$TEMPLATE")
             echo "Template: $TEMPLATE"
 
-            # Task-specific output dir
+            # Task-specific output dir (must be absolute for docker volume mount)
             TASK_OUTPUT="$OUTPUT_PATH/$TASK_NAME"
             mkdir -p "$TASK_OUTPUT"
             mkdir -p "$TASK_OUTPUT/video"
+            TASK_OUTPUT=$(cd "$TASK_OUTPUT" && pwd)
             echo "Task output: $TASK_OUTPUT"
 
             # Generate scenario from template
@@ -283,9 +284,18 @@ steps:
             echo "=== Outputs for $TASK_NAME ==="
             ls -la "$TASK_OUTPUT"
 
+            # Helper: count *.png files robust to missing dirs under set -euo pipefail.
+            count_png() {
+                if [[ -d "$1" ]]; then
+                    find "$1" -name "*.png" 2>/dev/null | wc -l
+                else
+                    echo 0
+                fi
+            }
+
             # Count frames per camera
             for CAM in $(echo "$CAMERAS" | tr ',' ' '); do
-                CAM_COUNT=$(find "$TASK_OUTPUT/rgb/$CAM" -name "*.png" 2>/dev/null | wc -l)
+                CAM_COUNT=$(count_png "$TASK_OUTPUT/rgb/$CAM")
                 echo "  $CAM: $CAM_COUNT frames"
             done
 
@@ -293,7 +303,7 @@ steps:
             VIDEO_DIR="$TASK_OUTPUT/video"
             for CAM in $(echo "$CAMERAS" | tr ',' ' '); do
                 FRAMES_DIR="$TASK_OUTPUT/rgb/$CAM"
-                FRAME_COUNT=$(find "$FRAMES_DIR" -name "*.png" 2>/dev/null | wc -l)
+                FRAME_COUNT=$(count_png "$FRAMES_DIR")
                 if [[ "$FRAME_COUNT" -gt 0 ]]; then
                     echo ""
                     echo "=== Generating video from $CAM camera ($FRAME_COUNT frames) ==="
@@ -317,37 +327,43 @@ steps:
                 INPUTS=""
                 FILTER=""
                 IDX=0
+                ACTUAL_CAM_COUNT=0
                 for SLOT in $GRID_ORDER; do
-                    if echo "$CAMERAS" | tr ',' ' ' | grep -qw "$SLOT"; then
+                    if echo "$CAMERAS" | tr ',' ' ' | grep -qw "$SLOT" && [[ -f "$VIDEO_DIR/${SLOT}_scenario.mp4" ]]; then
                         INPUTS="$INPUTS -i $VIDEO_DIR/${SLOT}_scenario.mp4"
                         FILTER="${FILTER}[${IDX}:v]scale=640:360[v${IDX}];"
                         IDX=$((IDX + 1))
+                        ACTUAL_CAM_COUNT=$((ACTUAL_CAM_COUNT + 1))
                     fi
                 done
 
-                # Determine grid columns based on camera count
-                if [[ "$CAM_COUNT" -le 2 ]]; then
-                    COLS=2
+                if [[ "$ACTUAL_CAM_COUNT" -lt 2 ]]; then
+                    echo "Skipping grid video: only $ACTUAL_CAM_COUNT camera(s) produced video"
                 else
-                    COLS=3
+                    # Determine grid columns based on camera count
+                    if [[ "$ACTUAL_CAM_COUNT" -le 2 ]]; then
+                        COLS=2
+                    else
+                        COLS=3
+                    fi
+
+                    LAYOUT=""
+                    STACK_INPUTS=""
+                    for ((i=0; i<ACTUAL_CAM_COUNT; i++)); do
+                        COL=$((i % COLS))
+                        ROW=$((i / COLS))
+                        if [[ -n "$LAYOUT" ]]; then LAYOUT="${LAYOUT}|"; fi
+                        LAYOUT="${LAYOUT}$((COL*640))_$((ROW*360))"
+                        STACK_INPUTS="${STACK_INPUTS}[v${i}]"
+                    done
+                    FILTER="${FILTER}${STACK_INPUTS}xstack=inputs=${ACTUAL_CAM_COUNT}:layout=${LAYOUT}[out]"
+
+                    ffmpeg -y $INPUTS \
+                        -filter_complex "$FILTER" \
+                        -map "[out]" \
+                        -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+                        "$VIDEO_DIR/grid_scenario.mp4"
                 fi
-
-                LAYOUT=""
-                STACK_INPUTS=""
-                for ((i=0; i<CAM_COUNT; i++)); do
-                    COL=$((i % COLS))
-                    ROW=$((i / COLS))
-                    if [[ -n "$LAYOUT" ]]; then LAYOUT="${LAYOUT}|"; fi
-                    LAYOUT="${LAYOUT}$((COL*640))_$((ROW*360))"
-                    STACK_INPUTS="${STACK_INPUTS}[v${i}]"
-                done
-                FILTER="${FILTER}${STACK_INPUTS}xstack=inputs=${CAM_COUNT}:layout=${LAYOUT}[out]"
-
-                ffmpeg -y $INPUTS \
-                    -filter_complex "$FILTER" \
-                    -map "[out]" \
-                    -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
-                    "$VIDEO_DIR/grid_scenario.mp4"
             fi
 
             ls -la "$VIDEO_DIR/"

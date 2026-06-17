@@ -73,15 +73,49 @@ signal.signal(signal.SIGINT, handle_signal)
 
 
 def find_ego(world, timeout=300):
+    """Find the ego vehicle.
+
+    OSC1 scenarios tag the ego with role_name="hero". OSC2 scenarios use the
+    actor name from the .osc file (e.g. "ego_vehicle") and may not set
+    role_name at all. We try several strategies in priority order:
+      1. role_name == "hero"           (OSC1 convention)
+      2. role_name == "ego_vehicle"    (OSC2 convention used by scenario_runner)
+      3. role_name starts with "ego"   (defensive — other naming conventions)
+      4. The Tesla Model3              (this scenario specifies Model3 as ego)
+    """
     deadline = time.time() + timeout
+    last_actor_count = -1
     while time.time() < deadline and running:
-        actors = world.get_actors().filter("vehicle.*")
+        actors = list(world.get_actors().filter("vehicle.*"))
+        if len(actors) != last_actor_count:
+            print(f"[sensors] {len(actors)} vehicle(s) in world: "
+                  + ", ".join(f"{a.type_id}(role={a.attributes.get('role_name','')})" for a in actors))
+            last_actor_count = len(actors)
+
+        # Strategy 1: role_name == "hero"
         for a in actors:
             if a.attributes.get("role_name") == "hero":
+                print(f"[sensors] Ego selected by role_name='hero': {a.type_id} (id={a.id})")
                 return a
-        if len(actors) > 0:
-            return actors[0]
+        # Strategy 2: role_name == "ego_vehicle" (OSC2)
+        for a in actors:
+            if a.attributes.get("role_name") == "ego_vehicle":
+                print(f"[sensors] Ego selected by role_name='ego_vehicle': {a.type_id} (id={a.id})")
+                return a
+        # Strategy 3: role_name starts with "ego"
+        for a in actors:
+            role = a.attributes.get("role_name", "")
+            if role.startswith("ego"):
+                print(f"[sensors] Ego selected by role_name prefix 'ego': {a.type_id} role='{role}' (id={a.id})")
+                return a
+        # Strategy 4: the Tesla Model3 (scenario specifies Model3 as ego)
+        for a in actors:
+            if "tesla.model3" in a.type_id:
+                print(f"[sensors] Ego selected by type tesla.model3: {a.type_id} (id={a.id})")
+                return a
+
         time.sleep(1)
+    print("[sensors] WARNING: no ego vehicle found by any strategy", file=sys.stderr)
     return None
 
 
@@ -101,13 +135,12 @@ def on_semantic(image, cam_name):
 
 
 def save_lidar(point_cloud):
-    now = time.time()
-    if now - last_save_time[0] < (1.0 / CAPTURE_FPS):
+    if frame_counter[0] == 0:
         return
     out_dir = os.path.join(OUTPUT_DIR, "lidar")
     points = np.frombuffer(point_cloud.raw_data, dtype=np.float32)
     points = points.reshape((-1, 4))[:, :3]
-    filename = os.path.join(out_dir, f"frame_{point_cloud.frame:06d}.ply")
+    filename = os.path.join(out_dir, f"frame_{frame_counter[0]:06d}.ply")
     _save_ply(filename, points)
 
 

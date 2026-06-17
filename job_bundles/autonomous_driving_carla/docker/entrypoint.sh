@@ -72,6 +72,7 @@ echo "[$(date -u +%FT%TZ)] CARLA TCP ready after ${WAITED}s"
 
 echo "[$(date -u +%FT%TZ)] Verifying CARLA RPC is actually responsive..."
 RPC_TIMEOUT=$((CARLA_TIMEOUT_S + 60))
+set +e
 "${CARLA_PYTHON:-/opt/venv/bin/python}" - <<EOF
 import sys
 import time
@@ -96,6 +97,7 @@ print(f"ERROR: CARLA RPC not ready within ${RPC_TIMEOUT}s. Last error: {last_err
 sys.exit(1)
 EOF
 RPC_OK=$?
+set -e
 if [[ "$RPC_OK" -ne 0 ]]; then
     echo "=== CARLA server log (tail) ==="
     tail -50 "$OUTPUT_DIR/carla_server.log" || true
@@ -150,7 +152,7 @@ echo "[$(date -u +%FT%TZ)] Running scenario_runner..."
 cd /opt/scenario_runner
 
 # Hard wall-clock timeout - never let a hung scenario block a worker forever.
-SRUNNER_HARD_TIMEOUT_S="${SRUNNER_HARD_TIMEOUT_S:-600}"
+SRUNNER_HARD_TIMEOUT_S="${SRUNNER_HARD_TIMEOUT_S:-1200}"
 
 # Whether to pass --reloadWorld to scenario_runner. Set RELOAD_WORLD=false at
 # the docker-run env layer to test scenarios against CARLA's default boot
@@ -220,9 +222,10 @@ if [[ "$SRUNNER_EXIT" -eq 124 ]]; then
 fi
 
 # scenario_runner.py occasionally returns 0 even on RuntimeError; detect that
-# from the log and treat as a failure.
-if grep -q "Traceback\|RuntimeError\|Error: " "$OUTPUT_DIR/scenario_runner.log"; then
-    echo "[$(date -u +%FT%TZ)] scenario_runner log contains errors despite exit code $SRUNNER_EXIT"
+# from the log and treat as a failure. Only match the exact failure summary line
+# that scenario_runner emits at the end of a failed run.
+if [[ "$SRUNNER_EXIT" -eq 0 ]] && grep -qP "^ERROR \(.*\): Simulation failed\." "$OUTPUT_DIR/scenario_runner.log"; then
+    echo "[$(date -u +%FT%TZ)] scenario_runner log contains failure markers despite exit code 0"
     SRUNNER_EXIT=4
 fi
 
@@ -236,14 +239,27 @@ echo ""
 echo "=== Sensor capture log ==="
 cat "$OUTPUT_DIR/capture_sensors.log" 2>/dev/null || echo "(no capture log)"
 echo ""
-FRAME_COUNT=$(find "$OUTPUT_DIR/rgb/front" -name "*.png" 2>/dev/null | wc -l)
-echo "[$(date -u +%FT%TZ)] Sensors captured $FRAME_COUNT frame sets"
+
+# Helper: count *.png files under a dir, robust to missing dirs under set -euo pipefail.
+# `find` exits non-zero when the path doesn't exist, which combined with pipefail
+# would kill the script. Check existence first, then count.
+count_png() {
+    local d="$1"
+    if [[ -d "$d" ]]; then
+        find "$d" -name "*.png" 2>/dev/null | wc -l
+    else
+        echo 0
+    fi
+}
+
+FRAME_COUNT=$(count_png "$OUTPUT_DIR/rgb")
+echo "[$(date -u +%FT%TZ)] Sensors captured $FRAME_COUNT frames total"
 
 # Generate videos from pre-composed mosaic frames (frame-synchronized, no alignment issues)
 if command -v ffmpeg &>/dev/null && [[ "$FRAME_COUNT" -gt 0 ]]; then
     mkdir -p "$OUTPUT_DIR/video"
 
-    RGB_MOSAIC_COUNT=$(find "$OUTPUT_DIR/rgb_mosaic" -name "*.png" 2>/dev/null | wc -l)
+    RGB_MOSAIC_COUNT=$(count_png "$OUTPUT_DIR/rgb_mosaic")
     if [[ "$RGB_MOSAIC_COUNT" -gt 0 ]]; then
         echo "[$(date -u +%FT%TZ)] Generating RGB mosaic video from $RGB_MOSAIC_COUNT frames..."
         ffmpeg -y -framerate 7 -pattern_type glob \
@@ -254,7 +270,7 @@ if command -v ffmpeg &>/dev/null && [[ "$FRAME_COUNT" -gt 0 ]]; then
             echo "[$(date -u +%FT%TZ)] RGB mosaic video failed"
     fi
 
-    SEM_MOSAIC_COUNT=$(find "$OUTPUT_DIR/semantic_mosaic" -name "*.png" 2>/dev/null | wc -l)
+    SEM_MOSAIC_COUNT=$(count_png "$OUTPUT_DIR/semantic_mosaic")
     if [[ "$SEM_MOSAIC_COUNT" -gt 0 ]]; then
         echo "[$(date -u +%FT%TZ)] Generating semantic mosaic video from $SEM_MOSAIC_COUNT frames..."
         ffmpeg -y -framerate 7 -pattern_type glob \
@@ -334,6 +350,10 @@ wait "$CARLA_PID" 2>/dev/null || true
 echo ""
 echo "=== Output files in $OUTPUT_DIR ==="
 ls -la "$OUTPUT_DIR" || true
+
+# Make outputs world-writable so the host (different UID than container 'carla'
+# user) can clean up the session working directory after the run.
+chmod -R a+rwX "$OUTPUT_DIR" 2>/dev/null || true
 
 echo ""
 echo "[$(date -u +%FT%TZ)] Done"

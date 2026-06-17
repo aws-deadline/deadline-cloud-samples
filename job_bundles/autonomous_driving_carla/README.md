@@ -7,7 +7,7 @@ on AWS Deadline Cloud with configurable multi-sensor capture. It demonstrates ho
 Deadline Cloud to orchestrate GPU-accelerated simulation workloads with Docker containers.
 
 The job runs a lane-change cut-in scenario where an NPC vehicle starts behind the ego vehicle,
-accelerates to position itself 20 meters ahead of the ego during a 15-second get-ahead phase,
+accelerates to position itself 20 meters ahead of the ego during a 105-second get-ahead phase,
 then cuts into the ego's lane. It sweeps across configurable ego speeds, NPC speeds, and NPC
 starting distances, creating a task for each parameter combination (default 2×2×2 = 8 tasks).
 Each task captures multi-sensor data from user-selected camera viewpoints and produces per-camera
@@ -112,7 +112,7 @@ Alternatively, submit via CLI:
 ## Monitor the Job
 
 Monitor progress in the Deadline Cloud console. Each task shows its parameter values
-(EgoSpeed, NpcSpeed, NpcDistance) in the task table. Tasks typically complete in ~2 minutes each.
+(EgoSpeed, NpcSpeed, NpcDistance) in the task table. Tasks typically complete in ~13 minutes each.
 
 The log output shows:
 - Scenario generation and parameter values
@@ -156,3 +156,4 @@ The `docker/` directory contains the files needed to build the image:
 - **Linux only**: The CARLA Docker image requires a Linux host with NVIDIA GPU drivers. Workers must run on Linux fleets.
 - **x86_64 only**: The CARLA Docker image does not support ARM architectures.
 - **Mosaic images**: RGB/semantic mosaic images are generated when 2 or more cameras are selected. The layout is 2×3 when all 6 are active, or a smaller grid otherwise.
+- **Capture rate scales with camera count**: PNG writes are synchronous, so selecting more cameras lowers the effective capture FPS. With 6 cameras, expect ~10–15 seconds of video for a 7-minute scenario. For longer videos, select fewer cameras or lower the capture resolution.
