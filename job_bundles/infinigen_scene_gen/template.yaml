@@ -1,0 +1,191 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Infinigen Scene Generation
+
+parameterDefinitions:
+  - name: Frames
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Scene Seeds
+      groupLabel: Scene Generation
+    default: "0-0"
+    description: >
+      Range of seeds to generate, e.g. "0-9" for 10 scenes, "0-99" for 100 scenes.
+
+  - name: SceneType
+    type: STRING
+    userInterface:
+      control: DROPDOWN_LIST
+      label: Scene Type
+      groupLabel: Scene Generation
+    default: indoor
+    allowedValues: [indoor, nature]
+    description: >
+      indoor uses generate_indoors (works with minimal install).
+      nature uses generate_nature (requires terrain install).
+
+  - name: SceneConfig
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Scene Configs
+      groupLabel: Scene Generation
+    default: "fast_solve.gin singleroom.gin"
+    description: >
+      Space-separated gin config files.
+      Indoor: "fast_solve.gin singleroom.gin"
+      Nature: "desert.gin simple.gin"
+
+  - name: RoomType
+    type: STRING
+    userInterface:
+      control: DROPDOWN_LIST
+      label: Room Type (indoor only)
+      groupLabel: Scene Generation
+    default: ANY
+    allowedValues: [ANY, DiningRoom, Bedroom, Kitchen, LivingRoom, Bathroom]
+    description: >
+      Which room type to generate. ANY picks randomly.
+
+  - name: SceneOverrides
+    type: STRING
+    userInterface:
+      control: LINE_EDIT
+      label: Extra Overrides
+      groupLabel: Scene Generation
+    default: ""
+    description: >
+      Additional gin overrides. Leave empty for defaults.
+
+  - name: RenderGroundTruth
+    type: STRING
+    userInterface:
+      control: CHECK_BOX
+      label: Render Ground Truth
+      groupLabel: Rendering
+    default: "True"
+    allowedValues: ["True", "False"]
+    description: >
+      If True, renders a second pass with flat shading for accurate GT
+      (depth, normals, segmentation).
+
+  - name: OutputDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Output Directory
+      groupLabel: Output
+    default: "./output"
+    description: Root output directory. Each scene writes to a subdirectory.
+
+  - name: CondaPackages
+    type: STRING
+    userInterface:
+      control: HIDDEN
+    default: infinigen jinja2 pyyaml setuptools
+    description: >
+      The infinigen package bundles bpy (Blender as Python module).
+
+steps:
+  - name: GenerateScenes
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Seed
+          type: INT
+          range: "{{Param.Frames}}"
+    hostRequirements:
+      amounts:
+        - name: amount.worker.gpu
+          min: 1
+    script:
+      actions:
+        onRun:
+          command: bash
+          args: ['{{Task.File.Run}}']
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          data: |
+            set -xeuo pipefail
+
+            SEED={{Task.Param.Seed}}
+            SCENE_DIR="{{Param.OutputDir}}/scene_${SEED}"
+            rm -rf "${SCENE_DIR}"
+
+            python -c "import infinigen; print(f'Infinigen {infinigen.__version__}')"
+            python -c "import bpy; print(f'bpy (Blender) {bpy.app.version_string}')"
+
+            # Select driver script based on scene type
+            if [ "{{Param.SceneType}}" = "indoor" ]; then
+              DRIVER="infinigen_examples.generate_indoors"
+            else
+              DRIVER="infinigen_examples.generate_nature"
+            fi
+
+            # Build overrides
+            OVERRIDES="compose_indoors.terrain_enabled=False"
+            if [ "{{Param.RoomType}}" != "ANY" ] && [ "{{Param.SceneType}}" = "indoor" ]; then
+              OVERRIDES="${OVERRIDES} restrict_solving.restrict_parent_rooms=[\"{{Param.RoomType}}\"]"
+            fi
+            if [ -n "{{Param.SceneOverrides}}" ]; then
+              OVERRIDES="${OVERRIDES} {{Param.SceneOverrides}}"
+            fi
+
+            # For nature scenes, enable terrain if available
+            if [ "{{Param.SceneType}}" = "nature" ]; then
+              OVERRIDES="{{Param.SceneOverrides}}"
+            fi
+
+            OVERRIDE_ARGS=""
+            if [ -n "${OVERRIDES}" ]; then
+              OVERRIDE_ARGS="-p ${OVERRIDES}"
+            fi
+
+            # Step 1: Generate coarse scene
+            echo "=== Step 1: Coarse generation (seed=${SEED}) ==="
+            python -m ${DRIVER} \
+              --seed ${SEED} --task coarse \
+              -g {{Param.SceneConfig}} \
+              ${OVERRIDE_ARGS} \
+              --output_folder "${SCENE_DIR}/coarse"
+
+            # Step 2 (nature only): Populate with fine assets + terrain
+            if [ "{{Param.SceneType}}" = "nature" ]; then
+              echo "=== Step 2: Populate + fine terrain (seed=${SEED}) ==="
+              python -m ${DRIVER} \
+                --seed ${SEED} --task populate fine_terrain \
+                -g {{Param.SceneConfig}} \
+                ${OVERRIDE_ARGS} \
+                --input_folder "${SCENE_DIR}/coarse" \
+                --output_folder "${SCENE_DIR}/fine"
+              RENDER_INPUT="${SCENE_DIR}/fine"
+            else
+              RENDER_INPUT="${SCENE_DIR}/coarse"
+            fi
+
+            # Step 3: Render RGB
+            echo "=== Step 3: Render RGB (seed=${SEED}) ==="
+            python -m ${DRIVER} \
+              --seed ${SEED} --task render \
+              -g {{Param.SceneConfig}} \
+              ${OVERRIDE_ARGS} \
+              --input_folder "${RENDER_INPUT}" \
+              --output_folder "${SCENE_DIR}/frames"
+
+            # Step 4 (optional): Render ground truth with flat shading
+            if [ "{{Param.RenderGroundTruth}}" = "True" ]; then
+              echo "=== Step 4: Render Ground Truth (seed=${SEED}) ==="
+              python -m ${DRIVER} \
+                --seed ${SEED} --task render \
+                -g {{Param.SceneConfig}} \
+                ${OVERRIDE_ARGS} \
+                -p render.render_image_func=@flat/render_image \
+                --input_folder "${RENDER_INPUT}" \
+                --output_folder "${SCENE_DIR}/frames"
+            fi
+
+            echo "=== Scene ${SEED} complete ==="
+            echo "Output: ${SCENE_DIR}"
+            find "${SCENE_DIR}/frames" -type f | head -30 || true
