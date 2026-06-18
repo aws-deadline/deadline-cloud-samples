@@ -10,6 +10,7 @@ This job bundle renders a V-Ray scene by dividing the image into configurable re
 - **Optional Movie Creation**: Creates an MP4 movie from rendered frames using ffmpeg
 - **Path Remapping**: Automatically handles asset path translation between workstation and workers
 - **Standalone Scripts**: Render and merge logic in separate script files for easy customization
+- **Automatic Asset Discovery**: Pre-submission hook parses the vrscene file to find all referenced textures and files, adding them to job attachments automatically
 
 ## How It Works
 
@@ -31,10 +32,12 @@ This job bundle renders a V-Ray scene by dividing the image into configurable re
 ```
 tile_render_with_vray_linux/
 ├── template.yaml                    # Job template definition
+├── hooks.yaml                       # Pre-submission hook configuration
 ├── scripts/
-│   ├── render_region.sh            # Renders a single region tile
-│   ├── merge_regions.sh            # Merges region tiles into complete frame
-│   └── setup_vray_path_mapping.py  # Generates V-Ray path remapping args
+│   ├── render_region.sh             # Renders a single region tile
+│   ├── merge_regions.sh             # Merges region tiles into complete frame
+│   ├── setup_vray_path_mapping.py   # Generates V-Ray path remapping args
+│   └── discover_vrscene_assets.py   # Discovers textures/files in vrscene
 └── README.md
 ```
 
@@ -104,6 +107,11 @@ Refer to the [Chaos V-Ray documentation](https://documentation.chaos.com/space/V
 
 ## Job Submission
 
+> **Note:** This bundle includes a pre-submission hook that automatically discovers textures and files referenced in the vrscene. You must enable bundle hooks before submitting:
+> ```bash
+> deadline config set settings.allow_bundle_hooks true
+> ```
+
 Using the GUI:
 ```bash
 deadline bundle gui-submit job_bundles/tile_render_with_vray_linux
@@ -115,6 +123,16 @@ deadline bundle submit job_bundles/tile_render_with_vray_linux \
     -p VraySceneFile="/path/to/scene.vrscene" \
     -p OutputDir="./output"
 ```
+
+### Automatic Asset Discovery
+
+The pre-submission hook (`scripts/discover_vrscene_assets.py`) parses the vrscene file before submission and automatically adds all referenced files to the job attachments. It detects:
+
+- **Texture files** referenced via `file="..."` parameters (e.g., in `BitmapBuffer` plugins)
+- **Mesh files** referenced via `file="..."` parameters (e.g., in `GeomMeshFile` plugins)
+- **Included vrscene files** via `#include "..."` directives
+
+Relative paths in the vrscene are resolved relative to the vrscene file's directory. Files that cannot be found on disk are logged as warnings but do not block submission.
 
 ## Path Remapping
 

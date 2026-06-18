@@ -1,0 +1,27 @@
+context:
+  version_partial: "17.0"
+  version_minor: "1"
+
+package:
+  name: nuke
+  version: ${{ version_partial + "." + version_minor }}
+
+source:
+  path: ../../archive_files/Nuke${{ version_partial }}v${{ version_minor }}-linux-x86_64.tgz
+  sha256: c76ec0cd3f881f41553878240618a983e936e543a5fd19ceea6c5c6765cc88a3
+  target_directory: installer
+
+build:
+  number: 0
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "*"
+  prefix_detection:
+    ignore_binary_files: True
+  # The binary is built to be relocatable, so can ignore the warnings about DSOs.
+  
+about:
+  homepage: https://www.foundry.com/products/nuke-family/nuke
+  license: LicenseRef-FoundryEULA
+  summary: Nuke is the powerful node-based compositing tool at the heart of the Nuke family.

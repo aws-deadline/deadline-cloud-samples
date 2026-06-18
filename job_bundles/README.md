@@ -71,6 +71,13 @@ If you've created a similar job for your favorite DCC, see [CONTRIBUTING.md](../
 The [gsplat_pipeline](gsplat_pipeline/README.md) job bundle can take a video file as input and train a 3D Gaussian Splatting point cloud.
 This example shows Deadline Cloud running a 3D reconstruction workload that uses CUDA GPUs for acceleration.
 
+### LLM evaluation with vLLM and lm-evaluation-harness
+
+The [vllm_lm_eval_leaderboard](vllm_lm_eval_leaderboard/README.md) job bundle evaluates multiple LLMs on a set of benchmarks in a single Deadline Cloud job using
+[vLLM](https://github.com/vllm-project/vllm) for inference and [EleutherAI's lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for scoring.
+Models are a STRING parameter sweep — each task starts vLLM for one model, runs every benchmark against it, then stops vLLM. A final aggregation step
+produces a ranked leaderboard (CSV + Markdown).
+
 ### Arnold standalone render
 
 The [arnold_standalone_render](arnold_standalone_render) job bundle renders Arnold `.ass` (Arnold Scene Source) files
@@ -108,6 +115,13 @@ job attachment S3 bucket with data files by copying them from where they are alr
 S3 prefix, then distributes the hashing and data copies across a number of workers you specify. Because job attachments
 uses content-addressed storage for data files, users that later submit jobs with these files attached will not have to
 upload them.
+
+### FFmpeg movie from job output
+
+The [ffmpeg_movie_from_job_output](ffmpeg_movie_from_job_output) job bundle downloads the rendered output of another
+completed job in the same queue and uses FFmpeg to encode the image sequence into an MP4 video. This is useful as a
+post-processing utility — after a render job completes, submit this job with the source Job ID to automatically
+assemble the frames into a movie with configurable frame rate, quality, and resolution settings.
 
 ### SSH via SSM Managed Node
 

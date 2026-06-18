@@ -1,0 +1,10 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: vray_adv_72002_maya2026_dr2_rhel8
+    sourceDownloadInstructions: 'Download the vray_adv_72002_maya2026_dr2_rhel8 full download file from Chaos Group. You will need a Chaos Group account to access the V-Ray downloads.'
+    buildTool: rattler-build
+jobParameters:
+  # conda-forge is used to get patchelf on Linux
+  - name: CondaChannels
+    value: conda-forge
