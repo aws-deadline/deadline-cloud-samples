@@ -132,7 +132,7 @@ parameterDefinitions:
   userInterface:
     control: HIDDEN
 steps:
-- name: Datagen
+- name: 1 - Datagen
   script:
     actions:
       onRun:
@@ -175,9 +175,9 @@ steps:
           --cube-size {{Param.CubeSize}} $RAND --output-dir "$OUT"
         echo "=== Datagen done -> $OUT/dataset ==="
         ls -la "$OUT/dataset/meta" || true
-- name: Train
+- name: 2 - Train
   dependencies:
-  - dependsOn: Datagen
+  - dependsOn: 1 - Datagen
   script:
     actions:
       onRun:
@@ -216,9 +216,9 @@ steps:
         [ -f "$CKPT/config.json" ] || { echo "ERROR: no checkpoint at $CKPT" >&2; ls -R "$TRAIN_OUT/checkpoints" || true; exit 1; }
         rm -rf "$OUT/checkpoint" && mkdir -p "$OUT/checkpoint" && cp -r "$CKPT/." "$OUT/checkpoint/"
         echo "=== Train done -> $OUT/checkpoint ==="
-- name: Render
+- name: 3 - Render
   dependencies:
-  - dependsOn: Train
+  - dependsOn: 2 - Train
   script:
     actions:
       onRun:
