@@ -1,6 +1,6 @@
 parameterValues:
   - name: OutputDir
-    value: ~/carla-output
+    value: ./outputs
   - name: ImageURI
     value: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16"
   - name: AwsRegion

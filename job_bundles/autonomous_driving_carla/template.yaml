@@ -113,6 +113,7 @@ parameterDefinitions:
     type: PATH
     objectType: DIRECTORY
     dataFlow: OUT
+    default: ./outputs
     description: Root output directory (each task writes to a subdirectory)
     userInterface:
       control: CHOOSE_DIRECTORY
@@ -194,10 +195,20 @@ steps:
           data: |
             set -euo pipefail
 
+            # Switch to the session's asset root so relative paths like
+            # {{Param.OutputDir}} (e.g. ./outputs) resolve under the area that
+            # Deadline Cloud tracks for output uploads.
+            ASSET_ROOT=$(find /sessions -maxdepth 2 -name "assetroot-*" -type d 2>/dev/null | head -1)
+            if [[ -z "$ASSET_ROOT" ]]; then
+                echo "ERROR: could not locate asset root under /sessions"
+                exit 1
+            fi
+            cd "$ASSET_ROOT"
+            echo "Asset root: $ASSET_ROOT"
+
             EGO_SPEED="{{Task.Param.EgoSpeed}}"
             NPC_SPEED="{{Task.Param.NpcSpeed}}"
             NPC_DISTANCE="{{Task.Param.NpcDistance}}"
-            OUTPUT_PATH="{{Param.OutputDir}}"
             TASK_NAME="ego${EGO_SPEED}_npc${NPC_SPEED}_dist${NPC_DISTANCE}"
 
             # Assemble camera list from checkboxes
@@ -220,18 +231,18 @@ steps:
             echo "  Cameras:     ${CAMERAS}"
             echo "  Task name:   $TASK_NAME"
 
-            # Locate template and data dir
-            TEMPLATE=$(find /sessions -name "change_lane.osc.template" 2>/dev/null | head -1)
-            if [[ -z "$TEMPLATE" ]]; then
-                echo "ERROR: change_lane.osc.template not found"
-                find /sessions -name "*.osc*" 2>/dev/null
+            # Locate template (relative to assetroot, where we cd'd above)
+            TEMPLATE="$ASSET_ROOT/data/change_lane.osc.template"
+            if [[ ! -f "$TEMPLATE" ]]; then
+                echo "ERROR: change_lane.osc.template not found at $TEMPLATE"
+                ls -la "$ASSET_ROOT/data" 2>/dev/null || true
                 exit 1
             fi
-            DATA_DIR=$(dirname "$TEMPLATE")
+            DATA_DIR="$ASSET_ROOT/data"
             echo "Template: $TEMPLATE"
 
             # Task-specific output dir (must be absolute for docker volume mount)
-            TASK_OUTPUT="$OUTPUT_PATH/$TASK_NAME"
+            TASK_OUTPUT="{{Param.OutputDir}}/$TASK_NAME"
             mkdir -p "$TASK_OUTPUT"
             mkdir -p "$TASK_OUTPUT/video"
             TASK_OUTPUT=$(cd "$TASK_OUTPUT" && pwd)
