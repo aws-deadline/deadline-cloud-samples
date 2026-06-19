@@ -1,13 +1,12 @@
 Set-PSDebug -Trace 2
 $ErrorActionPreference = "Stop"
 
-# SCRIPT CONFIGURATION VARIABLES - Update these for your environment
-# ------------------------------------------------------------------
+# Configuration
 $INSTALLER_S3_BUCKET = ""
 $AE_VERSION = "2026"
 $AE_INSTALLER = "After Effects_en_US_WIN_64.zip"
 
-# Version identifiers - update these when upgrading software
+# Version identifiers
 $RED_GIANT_VERSION = "2026.3.0"
 $MAXON_APP_VERSION = "2026.1.0"
 $BORIS_SAPPHIRE_VERSION = "2026"
@@ -47,13 +46,12 @@ if ($INSTALL_RSMB) {
     }
 }
 # END SCRIPT CONFIGURATION SECTION
-# ------------------------------------------------------------------
 
 $AE_PLUGIN_LOCATION = "C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore"
 $DOWNLOADS_PATH = "C:\Temp"
 $AE_LOCATION = "C:\Program Files\Adobe\Adobe After Effects $AE_VERSION\Support Files"
 
-# EBS Persistence - reads mount path set by EBS persistence script
+# EBS Persistence
 $MOUNT_PATH = [Environment]::GetEnvironmentVariable("DEADLINE_PERSISTENT_MOUNT", "Machine")
 if (-not $MOUNT_PATH) {
     Write-Host "WARNING: DEADLINE_PERSISTENT_MOUNT not set - no persistence"
@@ -114,10 +112,7 @@ function Setup-Junctions {
     }
 }
 
-# Snapshots Red Giant Windows service registrations to JSON on the persistent volume.
-# Installers register services that are lost when a new worker boots with a fresh OS
-# but reuses the same EBS volume. We save each service's binary path, start mode, and
-# display name so Import-InstallerState can re-register them in seconds.
+# Saves Red Giant service registrations to persistent volume for re-use
 function Export-InstallerState {
     New-Item -ItemType Directory -Path $SVC_BACKUP -Force | Out-Null
     $services = Get-WmiObject Win32_Service | Where-Object {
@@ -131,10 +126,7 @@ function Export-InstallerState {
     }
 }
 
-# Re-registers Windows services from the JSON snapshots saved by Export-InstallerState.
-# On subsequent boots the persistent volume already has the binaries, but the fresh OS
-# has no knowledge of the services. This reads each backup, creates the service via sc.exe,
-# and starts it if it was originally set to Auto start.
+# Re-registers services from saved JSON on fresh boots
 function Import-InstallerState {
     if (Test-Path $SVC_BACKUP) {
         foreach ($file in Get-ChildItem "$SVC_BACKUP\*.json") {

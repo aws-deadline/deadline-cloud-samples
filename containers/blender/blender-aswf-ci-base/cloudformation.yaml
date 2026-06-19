@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Deploys a Deadline Cloud queue and fleet configured for running Blender
+  renders inside a Docker container on GPU-enabled service-managed workers.
+
+Parameters:
+  FarmId:
+    Type: String
+    Description: Deadline Cloud farm ID
+    AllowedPattern: "farm-[0-9a-f]{32}"
+
+  ECRImageURI:
+    Type: String
+    Description: Full ECR image URI including tag (e.g. 123456789012.dkr.ecr.us-west-2.amazonaws.com/blender:4.5.0)
+
+  FleetRoleArn:
+    Type: String
+    Description: IAM role ARN for fleet workers
+
+  QueueRoleArn:
+    Type: String
+    Description: IAM role ARN for the queue
+
+  JobAttachmentsBucket:
+    Type: String
+    Description: S3 bucket name for job attachments
+
+  MaxWorkerCount:
+    Type: Number
+    Default: 1
+    Description: Maximum number of workers in the fleet
+
+  MinWorkerCount:
+    Type: Number
+    Default: 0
+    Description: Minimum number of workers (standby)
+
+Resources:
+  Queue:
+    Type: AWS::Deadline::Queue
+    Properties:
+      FarmId: !Ref FarmId
+      DisplayName: Blender Container Queue
+      RoleArn: !Ref QueueRoleArn
+      JobAttachmentSettings:
+        S3BucketName: !Ref JobAttachmentsBucket
+        RootPrefix: job-attachments
+
+  QueueEnvironment:
+    Type: AWS::Deadline::QueueEnvironment
+    Properties:
+      FarmId: !Ref FarmId
+      QueueId: !GetAtt Queue.QueueId
+      Priority: 10
+      TemplateType: YAML
+      Template: !Sub |
+        specificationVersion: "environment-2023-09"
+        parameterDefinitions:
+          - name: ContainerImage
+            type: STRING
+            description: "ECR image URI for the container"
+            default: "${ECRImageURI}"
+        environment:
+          name: DockerContainer
+          script:
+            actions:
+              onEnter:
+                command: bash
+                args: ["{{Env.File.Enter}}"]
+              onExit:
+                command: bash
+                args: ["{{Env.File.Exit}}"]
+            embeddedFiles:
+              - name: Enter
+                filename: enter.sh
+                type: TEXT
+                data: |
+                  #!/usr/bin/env bash
+                  set -euo pipefail
+                  IMAGE="{{Param.ContainerImage}}"
+
+                  REGION=$(echo "$IMAGE" | cut -d. -f4)
+                  REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
+                  aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+
+                  docker pull "$IMAGE"
+
+                  GPU_FLAGS=""
+                  if nvidia-smi &>/dev/null; then
+                      GPU_FLAGS="--gpus all --runtime=nvidia"
+                  fi
+                  JOB_USER_GID=$(id -g job-user)
+                  DOCKER_CONTAINER_ID=$(docker container run --rm --detach \
+                      --network host \
+                      --user "$(id -u job-user):$JOB_USER_GID" \
+                      $GPU_FLAGS \
+                      --mount "type=bind,src={{Session.WorkingDirectory}},dst={{Session.WorkingDirectory}}" \
+                      "$IMAGE" \
+                      bash -c 'sleep infinity')
+                  echo "openjd_env: DOCKER_CONTAINER_ID=$DOCKER_CONTAINER_ID"
+
+                  WRAPPER_DIR="$HOME/.local/bin"
+                  mkdir -p "$WRAPPER_DIR"
+                  for CMD in blender-openjd BlenderAdaptor; do
+                    cat > "$WRAPPER_DIR/$CMD" << EOF
+                  #!/usr/bin/env bash
+                  echo "[container-wrapper] docker exec \$DOCKER_CONTAINER_ID /usr/local/bin/$CMD \$*"
+                  exec docker exec --user "\$(id -u):\$(id -g)" "\$DOCKER_CONTAINER_ID" /usr/local/bin/$CMD "\$@"
+                  EOF
+                    chmod +x "$WRAPPER_DIR/$CMD"
+                  done
+                  echo "openjd_env: PATH=$WRAPPER_DIR:$PATH"
+
+              - name: Exit
+                filename: exit.sh
+                type: TEXT
+                data: |
+                  #!/usr/bin/env bash
+                  set -euo pipefail
+                  docker container stop -t 30 "$DOCKER_CONTAINER_ID"
+                  rm -f "$HOME/.local/bin/blender-openjd" "$HOME/.local/bin/BlenderAdaptor"
+
+  Fleet:
+    Type: AWS::Deadline::Fleet
+    Properties:
+      FarmId: !Ref FarmId
+      DisplayName: Blender Container GPU Fleet
+      RoleArn: !Ref FleetRoleArn
+      MaxWorkerCount: !Ref MaxWorkerCount
+      MinWorkerCount: !Ref MinWorkerCount
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            CpuArchitectureType: x86_64
+            VCpuCount:
+              Min: 4
+            MemoryMiB:
+              Min: 16384
+            OsFamily: LINUX
+            RootEbsVolume:
+              SizeGiB: 100
+            AcceleratorCapabilities:
+              Selections:
+                - Name: l40s
+                - Name: rtx-pro-server-6000
+              Count:
+                Min: 1
+                Max: 1
+          InstanceMarketOptions:
+            Type: on-demand
+      HostConfiguration:
+        ScriptBody: |
+          #!/bin/bash
+          set -e
+          echo "[$(date)] Installing Docker and NVIDIA Container Toolkit..."
+          dnf install -y docker
+          systemctl enable docker
+          systemctl start docker
+          if id "job-user" &>/dev/null; then
+              usermod -aG docker job-user
+          fi
+          curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+          dnf install -y nvidia-container-toolkit
+          nvidia-ctk runtime configure --runtime=docker
+          if nvidia-smi &>/dev/null; then
+              mkdir -p /etc/cdi
+              nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+          fi
+          systemctl restart docker
+          echo "[$(date)] Done."
+        ScriptTimeoutSeconds: 600
+
+  QueueFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Properties:
+      FarmId: !Ref FarmId
+      QueueId: !GetAtt Queue.QueueId
+      FleetId: !GetAtt Fleet.FleetId
+
+Outputs:
+  QueueId:
+    Value: !GetAtt Queue.QueueId
+  FleetId:
+    Value: !GetAtt Fleet.FleetId
+  QueueEnvironmentId:
+    Value: !GetAtt QueueEnvironment.QueueEnvironmentId

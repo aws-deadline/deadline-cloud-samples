@@ -1,0 +1,558 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: "GROMACS-MD-{{Param.JobName}}"
+description: |
+  GROMACS molecular dynamics simulation pipeline for AWS Deadline Cloud.
+  Runs the full MD workflow: system preparation, energy minimization,
+  equilibration (NVT + NPT), production MD, and analysis.
+  Supports fan-out across multiple independent systems (replicas or variants).
+
+parameterDefinitions:
+  - name: JobName
+    type: STRING
+    default: "gromacs-md"
+    userInterface:
+      control: LINE_EDIT
+      label: "Job Name"
+      groupLabel: "General"
+
+  - name: InputPdb
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    description: "Input protein structure in PDB format"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "Input PDB"
+      groupLabel: "Inputs"
+      fileFilters:
+        - label: "PDB Files"
+          patterns: ["*.pdb"]
+
+  - name: OutputDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    default: "output"
+    description: "Output directory for simulation results"
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: "Output Directory"
+      groupLabel: "Outputs"
+
+  - name: MdpMinimization
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    description: "MDP parameter file for energy minimization"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "Minimization MDP"
+      groupLabel: "MDP Parameters"
+      fileFilters:
+        - label: "MDP Files"
+          patterns: ["*.mdp"]
+
+  - name: MdpNvt
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    description: "MDP parameter file for NVT equilibration"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "NVT MDP"
+      groupLabel: "MDP Parameters"
+      fileFilters:
+        - label: "MDP Files"
+          patterns: ["*.mdp"]
+
+  - name: MdpNpt
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    description: "MDP parameter file for NPT equilibration"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "NPT MDP"
+      groupLabel: "MDP Parameters"
+      fileFilters:
+        - label: "MDP Files"
+          patterns: ["*.mdp"]
+
+  - name: MdpProduction
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    description: "MDP parameter file for production MD"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "Production MDP"
+      groupLabel: "MDP Parameters"
+      fileFilters:
+        - label: "MDP Files"
+          patterns: ["*.mdp"]
+
+  - name: ForceField
+    type: STRING
+    default: "amber99sb-ildn"
+    description: "Force field for parameterization (e.g. amber99sb-ildn, charmm27, oplsaa)"
+    userInterface:
+      control: LINE_EDIT
+      label: "Force Field"
+      groupLabel: "Simulation Parameters"
+
+  - name: WaterModel
+    type: STRING
+    default: "tip3p"
+    description: "Water model (e.g. tip3p, spc, spce, tip4p)"
+    userInterface:
+      control: LINE_EDIT
+      label: "Water Model"
+      groupLabel: "Simulation Parameters"
+
+  - name: BoxDistance
+    type: FLOAT
+    default: 1.0
+    minValue: 0.5
+    description: "Distance from solute to box edge (nm)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Box Distance (nm)"
+      groupLabel: "Simulation Parameters"
+
+  - name: ProductionSteps
+    type: INT
+    default: 500000
+    minValue: 1000
+    description: "Number of MD steps for production (500000 = 1 ns at 2 fs timestep)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Production Steps"
+      groupLabel: "Simulation Parameters"
+
+  - name: NumReplicas
+    type: INT
+    default: 1
+    minValue: 1
+    maxValue: 100
+    description: "Number of independent replica simulations to run in parallel"
+    userInterface:
+      control: SPIN_BOX
+      label: "Number of Replicas"
+      groupLabel: "Parallelism"
+
+  - name: MaxReplicaIndex
+    type: INT
+    default: 0
+    minValue: 0
+    maxValue: 99
+    description: "Last replica index (NumReplicas - 1)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Max Replica Index"
+      groupLabel: "Parallelism"
+
+  - name: CondaPackages
+    type: STRING
+    default: "gromacs"
+    description: "Packages to install via the queue's Conda environment."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Packages"
+      groupLabel: "Software Environment"
+
+  - name: CondaChannels
+    type: STRING
+    default: "conda-forge"
+    description: "Conda channels to resolve packages from."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Channels"
+      groupLabel: "Software Environment"
+
+jobEnvironments:
+  - name: GromacsToolchain
+    description: "Verify GROMACS is available from the Conda queue environment"
+    script:
+      embeddedFiles:
+        - name: Setup
+          type: TEXT
+          filename: "setup_toolchain.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "Verifying GROMACS toolchain..."
+            gmx --version | head -5
+            echo "openjd_env: WORK_DIR={{Session.WorkingDirectory}}"
+            echo "Toolchain ready."
+      actions:
+        onEnter:
+          command: "{{Env.File.Setup}}"
+          timeout: 60
+
+steps:
+  - name: PrepareSystem
+    description: "Prepare simulation system: topology, solvation box, and ion neutralization"
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 4
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+        - name: "attr.worker.cpu.arch"
+          anyOf: ["x86_64"]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: ReplicaIndex
+          type: INT
+          range: "0-{{Param.MaxReplicaIndex}}"
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "prepare_system.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            REPLICA={{Task.Param.ReplicaIndex}}
+            OUTDIR="{{Param.OutputDir}}/replica_${REPLICA}"
+            WORK="{{Session.WorkingDirectory}}/prep_${REPLICA}"
+            mkdir -p "${OUTDIR}" "${WORK}"
+
+            echo "=== Preparing system for replica ${REPLICA} ==="
+
+            # Copy input to working directory to avoid permission issues
+            cp "{{Param.InputPdb}}" "${WORK}/input.pdb"
+            cd "${WORK}"
+
+            # Generate topology with selected force field and water model
+            echo "Running pdb2gmx..."
+            echo "1" | gmx pdb2gmx -f input.pdb -o processed.gro -water {{Param.WaterModel}} -ff {{Param.ForceField}} -ignh
+
+            # Define simulation box
+            echo "Running editconf..."
+            gmx editconf -f processed.gro -o boxed.gro -c -d {{Param.BoxDistance}} -bt dodecahedron
+
+            # Solvate the box
+            echo "Running solvate..."
+            gmx solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
+
+            # Add ions to neutralize the system
+            # Create a minimal MDP for grompp (just needs to process topology)
+            printf "integrator = steep\nnsteps = 0\n" > ions.mdp
+            gmx grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr -maxwarn 1
+
+            # Replace solvent molecules with ions (group 13 = SOL typically)
+            echo "SOL" | gmx genion -s ions.tpr -o system.gro -p topol.top -pname NA -nname CL -neutral
+
+            # Copy outputs to persistent output directory
+            cp system.gro topol.top "${OUTDIR}/"
+            # Copy any .itp files (position restraints, etc.)
+            cp *.itp "${OUTDIR}/" 2>/dev/null || true
+
+            echo "System preparation complete for replica ${REPLICA}"
+            echo "  Topology: ${OUTDIR}/topol.top"
+            echo "  Coordinates: ${OUTDIR}/system.gro"
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 1800
+
+  - name: EnergyMinimization
+    description: "Energy minimization to remove steric clashes"
+    dependencies:
+      - dependsOn: PrepareSystem
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 4
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+        - name: "attr.worker.cpu.arch"
+          anyOf: ["x86_64"]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: ReplicaIndex
+          type: INT
+          range: "0-{{Param.MaxReplicaIndex}}"
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "energy_minimization.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            REPLICA={{Task.Param.ReplicaIndex}}
+            OUTDIR="{{Param.OutputDir}}/replica_${REPLICA}"
+            WORK="{{Session.WorkingDirectory}}/em_${REPLICA}"
+            mkdir -p "${WORK}"
+
+            echo "=== Energy Minimization for replica ${REPLICA} ==="
+
+            # Copy files to work dir
+            cp "${OUTDIR}/system.gro" "${WORK}/"
+            cp "${OUTDIR}/topol.top" "${WORK}/"
+            cp "${OUTDIR}"/*.itp "${WORK}/" 2>/dev/null || true
+            cp "{{Param.MdpMinimization}}" "${WORK}/em.mdp"
+            cd "${WORK}"
+
+            # Preprocess
+            gmx grompp -f em.mdp -c system.gro -p topol.top -o em.tpr -maxwarn 1
+
+            # Run energy minimization
+            gmx mdrun -v -deffnm em -ntmpi 1 -ntomp $(nproc)
+
+            # Extract potential energy
+            echo "Potential" | gmx energy -f em.edr -o em_potential.xvg || true
+
+            # Copy results
+            cp em.gro em.edr em.log em.tpr "${OUTDIR}/"
+            cp em_potential.xvg "${OUTDIR}/" 2>/dev/null || true
+
+            echo "Energy minimization complete for replica ${REPLICA}"
+            # Show final potential energy
+            tail -1 "${OUTDIR}/em_potential.xvg" 2>/dev/null || true
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 3600
+
+  - name: Equilibration
+    description: "NVT temperature equilibration followed by NPT pressure equilibration"
+    dependencies:
+      - dependsOn: EnergyMinimization
+      - dependsOn: PrepareSystem
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 4
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+        - name: "attr.worker.cpu.arch"
+          anyOf: ["x86_64"]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: ReplicaIndex
+          type: INT
+          range: "0-{{Param.MaxReplicaIndex}}"
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "equilibration.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            REPLICA={{Task.Param.ReplicaIndex}}
+            OUTDIR="{{Param.OutputDir}}/replica_${REPLICA}"
+            WORK="{{Session.WorkingDirectory}}/equil_${REPLICA}"
+            mkdir -p "${WORK}"
+
+            echo "=== Equilibration for replica ${REPLICA} ==="
+
+            # Copy files to work dir
+            cp "${OUTDIR}/em.gro" "${WORK}/"
+            cp "${OUTDIR}/topol.top" "${WORK}/"
+            cp "${OUTDIR}"/*.itp "${WORK}/" 2>/dev/null || true
+            cp "{{Param.MdpNvt}}" "${WORK}/nvt.mdp"
+            cp "{{Param.MdpNpt}}" "${WORK}/npt.mdp"
+            cd "${WORK}"
+
+            # --- NVT Equilibration ---
+            echo "--- NVT Equilibration ---"
+            gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr -maxwarn 1
+            gmx mdrun -deffnm nvt -ntmpi 1 -ntomp $(nproc)
+
+            # Extract temperature
+            echo "Temperature" | gmx energy -f nvt.edr -o nvt_temperature.xvg || true
+
+            # --- NPT Equilibration ---
+            echo "--- NPT Equilibration ---"
+            gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr -maxwarn 1
+            gmx mdrun -deffnm npt -ntmpi 1 -ntomp $(nproc)
+
+            # Extract pressure and density
+            echo "Pressure" | gmx energy -f npt.edr -o npt_pressure.xvg || true
+            echo "Density" | gmx energy -f npt.edr -o npt_density.xvg || true
+
+            # Copy results
+            cp nvt.gro nvt.edr nvt.log nvt.cpt "${OUTDIR}/"
+            cp npt.gro npt.edr npt.log npt.cpt npt.tpr "${OUTDIR}/"
+            cp nvt_temperature.xvg npt_pressure.xvg npt_density.xvg "${OUTDIR}/" 2>/dev/null || true
+
+            echo "Equilibration complete for replica ${REPLICA}"
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 7200
+
+  - name: ProductionMD
+    description: "Production molecular dynamics simulation"
+    dependencies:
+      - dependsOn: Equilibration
+      - dependsOn: PrepareSystem
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 4
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+        - name: "attr.worker.cpu.arch"
+          anyOf: ["x86_64"]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: ReplicaIndex
+          type: INT
+          range: "0-{{Param.MaxReplicaIndex}}"
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "production_md.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            REPLICA={{Task.Param.ReplicaIndex}}
+            OUTDIR="{{Param.OutputDir}}/replica_${REPLICA}"
+            WORK="{{Session.WorkingDirectory}}/prod_${REPLICA}"
+            mkdir -p "${WORK}"
+
+            echo "=== Production MD for replica ${REPLICA} ==="
+
+            # Copy files to work dir
+            cp "${OUTDIR}/npt.gro" "${WORK}/"
+            cp "${OUTDIR}/npt.cpt" "${WORK}/"
+            cp "${OUTDIR}/topol.top" "${WORK}/"
+            cp "${OUTDIR}"/*.itp "${WORK}/" 2>/dev/null || true
+            cp "{{Param.MdpProduction}}" "${WORK}/md.mdp"
+            cd "${WORK}"
+
+            # Override nsteps with user parameter
+            sed -i "s/^nsteps.*/nsteps = {{Param.ProductionSteps}}/" md.mdp
+
+            # Preprocess
+            gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr -maxwarn 1
+
+            # Run production MD
+            gmx mdrun -deffnm md -ntmpi 1 -ntomp $(nproc)
+
+            # Copy results
+            cp md.tpr md.xtc md.edr md.log md.gro md.cpt "${OUTDIR}/" 2>/dev/null || true
+
+            echo "Production MD complete for replica ${REPLICA}"
+            echo "  Trajectory: ${OUTDIR}/md.xtc"
+            echo "  Energy: ${OUTDIR}/md.edr"
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 86400
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+            notifyPeriodInSeconds: 60
+
+  - name: Analysis
+    description: "Post-simulation analysis: energy, RMSD, RMSF, radius of gyration"
+    dependencies:
+      - dependsOn: ProductionMD
+      - dependsOn: PrepareSystem
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 4
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+        - name: "attr.worker.cpu.arch"
+          anyOf: ["x86_64"]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: ReplicaIndex
+          type: INT
+          range: "0-{{Param.MaxReplicaIndex}}"
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "analysis.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            REPLICA={{Task.Param.ReplicaIndex}}
+            OUTDIR="{{Param.OutputDir}}/replica_${REPLICA}"
+            ANALYSIS_DIR="${OUTDIR}/analysis"
+            WORK="{{Session.WorkingDirectory}}/analysis_${REPLICA}"
+            mkdir -p "${ANALYSIS_DIR}" "${WORK}"
+
+            echo "=== Analysis for replica ${REPLICA} ==="
+
+            # Copy needed files to work dir
+            cp "${OUTDIR}/md.tpr" "${WORK}/"
+            cp "${OUTDIR}/md.xtc" "${WORK}/"
+            cp "${OUTDIR}/md.edr" "${WORK}/"
+            cp "${OUTDIR}/md.gro" "${WORK}/"
+            cp "${OUTDIR}/topol.top" "${WORK}/"
+            cp "${OUTDIR}"/*.itp "${WORK}/" 2>/dev/null || true
+            cd "${WORK}"
+
+            # Energy analysis (temperature, pressure, potential, kinetic)
+            echo "--- Energy Analysis ---"
+            printf "Temperature\nPressure\nPotential\nKinetic-En.\n\n" | gmx energy -f md.edr -o energy.xvg || true
+
+            # RMSD (backbone vs initial structure)
+            echo "--- RMSD Analysis ---"
+            printf "Backbone\nBackbone\n" | gmx rms -s md.tpr -f md.xtc -o rmsd.xvg -tu ns || true
+
+            # RMSD relative to crystal structure
+            printf "Backbone\nBackbone\n" | gmx rms -s md.tpr -f md.xtc -o rmsd_crystal.xvg -tu ns || true
+
+            # RMSF (per-residue fluctuation)
+            echo "--- RMSF Analysis ---"
+            printf "Backbone\n" | gmx rmsf -s md.tpr -f md.xtc -o rmsf.xvg -res || true
+
+            # Radius of gyration
+            echo "--- Radius of Gyration ---"
+            printf "Protein\n" | gmx gyrate -s md.tpr -f md.xtc -o gyrate.xvg || true
+
+            # Hydrogen bonds (protein intramolecular)
+            echo "--- Hydrogen Bond Analysis ---"
+            printf "Protein\nProtein\n" | gmx hbond -s md.tpr -f md.xtc -num hbond.xvg || true
+
+            # Copy analysis results
+            cp *.xvg "${ANALYSIS_DIR}/" 2>/dev/null || true
+
+            # Generate summary
+            SUMMARY="${ANALYSIS_DIR}/summary.txt"
+            printf "=== MD Simulation Analysis Summary ===\n" > "${SUMMARY}"
+            printf "Replica: ${REPLICA}\n" >> "${SUMMARY}"
+            printf "Production steps: {{Param.ProductionSteps}}\n" >> "${SUMMARY}"
+            printf "Force field: {{Param.ForceField}}\n" >> "${SUMMARY}"
+            printf "Water model: {{Param.WaterModel}}\n\n" >> "${SUMMARY}"
+            printf "Output files:\n" >> "${SUMMARY}"
+            ls -la "${ANALYSIS_DIR}"/*.xvg 2>/dev/null >> "${SUMMARY}" || true
+
+            echo "Analysis complete for replica ${REPLICA}"
+            echo "Results in: ${ANALYSIS_DIR}/"
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 3600
