@@ -9,6 +9,14 @@ Each seed produces a completely unique scene — different room layout,
 furniture, materials, terrain, and vegetation. Seeds fan out as independent
 tasks for parallel execution across the GPU fleet.
 
+## Sample outputs
+
+Renders produced by this job bundle (one seed each, full quality):
+
+| Indoor (`SceneType=indoor`, `RoomType=Bathroom`) | Nature (`SceneType=nature`, `desert.gin`) |
+| :---: | :---: |
+| ![Indoor bathroom RGB render](.images/indoor_bathroom_rgb.jpg) | ![Nature desert RGB render](.images/nature_desert_rgb.jpg) |
+
 ## Prerequisites
 
 1. The `infinigen` conda package built and published to your Deadline Cloud
@@ -100,6 +108,12 @@ Each scene produces:
 When `RenderGroundTruth=True`, a second pass with flat shading is rendered
 into the same `frames/` directory to provide accurate depth, normals, and
 segmentation ground truth.
+
+Examples of the auxiliary passes from the indoor bathroom render above:
+
+| Material segmentation | Ambient occlusion (geometry) |
+| :---: | :---: |
+| ![Per-pixel material ID labels](.images/indoor_bathroom_material_segmentation.png) | ![AO pass showing scene geometry](.images/indoor_bathroom_ao.jpg) |
 
 ## Known issues
 
