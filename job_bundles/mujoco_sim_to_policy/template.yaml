@@ -1,5 +1,5 @@
 specificationVersion: jobtemplate-2023-09
-name: Strands Robots Sim-to-Policy (3-step)
+name: MuJoCo Sim-to-Policy (3-step)
 description: |
   The so100 sim-to-policy pipeline as THREE dependent Deadline Cloud steps:
     Datagen -> Train -> Render  (each dependsOn the previous).
@@ -140,6 +140,19 @@ steps:
         args:
         - '{{Task.File.Run}}'
     embeddedFiles:
+    # Free-text params are written to data files and read with $(cat ...) rather
+    # than interpolated into the script body. OpenJD substitutes {{Param.*}} as
+    # literal text BEFORE bash parses the line, so interpolating a value directly
+    # into the shell -- even inside quotes -- lets a value containing a quote,
+    # $(...), or backticks run as code on the worker, and a benign apostrophe
+    # (e.g. "pick up the kid's toy") breaks the script. Substituting into a data
+    # file keeps the value as data; $(cat) reads it back verbatim.
+    - {name: StrandsPkg, type: TEXT, data: "{{Param.StrandsPackageSpec}}"}
+    - {name: Robot, type: TEXT, data: "{{Param.Robot}}"}
+    - {name: Instruction, type: TEXT, data: "{{Param.Instruction}}"}
+    - {name: CameraPlacements, type: TEXT, data: "{{Param.CameraPlacements}}"}
+    - {name: OutDir, type: TEXT, data: "{{Param.OutputDir}}"}
+    - {name: ScriptDir, type: TEXT, data: "{{Param.JobScriptDir}}"}
     - name: Run
       type: TEXT
       runnable: true
@@ -147,18 +160,12 @@ steps:
         #!/usr/bin/env bash
         set -euo pipefail
         echo "=== STEP 1/3 Datagen: {{Param.Episodes}} episodes ==="
-        # Free-text job parameters are exported to the environment first so the
-        # shell treats them as DATA, not source. OpenJD substitutes parameter
-        # values as literal text before bash parses the script, so interpolating
-        # them directly into a command would let a value containing quotes,
-        # command substitution, or backticks run as code on the worker. Quoting
-        # "$VAR" below keeps them inert.
-        export STRANDS_PKG='{{Param.StrandsPackageSpec}}'
-        export ROBOT='{{Param.Robot}}'
-        export INSTRUCTION='{{Param.Instruction}}'
-        export CAMERA_PLACEMENTS='{{Param.CameraPlacements}}'
-        export OUT='{{Param.OutputDir}}'
-        export SCRIPT_DIR='{{Param.JobScriptDir}}'
+        STRANDS_PKG="$(cat '{{Task.File.StrandsPkg}}')"
+        ROBOT="$(cat '{{Task.File.Robot}}')"
+        INSTRUCTION="$(cat '{{Task.File.Instruction}}')"
+        CAMERA_PLACEMENTS="$(cat '{{Task.File.CameraPlacements}}')"
+        OUT="$(cat '{{Task.File.OutDir}}')"
+        SCRIPT_DIR="$(cat '{{Task.File.ScriptDir}}')"
         export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl STRANDS_TRUST_REMOTE_CODE=1
         CPG="$(dirname "$(dirname "$(command -v python)")")"
         export LD_LIBRARY_PATH="${CONDA_PREFIX:-$CPG}/lib:${LD_LIBRARY_PATH:-}"
@@ -185,6 +192,9 @@ steps:
         args:
         - '{{Task.File.Run}}'
     embeddedFiles:
+    # Free-text params via data files, not script interpolation (see Datagen).
+    - {name: StrandsPkg, type: TEXT, data: "{{Param.StrandsPackageSpec}}"}
+    - {name: OutDir, type: TEXT, data: "{{Param.OutputDir}}"}
     - name: Run
       type: TEXT
       runnable: true
@@ -192,10 +202,8 @@ steps:
         #!/usr/bin/env bash
         set -euo pipefail
         echo "=== STEP 2/3 Train: ACT {{Param.TrainSteps}} steps ==="
-        # Free-text params via the environment so the shell treats them as data
-        # (see the Datagen step for the rationale).
-        export STRANDS_PKG='{{Param.StrandsPackageSpec}}'
-        export OUT='{{Param.OutputDir}}'
+        STRANDS_PKG="$(cat '{{Task.File.StrandsPkg}}')"
+        OUT="$(cat '{{Task.File.OutDir}}')"
         export STRANDS_TRUST_REMOTE_CODE=1
         CPG="$(dirname "$(dirname "$(command -v python)")")"
         export LD_LIBRARY_PATH="${CONDA_PREFIX:-$CPG}/lib:${LD_LIBRARY_PATH:-}"
@@ -226,6 +234,15 @@ steps:
         args:
         - '{{Task.File.Run}}'
     embeddedFiles:
+    # Free-text params via data files, not script interpolation (see Datagen).
+    - {name: StrandsPkg, type: TEXT, data: "{{Param.StrandsPackageSpec}}"}
+    - {name: Robot, type: TEXT, data: "{{Param.Robot}}"}
+    - {name: Instruction, type: TEXT, data: "{{Param.Instruction}}"}
+    - {name: CameraPlacements, type: TEXT, data: "{{Param.CameraPlacements}}"}
+    - {name: DemoCamPos, type: TEXT, data: "{{Param.DemoCameraPosition}}"}
+    - {name: DemoCamTgt, type: TEXT, data: "{{Param.DemoCameraTarget}}"}
+    - {name: OutDir, type: TEXT, data: "{{Param.OutputDir}}"}
+    - {name: ScriptDir, type: TEXT, data: "{{Param.JobScriptDir}}"}
     - name: Run
       type: TEXT
       runnable: true
@@ -233,16 +250,14 @@ steps:
         #!/usr/bin/env bash
         set -euo pipefail
         echo "=== STEP 3/3 Render: learned policy from demo camera ==="
-        # Free-text params via the environment so the shell treats them as data
-        # (see the Datagen step for the rationale).
-        export STRANDS_PKG='{{Param.StrandsPackageSpec}}'
-        export ROBOT='{{Param.Robot}}'
-        export INSTRUCTION='{{Param.Instruction}}'
-        export CAMERA_PLACEMENTS='{{Param.CameraPlacements}}'
-        export DEMO_CAM_POS='{{Param.DemoCameraPosition}}'
-        export DEMO_CAM_TGT='{{Param.DemoCameraTarget}}'
-        export OUT='{{Param.OutputDir}}'
-        export SCRIPT_DIR='{{Param.JobScriptDir}}'
+        STRANDS_PKG="$(cat '{{Task.File.StrandsPkg}}')"
+        ROBOT="$(cat '{{Task.File.Robot}}')"
+        INSTRUCTION="$(cat '{{Task.File.Instruction}}')"
+        CAMERA_PLACEMENTS="$(cat '{{Task.File.CameraPlacements}}')"
+        DEMO_CAM_POS="$(cat '{{Task.File.DemoCamPos}}')"
+        DEMO_CAM_TGT="$(cat '{{Task.File.DemoCamTgt}}')"
+        OUT="$(cat '{{Task.File.OutDir}}')"
+        SCRIPT_DIR="$(cat '{{Task.File.ScriptDir}}')"
         export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl STRANDS_TRUST_REMOTE_CODE=1
         CPG="$(dirname "$(dirname "$(command -v python)")")"
         export LD_LIBRARY_PATH="${CONDA_PREFIX:-$CPG}/lib:${LD_LIBRARY_PATH:-}"

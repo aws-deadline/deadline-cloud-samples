@@ -1,8 +1,10 @@
-# Strands Robots Sim-to-Policy Pipeline (3-step)
+# MuJoCo Sim-to-Policy Pipeline (3-step)
 
-This sample renders a learned robot-manipulation policy on
-[AWS Deadline Cloud](https://docs.aws.amazon.com/deadline-cloud/) as a single
-submitted job that runs three dependent steps on managed GPU workers:
+This sample trains and renders a learned robot-manipulation policy on
+[AWS Deadline Cloud](https://docs.aws.amazon.com/deadline-cloud/), using a
+[MuJoCo](https://mujoco.org/) simulation of the
+[Strands Robots](https://strands-labs.github.io/robots/) so100 arm. It is a
+single submitted job that runs three dependent steps on managed GPU workers:
 
 ```
  ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
@@ -11,62 +13,61 @@ submitted job that runs three dependent steps on managed GPU workers:
  │  → LeRobot    │     │  finetune     │     │ → MP4 + PNG   │
  │    dataset    │     │  → checkpoint │     │               │
  └───────────────┘     └───────────────┘     └───────────────┘
-         └──────────── shared OutputDir (job attachment) ───────────┘
+ └──────────── shared OutputDir (job attachment) ────────────┘
 ```
 
 You hand it a robot and a task instruction; it generates training data in
 simulation, finetunes a policy on that data, and renders a video of the learned
-policy driving the sim — with **no local GPU** and **no manual handoff** between
-stages.
+policy driving the sim.
+
+![The finetuned so100 policy lifting the cube in the rendered MuJoCo rollout](https://downloads.deadlinecloud.amazonaws.com/samples/mujoco_sim_to_policy/policy_render_final_frame.png)
 
 ## What problem it solves
 
-A policy trained on **real-robot camera images cannot drive a simulator** — the
-sim renders don't look like the real world (the real→sim *appearance gap*), so
-the policy flails. This pipeline closes that gap by **training on images
-rendered from the same simulator the policy will run in.** The training data and
-the deployment target share a renderer, so what the policy learns transfers.
+A policy trained on real-robot camera images cannot drive a simulator. The sim
+renders don't look like the real world (the real→sim appearance gap), so the
+policy flails. This pipeline closes that gap by training on images rendered from
+the same simulator the policy will run in. The training data and the deployment
+target share a renderer, so what the policy learns transfers.
 
-The three steps are wired with Open Job Description (OJD) `dependsOn`
+The three steps are wired with Open Job Description (OpenJD) `dependsOn`
 dependencies and share one `OutputDir` that flows `INOUT`:
 
 | Step | Reads | Writes | What it does |
 |------|-------|--------|--------------|
-| **Datagen** | — | `OutputDir/dataset/` | Scripted joint-space pick of a cube in [Strands Robots](https://strands-labs.github.io/robots/) MuJoCo, recorded as a LeRobot dataset. Every episode is physically **verified** (did the block leave the floor?) and discarded if not. |
-| **Train** | `OutputDir/dataset/` | `OutputDir/checkpoint/` | Finetunes a LeRobot **ACT** policy on the generated dataset (`lerobot-train`, CUDA). |
-| **Render** | `OutputDir/checkpoint/` | `OutputDir/*.mp4`, `*.png` | Drives a MuJoCo `so100` rollout with the finetuned policy and records the result. |
+| Datagen | — | `OutputDir/dataset/` | Scripted joint-space pick of a cube in MuJoCo, recorded as a LeRobot dataset. Each episode is verified by a cube-height check (did the block leave the floor?) and discarded if it fails. |
+| Train | `OutputDir/dataset/` | `OutputDir/checkpoint/` | Finetunes a LeRobot ACT policy on the generated dataset (`lerobot-train`, CUDA). |
+| Render | `OutputDir/checkpoint/` | `OutputDir/*.mp4`, `*.png` | Drives a MuJoCo `so100` rollout with the finetuned policy and records the result. |
 
-Because the steps are independent and share the work directory, you can
-**re-run a single step** — e.g. re-render with a new camera without
-re-generating data or re-training.
+Because the steps are independent and share the work directory, you can re-run a
+single step — for example, re-render with a new camera without re-generating
+data or re-training.
 
 ## Why these design choices
 
-- **Genuine grasp, not a welded fake.** Datagen performs a no-weld physical
-  pinch: the arm reaches from home, descends onto the cube with the gripper
-  open, closes, and lifts. The grip is marginal, so **verify-and-keep** checks
-  that the cube actually left the floor and discards (then retries) any episode
-  that didn't — roughly 70–80% of randomized attempts hold, and only the
-  successes reach the dataset, so a slipped grasp never poisons training data.
-- **Tuned for the imperfect policy, not the scripted demo.** The grasp pose is
-  deliberately error-tolerant rather than visually perfect: a low, centered,
-  wide-open grip looks cleaner in the scripted rollout but is a *tighter target*
-  — the learned policy's reach has error, and a tight grip turns a near-miss
-  into a knock that shoves the cube away. A slightly higher, more forgiving grip
-  on a stable cube (rather than a tall, tippy block) is what the trained policy
-  can actually reproduce. The thing you render is an imperfect *learned* policy,
-  so the demonstration is optimized for that, not for how the script looks.
+- **Genuine grasp, no weld.** Datagen performs a physical pinch: the arm reaches
+  from home, descends onto the cube with the gripper open, closes, and lifts.
+  The grip is marginal, so each episode is verified — it checks that the cube
+  actually left the floor and discards (then retries) any episode that didn't.
+  Roughly 70–80% of randomized attempts hold, and only those reach the dataset,
+  so a slipped grasp doesn't poison the training data.
+- **Tuned for the learned policy, not the scripted demo.** The grasp pose is
+  deliberately error-tolerant. A low, centered, wide-open grip looks cleaner in
+  the scripted rollout, but it is a tighter target: the learned policy's descent
+  has x,y error, and a tight grip turns a near-miss into a knock that shoves the
+  cube away. A slightly higher, more forgiving grip on a stable cube reproduces
+  more reliably once the imperfect learned policy is the one driving.
 - **Finetune in-env instead of loading a public checkpoint.** Public so100
   checkpoints on HuggingFace fail to load on the pinned LeRobot due to
   config-schema drift (older ACT checkpoints lack the `type` field; newer pi0
   checkpoints carry fields the installed config rejects). Finetuning writes a
-  checkpoint with the *same* LeRobot version we render with, so it always loads.
+  checkpoint with the same LeRobot version we render with, so it always loads.
 - **Reproducible environment.** The `CondaPackages` / `CondaChannels` job
   parameters (default `python=3.12 pip git ffmpeg` on `conda-forge`) are consumed
-  by the **Conda queue environment attached to the queue** — the same job
-  parameters the repo's `conda_queue_env_*` templates read — which solves them
-  into the per-job environment. On top of that, each step `pip install`s the
-  Strands package spec at runtime, so every worker gets the same environment.
+  by the Conda queue environment attached to the queue — the same job parameters
+  the repo's `conda_queue_env_*` templates read — which solves them into the
+  per-job environment. On top of that, each step `pip install`s the Strands
+  package spec at runtime, so every worker gets the same environment.
 
 ## About the instruction
 
@@ -74,12 +75,12 @@ The `Instruction` parameter (default `pick up the red cube`) is recorded as the
 language annotation on every frame of the dataset, the ACT policy is conditioned
 on it during training, and it is passed to the policy again at render time.
 
-Be aware of what this does and does not mean: **this sample demonstrates a single
-task.** Every training episode carries the *same* instruction and the *same*
-scripted pick, so the policy learns to reproduce that one behavior — the
-instruction annotates and conditions the data, but it is **not a behavior
-selector** here. Submitting with a different `Instruction` re-labels the dataset
-but does not change what the robot does; it would still attempt the pick.
+Note that this sample demonstrates a single task. Every training episode carries
+the same instruction and the same scripted pick, so the policy learns to
+reproduce that one behavior. The instruction annotates and conditions the data,
+but it does not select behavior here: submitting with a different `Instruction`
+re-labels the dataset without changing what the robot does. It would still
+attempt the pick.
 
 To make the instruction actually steer behavior, you would generate episodes for
 *multiple* distinct tasks (each with its own instruction and motion) so the
@@ -103,13 +104,13 @@ next step but is out of scope for this single-task demo.
 ```bash
 # Submit with an absolute, known output path (so outputs upload correctly):
 OUT="$(pwd)/output"; mkdir -p "$OUT"
-deadline bundle submit so100_datagen_train_render -p "OutputDir=$OUT" --yes
+deadline bundle submit mujoco_sim_to_policy -p "OutputDir=$OUT" --yes
 ```
 
 Or review parameters in a GUI before sending:
 
 ```bash
-deadline bundle gui-submit so100_datagen_train_render
+deadline bundle gui-submit mujoco_sim_to_policy
 ```
 
 Watch progress and collect the video:
