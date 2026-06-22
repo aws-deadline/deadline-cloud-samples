@@ -30,42 +30,19 @@ build:
     binary_relocation: false
     missing_dso_allowlist:
       - "**"
+  # Run the packaging logic from separate bash scripts rather than inline commands.
+  # Inline build.script commands are run by the build machine's default interpreter
+  # (cmd.exe on Windows), which cannot parse these bash commands. A .sh file is always
+  # run with bash via extension detection, so this works when building a linux target
+  # from a Windows machine (cross-build). bash is available on the Deadline Cloud sample
+  # Windows workers, so the win branch drives bash too.
   script:
     - if: unix
       then:
-        - mkdir -p $PREFIX/opt/ayon-launcher
-        - cp -r ayon app_launcher common dependencies lib share shim vendor version.py LICENSE $PREFIX/opt/ayon-launcher/
-        - mkdir -p $PREFIX/bin
-        - ln -sf ../opt/ayon-launcher/ayon $PREFIX/bin/ayon
-        - mkdir -p $PREFIX/etc/conda/activate.d
-        - |
-          cat > $PREFIX/etc/conda/activate.d/ayon-launcher.sh << 'ACTIVATE'
-          #!/bin/bash
-          export AYON_LAUNCHER_DIR="$CONDA_PREFIX/opt/ayon-launcher"
-          export AYON_HEADLESS_MODE=1
-          ACTIVATE
-        - chmod +x $PREFIX/etc/conda/activate.d/ayon-launcher.sh
+        - bash $RECIPE_DIR/build.sh
     - if: win
       then:
-        - mkdir -p $PREFIX/opt/ayon-launcher
-        - cp -r ayon.exe ayon_console.exe common dependencies lib share shim vendor version.py LICENSE $PREFIX/opt/ayon-launcher/
-        - cp *.dll $PREFIX/opt/ayon-launcher/ || true
-        - mkdir -p $PREFIX/Scripts
-        - |
-          cat > $PREFIX/Scripts/ayon << 'WRAPPER'
-          #!/bin/bash
-          exec "$CONDA_PREFIX/opt/ayon-launcher/ayon_console.exe" "$@"
-          WRAPPER
-        - chmod +x $PREFIX/Scripts/ayon
-        - mkdir -p $PREFIX/etc/conda/activate.d
-        - |
-          cat > $PREFIX/etc/conda/activate.d/ayon-launcher.sh << 'ACTIVATE'
-          #!/bin/bash
-          export AYON_LAUNCHER_DIR="$CONDA_PREFIX/opt/ayon-launcher"
-          export AYON_HEADLESS_MODE=1
-          ACTIVATE
-        - chmod +x $PREFIX/etc/conda/activate.d/ayon-launcher.sh
-        - printf '@echo off\r\nset "AYON_LAUNCHER_DIR=%%CONDA_PREFIX%%\\opt\\ayon-launcher"\r\nset "AYON_HEADLESS_MODE=1"\r\n' > $PREFIX/etc/conda/activate.d/ayon-launcher.bat
+        - bash %RECIPE_DIR%\build_win.sh
 
 tests:
   - if: unix
