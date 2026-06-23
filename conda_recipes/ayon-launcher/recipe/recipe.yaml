@@ -30,12 +30,20 @@ build:
     binary_relocation: false
     missing_dso_allowlist:
       - "**"
-  # Run the packaging logic from separate bash scripts rather than inline commands.
-  # Inline build.script commands are run by the build machine's default interpreter
-  # (cmd.exe on Windows), which cannot parse these bash commands. A .sh file is always
-  # run with bash via extension detection, so this works when building a linux target
-  # from a Windows machine (cross-build). bash is available on the Deadline Cloud sample
-  # Windows workers, so the win branch drives bash too.
+  # The packaging logic lives in separate bash scripts (build.sh / build_win.sh)
+  # rather than inline commands, because the inline bash (mkdir -p, cp -r, heredocs)
+  # cannot be parsed by cmd.exe when the win-64 target is built on a Windows worker.
+  #
+  # rattler-build runs the build script through the build HOST's native shell
+  # (bash on Linux, cmd.exe on Windows), while the if: unix / if: win selectors choose
+  # the branch by TARGET platform. Each conda platform is therefore built on a
+  # matching-OS fleet: linux-64 on a Linux worker (bash runs build.sh directly), and
+  # win-64 on a Windows worker (cmd.exe expands %RECIPE_DIR% and launches bash, which is
+  # available on the Deadline Cloud sample Windows workers, to run build_win.sh).
+  #
+  # Building a target on a non-matching host (e.g. a linux-64 target from Windows) is
+  # NOT supported: cmd.exe will not expand $RECIPE_DIR and bash will not expand
+  # %RECIPE_DIR%, so the script invocation fails. See the recipe README for details.
   script:
     - if: unix
       then:
@@ -44,22 +52,30 @@ build:
       then:
         - bash %RECIPE_DIR%\build_win.sh
 
+# Use package_contents checks rather than `script` tests. rattler-build evaluates
+# these globs directly against the built package without launching a shell, so they
+# work on every platform - unlike `test -f/-x/-d`, which is a posix builtin that
+# cmd.exe cannot run when the win-64 package is tested on a Windows worker.
+# Paths are forward-slash and relative to the install prefix.
 tests:
   - if: unix
     then:
-      script:
-        - test -x $PREFIX/bin/ayon
-        - test -f $PREFIX/opt/ayon-launcher/ayon
-        - test -d $PREFIX/opt/ayon-launcher/dependencies
-        - test -d $PREFIX/opt/ayon-launcher/lib
+      package_contents:
+        files:
+          - bin/ayon
+          - opt/ayon-launcher/ayon
+          - opt/ayon-launcher/dependencies/**
+          - opt/ayon-launcher/lib/**
+          - etc/conda/activate.d/ayon-launcher.sh
   - if: win
     then:
-      script:
-        - test -x $PREFIX/Scripts/ayon
-        - test -f $PREFIX/opt/ayon-launcher/ayon_console.exe
-        - test -d $PREFIX/opt/ayon-launcher/dependencies
-        - test -d $PREFIX/opt/ayon-launcher/lib
-        - test -f $PREFIX/etc/conda/activate.d/ayon-launcher.sh
+      package_contents:
+        files:
+          - Scripts/ayon
+          - opt/ayon-launcher/ayon_console.exe
+          - opt/ayon-launcher/dependencies/**
+          - opt/ayon-launcher/lib/**
+          - etc/conda/activate.d/ayon-launcher.sh
 
 about:
   summary: AYON Launcher for Deadline Cloud workers — provides the pipeline runtime for headless publishing.

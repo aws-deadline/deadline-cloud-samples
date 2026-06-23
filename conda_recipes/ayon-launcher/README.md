@@ -26,6 +26,23 @@ The AYON Launcher conda package provides the **runtime environment**. The studio
 pixi global install rattler-build
 ```
 
+> **Build each platform on a matching-OS host.** The build scripts are bash
+> (`build.sh` / `build_win.sh`), and rattler-build runs the build script through the
+> **build host's native shell** — bash on Linux, `cmd.exe` on Windows — while the
+> `if: unix` / `if: win` selectors choose the branch by the **target** platform. As a
+> result:
+> - Build **linux-64 on a Linux host** (bash runs `build.sh` directly).
+> - Build **win-64 on a Windows host** (`cmd.exe` expands `%RECIPE_DIR%` and launches
+>   bash to run `build_win.sh`; bash ships with the Deadline Cloud sample Windows
+>   workers and Git for Windows).
+>
+> Cross-OS builds are **not supported** — e.g. building linux-64 from Windows fails
+> because `cmd.exe` does not expand `$RECIPE_DIR`, and building win-64 from Linux fails
+> because bash does not expand `%RECIPE_DIR%`. When submitting with
+> `submit-package-job`, the job runs rattler-build on a fleet worker, so ensure the
+> queue has a fleet whose OS matches each requested conda platform (see the repo's
+> top-level `conda_recipes/README.md`).
+
 ### Linux (linux-64)
 
 The Linux source is downloaded directly from GitHub releases:
