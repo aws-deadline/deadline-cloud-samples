@@ -63,6 +63,9 @@ tests:
 
 about:
   homepage: https://infinigen.org/
+  # Reflects Infinigen's own source license. The built package also bundles
+  # bpy (Blender, GPL); the built artifact is therefore subject to GPL terms.
+  # See README "Licensing" for redistribution implications.
   license: BSD-3-Clause
   summary: >
     Infinigen is a procedural generator of photorealistic 3D scenes built on Blender.

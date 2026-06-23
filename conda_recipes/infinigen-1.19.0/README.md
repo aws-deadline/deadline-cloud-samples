@@ -77,6 +77,16 @@ Infinigen depends on at runtime is GPL-licensed (Blender). This recipe builds
 Infinigen from upstream source and pulls `bpy` from PyPI at install time —
 no GPL binaries are redistributed in this samples repository.
 
+**Note on the package you build from this recipe:** the resulting conda
+package physically bundles `bpy` (and its Blender components), which are
+licensed under the **GNU GPL**. As a result, the built package artifact is
+subject to GPL terms, even though its `license` metadata records
+`BSD-3-Clause` (which reflects Infinigen's own source license only). Building
+and using the package to render is unrestricted; however, if you redistribute
+the built package to third parties, you are responsible for complying with the
+GPL, including making the corresponding source available. Consult your own
+legal/open-source guidance before redistributing.
+
 ## Known issues
 
 - Infinigen v1.19.0 has a bug in `reptile.py` where `reptile_postprocessing()`
