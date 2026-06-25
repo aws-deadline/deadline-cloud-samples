@@ -1,0 +1,14 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    # The terrain C++/CUDA extensions are compiled during the build.
+    # If a GPU is available, NVCC compiles the optional CUDA path; otherwise
+    # the build falls back to the CPU-only terrain libraries.
+    additionalHostRequirements:
+      amounts:
+        - name: amount.worker.gpu
+          min: 1
+    buildTool: rattler-build
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge

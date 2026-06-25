@@ -14,13 +14,14 @@ echo "Frame: $FRAME, Grid: ${COLS}x${ROWS}"
 
 BASE="${FILENAME%.*}"
 EXT="${FILENAME##*.}"
+PADDED_FRAME=$(printf "%04d" $FRAME)
 
-# Check all region files exist
+# Check all region files exist (V-Ray names them with .NNNN before extension)
 echo "Checking region files..."
 MISSING=0
 for ((row=0; row<ROWS; row++)); do
   for ((col=0; col<COLS; col++)); do
-    F="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${EXT}"
+    F="${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${PADDED_FRAME}.${EXT}"
     if [ ! -f "$F" ]; then
       echo "ERROR: Missing $F"
       MISSING=$((MISSING+1))
@@ -38,7 +39,7 @@ echo "Merging rows horizontally..."
 for ((row=0; row<ROWS; row++)); do
   ROW_FILES=""
   for ((col=0; col<COLS; col++)); do
-    ROW_FILES="$ROW_FILES ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${EXT}"
+    ROW_FILES="$ROW_FILES ${OUTPUT_DIR}/${BASE}_f${FRAME}_region_r${row}_c${col}.${PADDED_FRAME}.${EXT}"
   done
   convert $ROW_FILES +append "${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
 done
@@ -50,7 +51,6 @@ for ((row=0; row<ROWS; row++)); do
   ALL_ROWS="$ALL_ROWS ${OUTPUT_DIR}/${BASE}_f${FRAME}_row_${row}.${EXT}"
 done
 
-PADDED_FRAME=$(printf "%04d" $FRAME)
 FINAL_OUTPUT="${OUTPUT_DIR}/${BASE}.${PADDED_FRAME}.${EXT}"
 convert $ALL_ROWS -append "$FINAL_OUTPUT"
 

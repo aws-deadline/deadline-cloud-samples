@@ -25,32 +25,31 @@ if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -n "${OS:-}"
 fi
 
 # Determine plugin download directory
-_SP_PLUGIN_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/.maya-plugins"
+_SP_PLUGIN_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/deadline-plugins/maya"
 mkdir -p "$_SP_PLUGIN_DIR"
 
 # Download generic plugins to the session working directory
+_SP_GENERIC_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/deadline-plugins/generic"
 _SP_GENERIC_SRC="s3://${DEADLINE_JA_S3_BUCKET}/${_SP_PREFIX}plugins/generic/"
 if [ -n "${OPENJD_SESSION_WORKING_DIR:-}" ]; then
     if aws s3 ls "$_SP_GENERIC_SRC" >/dev/null 2>&1; then
         echo "Plugin Sync: Downloading plugins from $_SP_GENERIC_SRC"
-        aws s3 cp "$_SP_GENERIC_SRC" "$OPENJD_SESSION_WORKING_DIR/" --recursive --quiet 2>/dev/null || true
+        aws s3 cp "$_SP_GENERIC_SRC" "$_SP_GENERIC_DIR" --recursive --quiet 2>/dev/null || true
     fi
 fi
 
 # Download Maya-specific plugins
 _SP_DCC_SRC="s3://${DEADLINE_JA_S3_BUCKET}/${_SP_PREFIX}plugins/${_SP_OS}/maya/${MAYA_VERSION}/"
-_SP_MAYA_DIR="$_SP_PLUGIN_DIR/maya"
-mkdir -p "$_SP_MAYA_DIR"
 
 if aws s3 ls "$_SP_DCC_SRC" >/dev/null 2>&1; then
     echo "Plugin Sync: Downloading Maya plugins from $_SP_DCC_SRC"
-    aws s3 cp "$_SP_DCC_SRC" "$_SP_MAYA_DIR/" --recursive --quiet 2>/dev/null || true
+    aws s3 cp "$_SP_DCC_SRC" "$_SP_PLUGIN_DIR/" --recursive --quiet 2>/dev/null || true
 fi
 
 # Append to MAYA_MODULE_PATH if we downloaded any files
-if [ -d "$_SP_MAYA_DIR" ] && [ -n "$(ls -A "$_SP_MAYA_DIR" 2>/dev/null)" ]; then
-    export MAYA_MODULE_PATH="${_SP_MAYA_DIR}:${MAYA_MODULE_PATH:-}"
-    echo "Plugin Sync: MAYA_MODULE_PATH updated with $_SP_MAYA_DIR"
+if [ -d "$_SP_PLUGIN_DIR" ] && [ -n "$(ls -A "$_SP_PLUGIN_DIR" 2>/dev/null)" ]; then
+    export MAYA_MODULE_PATH="${_SP_PLUGIN_DIR}:${MAYA_MODULE_PATH:-}"
+    echo "Plugin Sync: MAYA_MODULE_PATH updated with $_SP_PLUGIN_DIR"
 else
     echo "Plugin Sync: No Maya plugins found, skipping."
 fi
@@ -59,4 +58,4 @@ fi
 export _MAYA_PLUGIN_SYNC_DIR="$_SP_PLUGIN_DIR"
 
 # Clean up temp variables
-unset _SP_PREFIX _SP_OS _SP_PLUGIN_DIR _SP_GENERIC_SRC _SP_DCC_SRC _SP_MAYA_DIR
+unset _SP_PREFIX _SP_OS _SP_PLUGIN_DIR _SP_GENERIC_SRC _SP_DCC_SRC

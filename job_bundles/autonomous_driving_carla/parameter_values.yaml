@@ -1,0 +1,21 @@
+parameterValues:
+  - name: OutputDir
+    value: ./outputs
+  - name: ImageURI
+    value: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16"
+  - name: AwsRegion
+    value: "us-east-2"
+  - name: CarlaTimeoutSeconds
+    value: 120
+  - name: CarlaBootTown
+    value: "Town04"
+  - name: CamFront
+    value: "True"
+  - name: CondaPackages
+    value: "ffmpeg"
+  - name: EgoSpeeds
+    value: "20,40"
+  - name: NpcSpeeds
+    value: "30,50"
+  - name: NpcDistances
+    value: "10,15"

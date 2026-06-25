@@ -1,0 +1,277 @@
+specificationVersion: jobtemplate-2023-09
+name: MuJoCo Sim-to-Policy (3-step)
+description: |
+  The so100 sim-to-policy pipeline as THREE dependent Deadline Cloud steps:
+    Datagen -> Train -> Render  (each dependsOn the previous).
+  Steps share a single OutputDir (job attachment): Datagen writes dataset/,
+  Train reads it and writes checkpoint/, Render reads checkpoint/ and writes the
+  MP4 + PNG. Independently re-runnable (e.g. re-render without re-training).
+  Each step installs strands-robots + lerobot via the Conda queue env. On a
+  multi-worker fleet the steps still serialize (Render needs Train's output), but
+  this is the idiomatic, observable, retry-friendly structure.
+
+  To test an alternative dataset end-to-end, skip Datagen and run the Train+Render
+  steps against a pre-populated OutputDir/dataset.
+parameterDefinitions:
+- name: Robot
+  type: STRING
+  default: so100
+  userInterface:
+    control: LINE_EDIT
+    label: Robot
+- name: Episodes
+  type: INT
+  default: 150
+  minValue: 1
+  maxValue: 5000
+  userInterface:
+    control: SPIN_BOX
+    label: Episodes
+- name: TrainSteps
+  type: INT
+  default: 6000
+  minValue: 1
+  maxValue: 200000
+  userInterface:
+    control: SPIN_BOX
+    label: Train Steps
+- name: TrainBatchSize
+  type: INT
+  default: 8
+  minValue: 1
+  maxValue: 256
+  userInterface:
+    control: SPIN_BOX
+    label: Train Batch Size
+- name: Randomize
+  type: STRING
+  default: 'true'
+  allowedValues:
+  - 'true'
+  - 'false'
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Domain Randomize
+- name: Instruction
+  type: STRING
+  default: pick up the red cube
+  userInterface:
+    control: LINE_EDIT
+    label: Instruction
+- name: Duration
+  type: FLOAT
+  default: 12.0
+  minValue: 0.5
+  maxValue: 120.0
+  userInterface:
+    control: SPIN_BOX
+    label: Duration (s)
+- name: Fps
+  type: INT
+  default: 30
+  minValue: 1
+  maxValue: 60
+  userInterface:
+    control: SPIN_BOX
+    label: FPS
+- name: CubeSize
+  type: FLOAT
+  default: 0.036
+  minValue: 0.005
+  maxValue: 0.05
+  userInterface:
+    control: SPIN_BOX
+    label: Cube Size
+- name: DemoCameraPosition
+  type: STRING
+  default: 0.6,-0.35,0.3
+  userInterface:
+    control: LINE_EDIT
+    label: Demo Camera Position
+- name: DemoCameraTarget
+  type: STRING
+  default: 0.2,-0.05,0.08
+  userInterface:
+    control: LINE_EDIT
+    label: Demo Camera Target
+- name: CameraPlacements
+  type: STRING
+  default: '{"top": {"position": [0.25, 0.0, 0.6], "target": [0.25, 0.0, 0.0]}, "wrist": {"position": [0.15, 0.0, 0.18], "target": [0.3, 0.0, 0.03]}}'
+  userInterface:
+    control: LINE_EDIT
+    label: Camera Placements (JSON)
+- name: StrandsPackageSpec
+  type: STRING
+  default: strands-robots[sim-mujoco,lerobot] @ git+https://github.com/strands-labs/robots.git@main
+  userInterface:
+    control: LINE_EDIT
+    label: Strands Package Spec
+- name: CondaPackages
+  type: STRING
+  default: python=3.12 pip git ffmpeg
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+- name: CondaChannels
+  type: STRING
+  default: conda-forge
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: INOUT
+  description: Shared work dir; holds dataset/, checkpoint/, and the render output.
+- name: JobScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: Directory containing the bundled datagen + render Python scripts.
+  userInterface:
+    control: HIDDEN
+steps:
+- name: 1 - Datagen
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Task.File.Run}}'
+    embeddedFiles:
+    # Free-text params are written to data files and read with $(cat ...) rather
+    # than interpolated into the script body. OpenJD substitutes {{Param.*}} as
+    # literal text BEFORE bash parses the line, so interpolating a value directly
+    # into the shell -- even inside quotes -- lets a value containing a quote,
+    # $(...), or backticks run as code on the worker, and a benign apostrophe
+    # (e.g. "pick up the kid's toy") breaks the script. Substituting into a data
+    # file keeps the value as data; $(cat) reads it back verbatim.
+    - {name: StrandsPkg, type: TEXT, data: "{{Param.StrandsPackageSpec}}"}
+    - {name: Robot, type: TEXT, data: "{{Param.Robot}}"}
+    - {name: Instruction, type: TEXT, data: "{{Param.Instruction}}"}
+    - {name: CameraPlacements, type: TEXT, data: "{{Param.CameraPlacements}}"}
+    - {name: OutDir, type: TEXT, data: "{{Param.OutputDir}}"}
+    - {name: ScriptDir, type: TEXT, data: "{{Param.JobScriptDir}}"}
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "=== STEP 1/3 Datagen: {{Param.Episodes}} episodes ==="
+        STRANDS_PKG="$(cat '{{Task.File.StrandsPkg}}')"
+        ROBOT="$(cat '{{Task.File.Robot}}')"
+        INSTRUCTION="$(cat '{{Task.File.Instruction}}')"
+        CAMERA_PLACEMENTS="$(cat '{{Task.File.CameraPlacements}}')"
+        OUT="$(cat '{{Task.File.OutDir}}')"
+        SCRIPT_DIR="$(cat '{{Task.File.ScriptDir}}')"
+        export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl STRANDS_TRUST_REMOTE_CODE=1
+        CPG="$(dirname "$(dirname "$(command -v python)")")"
+        export LD_LIBRARY_PATH="${CONDA_PREFIX:-$CPG}/lib:${LD_LIBRARY_PATH:-}"
+        python -m pip install --upgrade pip
+        python -m pip install "$STRANDS_PKG"
+        mkdir -p "$OUT"
+        RAND=""; [ "{{Param.Randomize}}" = "true" ] && RAND="--randomize"
+        rm -rf "$OUT/dataset"
+        python "$SCRIPT_DIR/generate_dataset.py" \
+          --robot "$ROBOT" --repo-id local/so100_sim_pick \
+          --episodes {{Param.Episodes}} --fps {{Param.Fps}} \
+          --cameras "top,wrist" --camera-placements "$CAMERA_PLACEMENTS" \
+          --task "$INSTRUCTION" \
+          --cube-size {{Param.CubeSize}} $RAND --output-dir "$OUT"
+        echo "=== Datagen done -> $OUT/dataset ==="
+        ls -la "$OUT/dataset/meta" || true
+- name: 2 - Train
+  dependencies:
+  - dependsOn: 1 - Datagen
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Task.File.Run}}'
+    embeddedFiles:
+    # Free-text params via data files, not script interpolation (see Datagen).
+    - {name: StrandsPkg, type: TEXT, data: "{{Param.StrandsPackageSpec}}"}
+    - {name: OutDir, type: TEXT, data: "{{Param.OutputDir}}"}
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "=== STEP 2/3 Train: ACT {{Param.TrainSteps}} steps ==="
+        STRANDS_PKG="$(cat '{{Task.File.StrandsPkg}}')"
+        OUT="$(cat '{{Task.File.OutDir}}')"
+        export STRANDS_TRUST_REMOTE_CODE=1
+        CPG="$(dirname "$(dirname "$(command -v python)")")"
+        export LD_LIBRARY_PATH="${CONDA_PREFIX:-$CPG}/lib:${LD_LIBRARY_PATH:-}"
+        python -m pip install --upgrade pip
+        python -m pip install "$STRANDS_PKG"
+        if [ ! -f "$OUT/dataset/meta/info.json" ]; then
+          echo "ERROR: no dataset at $OUT/dataset (Datagen step must run first)" >&2; exit 1
+        fi
+        TRAIN_OUT="$(pwd)/act_finetune"
+        lerobot-train \
+          --dataset.repo_id=local/so100_sim_pick \
+          --dataset.root="$OUT/dataset" \
+          --policy.type=act --policy.device=cuda --policy.push_to_hub=false \
+          --batch_size={{Param.TrainBatchSize}} --steps={{Param.TrainSteps}} \
+          --save_freq={{Param.TrainSteps}} --wandb.enable=false \
+          --job_name=act_so100_finetune --output_dir="$TRAIN_OUT"
+        CKPT="$TRAIN_OUT/checkpoints/last/pretrained_model"
+        [ -f "$CKPT/config.json" ] || { echo "ERROR: no checkpoint at $CKPT" >&2; ls -R "$TRAIN_OUT/checkpoints" || true; exit 1; }
+        rm -rf "$OUT/checkpoint" && mkdir -p "$OUT/checkpoint" && cp -r "$CKPT/." "$OUT/checkpoint/"
+        echo "=== Train done -> $OUT/checkpoint ==="
+- name: 3 - Render
+  dependencies:
+  - dependsOn: 2 - Train
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Task.File.Run}}'
+    embeddedFiles:
+    # Free-text params via data files, not script interpolation (see Datagen).
+    - {name: StrandsPkg, type: TEXT, data: "{{Param.StrandsPackageSpec}}"}
+    - {name: Robot, type: TEXT, data: "{{Param.Robot}}"}
+    - {name: Instruction, type: TEXT, data: "{{Param.Instruction}}"}
+    - {name: CameraPlacements, type: TEXT, data: "{{Param.CameraPlacements}}"}
+    - {name: DemoCamPos, type: TEXT, data: "{{Param.DemoCameraPosition}}"}
+    - {name: DemoCamTgt, type: TEXT, data: "{{Param.DemoCameraTarget}}"}
+    - {name: OutDir, type: TEXT, data: "{{Param.OutputDir}}"}
+    - {name: ScriptDir, type: TEXT, data: "{{Param.JobScriptDir}}"}
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "=== STEP 3/3 Render: learned policy from demo camera ==="
+        STRANDS_PKG="$(cat '{{Task.File.StrandsPkg}}')"
+        ROBOT="$(cat '{{Task.File.Robot}}')"
+        INSTRUCTION="$(cat '{{Task.File.Instruction}}')"
+        CAMERA_PLACEMENTS="$(cat '{{Task.File.CameraPlacements}}')"
+        DEMO_CAM_POS="$(cat '{{Task.File.DemoCamPos}}')"
+        DEMO_CAM_TGT="$(cat '{{Task.File.DemoCamTgt}}')"
+        OUT="$(cat '{{Task.File.OutDir}}')"
+        SCRIPT_DIR="$(cat '{{Task.File.ScriptDir}}')"
+        export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl STRANDS_TRUST_REMOTE_CODE=1
+        CPG="$(dirname "$(dirname "$(command -v python)")")"
+        export LD_LIBRARY_PATH="${CONDA_PREFIX:-$CPG}/lib:${LD_LIBRARY_PATH:-}"
+        python -m pip install --upgrade pip
+        python -m pip install "$STRANDS_PKG"
+        CKPT="$OUT/checkpoint"
+        [ -f "$CKPT/config.json" ] || { echo "ERROR: no checkpoint at $CKPT (Train must run first)" >&2; exit 1; }
+        python "$SCRIPT_DIR/render_scene.py" \
+          --robot "$ROBOT" --instruction "$INSTRUCTION" \
+          --policy-provider lerobot_local --policy-model "$CKPT" \
+          --policy-device cuda --policy-type act --policy-embodiment '{}' \
+          --cameras "top,wrist" --camera-placements "$CAMERA_PLACEMENTS" \
+          --camera-position "$DEMO_CAM_POS" \
+          --camera-target "$DEMO_CAM_TGT" \
+          --cube-size {{Param.CubeSize}} --duration {{Param.Duration}} \
+          --fps {{Param.Fps}} --output-dir "$OUT"
+        echo "=== Render done ==="; ls -la "$OUT"
