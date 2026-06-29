@@ -42,8 +42,10 @@ New-Item -ItemType Directory -Path $pluginsDir -Force
 Write-Host ' --- Downloading all installers and plugins --- '
 
 # Download all files sequentially for PowerShell 5.1 compatibility
+
+$VRAY_INSTALLER = Split-Path "$VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI" -Leaf
 Write-Host 'Downloading V-Ray installer...'
-aws s3 cp --no-progress "$VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI" C:\3dsmax_setup\vray.exe
+aws s3 cp --no-progress "$VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI" "C:\3dsmax_setup\$VRAY_INSTALLER"
 Write-Host 'Downloading Forest Pack installer...'
 aws s3 cp --no-progress "$FOREST_PACK_INSTALLER_EXE_S3_URI" C:\3dsmax_setup\forestpack.exe
 Write-Host 'Downloading RailClone installer...'
@@ -73,7 +75,7 @@ Write-Host ' --- Installing V-Ray for 3ds Max 2025 --- '
 "@ | Out-File -FilePath "C:\3dsmax_setup\config.xml" -Encoding UTF8
 
 # Install V-Ray with render server configuration
-Start-Process "C:\3dsmax_setup\vray.exe" -ArgumentList '-gui=0','-configFile=C:\3dsmax_setup\config.xml','-quiet=1' -Wait
+Start-Process "C:\3dsmax_setup\$VRAY_INSTALLER" -ArgumentList '-gui=0','-configFile=C:\3dsmax_setup\config.xml','-quiet=1' -Wait
 
 Write-Host ' --- Installing Forest Pack --- '
 
@@ -97,6 +99,9 @@ Write-Host ' --- Configuring environment for V-Ray for 3ds Max 2025 --- '
 [System.Environment]::SetEnvironmentVariable('VRAY_FOR_3DSMAX2025_MAIN', 'C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\bin\', 'Machine')
 [System.Environment]::SetEnvironmentVariable('VRAY_FOR_3DSMAX2025_PLUGINS', 'C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\bin\plugins\', 'Machine')
 [System.Environment]::SetEnvironmentVariable('VRAY_MDL_PATH_3DSMAX2025', "$VRAY_FOR_3DSMAX2025_INSTALL_ROOT\mdl", 'Machine')
+
+# V-Ray introduced Cloud Licensing in 7.30.02 which must be disabled for UBL to work
+Start-Process "C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\utils\setvrlservice.exe" -ArgumentList '-cloud-server=0' -Wait -ErrorAction SilentlyContinue
 
 Write-Host ' --- Configuring environment for Forest Pack --- '
 

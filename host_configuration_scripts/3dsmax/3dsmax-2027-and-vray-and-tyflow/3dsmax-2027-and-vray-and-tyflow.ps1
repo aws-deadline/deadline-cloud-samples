@@ -30,7 +30,8 @@ Start-Process "C:\3dsmax_setup\Setup.exe" -ArgumentList '-q' -Wait
 
 Write-Host ' --- Installing V-Ray for 3ds Max 2027 --- '
 
-aws s3 cp --no-progress "$VRAY_FOR_3DSMAX2027_INSTALLER_EXE_S3_URI" C:\3dsmax_setup\vray.exe
+$VRAY_INSTALLER = Split-Path "$VRAY_FOR_3DSMAX2027_INSTALLER_EXE_S3_URI" -Leaf
+aws s3 cp --no-progress "$VRAY_FOR_3DSMAX2027_INSTALLER_EXE_S3_URI" "C:\3dsmax_setup\$VRAY_INSTALLER"
 @"
 <DefValues>
 <Value Name="INSTALL_TYPE" DataType="value">1</Value>
@@ -44,7 +45,7 @@ aws s3 cp --no-progress "$VRAY_FOR_3DSMAX2027_INSTALLER_EXE_S3_URI" C:\3dsmax_se
 <Value Name="VISIT_SPOT3D" DataType="value">0</Value>
 </DefValues>
 "@ | Out-File -FilePath "C:\3dsmax_setup\config.xml" -Encoding UTF8
-Start-Process "C:\3dsmax_setup\vray.exe" -ArgumentList '-gui=0','-configFile=C:\3dsmax_setup\config.xml','-quiet=1' -Wait
+Start-Process "C:\3dsmax_setup\$VRAY_INSTALLER" -ArgumentList '-gui=0','-configFile=C:\3dsmax_setup\config.xml','-quiet=1' -Wait
 
 Write-Host ' --- Installing tyFlow Plugin --- '
 
@@ -66,6 +67,9 @@ Write-Host ' --- Configuring environment for V-Ray for 3ds Max 2027 --- '
 [System.Environment]::SetEnvironmentVariable('VRAY_FOR_3DSMAX2027_MAIN', 'C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2027\bin\', 'Machine')
 [System.Environment]::SetEnvironmentVariable('VRAY_FOR_3DSMAX2027_PLUGINS', 'C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2027\bin\plugins\', 'Machine')
 [System.Environment]::SetEnvironmentVariable('VRAY_MDL_PATH_3DSMAX2027', "$VRAY_FOR_3DSMAX2027_INSTALL_ROOT\mdl", 'Machine')
+
+# V-Ray introduced Cloud Licensing in 7.30.02 which must be disabled for UBL to work
+Start-Process "C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2027\utils\setvrlservice.exe" -ArgumentList '-cloud-server=0' -Wait -ErrorAction SilentlyContinue
 
 Write-Host ' --- Installing Deadline Cloud for 3ds Max --- '
 
