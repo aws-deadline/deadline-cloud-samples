@@ -125,7 +125,8 @@ def main():
     # Generate results.html
     output_dir = os.path.dirname(args.output)
     html_path = os.path.join(output_dir, "results.html")
-    data_json = json.dumps(results, ensure_ascii=False)
+    # Escape "</" so user-controlled strings can't break out of the <script> block.
+    data_json = json.dumps(results, ensure_ascii=False).replace("</", "<\\/")
     html_content = HTML_TEMPLATE.replace("__DATA_PLACEHOLDER__", data_json)
     with open(html_path, "w") as f:
         f.write(html_content)

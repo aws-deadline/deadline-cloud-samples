@@ -96,7 +96,11 @@ parameterDefinitions:
     control: HIDDEN
 - name: CondaPackages
   type: STRING
-  default: python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9
+  # prometheus-fastapi-instrumentator>=8.0.2 is pinned to fix the
+  # `_IncludedRouter has no attribute path` bug that breaks vLLM 0.19.1
+  # when paired with FastAPI>=0.116. Remove the pin when upgrading vLLM
+  # to a version that declares a compatible instrumentator dependency.
+  default: python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9 prometheus-fastapi-instrumentator=8.0.2
   userInterface:
     control: HIDDEN
 - name: CondaChannels
@@ -132,35 +136,38 @@ steps:
       - name: Enter
         filename: start-vllm.sh
         type: TEXT
-        data: "#!/bin/bash\nset -euo pipefail\n\nexport HF_TOKEN=\"{{Param.HfToken}}\"\
-          \n\n# Bypass user-local site-packages (~/.local/lib/...) so Python only\
-          \ uses\n# the conda env. Avoids conflicts with stale packages on the worker\
-          \ AMI\n# (e.g. old typing_extensions missing TypeIs that breaks newer Starlette).\n\
-          export PYTHONNOUSERSITE=1\n\necho \"Starting vLLM server for {{Param.ModelName}}...\"\
-          \nVLLM_LOG=\"{{Session.WorkingDirectory}}/vllm_server.log\"\necho \"openjd_env:\
-          \ VLLM_LOG=$VLLM_LOG\"\n\nnohup python \"{{Env.File.VllmLauncher}}\" \\\n\
-          \  --model \"{{Param.ModelName}}\" \\\n  --dtype auto \\\n  --port 8000\
-          \ \\\n  --gpu-memory-utilization {{Param.GpuMemoryUtilization}} \\\n  --max-model-len\
-          \ {{Param.MaxModelLen}} \\\n  --no-enable-log-requests \\\n  --enforce-eager\
-          \ \\\n  > \"$VLLM_LOG\" 2>&1 &\nVLLM_PID=$!\necho \"openjd_env: VLLM_PID=$VLLM_PID\"\
-          \n\n# Wait for server to be ready using the embedded Python wait script\n\
-          python \"{{Env.File.WaitScript}}\" \"$VLLM_PID\" \"$VLLM_LOG\"\n"
-      - name: VllmLauncher
-        filename: vllm_launcher.py
-        type: TEXT
-        data: "# Monkey-patch prometheus-fastapi-instrumentator to handle the\n# `_IncludedRouter\
-          \ has no attribute path` AttributeError that breaks\n# every HTTP request\
-          \ when used with newer Starlette/FastAPI.\nimport prometheus_fastapi_instrumentator.routing\
-          \ as _r\n_orig = _r._get_route_name\ndef _safe_get_route_name(scope, routes):\n\
-          \    try:\n        return _orig(scope, routes)\n    except AttributeError:\n\
-          \        return \"\"\n_r._get_route_name = _safe_get_route_name\n\n# Also\
-          \ patch the routing.get_route_name wrapper to swallow the same error\n_orig_outer\
-          \ = _r.get_route_name\ndef _safe_outer(request):\n    try:\n        return\
-          \ _orig_outer(request)\n    except AttributeError:\n        return \"\"\n\
-          _r.get_route_name = _safe_outer\n\n# Now hand off to vLLM's normal entry\
-          \ point (equivalent to python -m vllm.entrypoints.openai.api_server)\nimport\
-          \ runpy\nrunpy.run_module(\"vllm.entrypoints.openai.api_server\", run_name=\"\
-          __main__\", alter_sys=True)\n"
+        data: |
+          #!/bin/bash
+          set -euo pipefail
+
+          export HF_TOKEN="{{Param.HfToken}}"
+
+          # Bypass user-local site-packages (~/.local/lib/...) so Python only uses
+          # the conda env. Avoids conflicts with stale packages on the worker AMI
+          # (e.g. old typing_extensions missing TypeIs that breaks newer Starlette).
+          export PYTHONNOUSERSITE=1
+
+          echo "Starting vLLM server for {{Param.ModelName}}..."
+          VLLM_LOG="{{Session.WorkingDirectory}}/vllm_server.log"
+          echo "openjd_env: VLLM_LOG=$VLLM_LOG"
+
+          # --enforce-eager disables CUDA graph capture (~20-30% throughput cost)
+          # but prevents hangs on some AMI/driver combos at startup. Remove it
+          # (and test) for maximum throughput on a known-good GPU fleet.
+          nohup python -m vllm.entrypoints.openai.api_server \
+            --model "{{Param.ModelName}}" \
+            --dtype auto \
+            --port 8000 \
+            --gpu-memory-utilization {{Param.GpuMemoryUtilization}} \
+            --max-model-len {{Param.MaxModelLen}} \
+            --no-enable-log-requests \
+            --enforce-eager \
+            > "$VLLM_LOG" 2>&1 &
+          VLLM_PID=$!
+          echo "openjd_env: VLLM_PID=$VLLM_PID"
+
+          # Wait for server to be ready using the embedded Python wait script
+          python "{{Env.File.WaitScript}}" "$VLLM_PID" "$VLLM_LOG"
       - name: WaitScript
         filename: wait_for_vllm.py
         type: TEXT

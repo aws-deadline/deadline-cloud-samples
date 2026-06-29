@@ -43,7 +43,7 @@ You need:
 - An SMF fleet with NVIDIA GPUs and ≥32 GB RAM. FLUX.2 Klein 4B fits comfortably on 16 GB+ GPUs (e.g. L4, A10G, RTX 3090/4070) thanks to CPU offloading; tiny GPUs may need to fall back to a smaller model.
 - A queue with a Conda queue environment attached that reads `CondaPackages` and `CondaChannels` job parameters.
 
-> **Note on dependencies.** `Flux2KleinPipeline` is only available in bleeding-edge `diffusers`, so the bundle ships an `InstallDeps` job environment that pip-installs PyTorch (CUDA 12.4) and `diffusers` from git on top of the queue's Conda env on every session, plus downloads 4 small Google Fonts (~600 KB) for the caption overlay. Expect ~30–90 s of additional setup time per worker on first use, plus the model download on first run.
+> **Note on dependencies.** `Flux2KleinPipeline` is not yet in a PyPI `diffusers` release (latest: 0.36.0), so the bundle ships an `InstallDeps` job environment that pip-installs PyTorch (CUDA 12.4) and `diffusers` from a pinned git commit (`c112837`) on top of the queue's Conda env on every session, plus downloads 4 small Google Fonts (~600 KB) for the caption overlay. Expect ~30–90 s of additional setup time per worker on first use, plus the model download on first run. When `Flux2KleinPipeline` ships in a stable PyPI release, update `InstallDeps` to use `pip install diffusers==<version>` instead.
 
 The fastest way to get a compatible farm is to deploy the [`cuda_farm`](../../cloudformation/farm_templates/cuda_farm) CloudFormation template (same one used by `vllm_batch`). Once the stack reaches `CREATE_COMPLETE`:
 

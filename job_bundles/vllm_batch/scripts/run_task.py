@@ -3,7 +3,6 @@
 import argparse
 import json
 import os
-import sys
 import time
 import urllib.request
 import urllib.error
@@ -44,6 +43,7 @@ def call_vllm(prompt_text, model, max_tokens, temperature):
                 time.sleep(2)
             else:
                 raise
+    raise RuntimeError("unreachable: retry loop exited without returning or raising")
 
 
 def main():

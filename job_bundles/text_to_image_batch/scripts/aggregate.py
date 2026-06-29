@@ -243,7 +243,8 @@ def main():
     # gallery.html — the human-friendly viewer. References images/ relatively
     # (sibling directory inside output/).
     gallery_path = os.path.join(output_root, "gallery.html")
-    data_json = json.dumps(items, ensure_ascii=False)
+    # Escape "</" so user-controlled strings can't break out of the <script> block.
+    data_json = json.dumps(items, ensure_ascii=False).replace("</", "<\\/")
     html = HTML_TEMPLATE.replace("__DATA_PLACEHOLDER__", data_json)
     with open(gallery_path, "w") as f:
         f.write(html)

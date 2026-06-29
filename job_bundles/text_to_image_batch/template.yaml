@@ -234,9 +234,13 @@ jobEnvironments:
         echo "Installing PyTorch with CUDA 12.4 support..."
         pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
+        # Flux2KleinPipeline is not yet in a PyPI diffusers release (latest: 0.36.0).
+        # Pinned to a specific commit so this bundle doesn't silently break on future
+        # main-branch changes. Bump the hash when testing a newer upstream revision.
+        DIFFUSERS_COMMIT=c112837d160efc3c3c1e894de0c44cfc5323d314
         echo "Installing diffusers from git (for Flux2KleinPipeline) + deps..."
         pip install --quiet \
-          git+https://github.com/huggingface/diffusers.git \
+          git+https://github.com/huggingface/diffusers.git@${DIFFUSERS_COMMIT} \
           transformers \
           accelerate \
           sentencepiece \

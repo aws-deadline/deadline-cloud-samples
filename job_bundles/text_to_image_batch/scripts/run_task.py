@@ -35,6 +35,11 @@ import urllib.request
 # Subject extraction from chained-from-vllm prompts
 # ---------------------------------------------------------------------------
 
+# Matches vllm_batch-style requests like "Write a slogan for artisan sourdough bread
+# targeting millennials" and captures the subject ("artisan sourdough bread") so we
+# can use it as the diffusion prompt instead of the generated slogan text (which is
+# too abstract to give the model a concrete visual subject).
+# Structure: <action verb> [optional modifiers] <creative-copy noun> for/about <subject> [stop word]
 SLOGAN_REQUEST_PATTERN = re.compile(
     r"(?ix)"
     r"(?:write|generate|create|make|compose|craft|draft|design)\s+"
@@ -354,8 +359,8 @@ def call_diffusers(payload, port, attempts=3, attempt_timeout=600):
             body = b""
             try:
                 body = e.read()
-            except Exception:
-                pass
+            except Exception as read_err:
+                print(f"  WARN: could not read error response body: {read_err}", flush=True)
             try:
                 err = json.loads(body)
                 raise RuntimeError(
