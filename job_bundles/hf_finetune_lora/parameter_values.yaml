@@ -1,0 +1,7 @@
+# Pre-populate values for the queue environment's parameters in the GUI submitter.
+# These show up as the defaults in the "Queue Environment: Conda" section.
+parameterValues:
+  - name: CondaPackages
+    value: "python=3.11 pip pyyaml safetensors huggingface_hub"
+  - name: CondaChannels
+    value: "deadline-cloud conda-forge"

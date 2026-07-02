@@ -1,0 +1,316 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: HuggingFace LoRA Fine-Tuning
+description: Fine-tune a HuggingFace causal LM with LoRA / QLoRA on a custom instruction dataset
+
+parameterDefinitions:
+
+# ---------- Model ----------
+- name: BaseModel
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Base Model
+    groupLabel: Model
+  default: "Qwen/Qwen2.5-7B"
+  allowedValues:
+  - "Qwen/Qwen2.5-1.5B"
+  - "Qwen/Qwen2.5-7B"
+  - "Qwen/Qwen2.5-0.5B"
+  - "meta-llama/Llama-3.1-8B"
+  - "mistralai/Mistral-7B-v0.3"
+  - "microsoft/Phi-3.5-mini-instruct"
+  description: HuggingFace model ID to fine-tune. Larger models require more VRAM but produce better fact recall.
+
+- name: HuggingFaceToken
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: HuggingFace Token (optional)
+    groupLabel: Model
+  default: ""
+  description: Required only for gated models (Llama, Mistral). Leave empty otherwise.
+
+- name: UseQLoRA
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Use QLoRA (4-bit quantization)
+    groupLabel: Model
+  default: "yes"
+  allowedValues: ["yes", "no"]
+  description: 4-bit quantization to fit larger models on smaller GPUs. Recommended for >3B params.
+
+# ---------- Dataset ----------
+- name: DatasetPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Dataset Folder (local)
+    groupLabel: Dataset
+  default: "sample_data"
+  description: |
+    Local folder containing one or more .jsonl training files. All .jsonl
+    files in the folder are concatenated. Auto-uploaded to S3 via job
+    attachments. Default points to the bundle's bundled sample_data.
+
+- name: DatasetS3Uri
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Dataset S3 URI (optional override)
+    groupLabel: Dataset
+  default: ""
+  description: |
+    Optional. If set, ignores DatasetPath and downloads from S3 instead.
+    Accepts either a single .jsonl URI (s3://bucket/path/train.jsonl) or
+    a prefix ending in / (s3://bucket/path/) which loads all .jsonl files
+    under that prefix.
+
+- name: InstructionColumn
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Instruction Column
+    groupLabel: Dataset
+  default: "instruction"
+  description: JSONL field name for the user prompt
+
+- name: ResponseColumn
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Response Column
+    groupLabel: Dataset
+  default: "output"
+  description: JSONL field name for the target response
+
+- name: MaxSamples
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Max Samples (0 = all)
+    groupLabel: Dataset
+  default: 0
+  minValue: 0
+  maxValue: 1000000
+  description: Cap dataset size for fast tests. 0 means use the entire dataset.
+
+# ---------- LoRA ----------
+- name: LoraRank
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: LoRA Rank (r)
+    groupLabel: LoRA Configuration
+  default: 32
+  minValue: 1
+  maxValue: 256
+  description: Higher rank = more adapter capacity = more VRAM. Typical 8/16/32/64. 32 works well for fact memorization.
+
+- name: LoraAlpha
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: LoRA Alpha
+    groupLabel: LoRA Configuration
+  default: 64
+  minValue: 1
+  maxValue: 512
+  description: LoRA scaling factor. Convention is 2x the rank.
+
+- name: LoraDropout
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: LoRA Dropout
+    groupLabel: LoRA Configuration
+  default: "0.05"
+  description: Dropout regularization for LoRA layers (0.0 - 0.5)
+
+# ---------- Training ----------
+- name: LearningRate
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Learning Rate
+    groupLabel: Training
+  default: "1e-4"
+  description: Typical LoRA range 1e-4 to 5e-4. Supports scientific notation.
+
+- name: Epochs
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Epochs
+    groupLabel: Training
+  default: 10
+  minValue: 1
+  maxValue: 100
+
+- name: PerDeviceBatchSize
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Per-Device Batch Size
+    groupLabel: Training
+  default: 1
+  minValue: 1
+  maxValue: 64
+
+- name: GradAccumSteps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Gradient Accumulation Steps
+    groupLabel: Training
+  default: 4
+  minValue: 1
+  maxValue: 64
+
+- name: MaxSeqLength
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Max Sequence Length
+    groupLabel: Training
+  default: 512
+  minValue: 64
+  maxValue: 4096
+
+# ---------- Output ----------
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+  description: Where the LoRA adapter will be saved (downloaded back via job attachments)
+
+- name: AdapterName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Adapter Name
+    groupLabel: Output
+  default: "my-lora-adapter"
+  description: Subfolder name for the adapter (under Output Directory)
+
+# ---------- Hidden / advanced ----------
+- name: TrainScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  default: train.py
+
+- name: HfCacheDir
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: "/mnt/persistent/hf_cache"
+  description: Cache directory (uses persistent volume for cross-job model reuse)
+
+- name: RunTests
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: "no"
+  allowedValues: ["yes", "no"]
+  description: If yes, runs a small Saffron Stack test suite after training and prints answers to the log.
+
+# NOTE: CondaPackages and CondaChannels parameters come from the queue's Conda
+# queue environment. Default values for them are provided in parameter_values.yaml
+# (so they auto-populate the GUI submitter), rather than re-declaring them here.
+
+
+jobEnvironments:
+
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+    TOKENIZERS_PARALLELISM: "false"
+
+- name: InstallDeps
+  description: Install PyTorch + HuggingFace fine-tuning stack via pip
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ['{{Env.File.Enter}}']
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      filename: install_deps.sh
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        echo "[deps] Python: $(python3 --version)"
+        echo "[deps] Installing PyTorch with CUDA 12.4..."
+        pip install --quiet torch --index-url https://download.pytorch.org/whl/cu124
+        echo "[deps] Installing HuggingFace + PEFT + bitsandbytes stack..."
+        pip install --quiet \
+          "transformers>=4.45,<5" \
+          "peft>=0.13,<1" \
+          "accelerate>=1.0,<2" \
+          "bitsandbytes>=0.44,<1" \
+          "datasets>=3.0,<4" \
+          "boto3>=1.35,<2"
+        echo "[deps] Verifying GPU availability..."
+        python3 -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); \
+          print(f'Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"NO GPU\"}')"
+        echo "[deps] Install complete."
+
+steps:
+- name: FineTune
+  description: Run QLoRA fine-tuning on the configured base model and dataset
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      filename: run_training.sh
+      runnable: true
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+        echo "[run] Starting LoRA fine-tuning"
+        python3 -u "{{Param.TrainScript}}" \
+          --base-model "{{Param.BaseModel}}" \
+          --hf-token "{{Param.HuggingFaceToken}}" \
+          --use-qlora "{{Param.UseQLoRA}}" \
+          --dataset-path "{{Param.DatasetPath}}" \
+          --dataset-s3-uri "{{Param.DatasetS3Uri}}" \
+          --instruction-column "{{Param.InstructionColumn}}" \
+          --response-column "{{Param.ResponseColumn}}" \
+          --max-samples {{Param.MaxSamples}} \
+          --lora-rank {{Param.LoraRank}} \
+          --lora-alpha {{Param.LoraAlpha}} \
+          --lora-dropout {{Param.LoraDropout}} \
+          --learning-rate {{Param.LearningRate}} \
+          --epochs {{Param.Epochs}} \
+          --per-device-batch-size {{Param.PerDeviceBatchSize}} \
+          --grad-accum-steps {{Param.GradAccumSteps}} \
+          --max-seq-length {{Param.MaxSeqLength}} \
+          --output-dir "{{Param.OutputDir}}" \
+          --adapter-name "{{Param.AdapterName}}" \
+          --hf-cache-dir "{{Param.HfCacheDir}}" \
+          --run-tests "{{Param.RunTests}}"
+        echo "[run] Training step complete."
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    - name: amount.worker.memory
+      min: 32768
