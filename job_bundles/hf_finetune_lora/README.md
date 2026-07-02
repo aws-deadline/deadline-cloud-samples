@@ -78,7 +78,7 @@ Compatible with many public HuggingFace datasets including:
 - [`HuggingFaceH4/no_robots`](https://huggingface.co/datasets/HuggingFaceH4/no_robots)
 - [`yahma/alpaca-cleaned`](https://huggingface.co/datasets/yahma/alpaca-cleaned)
 
-See [`examples/`](./examples/) for two complete examples (style transfer + fictional knowledge).
+See [`sample_data/`](./sample_data/) for the bundled example dataset that ships with the bundle.
 
 ## Key parameters
 
@@ -243,18 +243,17 @@ print(tokenizer.decode(outputs[0][inputs.shape[1]:], skip_special_tokens=True))
 You can also use `model.disable_adapter()` to temporarily switch back to the base
 model for A/B comparison.
 
-## Examples
+## Bundled sample data
 
-The `examples/` directory contains a complete end-to-end example:
+The bundle ships with a small fully-fictional example dataset in
+[`sample_data/`](./sample_data/) so that submitting with all defaults produces
+a working demo out of the box. The dataset teaches the model facts about
+"Saffron Stack" — an invented Chipotle-style vegetarian Indian fast-casual chain
+— demonstrating the pattern for fine-tuning on your own proprietary knowledge
+(product wiki, internal acronyms, customer-support playbook, brand voice, etc.).
 
-### [examples/saffron_stack/](examples/saffron_stack/) — Fictional knowledge
-Teaches the model facts about an invented restaurant chain. Demonstrates
-fine-tuning as a way to inject **proprietary or domain-specific knowledge**
-into a model — the standard use case for company-internal fine-tunes (product
-wiki, internal acronyms, customer-support playbook, brand voice, etc.).
-
-The example ships as bundled sample data (see [`sample_data/`](./sample_data/))
-so submitting the bundle with all defaults trains on it out of the box.
+To use your own data, simply replace the files in `sample_data/` with your own
+JSONL files, or point the `DatasetPath` parameter at a different folder.
 
 ## Output structure
 
