@@ -1,0 +1,5 @@
+version: "1.0"
+preSubmission:
+  - command: python3
+    args: [scripts/discover_vrscene_assets.py]
+    timeout: 120

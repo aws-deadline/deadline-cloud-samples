@@ -116,6 +116,13 @@ S3 prefix, then distributes the hashing and data copies across a number of worke
 uses content-addressed storage for data files, users that later submit jobs with these files attached will not have to
 upload them.
 
+### FFmpeg movie from job output
+
+The [ffmpeg_movie_from_job_output](ffmpeg_movie_from_job_output) job bundle downloads the rendered output of another
+completed job in the same queue and uses FFmpeg to encode the image sequence into an MP4 video. This is useful as a
+post-processing utility — after a render job completes, submit this job with the source Job ID to automatically
+assemble the frames into a movie with configurable frame rate, quality, and resolution settings.
+
 ### SSH via SSM Managed Node
 
 The [ssh_to_smf](ssh_to_smf/README.md) job bundle registers a Deadline Cloud worker as an

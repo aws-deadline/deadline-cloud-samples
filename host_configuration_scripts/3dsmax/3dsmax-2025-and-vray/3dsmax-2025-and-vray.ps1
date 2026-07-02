@@ -8,17 +8,11 @@ Requirements:
 - Your fleet role must have permissions to s3:GetObject both the installer files from your S3 bucket.
 #>
 
-# TODO: Replace the below value with your bucket name
-$BUCKET_NAME="your-bucket-name"
-
-# TODO: Replace this with your 3dsMax folder name
-$3DS_MAX_FOLDER_NAME="3ds Max 2025.2 Update - (EN)"
-
-# TODO: Replace this with your 3dsMax zip file name
-$3DS_MAX_ZIP_FILE="$3DS_MAX_FOLDER_NAME.zip"
-
-# TODO: Replace this with your V-Ray for 3dsMax 2025 installer file name
-$VRAY_FOR_3DSMAX2025_INSTALLER_FILE="vray_adv_71000_max2025_x64.exe"
+# TODO: Replace the below value with your S3 URI from your bucket
+# Guide on how to create the 3ds Max installer zip file: https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/host_configuration_scripts/3dsmax/README.md
+$3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket-name/path/to/3ds-max-2025.zip"
+# TODO: Replace the below values with the S3 URI from your bucket
+$VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI="s3://your-bucket-name/path/to/vray_adv_71000_max2025_x64.exe"
 
 # Optional: Replace this with your preferred V-Ray for 3dsMax 2025 installation root
 $VRAY_FOR_3DSMAX2025_INSTALL_ROOT="C:\Program Files\Chaos\V-Ray\3ds Max 2025"
@@ -26,13 +20,13 @@ $VRAY_FOR_3DSMAX2025_INSTALL_ROOT="C:\Program Files\Chaos\V-Ray\3ds Max 2025"
 Write-Host ' --- Installing 3dsMax 2025 --- '
 
 mkdir C:\3dsmax_setup -Force
-aws s3 cp --no-progress "s3://$BUCKET_NAME/$3DS_MAX_ZIP_FILE" C:\3dsmax_setup\3dsmax.zip
+aws s3 cp --no-progress "$3DS_MAX_INSTALLER_ZIP_S3_URI" C:\3dsmax_setup\3dsmax.zip
 Expand-Archive C:\3dsmax_setup\3dsmax.zip C:\3dsmax_setup\
-Start-Process "C:\3dsmax_setup\$3DS_MAX_FOLDER_NAME\Setup.exe" -ArgumentList '-q' -Wait
+Start-Process "C:\3dsmax_setup\Setup.exe" -ArgumentList '-q' -Wait
 
 Write-Host ' --- Installing V-Ray for 3dsMax 2025 --- '
-
-aws s3 cp --no-progress "s3://$BUCKET_NAME/$VRAY_FOR_3DSMAX2025_INSTALLER_FILE" C:\3dsmax_setup\
+$VRAY_INSTALLER = Split-Path "$VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI" -Leaf
+aws s3 cp --no-progress "$VRAY_FOR_3DSMAX2025_INSTALLER_EXE_S3_URI" "C:\3dsmax_setup\$VRAY_INSTALLER"
 @"
 <DefValues>
 <Value Name="INSTALL_TYPE" DataType="value">1</Value>
@@ -46,7 +40,7 @@ aws s3 cp --no-progress "s3://$BUCKET_NAME/$VRAY_FOR_3DSMAX2025_INSTALLER_FILE" 
 <Value Name="VISIT_SPOT3D" DataType="value">0</Value>
 </DefValues>
 "@ | Out-File -FilePath "C:\3dsmax_setup\config.xml" -Encoding UTF8
-Start-Process "C:\3dsmax_setup\$VRAY_FOR_3DSMAX2025_INSTALLER_FILE" -ArgumentList '-gui=0','-configFile=C:\3dsmax_setup\config.xml','-quiet=1' -Wait
+Start-Process "C:\3dsmax_setup\$VRAY_INSTALLER" -ArgumentList '-gui=0','-configFile=C:\3dsmax_setup\config.xml','-quiet=1' -Wait
 
 Write-Host ' --- Configuring environment for 3dsMax 2025 --- '
 
@@ -60,6 +54,9 @@ Write-Host ' --- Configuring environment for V-Ray for 3dsMax 2025 --- '
 [System.Environment]::SetEnvironmentVariable('VRAY_FOR_3DSMAX2025_MAIN', 'C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\bin\', 'Machine')
 [System.Environment]::SetEnvironmentVariable('VRAY_FOR_3DSMAX2025_PLUGINS', 'C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\bin\plugins\', 'Machine')
 [System.Environment]::SetEnvironmentVariable('VRAY_MDL_PATH_3DSMAX2025', "$VRAY_FOR_3DSMAX2025_INSTALL_ROOT\mdl", 'Machine')
+
+# V-Ray introduced Cloud Licensing in 7.30.02 which must be disabled for UBL to work
+Start-Process "C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax2025\utils\setvrlservice.exe" -ArgumentList '-cloud-server=0' -Wait -ErrorAction SilentlyContinue
 
 Write-Host ' --- Installing Deadline Cloud for 3dsMax --- '
 

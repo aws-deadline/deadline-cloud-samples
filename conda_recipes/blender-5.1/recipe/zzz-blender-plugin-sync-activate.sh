@@ -22,9 +22,9 @@ fi
 
 _SP_PREFIX="${DEADLINE_JA_ROOT_PREFIX:+${DEADLINE_JA_ROOT_PREFIX}/}"
 _SP_OS="linux"
-if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -n "${OS:-}" ]; then
-    _SP_OS="windows"
-fi
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) _SP_OS="windows" ;;
+esac
 
 # Determine plugin download directory
 _SP_PLUGIN_DIR="${OPENJD_SESSION_WORKING_DIR:-${TMPDIR:-/tmp}}/deadline-plugins/blender"

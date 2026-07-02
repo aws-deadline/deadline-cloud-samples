@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: vina_1.2.5_linux_x86_64
+    sourceDownloadInstructions: 'Run "curl -LO https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64 --output-dir archive_files"'
+    buildTool: rattler-build

@@ -1,0 +1,117 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Satellite Imagery Classification - Grand Canyon
+description: |
+  Classifies Sentinel-2 satellite tiles into 5 land-cover classes
+  (Water, Vegetation, Bare Soil, Rock, Cloud/Snow) using spectral
+  index thresholds (NDVI, NDWI, BSI). Each tile is processed as an
+  independent parallel task, followed by a mosaic assembly step.
+
+parameterDefinitions:
+- name: TilesDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: sample_tiles
+  description: "Directory containing input Sentinel-2 GeoTIFF tiles (4-band: Red, Green, Blue, NIR)."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Input Tiles Directory
+    groupLabel: Input / Output
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  description: "Directory where classified GeoTIFFs, PNGs, and final mosaic will be written."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Input / Output
+
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: "Directory containing the bundled Python scripts."
+  userInterface:
+    control: HIDDEN
+
+- name: SampleTilesUrl
+  type: STRING
+  default: "https://downloads.deadlinecloud.amazonaws.com/samples/satellite-classification-tiles"
+  description: "Base URL for downloading sample tiles. Only used when TilesDir is the default."
+  userInterface:
+    control: HIDDEN
+
+- name: CondaPackages
+  type: STRING
+  default: "python numpy rasterio matplotlib"
+  description: "Packages to install via the queue's Conda environment."
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+
+- name: CondaChannels
+  type: STRING
+  default: "conda-forge"
+  description: "Conda channels to resolve packages from."
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+    groupLabel: Software Environment
+
+steps:
+- name: ClassifyTiles
+  hostRequirements:
+    amounts:
+    - name: amount.worker.vcpu
+      min: 2
+    - name: amount.worker.memory
+      min: 4096
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: TileFile
+      type: STRING
+      range:
+      - T12S_GC_North_Rim
+      - T12S_GC_South_Rim
+      - T12S_GC_Inner_Canyon
+      - T12S_GC_Desert_East
+      - T12S_GC_River_West
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/run_classify_tile.py"
+        - "{{Task.Param.TileFile}}"
+        - "{{Param.SampleTilesUrl}}"
+        - "{{Param.TilesDir}}"
+        - "{{Param.OutputDir}}"
+        - "{{Param.ScriptsDir}}"
+
+- name: MosaicResults
+  dependencies:
+  - dependsOn: ClassifyTiles
+  hostRequirements:
+    amounts:
+    - name: amount.worker.vcpu
+      min: 2
+    - name: amount.worker.memory
+      min: 4096
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/mosaic.py"
+        - "{{Param.OutputDir}}"

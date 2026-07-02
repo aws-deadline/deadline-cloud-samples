@@ -2,11 +2,50 @@
 #
 # This script finds the Python that is used by the Deadline Cloud CLI,
 # and then runs submit-package-job-script.py with that Python.
+#
+# It requires a Python interpreter that has the 'deadline' library available.
+# When the Deadline Cloud CLI is installed with `pip install deadline`, this
+# script discovers that interpreter automatically from the 'deadline' entry
+# point script. The standalone submitter installer does not bundle a reusable
+# Python interpreter, so in that case you must point this script at a suitable
+# Python yourself by setting the DEADLINE_PYTHON environment variable, e.g.:
+#
+#     DEADLINE_PYTHON=python3 ./submit-package-job blender-4.2
+#
+# where that Python has the 'deadline' library installed (`pip install deadline`).
 
 set -euo pipefail
 
+usage_error() {
+    echo "ERROR: $1" >&2
+    echo >&2
+    echo "submit-package-job needs a Python interpreter that has the 'deadline' library" >&2
+    echo "installed. Set the DEADLINE_PYTHON environment variable to such an interpreter, e.g.:" >&2
+    echo >&2
+    echo "    DEADLINE_PYTHON=python3 $0 ${SCRIPT_ARGS}" >&2
+    echo >&2
+    echo "and ensure it has the library available (pip install deadline)." >&2
+    exit 1
+}
+
+# Remember the original arguments for use in error messages.
+SCRIPT_ARGS="$*"
+
+# Allow the user to specify their own Python interpreter. This is required when
+# the Deadline Cloud CLI was installed via the standalone submitter installer,
+# which does not ship a reusable Python interpreter.
+if [ -n "${DEADLINE_PYTHON:-}" ]; then
+    # Run the Python script submitter with the provided Python.
+    # Not quoting the command for cases like `DEADLINE_PYTHON="/usr/bin/env python"`.
+    $DEADLINE_PYTHON "$0-script.py" "$@"
+    exit $?
+fi
+
 # Find the path to the 'deadline' executable
-DEADLINE_PATH="$(which deadline)"
+DEADLINE_PATH="$(command -v deadline || true)"
+if [ -z "$DEADLINE_PATH" ]; then
+    usage_error "Could not find the 'deadline' command on your PATH."
+fi
 
 if [ "$(basename "$(dirname "$DEADLINE_PATH")")" = Scripts ]; then
     # Windows Python installation with Scripts directory
@@ -15,8 +54,20 @@ if [ "$(basename "$(dirname "$DEADLINE_PATH")")" = Scripts ]; then
     # Run the Python script submitter with the same Python
     "$DEADLINE_PYTHON" "$0-script.py" "$@"
 else
-    # Take the #! from the script
+    # The 'deadline' command is expected to be a pip-installed entry point
+    # script whose first line is a `#!` shebang pointing at the Python to use.
+    # The standalone submitter installer instead provides a compiled binary
+    # with no reusable interpreter, so guard against that case.
+    if [ "$(head -c 2 "$DEADLINE_PATH")" != "#!" ]; then
+        usage_error "The 'deadline' command at '$DEADLINE_PATH' is not a pip-installed Python script (it looks like the standalone submitter installer build, which does not bundle a reusable Python interpreter)."
+    fi
+
+    # Take the interpreter path from the #! shebang line.
     DEADLINE_PYTHON=$(head -1 "$DEADLINE_PATH" | cut -c 3-)
+
+    if [ -z "$DEADLINE_PYTHON" ]; then
+        usage_error "Could not determine the Python interpreter from '$DEADLINE_PATH'."
+    fi
 
     # Run the Python script submitter with the same Python.
     # Not quoting the command for cases like `#!/usr/bin/env python`

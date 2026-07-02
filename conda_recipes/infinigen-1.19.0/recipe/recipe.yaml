@@ -1,0 +1,73 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+#
+# Packages Infinigen (procedural 3D scene generator built on Blender)
+# for use on AWS Deadline Cloud service-managed fleets.
+#
+# Infinigen requires bpy==4.2.0 (Blender as Python module) and Python 3.11.
+# The terrain C++ extensions are compiled during pip install via setuptools/Cython.
+
+context:
+  version: "1.19.0"
+
+package:
+  name: infinigen
+  version: ${{ version }}
+
+source:
+  - git: https://github.com/princeton-vl/infinigen.git
+    tag: v${{ version }}
+    target_directory: infinigen
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - bash $RECIPE_DIR/build.sh
+  # Infinigen bundles compiled .so files from the terrain build that link
+  # against libraries provided by pip-installed wheels (e.g. bpy). Disable
+  # binary relocation so those rpaths are preserved.
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+  prefix_detection:
+    ignore_binary_files: true
+
+requirements:
+  host:
+    - python =3.11
+    - pip
+    - setuptools
+    - numpy <2
+    - cython
+    - cmake
+    - gxx_linux-64
+    # System deps for terrain/OpenGL
+    - mesalib
+    - glew
+    - glm
+    - zlib
+  run:
+    - python =3.11
+    - numpy <2
+    - mesalib
+    - glew
+    - glm
+    - zlib
+
+tests:
+  - script:
+      - python -c "import infinigen; print(f'Infinigen {infinigen.__version__}')"
+
+about:
+  homepage: https://infinigen.org/
+  # Reflects Infinigen's own source license. The built package also bundles
+  # bpy (Blender, GPL); the built artifact is therefore subject to GPL terms.
+  # See README "Licensing" for redistribution implications.
+  license: BSD-3-Clause
+  summary: >
+    Infinigen is a procedural generator of photorealistic 3D scenes built on Blender.
+    It generates scenes entirely from randomized mathematical rules, producing RGB,
+    depth, surface normals, optical flow, and segmentation ground truth.

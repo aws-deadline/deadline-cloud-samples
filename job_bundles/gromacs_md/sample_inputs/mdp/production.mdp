@@ -1,0 +1,50 @@
+; Production MD parameters for GROMACS
+; Unrestrained NPT simulation at 300K/1bar
+
+; Run parameters
+integrator  = md            ; Leap-frog integrator
+nsteps      = 500000        ; 1 ns (2fs * 500000)
+dt          = 0.002         ; 2 fs timestep
+
+; Output control
+nstxout-compressed  = 5000  ; Write compressed coords every 10 ps
+nstlog              = 5000  ; Update log file every 10 ps
+nstenergy           = 5000  ; Save energies every 10 ps
+
+; Bond parameters
+continuation    = yes       ; Continuing from NPT
+constraint_algorithm = lincs
+constraints     = h-bonds
+lincs_iter      = 1
+lincs_order     = 4
+
+; Neighbor searching
+nstlist         = 10
+cutoff-scheme   = Verlet
+ns_type         = grid
+rcoulomb        = 1.0
+rvdw            = 1.0
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.16
+
+; Temperature coupling
+tcoupl      = V-rescale
+tc-grps     = Protein Non-Protein
+tau_t       = 0.1     0.1
+ref_t       = 300     300
+
+; Pressure coupling
+pcoupl          = Parrinello-Rahman
+pcoupltype      = isotropic
+tau_p           = 2.0
+ref_p           = 1.0
+compressibility = 4.5e-5
+
+; Periodic boundary conditions
+pbc         = xyz
+
+; Velocity generation
+gen_vel     = no            ; Velocities from equilibration

@@ -1,0 +1,380 @@
+specificationVersion: jobtemplate-2023-09
+name: CARLA Simulation Demo
+description: |
+  Run a CARLA lane-change cut-in scenario where an NPC vehicle overtakes and
+  cuts into the ego vehicle's lane. Sweeps across ego speeds, NPC speeds, and
+  NPC distances to generate a parameter grid. Each combination runs as a
+  parallel task, capturing multi-camera RGB frames and producing per-task videos.
+
+parameterDefinitions:
+  # --- Scenario Settings ---
+  - name: CarlaBootTown
+    type: STRING
+    default: "Town04"
+    allowedValues: ["Town04", "Town10HD_Opt"]
+    description: |
+      Town to run the scenario in. Must match the scenario file's set_map().
+      Town04: multi-lane highway (lane change, overtake, cut-in scenarios).
+    userInterface:
+      control: DROPDOWN_LIST
+      label: Town Map
+      groupLabel: Scenario Settings
+
+  - name: EgoSpeeds
+    type: STRING
+    default: "20,40"
+    description: "Ego vehicle speeds (kph), comma-separated."
+    userInterface:
+      control: LINE_EDIT
+      label: Ego Speeds (kph)
+      groupLabel: Scenario Settings
+
+  - name: NpcSpeeds
+    type: STRING
+    default: "30,50"
+    description: "NPC vehicle speeds (kph), comma-separated."
+    userInterface:
+      control: LINE_EDIT
+      label: NPC Speeds (kph)
+      groupLabel: Scenario Settings
+
+  - name: NpcDistances
+    type: STRING
+    default: "10,15"
+    description: "NPC starting distances (m), comma-separated."
+    userInterface:
+      control: LINE_EDIT
+      label: NPC Distances (m)
+      groupLabel: Scenario Settings
+
+  # --- Camera Viewpoints ---
+  - name: CamFront
+    type: STRING
+    default: "True"
+    allowedValues: ["True", "False"]
+    description: Forward-facing dashcam view
+    userInterface:
+      control: CHECK_BOX
+      label: Front
+      groupLabel: Camera Viewpoints
+
+  - name: CamFrontLeft
+    type: STRING
+    default: "False"
+    allowedValues: ["True", "False"]
+    description: Front-left 60° view
+    userInterface:
+      control: CHECK_BOX
+      label: Front Left
+      groupLabel: Camera Viewpoints
+
+  - name: CamFrontRight
+    type: STRING
+    default: "False"
+    allowedValues: ["True", "False"]
+    description: Front-right 60° view
+    userInterface:
+      control: CHECK_BOX
+      label: Front Right
+      groupLabel: Camera Viewpoints
+
+  - name: CamRear
+    type: STRING
+    default: "False"
+    allowedValues: ["True", "False"]
+    description: Rear-facing view
+    userInterface:
+      control: CHECK_BOX
+      label: Rear
+      groupLabel: Camera Viewpoints
+
+  - name: CamRearLeft
+    type: STRING
+    default: "False"
+    allowedValues: ["True", "False"]
+    description: Rear-left 120° view
+    userInterface:
+      control: CHECK_BOX
+      label: Rear Left
+      groupLabel: Camera Viewpoints
+
+  - name: CamRearRight
+    type: STRING
+    default: "False"
+    allowedValues: ["True", "False"]
+    description: Rear-right 120° view
+    userInterface:
+      control: CHECK_BOX
+      label: Rear Right
+      groupLabel: Camera Viewpoints
+
+  # --- Output ---
+  - name: OutputDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    default: ./outputs
+    description: Root output directory (each task writes to a subdirectory)
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Output Directory
+      groupLabel: Output
+
+  # --- Advanced ---
+  - name: ImageURI
+    type: STRING
+    description: ECR URI of the CARLA multi-sensor image
+    default: "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16"
+    userInterface:
+      control: LINE_EDIT
+      label: Container Image URI
+      groupLabel: Advanced
+
+  - name: AwsRegion
+    type: STRING
+    default: "us-west-2"
+    userInterface:
+      control: LINE_EDIT
+      label: AWS Region (for ECR login)
+      groupLabel: Advanced
+
+  - name: CarlaTimeoutSeconds
+    type: INT
+    default: 120
+    minValue: 30
+    maxValue: 600
+    description: How long to wait for the CARLA server to come up before failing
+    userInterface:
+      control: SPIN_BOX
+      label: CARLA Boot Timeout (seconds)
+      groupLabel: Advanced
+
+  - name: CondaChannels
+    type: STRING
+    default: conda-forge
+    description: Conda channels for the queue environment. ffmpeg requires conda-forge.
+    userInterface:
+      control: HIDDEN
+
+  - name: CondaPackages
+    type: STRING
+    default: "ffmpeg"
+    description: Conda packages to install in the queue environment
+    userInterface:
+      control: LINE_EDIT
+      label: Conda Packages
+      groupLabel: Advanced
+
+steps:
+  - name: 1-RunScenario
+    hostRequirements:
+      amounts:
+        - name: amount.worker.gpu
+          min: 1
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: EgoSpeed
+          type: INT
+          range: "{{Param.EgoSpeeds}}"
+        - name: NpcSpeed
+          type: INT
+          range: "{{Param.NpcSpeeds}}"
+        - name: NpcDistance
+          type: INT
+          range: "{{Param.NpcDistances}}"
+      combination: EgoSpeed * NpcSpeed * NpcDistance
+    script:
+      actions:
+        onRun:
+          command: bash
+          args:
+            - "{{Task.File.Run}}"
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          data: |
+            set -euo pipefail
+
+            # Switch to the session's asset root so relative paths like
+            # {{Param.OutputDir}} (e.g. ./outputs) resolve under the area that
+            # Deadline Cloud tracks for output uploads.
+            ASSET_ROOT=$(find /sessions -maxdepth 2 -name "assetroot-*" -type d 2>/dev/null | head -1)
+            if [[ -z "$ASSET_ROOT" ]]; then
+                echo "ERROR: could not locate asset root under /sessions"
+                exit 1
+            fi
+            cd "$ASSET_ROOT"
+            echo "Asset root: $ASSET_ROOT"
+
+            EGO_SPEED="{{Task.Param.EgoSpeed}}"
+            NPC_SPEED="{{Task.Param.NpcSpeed}}"
+            NPC_DISTANCE="{{Task.Param.NpcDistance}}"
+            TASK_NAME="ego${EGO_SPEED}_npc${NPC_SPEED}_dist${NPC_DISTANCE}"
+
+            # Assemble camera list from checkboxes
+            CAMERAS=""
+            if [[ "{{Param.CamFrontLeft}}" == "True" ]]; then CAMERAS="${CAMERAS}front_left,"; fi
+            if [[ "{{Param.CamFront}}" == "True" ]]; then CAMERAS="${CAMERAS}front,"; fi
+            if [[ "{{Param.CamFrontRight}}" == "True" ]]; then CAMERAS="${CAMERAS}front_right,"; fi
+            if [[ "{{Param.CamRearLeft}}" == "True" ]]; then CAMERAS="${CAMERAS}rear_left,"; fi
+            if [[ "{{Param.CamRear}}" == "True" ]]; then CAMERAS="${CAMERAS}rear,"; fi
+            if [[ "{{Param.CamRearRight}}" == "True" ]]; then CAMERAS="${CAMERAS}rear_right,"; fi
+            CAMERAS="${CAMERAS%,}"  # trim trailing comma
+            if [[ -z "$CAMERAS" ]]; then
+                CAMERAS="front"  # fallback if nothing selected
+            fi
+
+            echo "=== CARLA Simulation Demo ==="
+            echo "  EgoSpeed:    ${EGO_SPEED} kph"
+            echo "  NpcSpeed:    ${NPC_SPEED} kph"
+            echo "  NpcDistance: ${NPC_DISTANCE} m"
+            echo "  Cameras:     ${CAMERAS}"
+            echo "  Task name:   $TASK_NAME"
+
+            # Locate template (relative to assetroot, where we cd'd above)
+            TEMPLATE="$ASSET_ROOT/data/change_lane.osc.template"
+            if [[ ! -f "$TEMPLATE" ]]; then
+                echo "ERROR: change_lane.osc.template not found at $TEMPLATE"
+                ls -la "$ASSET_ROOT/data" 2>/dev/null || true
+                exit 1
+            fi
+            DATA_DIR="$ASSET_ROOT/data"
+            echo "Template: $TEMPLATE"
+
+            # Task-specific output dir (must be absolute for docker volume mount)
+            TASK_OUTPUT="{{Param.OutputDir}}/$TASK_NAME"
+            mkdir -p "$TASK_OUTPUT"
+            mkdir -p "$TASK_OUTPUT/video"
+            TASK_OUTPUT=$(cd "$TASK_OUTPUT" && pwd)
+            echo "Task output: $TASK_OUTPUT"
+
+            # Generate scenario from template
+            export EGO_SPEED NPC_SPEED NPC_DISTANCE CARLA_BOOT_TOWN="{{Param.CarlaBootTown}}"
+            envsubst '${EGO_SPEED} ${NPC_SPEED} ${NPC_DISTANCE} ${CARLA_BOOT_TOWN}' \
+                < "$TEMPLATE" > "$DATA_DIR/change_lane_${TASK_NAME}.osc"
+            SCENARIO_FILE="$DATA_DIR/change_lane_${TASK_NAME}.osc"
+            echo ""
+            echo "=== Generated scenario ==="
+            cat "$SCENARIO_FILE"
+            echo ""
+
+            INPUT_DIR="$DATA_DIR"
+            INPUT_FILE=$(basename "$SCENARIO_FILE")
+
+            chmod -R a+rX "$INPUT_DIR"
+            chmod -R a+rwX "$TASK_OUTPUT"
+
+            ECR_HOST=$(echo "{{Param.ImageURI}}" | cut -d/ -f1)
+
+            echo "=== ECR login ==="
+            aws ecr get-login-password --region "{{Param.AwsRegion}}" \
+                | docker login --username AWS --password-stdin "$ECR_HOST"
+
+            echo ""
+            echo "=== Pulling image: {{Param.ImageURI}} ==="
+            time docker pull "{{Param.ImageURI}}"
+
+            echo ""
+            echo "=== Running CARLA: $TASK_NAME ==="
+            time docker run --rm \
+                --runtime=nvidia \
+                --network host \
+                --env NVIDIA_VISIBLE_DEVICES=all \
+                --env NVIDIA_DRIVER_CAPABILITIES=all \
+                -e CARLA_TIMEOUT_S={{Param.CarlaTimeoutSeconds}} \
+                -e RELOAD_WORLD=false \
+                -e CARLA_BOOT_TOWN="{{Param.CarlaBootTown}}" \
+                -e CAMERAS="$CAMERAS" \
+                -v "$INPUT_DIR:/inputs:ro" \
+                -v "$TASK_OUTPUT:/outputs" \
+                "{{Param.ImageURI}}" \
+                "/inputs/$INPUT_FILE" \
+                "/outputs"
+
+            echo ""
+            echo "=== Outputs for $TASK_NAME ==="
+            ls -la "$TASK_OUTPUT"
+
+            # Helper: count *.png files robust to missing dirs under set -euo pipefail.
+            count_png() {
+                if [[ -d "$1" ]]; then
+                    find "$1" -name "*.png" 2>/dev/null | wc -l
+                else
+                    echo 0
+                fi
+            }
+
+            # Count frames per camera
+            for CAM in $(echo "$CAMERAS" | tr ',' ' '); do
+                CAM_COUNT=$(count_png "$TASK_OUTPUT/rgb/$CAM")
+                echo "  $CAM: $CAM_COUNT frames"
+            done
+
+            # Generate video for each selected camera
+            VIDEO_DIR="$TASK_OUTPUT/video"
+            for CAM in $(echo "$CAMERAS" | tr ',' ' '); do
+                FRAMES_DIR="$TASK_OUTPUT/rgb/$CAM"
+                FRAME_COUNT=$(count_png "$FRAMES_DIR")
+                if [[ "$FRAME_COUNT" -gt 0 ]]; then
+                    echo ""
+                    echo "=== Generating video from $CAM camera ($FRAME_COUNT frames) ==="
+                    ffmpeg -y -framerate 7 -pattern_type glob \
+                        -i "$FRAMES_DIR/frame_*.png" \
+                        -c:v libx264 -pix_fmt yuv420p \
+                        -movflags +faststart \
+                        "$VIDEO_DIR/${CAM}_scenario.mp4"
+                fi
+            done
+
+            # Generate stitched grid video if multiple cameras selected
+            # Tiles cameras in spatial order (front_left, front, front_right,
+            # rear_left, rear, rear_right) into a compact grid.
+            CAM_COUNT=$(echo "$CAMERAS" | tr ',' ' ' | wc -w)
+            if [[ "$CAM_COUNT" -gt 1 ]]; then
+                echo ""
+                echo "=== Generating stitched grid video ($CAM_COUNT cameras) ==="
+
+                GRID_ORDER="front_left front front_right rear_left rear rear_right"
+                INPUTS=""
+                FILTER=""
+                IDX=0
+                ACTUAL_CAM_COUNT=0
+                for SLOT in $GRID_ORDER; do
+                    if echo "$CAMERAS" | tr ',' ' ' | grep -qw "$SLOT" && [[ -f "$VIDEO_DIR/${SLOT}_scenario.mp4" ]]; then
+                        INPUTS="$INPUTS -i $VIDEO_DIR/${SLOT}_scenario.mp4"
+                        FILTER="${FILTER}[${IDX}:v]scale=640:360[v${IDX}];"
+                        IDX=$((IDX + 1))
+                        ACTUAL_CAM_COUNT=$((ACTUAL_CAM_COUNT + 1))
+                    fi
+                done
+
+                if [[ "$ACTUAL_CAM_COUNT" -lt 2 ]]; then
+                    echo "Skipping grid video: only $ACTUAL_CAM_COUNT camera(s) produced video"
+                else
+                    # Determine grid columns based on camera count
+                    if [[ "$ACTUAL_CAM_COUNT" -le 2 ]]; then
+                        COLS=2
+                    else
+                        COLS=3
+                    fi
+
+                    LAYOUT=""
+                    STACK_INPUTS=""
+                    for ((i=0; i<ACTUAL_CAM_COUNT; i++)); do
+                        COL=$((i % COLS))
+                        ROW=$((i / COLS))
+                        if [[ -n "$LAYOUT" ]]; then LAYOUT="${LAYOUT}|"; fi
+                        LAYOUT="${LAYOUT}$((COL*640))_$((ROW*360))"
+                        STACK_INPUTS="${STACK_INPUTS}[v${i}]"
+                    done
+                    FILTER="${FILTER}${STACK_INPUTS}xstack=inputs=${ACTUAL_CAM_COUNT}:layout=${LAYOUT}[out]"
+
+                    ffmpeg -y $INPUTS \
+                        -filter_complex "$FILTER" \
+                        -map "[out]" \
+                        -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+                        "$VIDEO_DIR/grid_scenario.mp4"
+                fi
+            fi
+
+            ls -la "$VIDEO_DIR/"

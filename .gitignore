@@ -18,3 +18,4 @@ conda_recipes/archive_files/vraystd_*
 **/*.aex
 **/*.conda
 **/*.safetensors
+conda_recipes/archive_files/

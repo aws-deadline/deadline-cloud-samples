@@ -1,0 +1,217 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: ESMFold Protein Structure Prediction
+description: |
+  Predicts 3D protein structures from amino-acid sequences using Meta's
+  ESMFold (facebook/esmfold_v1) via HuggingFace transformers — no MSA pipeline,
+  fully open weights (MIT).
+
+  Pipeline:
+    SplitFasta (1 task)         → batch manifests in WorkspacePath
+    Fold (Parallelism tasks, GPU) → PDB + summary.json per sequence
+    Render (Parallelism tasks, CPU) → PNG per structure colored by pLDDT
+    Validate (1 task, optional)   → TM-score CSV when reference PDBs provided
+
+  Foundation deps (python, pytorch with CUDA, transformers, biotite, py3Dmol,
+  pymol-open-source) come from the queue's Conda queue environment via the
+  CondaPackages parameter — same pattern as job_bundles/unsloth_finetune.
+
+  Your queue must have a Conda queue environment configured. See
+  https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html
+
+parameterDefinitions:
+- name: InputFasta
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  description: "FASTA file of protein sequences to fold. One record per sequence; max 1024 aa each."
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Input FASTA
+    groupLabel: Input
+    fileFilters:
+    - label: FASTA files
+      patterns: ["*.fasta", "*.fa", "*.faa"]
+    - label: All files
+      patterns: ["*"]
+
+- name: Parallelism
+  type: INT
+  default: 2
+  minValue: 1
+  maxValue: 64
+  description: "How many GPU tasks to fan out across. Sequences are round-robin distributed by length."
+  userInterface:
+    control: SPIN_BOX
+    label: Parallelism
+    groupLabel: Input
+
+- name: ReferencePdbDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: ""
+  description: "Optional. Directory of reference PDBs named <seq_id>.pdb for TM-score validation. Leave empty to skip the Validate step."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Reference PDB Directory (optional)
+    groupLabel: Validation
+
+- name: ChunkSize
+  type: INT
+  default: 64
+  minValue: 16
+  maxValue: 256
+  description: "Axial-attention chunk size. Lower values reduce VRAM at the cost of speed. 64 fits 600aa on a 24GB A10G."
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Advanced
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: esmfold_runs
+  description: "Output directory. PDB files land at <OutputDir>/results/<seq_id>/<seq_id>.pdb."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+
+- name: ModelId
+  type: STRING
+  default: "facebook/esmfold_v1"
+  description: "HuggingFace model ID for the ESMFold checkpoint to load."
+  userInterface:
+    control: HIDDEN
+
+- name: WorkspacePath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: workspace
+  description: "Internal scratch directory for batch manifests passed between steps. dataFlow OUT so manifests written by SplitFasta are re-staged for Fold."
+  userInterface:
+    control: HIDDEN
+
+- name: JobScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: "Directory containing bundled scripts."
+  userInterface:
+    control: HIDDEN
+
+- name: CondaPackages
+  type: STRING
+  default: "python=3.11 pytorch>=2.4=*cuda* cuda-toolkit=12.9 transformers biotite numpy matplotlib"
+  description: "Conda packages installed by the queue's Conda queue environment."
+  userInterface:
+    control: HIDDEN
+
+- name: CondaChannels
+  type: STRING
+  default: "conda-forge"
+  description: "Conda channels."
+  userInterface:
+    control: HIDDEN
+
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+steps:
+- name: SplitFasta
+  description: |
+    Parses the input FASTA, validates each sequence (length <= 1024, only
+    standard amino acids), and round-robins records into Parallelism manifest
+    files for the Fold step to consume.
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/split_fasta.py'
+        - '{{Param.WorkspacePath}}'
+        - '--input-fasta'
+        - '{{Param.InputFasta}}'
+        - '--parallelism'
+        - '{{Param.Parallelism}}'
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+
+- name: Fold
+  description: |
+    Runs ESMFold inference on the assigned batch. Writes PDB files with pLDDT
+    encoded in the B-factor column. Performs structural sanity checks (atom
+    count, NaN coordinates, pLDDT range) before declaring the task successful.
+  dependencies:
+  - dependsOn: SplitFasta
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: BatchIndex
+      type: INT
+      range: "1-{{Param.Parallelism}}"
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/fold.py'
+        - '{{Param.WorkspacePath}}'
+        - '--index'
+        - '{{Task.Param.BatchIndex}}'
+        - '--output-dir'
+        - '{{Param.OutputDir}}'
+        - '--model-id'
+        - '{{Param.ModelId}}'
+        - '--chunk-size'
+        - '{{Param.ChunkSize}}'
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    - {name: amount.worker.gpu, min: 1}
+    - {name: amount.worker.memory, min: 16384}
+
+- name: Render
+  description: |
+    Renders a PNG per structure colored by pLDDT confidence (orange < 50,
+    yellow 50-70, cyan 70-90, blue > 90). CPU only.
+  dependencies:
+  - dependsOn: Fold
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/render.py'
+        - '--output-dir'
+        - '{{Param.OutputDir}}'
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+
+- name: Validate
+  description: |
+    Optional TM-score comparison against reference PDBs. Skipped if
+    ReferencePdbDir is empty. Writes validation.csv summarizing per-sequence
+    TM-score and RMSD.
+  dependencies:
+  - dependsOn: Fold
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/validate.py'
+        - '--output-dir'
+        - '{{Param.OutputDir}}'
+        - '--reference-pdb-dir'
+        - '{{Param.ReferencePdbDir}}'
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
