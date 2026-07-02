@@ -94,6 +94,13 @@ render();
 </html>"""
 
 
+def _index_from_filename(name):
+    """Extract the first integer from a filename for stable sorting.
+    e.g. 'result_10.jsonl' -> 10, 'result_2.jsonl' -> 2, 'foo.jsonl' -> 0."""
+    m = re.search(r"\d+", name)
+    return int(m.group()) if m else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Aggregate per-task results")
     parser.add_argument("--results-dir", required=True)
@@ -106,14 +113,15 @@ def main():
 
     # Collect all result_N.jsonl files in order
     results = []
-    for filename in sorted(os.listdir(args.results_dir), key=lambda f: int(re.search(r'\d+', f).group()) if re.search(r'\d+', f) else 0):
+    for filename in sorted(os.listdir(args.results_dir), key=_index_from_filename):
+        if not filename.endswith(".jsonl"):
+            continue
         filepath = os.path.join(args.results_dir, filename)
-        if filename.endswith(".jsonl"):
-            with open(filepath) as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        results.append(json.loads(line))
+        with open(filepath) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    results.append(json.loads(line))
 
     # Write JSONL
     with open(args.output, "w") as out:
@@ -123,10 +131,9 @@ def main():
     print(f"Aggregated {len(results)} results into {args.output}")
 
     # Generate results.html
-    output_dir = os.path.dirname(args.output)
+    output_dir = os.path.dirname(os.path.abspath(args.output))
     html_path = os.path.join(output_dir, "results.html")
-    # Escape "</" so user-controlled strings can't break out of the <script> block.
-    data_json = json.dumps(results, ensure_ascii=False).replace("</", "<\\/")
+    data_json = json.dumps(results, ensure_ascii=False)
     html_content = HTML_TEMPLATE.replace("__DATA_PLACEHOLDER__", data_json)
     with open(html_path, "w") as f:
         f.write(html_content)

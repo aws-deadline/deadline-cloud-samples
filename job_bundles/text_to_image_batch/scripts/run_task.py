@@ -35,11 +35,6 @@ import urllib.request
 # Subject extraction from chained-from-vllm prompts
 # ---------------------------------------------------------------------------
 
-# Matches vllm_batch-style requests like "Write a slogan for artisan sourdough bread
-# targeting millennials" and captures the subject ("artisan sourdough bread") so we
-# can use it as the diffusion prompt instead of the generated slogan text (which is
-# too abstract to give the model a concrete visual subject).
-# Structure: <action verb> [optional modifiers] <creative-copy noun> for/about <subject> [stop word]
 SLOGAN_REQUEST_PATTERN = re.compile(
     r"(?ix)"
     r"(?:write|generate|create|make|compose|craft|draft|design)\s+"
@@ -359,8 +354,8 @@ def call_diffusers(payload, port, attempts=3, attempt_timeout=600):
             body = b""
             try:
                 body = e.read()
-            except Exception as read_err:
-                print(f"  WARN: could not read error response body: {read_err}", flush=True)
+            except Exception:
+                pass
             try:
                 err = json.loads(body)
                 raise RuntimeError(
@@ -386,44 +381,57 @@ def _truthy(v):
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input-file", required=True)
-    parser.add_argument("--prompt-index", type=int, required=True)
-    parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--style-suffix", default="")
-    parser.add_argument("--width", type=int, default=1024)
-    parser.add_argument("--height", type=int, default=1024)
-    parser.add_argument("--inference-steps", type=int, default=4)
-    parser.add_argument("--guidance-scale", type=float, default=1.0)
-    parser.add_argument("--seed", type=int, default=-1)
-    parser.add_argument("--port", type=int, default=8001)
-    parser.add_argument("--overlay-caption", default="true",
-                        help='"true"/"false" (default: true). Composite the slogan via PIL '
-                             'instead of feeding it to the diffusion model.')
-    parser.add_argument("--font-style", default="auto",
-                        help='"auto" (vibe-based), "sans"/"serif"/"display"/"script"/"mono", '
-                             "or a path to a .ttf file.")
-    args = parser.parse_args()
+def parse_range(range_str):
+    """Parse an OpenJD IntRangeExpr into a sorted list of unique integers.
 
-    overlay_enabled = _truthy(args.overlay_caption)
+    Supports the full OpenJD range syntax from RFC 0001 (Task Chunking):
+      - Single value:         "37"
+      - Contiguous range:     "1-5"       -> 1,2,3,4,5
+      - Stride range:         "1-10:2"    -> 1,3,5,7,9
+      - Comma-separated:      "2,5,8-9"   -> 2,5,8,9
+      - Combined:             "1-3,7-15:3"-> 1,2,3,7,10,13
+    """
+    indices = []
+    for part in range_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        step = 1
+        if ":" in part:
+            part, step_s = part.split(":", 1)
+            step = int(step_s)
+            if step < 1:
+                raise ValueError(f"Stride must be >= 1, got {step} in {range_str!r}")
+        if "-" in part:
+            start_s, end_s = part.split("-", 1)
+            start, end = int(start_s), int(end_s)
+            indices.extend(range(start, end + 1, step))
+        else:
+            indices.append(int(part))
+    return sorted(set(indices))
 
-    prompt_data = get_prompt_by_index(args.input_file, args.prompt_index)
+
+def process_prompt(index, args, overlay_enabled, images_dir, metadata_dir):
+    """Process one prompt: read it, generate the image, overlay caption, save outputs.
+
+    Returns True on success (or if the line was missing / skipped), False on error.
+    """
+    prompt_data = get_prompt_by_index(args.input_file, index)
     if prompt_data is None:
-        print(f"No prompt at line {args.prompt_index}, skipping.", flush=True)
-        return
+        print(f"  Prompt {index}: not found in file, skipping.", flush=True)
+        return True
 
     final_prompt, caption = build_prompt_and_caption(
         prompt_data, args.style_suffix, overlay_enabled
     )
     if not final_prompt:
         print(
-            f"ERROR: line {args.prompt_index} has no usable visual prompt.\n"
-            f"Each line needs a 'prompt', 'generated_text', 'description', or 'text'\n"
-            f"field, or pass a job-level --parameter StyleSuffix='...'.",
+            f"ERROR: line {index} has no usable visual prompt. "
+            f"Each line needs a 'prompt', 'generated_text', 'description', or 'text' "
+            f"field, or a job-level StyleSuffix.",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return False
 
     width = int(prompt_data.get("width", args.width))
     height = int(prompt_data.get("height", args.height))
@@ -432,7 +440,7 @@ def main():
     raw_seed = prompt_data.get("seed", args.seed)
     seed = int(raw_seed)
     if seed < 0:
-        rng = random.Random(args.prompt_index)
+        rng = random.Random(index)
         seed = rng.randint(0, 2**31 - 1)
 
     payload = {
@@ -444,9 +452,9 @@ def main():
         "seed": seed,
     }
 
-    print(f"Task {args.prompt_index}: {final_prompt[:140]}", flush=True)
+    print(f"  Prompt {index}: {final_prompt[:120]}", flush=True)
     print(
-        f"  size={width}x{height} steps={steps} guidance={args.guidance_scale} "
+        f"    size={width}x{height} steps={steps} guidance={args.guidance_scale} "
         f"seed={seed} overlay={'on' if overlay_enabled and caption else 'off'}",
         flush=True,
     )
@@ -472,23 +480,14 @@ def main():
 
     elapsed = time.time() - started
 
-    # Lay out output as: OutputDir/output/{images,metadata}/image_NNNN.{png,json}
-    # The "output/" wrapper keeps every job's artifacts grouped together so
-    # multiple runs can share an OutputDir without clobbering one another.
-    output_root = os.path.join(args.output_dir, "output")
-    images_dir = os.path.join(output_root, "images")
-    metadata_dir = os.path.join(output_root, "metadata")
-    os.makedirs(images_dir, exist_ok=True)
-    os.makedirs(metadata_dir, exist_ok=True)
-
-    image_filename = f"image_{args.prompt_index:04d}.png"
+    image_filename = f"image_{index:04d}.png"
     image_path = os.path.join(images_dir, image_filename)
     with open(image_path, "wb") as f:
         f.write(png_bytes)
 
     metadata = {
         **prompt_data,
-        "index": args.prompt_index,
+        "index": index,
         "image": image_filename,
         "final_prompt": final_prompt,
         "width": width,
@@ -501,11 +500,65 @@ def main():
         "elapsed_seconds": round(elapsed, 2),
         "generation_seconds": round(gen_elapsed, 2),
     }
-    metadata_path = os.path.join(metadata_dir, f"image_{args.prompt_index:04d}.json")
+    metadata_path = os.path.join(metadata_dir, f"image_{index:04d}.json")
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    print(f"  -> {image_filename} ({len(png_bytes):,} bytes, {elapsed:.1f}s)", flush=True)
+    print(f"    -> {image_filename} ({len(png_bytes):,} bytes, {elapsed:.1f}s)", flush=True)
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input-file", required=True)
+    parser.add_argument("--prompt-range", required=True,
+                        help="OpenJD chunk range string, e.g. '1-5', '37', or '2,5,8-9'")
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--style-suffix", default="")
+    parser.add_argument("--width", type=int, default=1024)
+    parser.add_argument("--height", type=int, default=1024)
+    parser.add_argument("--inference-steps", type=int, default=4)
+    parser.add_argument("--guidance-scale", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=-1)
+    parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--overlay-caption", default="true",
+                        help='"true"/"false" (default: true). Composite the slogan via PIL '
+                             'instead of feeding it to the diffusion model.')
+    parser.add_argument("--font-style", default="auto",
+                        help='"auto" (vibe-based), "sans"/"serif"/"display"/"script"/"mono", '
+                             "or a path to a .ttf file.")
+    args = parser.parse_args()
+
+    overlay_enabled = _truthy(args.overlay_caption)
+
+    # Lay out output as: OutputDir/output/{images,metadata}/image_NNNN.{png,json}
+    # The "output/" wrapper keeps every job's artifacts grouped together so
+    # multiple runs can share an OutputDir without clobbering one another.
+    output_root = os.path.join(args.output_dir, "output")
+    images_dir = os.path.join(output_root, "images")
+    metadata_dir = os.path.join(output_root, "metadata")
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    indices = parse_range(args.prompt_range)
+    print(f"Processing chunk with {len(indices)} prompts: {indices}", flush=True)
+    chunk_start = time.time()
+
+    failures = 0
+    for idx in indices:
+        ok = process_prompt(idx, args, overlay_enabled, images_dir, metadata_dir)
+        if not ok:
+            failures += 1
+
+    chunk_elapsed = time.time() - chunk_start
+    print(
+        f"Chunk done in {chunk_elapsed:.1f}s "
+        f"({len(indices)} prompts, {chunk_elapsed / max(len(indices), 1):.1f}s/prompt avg)",
+        flush=True,
+    )
+
+    if failures > 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

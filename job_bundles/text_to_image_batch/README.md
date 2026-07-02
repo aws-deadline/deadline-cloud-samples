@@ -43,7 +43,7 @@ You need:
 - An SMF fleet with NVIDIA GPUs and ≥32 GB RAM. FLUX.2 Klein 4B fits comfortably on 16 GB+ GPUs (e.g. L4, A10G, RTX 3090/4070) thanks to CPU offloading; tiny GPUs may need to fall back to a smaller model.
 - A queue with a Conda queue environment attached that reads `CondaPackages` and `CondaChannels` job parameters.
 
-> **Note on dependencies.** `Flux2KleinPipeline` is not yet in a PyPI `diffusers` release (latest: 0.36.0), so the bundle ships an `InstallDeps` job environment that pip-installs PyTorch (CUDA 12.4) and `diffusers` from a pinned git commit (`c112837`) on top of the queue's Conda env on every session, plus downloads 4 small Google Fonts (~600 KB) for the caption overlay. Expect ~30–90 s of additional setup time per worker on first use, plus the model download on first run. When `Flux2KleinPipeline` ships in a stable PyPI release, update `InstallDeps` to use `pip install diffusers==<version>` instead.
+> **Note on dependencies.** `Flux2KleinPipeline` is only available in bleeding-edge `diffusers`, so the bundle ships an `InstallDeps` job environment that pip-installs PyTorch (CUDA 12.4) and `diffusers` from git on top of the queue's Conda env on every session, plus downloads 4 small Google Fonts (~600 KB) for the caption overlay. Expect ~30–90 s of additional setup time per worker on first use, plus the model download on first run.
 
 The fastest way to get a compatible farm is to deploy the [`cuda_farm`](../../cloudformation/farm_templates/cuda_farm) CloudFormation template (same one used by `vllm_batch`). Once the stack reaches `CREATE_COMPLETE`:
 
@@ -90,17 +90,42 @@ If your `--parameter OutputDir=$PWD/run1`, replace `output` with `run1/output` i
 
 ## Prompt Range syntax
 
-The `Prompts` parameter controls **which lines** from the JSONL get processed as tasks:
+The `Prompts` parameter controls **which lines** from the JSONL get processed. It accepts the full OpenJD integer range expression syntax:
 
 | Value | What it does |
 |---|---|
 | `1-10` | Process the first 10 prompts |
 | `2-8` | Process lines 2 through 8 |
 | `2,5,8-9` | Process lines 2, 5, 8, and 9 |
-| `1,3,5,7,9` | Process odd-numbered lines |
+| `1,3,5,7,9` | Process specific lines |
 | `4,7` | Re-run only lines 4 and 7 (useful for retrying failed tasks) |
+| `1-10:2` | Stride: every 2nd line starting at 1 → 1, 3, 5, 7, 9 |
+| `1-3,7-15:3` | Combined: lines 1-3 plus every 3rd from 7-15 → 1, 2, 3, 7, 10, 13 |
 
 Process a subset for testing, retry only failed lines, or batch through chunks of a large input file.
+
+## Chunk size and adaptive sizing
+
+Prompts are grouped into chunks and each chunk runs as one task. This is powered by Deadline Cloud's [Task Chunking](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-chunking.html) feature, which reduces scheduling overhead: one worker processes a chunk of prompts consecutively while the diffusion pipeline stays loaded in memory.
+
+Example: `Prompts=1-100` with `ChunkSize=10` creates 10 tasks. The first task generates images for prompts 1-10, the second processes 11-20, etc.
+
+| ChunkSize | Effect |
+|---|---|
+| `1` | 1 image per task (maximum parallelism, most scheduling overhead) |
+| `5` (default) | Balanced |
+| `20` | Fewer tasks, less overhead, more sequential work per worker |
+| `150` (max) | One large task per worker |
+
+**Rule of thumb:** Set `ChunkSize` so each chunk takes roughly 30–120 seconds. Too small and you waste time on task scheduling; too large and slow prompts block fast ones from other workers.
+
+### Adaptive sizing with `TargetRuntimeSeconds`
+
+Rather than fixing the chunk size, you can let Deadline Cloud auto-tune it. Set `TargetRuntimeSeconds` to how long you want each chunk to take (default `120`s). The scheduler starts with your `ChunkSize` as the initial guess, observes how long chunks actually take, then grows or shrinks the chunk size on future tasks to hit the target.
+
+- **Fast images** (small size, few steps) → scheduler grows chunks to keep workers busy
+- **Slow images** (large size, many steps) → scheduler shrinks chunks to preserve parallelism
+- Set `TargetRuntimeSeconds=0` to disable adaptive sizing and always use exactly `ChunkSize` prompts per chunk
 
 ## Input format
 
@@ -274,7 +299,9 @@ cd <OutputDir>/output && python3 -m http.server 8080
 | `ModelName` | `black-forest-labs/FLUX.2-klein-4B` | HuggingFace model ID. Anything `diffusers.DiffusionPipeline` can load — FLUX.2-klein-4B (default), FLUX.2-klein-base-4B, SDXL Turbo, SDXL, SD3.5, etc. |
 | `InputFile` | _(required)_ | Path to input JSONL. |
 | `OutputDir` | _(required)_ | Directory for outputs. |
-| `Prompts` | `1-10` | Which lines from the JSONL to process. |
+| `Prompts` | `1-10` | Which lines from the JSONL to process (see [Prompt Range syntax](#prompt-range-syntax)). |
+| `ChunkSize` | 5 | Prompts per task (see [Chunk size](#chunk-size-and-adaptive-sizing)). |
+| `TargetRuntimeSeconds` | 120 | Target seconds per chunk; scheduler auto-tunes ChunkSize toward this (0 disables). |
 | `StyleSuffix` | _(empty)_ | Style appended to every prompt; per-line `style` overrides. |
 | `OverlayCaption` | **`true`** | When `true`, composite caption via PIL. When `false`, feed it to the diffusion model. |
 | `FontStyle` | `auto` | Overlay font: `auto` / `sans` / `serif` / `display` / `script` / `mono` / path. |
@@ -347,4 +374,5 @@ Example: 100 prompts on a fleet with max 5 workers → 5 pipelines load in paral
 - [diffusers documentation](https://huggingface.co/docs/diffusers)
 - [Pillow ImageDraw.rounded_rectangle](https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html#PIL.ImageDraw.ImageDraw.rounded_rectangle)
 - [Open Job Description Step Environments](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#4-environment)
+- [Deadline Cloud Task Chunking](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-chunking.html)
 - [`vllm_batch`](../vllm_batch/) — the text-side companion bundle.

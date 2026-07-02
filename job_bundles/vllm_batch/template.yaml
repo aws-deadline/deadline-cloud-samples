@@ -1,11 +1,17 @@
 specificationVersion: jobtemplate-2023-09
+extensions:
+- TASK_CHUNKING
 name: vLLM Batch Inference
-description: "Batch inference using vLLM on a JSONL file of prompts. Each prompt becomes\n\
-  one task. The model is loaded once per worker session via a step environment\nthat\
-  \ starts a vLLM server \u2014 the scheduler distributes tasks across available\n\
-  workers, reusing the loaded model for every task on that worker.\n\nDependencies\
-  \ (vLLM, PyTorch) are provided by the queue's Conda queue\nenvironment via the CondaPackages\
-  \ parameter. Your queue must have a Conda\nqueue environment configured.\n"
+description: "Batch inference using vLLM on a JSONL file of prompts. Prompts are\n\
+  grouped into chunks (configurable ChunkSize) and each chunk becomes one task.\n\
+  The vLLM model is loaded once per worker session via a step environment, and\n\
+  each task processes its chunk of prompts against the local vLLM server.\n\n\
+  Uses the Open Job Description Task Chunking extension, which is a Deadline\n\
+  Cloud feature that reduces scheduling overhead by processing multiple prompts\n\
+  per task while keeping the option to run only a subset via the Prompts\n\
+  parameter.\n\nDependencies (vLLM, PyTorch) are provided by the queue's Conda\n\
+  queue environment via the CondaPackages parameter. Your queue must have a\n\
+  Conda queue environment configured.\n"
 parameterDefinitions:
 - name: ModelName
   type: STRING
@@ -37,10 +43,30 @@ parameterDefinitions:
 - name: Prompts
   type: STRING
   default: "1-10"
-  description: "Which lines from the JSONL file to process as tasks. Examples: '1-10' (lines 1 through 10), '2-8' (subset), '2,5,8-9' (specific lines and a range), '1,3,5,7,9' (specific lines)."
+  description: "Which lines from the JSONL file to process. Examples: '1-10' (lines 1 through 10), '2-8' (subset), '2,5,8-9' (specific lines and a range), '1,3,5,7,9' (specific lines). Prompts are grouped into chunks of size ChunkSize; each chunk runs as one task."
   userInterface:
     control: LINE_EDIT
     label: Prompt Range
+    groupLabel: Job Settings
+- name: ChunkSize
+  type: INT
+  default: 5
+  minValue: 1
+  maxValue: 150
+  description: "How many prompts to process per task. Higher values mean fewer tasks with more prompts each (less scheduling overhead). Lower values mean more parallelism across workers."
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Job Settings
+- name: TargetRuntimeSeconds
+  type: INT
+  default: 120
+  minValue: 0
+  maxValue: 3600
+  description: "Target runtime per chunk in seconds. Deadline Cloud may dynamically grow or shrink chunk sizes to approach this target. Set to 0 to disable and always use ChunkSize exactly."
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (sec)
     groupLabel: Job Settings
 - name: MaxTokens
   type: INT
@@ -96,11 +122,7 @@ parameterDefinitions:
     control: HIDDEN
 - name: CondaPackages
   type: STRING
-  # prometheus-fastapi-instrumentator>=8.0.2 is pinned to fix the
-  # `_IncludedRouter has no attribute path` bug that breaks vLLM 0.19.1
-  # when paired with FastAPI>=0.116. Remove the pin when upgrading vLLM
-  # to a version that declares a compatible instrumentator dependency.
-  default: python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9 prometheus-fastapi-instrumentator=8.0.2
+  default: python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9
   userInterface:
     control: HIDDEN
 - name: CondaChannels
@@ -117,8 +139,12 @@ steps:
   parameterSpace:
     taskParameterDefinitions:
     - name: PromptIndex
-      type: INT
+      type: CHUNK[INT]
       range: '{{Param.Prompts}}'
+      chunks:
+        defaultTaskCount: '{{Param.ChunkSize}}'
+        targetRuntimeSeconds: '{{Param.TargetRuntimeSeconds}}'
+        rangeConstraint: NONCONTIGUOUS
   stepEnvironments:
   - name: VllmServer
     description: Starts a vLLM server that persists across all tasks on this worker.
@@ -136,38 +162,35 @@ steps:
       - name: Enter
         filename: start-vllm.sh
         type: TEXT
-        data: |
-          #!/bin/bash
-          set -euo pipefail
-
-          export HF_TOKEN="{{Param.HfToken}}"
-
-          # Bypass user-local site-packages (~/.local/lib/...) so Python only uses
-          # the conda env. Avoids conflicts with stale packages on the worker AMI
-          # (e.g. old typing_extensions missing TypeIs that breaks newer Starlette).
-          export PYTHONNOUSERSITE=1
-
-          echo "Starting vLLM server for {{Param.ModelName}}..."
-          VLLM_LOG="{{Session.WorkingDirectory}}/vllm_server.log"
-          echo "openjd_env: VLLM_LOG=$VLLM_LOG"
-
-          # --enforce-eager disables CUDA graph capture (~20-30% throughput cost)
-          # but prevents hangs on some AMI/driver combos at startup. Remove it
-          # (and test) for maximum throughput on a known-good GPU fleet.
-          nohup python -m vllm.entrypoints.openai.api_server \
-            --model "{{Param.ModelName}}" \
-            --dtype auto \
-            --port 8000 \
-            --gpu-memory-utilization {{Param.GpuMemoryUtilization}} \
-            --max-model-len {{Param.MaxModelLen}} \
-            --no-enable-log-requests \
-            --enforce-eager \
-            > "$VLLM_LOG" 2>&1 &
-          VLLM_PID=$!
-          echo "openjd_env: VLLM_PID=$VLLM_PID"
-
-          # Wait for server to be ready using the embedded Python wait script
-          python "{{Env.File.WaitScript}}" "$VLLM_PID" "$VLLM_LOG"
+        data: "#!/bin/bash\nset -euo pipefail\n\nexport HF_TOKEN=\"{{Param.HfToken}}\"\
+          \n\n# Bypass user-local site-packages (~/.local/lib/...) so Python only\
+          \ uses\n# the conda env. Avoids conflicts with stale packages on the worker\
+          \ AMI\n# (e.g. old typing_extensions missing TypeIs that breaks newer Starlette).\n\
+          export PYTHONNOUSERSITE=1\n\necho \"Starting vLLM server for {{Param.ModelName}}...\"\
+          \nVLLM_LOG=\"{{Session.WorkingDirectory}}/vllm_server.log\"\necho \"openjd_env:\
+          \ VLLM_LOG=$VLLM_LOG\"\n\nnohup python \"{{Env.File.VllmLauncher}}\" \\\n\
+          \  --model \"{{Param.ModelName}}\" \\\n  --dtype auto \\\n  --port 8000\
+          \ \\\n  --gpu-memory-utilization {{Param.GpuMemoryUtilization}} \\\n  --max-model-len\
+          \ {{Param.MaxModelLen}} \\\n  --no-enable-log-requests \\\n  --enforce-eager\
+          \ \\\n  > \"$VLLM_LOG\" 2>&1 &\nVLLM_PID=$!\necho \"openjd_env: VLLM_PID=$VLLM_PID\"\
+          \n\n# Wait for server to be ready using the embedded Python wait script\n\
+          python \"{{Env.File.WaitScript}}\" \"$VLLM_PID\" \"$VLLM_LOG\"\n"
+      - name: VllmLauncher
+        filename: vllm_launcher.py
+        type: TEXT
+        data: "# Monkey-patch prometheus-fastapi-instrumentator to handle the\n# `_IncludedRouter\
+          \ has no attribute path` AttributeError that breaks\n# every HTTP request\
+          \ when used with newer Starlette/FastAPI.\nimport prometheus_fastapi_instrumentator.routing\
+          \ as _r\n_orig = _r._get_route_name\ndef _safe_get_route_name(scope, routes):\n\
+          \    try:\n        return _orig(scope, routes)\n    except AttributeError:\n\
+          \        return \"\"\n_r._get_route_name = _safe_get_route_name\n\n# Also\
+          \ patch the routing.get_route_name wrapper to swallow the same error\n_orig_outer\
+          \ = _r.get_route_name\ndef _safe_outer(request):\n    try:\n        return\
+          \ _orig_outer(request)\n    except AttributeError:\n        return \"\"\n\
+          _r.get_route_name = _safe_outer\n\n# Now hand off to vLLM's normal entry\
+          \ point (equivalent to python -m vllm.entrypoints.openai.api_server)\nimport\
+          \ runpy\nrunpy.run_module(\"vllm.entrypoints.openai.api_server\", run_name=\"\
+          __main__\", alter_sys=True)\n"
       - name: WaitScript
         filename: wait_for_vllm.py
         type: TEXT
@@ -215,7 +238,7 @@ steps:
         - '{{Param.JobScriptDir}}/run_task.py'
         - --input-file
         - '{{Param.InputFile}}'
-        - --prompt-index
+        - --prompt-range
         - '{{Task.Param.PromptIndex}}'
         - --output-dir
         - '{{Param.OutputDir}}/output/results'

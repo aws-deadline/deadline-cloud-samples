@@ -1,4 +1,6 @@
 specificationVersion: jobtemplate-2023-09
+extensions:
+- TASK_CHUNKING
 name: Text to Image (Batch)
 description: |
   Batch image generation that produces marketing-quality posters: clean AI
@@ -69,12 +71,42 @@ parameterDefinitions:
   type: STRING
   default: "1-10"
   description: |
-    Which lines from the JSONL file to process as tasks. Examples:
+    Which lines from the JSONL file to process. Examples:
     "1-10" (first 10 lines), "2-8" (subset),
-    "2,5,8-9" (specific lines and a range), "1,3,5,7" (just those lines).
+    "2,5,8-9" (specific lines and a range), "1,3,5,7" (just those lines),
+    "1-10:2" (stride — every 2nd line: 1,3,5,7,9). Prompts are grouped
+    into chunks of size ChunkSize; each chunk runs as one task.
   userInterface:
     control: LINE_EDIT
     label: Prompt Range
+    groupLabel: Job Settings
+
+- name: ChunkSize
+  type: INT
+  default: 5
+  minValue: 1
+  maxValue: 150
+  description: |
+    How many prompts to process per task. Higher values mean fewer tasks
+    with more prompts each (less scheduling overhead). Lower values mean
+    more parallelism across workers.
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Job Settings
+
+- name: TargetRuntimeSeconds
+  type: INT
+  default: 120
+  minValue: 0
+  maxValue: 3600
+  description: |
+    Target runtime per chunk in seconds. Deadline Cloud may dynamically
+    grow or shrink chunk sizes to approach this target. Set to 0 to
+    disable and always use ChunkSize exactly.
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (sec)
     groupLabel: Job Settings
 
 - name: StyleSuffix
@@ -234,13 +266,9 @@ jobEnvironments:
         echo "Installing PyTorch with CUDA 12.4 support..."
         pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-        # Flux2KleinPipeline is not yet in a PyPI diffusers release (latest: 0.36.0).
-        # Pinned to a specific commit so this bundle doesn't silently break on future
-        # main-branch changes. Bump the hash when testing a newer upstream revision.
-        DIFFUSERS_COMMIT=c112837d160efc3c3c1e894de0c44cfc5323d314
         echo "Installing diffusers from git (for Flux2KleinPipeline) + deps..."
         pip install --quiet \
-          git+https://github.com/huggingface/diffusers.git@${DIFFUSERS_COMMIT} \
+          git+https://github.com/huggingface/diffusers.git \
           transformers \
           accelerate \
           sentencepiece \
@@ -285,8 +313,12 @@ steps:
   parameterSpace:
     taskParameterDefinitions:
     - name: PromptIndex
-      type: INT
+      type: CHUNK[INT]
       range: "{{Param.Prompts}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntimeSeconds}}"
+        rangeConstraint: NONCONTIGUOUS
   stepEnvironments:
   - name: DiffusersServer
     description: Starts a local HTTP server that loads the diffusion pipeline once and serves all tasks on this worker.
@@ -555,7 +587,7 @@ steps:
         - '{{Param.JobScriptDir}}/run_task.py'
         - --input-file
         - '{{Param.InputFile}}'
-        - --prompt-index
+        - --prompt-range
         - '{{Task.Param.PromptIndex}}'
         - --output-dir
         - '{{Param.OutputDir}}'
