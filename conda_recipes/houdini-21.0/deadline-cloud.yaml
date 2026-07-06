@@ -1,10 +1,10 @@
 condaPlatforms:
   - platform: linux-64
     defaultSubmit: true
-    sourceArchiveFilename: houdini-21.0.440-linux_x86_64_gcc11.2.tar.gz
-    sourceDownloadInstructions: Download the old installer archive(not the launcher) from SideFX Houdini's downloads page.
+    sourceArchiveFilename: houdini-21.0.596-linux_x86_64_gcc11.2.tar.gz
+    sourceDownloadInstructions: Download the Houdini 21.0.596 Linux installer archive (not the launcher) from the SideFX downloads page.
     buildTool: rattler-build
 jobParameters:
-  # conda-forge is used to get patchelf
+  # conda-forge is used to get patchelf on Linux
   - name: CondaChannels
     value: conda-forge
