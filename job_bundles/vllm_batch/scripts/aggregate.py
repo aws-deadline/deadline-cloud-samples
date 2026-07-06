@@ -65,8 +65,8 @@ function render(filter = '') {
   document.getElementById('results').innerHTML = filtered.map((d, i) => `
     <div class="card">
       <div class="card-header">
-        <span class="card-id">${d.id || '#' + (DATA.indexOf(d) + 1)}</span>
-        <div class="card-meta"><span>${d.prompt_tokens||'?'} in</span><span>${d.completion_tokens||'?'} out</span><span>${d.finish_reason||''}</span></div>
+        <span class="card-id">${esc(d.id || '#' + (DATA.indexOf(d) + 1))}</span>
+        <div class="card-meta"><span>${esc(d.prompt_tokens||'?')} in</span><span>${esc(d.completion_tokens||'?')} out</span><span>${esc(d.finish_reason||'')}</span></div>
       </div>
       <div class="prompt-label">Prompt</div>
       <div class="prompt-text">${esc(d.prompt||d.text||'')}</div>
@@ -74,7 +74,7 @@ function render(filter = '') {
       <div class="response-text">${esc(d.generated_text||'(no response)')}</div>
     </div>`).join('');
 }
-function esc(s) { const el = document.createElement('span'); el.textContent = s; return el.innerHTML; }
+function esc(s) { const el = document.createElement('span'); el.textContent = s == null ? '' : String(s); return el.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function exportCSV() {
   const rows = [['id','prompt','generated_text','prompt_tokens','completion_tokens','finish_reason']];
   DATA.forEach(d => rows.push([d.id||'',d.prompt||'',d.generated_text||'',d.prompt_tokens||'',d.completion_tokens||'',d.finish_reason||'']));

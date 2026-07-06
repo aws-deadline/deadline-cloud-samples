@@ -355,7 +355,7 @@ def call_diffusers(payload, port, attempts=3, attempt_timeout=600):
             try:
                 body = e.read()
             except (OSError, AttributeError):
-                pass
+                pass  # best-effort read of error body; proceed with empty bytes
             try:
                 err = json.loads(body)
                 raise RuntimeError(
