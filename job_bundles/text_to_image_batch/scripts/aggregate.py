@@ -111,7 +111,7 @@ const DATA = __DATA_PLACEHOLDER__;
 function esc(s) {
   const el = document.createElement('span');
   el.textContent = s == null ? '' : String(s);
-  return el.innerHTML;
+  return el.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function render(filter) {

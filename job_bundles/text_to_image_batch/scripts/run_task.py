@@ -354,7 +354,7 @@ def call_diffusers(payload, port, attempts=3, attempt_timeout=600):
             body = b""
             try:
                 body = e.read()
-            except Exception:
+            except (OSError, AttributeError):
                 pass
             try:
                 err = json.loads(body)

@@ -71,6 +71,12 @@
 <script>
 let prompts = [];
 
+function esc(s) {
+  const el = document.createElement('span');
+  el.textContent = s == null ? '' : String(s);
+  return el.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function addPrompt(data = {}) {
   prompts.push({
     prompt: data.prompt || '',
@@ -108,22 +114,22 @@ function render() {
       <span class="prompt-num">${i + 1}</span>
       <div class="prompt-fields">
         <textarea class="prompt-main" placeholder="Enter your prompt..."
-          oninput="updatePrompt(${i}, 'prompt', this.value)">${p.prompt}</textarea>
+          oninput="updatePrompt(${i}, 'prompt', this.value)">${esc(p.prompt)}</textarea>
         <button class="toggle-opts" onclick="toggleOpts(${i})">⚙ options</button>
         <div class="prompt-opts hidden" id="opts-${i}">
           <div class="opt-group">
             <label>ID</label>
-            <input type="text" value="${p.id}" placeholder="optional"
+            <input type="text" value="${esc(p.id)}" placeholder="optional"
               oninput="updatePrompt(${i}, 'id', this.value)">
           </div>
           <div class="opt-group">
             <label>Max tokens</label>
-            <input type="number" value="${p.max_tokens}" placeholder="default"
+            <input type="number" value="${esc(p.max_tokens)}" placeholder="default"
               oninput="updatePrompt(${i}, 'max_tokens', this.value)">
           </div>
           <div class="opt-group">
             <label>Temperature</label>
-            <input type="text" value="${p.temperature}" placeholder="default"
+            <input type="text" value="${esc(p.temperature)}" placeholder="default"
               oninput="updatePrompt(${i}, 'temperature', this.value)">
           </div>
         </div>

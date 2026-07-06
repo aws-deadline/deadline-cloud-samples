@@ -9,7 +9,6 @@ the local vLLM server for each one and writing per-prompt result files.
 import argparse
 import json
 import os
-import sys
 import time
 import urllib.request
 import urllib.error
