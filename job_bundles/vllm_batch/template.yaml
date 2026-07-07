@@ -178,19 +178,8 @@ steps:
       - name: VllmLauncher
         filename: vllm_launcher.py
         type: TEXT
-        data: "# Monkey-patch prometheus-fastapi-instrumentator to handle the\n# `_IncludedRouter\
-          \ has no attribute path` AttributeError that breaks\n# every HTTP request\
-          \ when used with newer Starlette/FastAPI.\nimport prometheus_fastapi_instrumentator.routing\
-          \ as _r\n_orig = _r._get_route_name\ndef _safe_get_route_name(scope, routes):\n\
-          \    try:\n        return _orig(scope, routes)\n    except AttributeError:\n\
-          \        return \"\"\n_r._get_route_name = _safe_get_route_name\n\n# Also\
-          \ patch the routing.get_route_name wrapper to swallow the same error\n_orig_outer\
-          \ = _r.get_route_name\ndef _safe_outer(request):\n    try:\n        return\
-          \ _orig_outer(request)\n    except AttributeError:\n        return \"\"\n\
-          _r.get_route_name = _safe_outer\n\n# Now hand off to vLLM's normal entry\
-          \ point (equivalent to python -m vllm.entrypoints.openai.api_server)\nimport\
-          \ runpy\nrunpy.run_module(\"vllm.entrypoints.openai.api_server\", run_name=\"\
-          __main__\", alter_sys=True)\n"
+        data: "import runpy\nrunpy.run_module(\"vllm.entrypoints.openai.api_server\"\
+          , run_name=\"__main__\", alter_sys=True)\n"
       - name: WaitScript
         filename: wait_for_vllm.py
         type: TEXT

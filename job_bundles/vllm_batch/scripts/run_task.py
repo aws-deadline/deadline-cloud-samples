@@ -49,16 +49,19 @@ def parse_range(range_str):
     return sorted(set(indices))
 
 
-def get_prompt_by_index(input_file, index):
-    """Read the Nth line (1-based) from the input JSONL file."""
+def load_prompts(input_file, indices):
+    """Load all requested lines (1-based) in a single pass over the file."""
+    needed = set(indices)
+    results = {}
     with open(input_file) as f:
         for i, line in enumerate(f, 1):
-            if i == index:
+            if i in needed:
                 line = line.strip()
-                if not line:
-                    return None
-                return json.loads(line)
-    return None
+                if line:
+                    results[i] = json.loads(line)
+                if len(results) == len(needed):
+                    break
+    return results
 
 
 def call_vllm(prompt_text, model, max_tokens, temperature):
@@ -77,21 +80,23 @@ def call_vllm(prompt_text, model, max_tokens, temperature):
     )
 
     # Retry up to 3 times for transient errors
+    last_err = None
     for attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=300) as resp:
                 return json.loads(resp.read())
         except (urllib.error.URLError, OSError) as e:
+            last_err = e
             if attempt < 2:
                 print(f"    retry {attempt + 1}: {e}", flush=True)
                 time.sleep(2)
             else:
                 raise
+    raise RuntimeError(f"all retries failed: {last_err}")
 
 
-def process_prompt(index, input_file, output_dir, model, default_max_tokens, default_temperature):
-    """Process one prompt: read it, call vLLM, write the result file."""
-    prompt_data = get_prompt_by_index(input_file, index)
+def process_prompt(index, prompt_data, output_dir, model, default_max_tokens, default_temperature):
+    """Process one prompt: call vLLM and write the result file."""
     if prompt_data is None:
         print(f"  Prompt {index}: not found in file, skipping.", flush=True)
         return
@@ -135,11 +140,13 @@ def main():
 
     indices = parse_range(args.prompt_range)
     print(f"Processing chunk with {len(indices)} prompts: {indices}", flush=True)
+
+    prompts = load_prompts(args.input_file, indices)
     chunk_start = time.time()
 
     for idx in indices:
         prompt_start = time.time()
-        process_prompt(idx, args.input_file, args.output_dir, args.model,
+        process_prompt(idx, prompts.get(idx), args.output_dir, args.model,
                        args.max_tokens, args.temperature)
         print(f"    ({time.time() - prompt_start:.1f}s)", flush=True)
 

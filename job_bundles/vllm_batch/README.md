@@ -187,6 +187,8 @@ The Aggregate step also produces `results.html` — a self-contained visual view
 | GpuMemoryUtilization | 0.90 | Fraction of GPU memory for KV cache |
 | HfToken | _(empty)_ | HuggingFace token for gated models |
 
+**Gated models** (like Llama): Leave `HfToken` empty if your model is public. If your model requires authentication, paste your HuggingFace token here. It works but is stored in plaintext. For a more secure setup, set `HF_TOKEN` in your queue environment instead.
+
 ## How scaling works
 
 - Each **task** processes a chunk of `ChunkSize` prompts

@@ -156,6 +156,7 @@ function closeModal(e) {
   document.getElementById('modal').classList.add('hidden');
 }
 
+function csvSafe(c) { const s = String(c); return /^[=+\-@]/.test(s) ? "\t" + s : s; }
 function exportCsv() {
   const rows = [['id', 'image', 'final_prompt', 'width', 'height', 'inference_steps', 'guidance_scale', 'seed', 'elapsed_seconds']];
   DATA.forEach(d => rows.push([
@@ -165,7 +166,7 @@ function exportCsv() {
     d.seed == null ? '' : d.seed,
     d.elapsed_seconds == null ? '' : d.elapsed_seconds,
   ]));
-  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const csv = rows.map(r => r.map(c => '"' + csvSafe(c).replace(/"/g, '""') + '"').join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

@@ -75,10 +75,11 @@ function render(filter = '') {
     </div>`).join('');
 }
 function esc(s) { const el = document.createElement('span'); el.textContent = s == null ? '' : String(s); return el.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function csvSafe(c) { const s = String(c); return /^[=+\\-@]/.test(s) ? "\\t" + s : s; }
 function exportCSV() {
   const rows = [['id','prompt','generated_text','prompt_tokens','completion_tokens','finish_reason']];
   DATA.forEach(d => rows.push([d.id||'',d.prompt||'',d.generated_text||'',d.prompt_tokens||'',d.completion_tokens||'',d.finish_reason||'']));
-  const csv = rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\\n');
+  const csv = rows.map(r => r.map(c => '"'+csvSafe(c).replace(/"/g,'""')+'"').join(',')).join('\\n');
   const blob = new Blob([csv],{type:'text/csv'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'results.csv'; a.click();
 }
 document.getElementById('totalCount').textContent = DATA.length;
