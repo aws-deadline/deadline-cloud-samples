@@ -142,7 +142,17 @@ parameterDefinitions:
     control: LINE_EDIT
     label: Conda Packages
     groupLabel: Software Environment
-  default: ffmpeg colmap glomap nerfstudio
+  default: ffmpeg colmap glomap nerfstudio cuda
+- name: CondaChannels
+  type: STRING
+  description: >
+    The conda channels to use when installing packages. The queue environment reads this parameter
+    to configure the channel list for the job's conda virtual environment.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+    groupLabel: Software Environment
+  default: "deadline-cloud conda-forge"
 
 # Hidden
 - name: JobScriptDir

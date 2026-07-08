@@ -1,0 +1,4 @@
+assetReferences:
+  inputs:
+    directories:
+      - "./data"

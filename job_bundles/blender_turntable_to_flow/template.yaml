@@ -1,0 +1,381 @@
+specificationVersion: jobtemplate-2023-09
+name: Blender Turntable to Autodesk Flow Production Tracking
+description: |
+  Renders an animated turntable in Blender, encodes it to a review-ready movie,
+  extracts a poster-frame thumbnail, and publishes the result to Autodesk Flow
+  Production Tracking (formerly ShotGrid) as a new Version on an Asset's review
+  Task. See https://www.autodesk.com/products/flow-production-tracking/overview
+
+  This sample demonstrates the canonical Deadline Cloud pattern for post-render
+  work: each piece of post-render work (encode, thumbnail, publish) is a
+  first-class OpenJD Step with a step dependency. Steps are independently
+  observable in the monitor, independently retryable, independently schedulable,
+  and can fan out in parallel.
+
+  The step graph is:
+
+    RenderTurntable
+       |-- GenerateMovie     (depends: RenderTurntable)   ffmpeg frames -> H.264 mp4
+       |-- GenerateThumbnail (depends: RenderTurntable)   mid frame -> jpg
+       +-- PublishToFlow     (depends: GenerateMovie, GenerateThumbnail)
+
+  GenerateMovie and GenerateThumbnail run in parallel because neither depends on
+  the other. PublishToFlow waits for both because it uploads both artifacts.
+
+  The job needs Blender, FFmpeg, and Python to run. On Deadline Cloud
+  service-managed fleets, use a conda queue environment with the CondaPackages
+  "blender ffmpeg python" and the CondaChannels "deadline-cloud conda-forge".
+  Blender comes from the deadline-cloud channel; FFmpeg comes from conda-forge.
+
+  Flow credentials are stored in AWS Secrets Manager. PublishToFlow reads the
+  script name + API key at runtime using the worker's queue role, so they stay
+  out of the job bundle and parameters. See the README for the one-time setup.
+
+parameterDefinitions:
+
+# Turntable
+- name: ObjectShape
+  type: STRING
+  description: The object to build and spin on the turntable.
+  default: monkey
+  allowedValues: [monkey, cube, torus, ico_sphere, cylinder, cone]
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Object Shape
+    groupLabel: Turntable
+- name: FrameRange
+  type: STRING
+  description: The frame range of the turntable. A full 360 rotation is spread across this range.
+  default: 1-48
+  userInterface:
+    control: LINE_EDIT
+    label: Frame Range
+    groupLabel: Turntable
+- name: ResolutionX
+  type: INT
+  default: 960
+  minValue: 16
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution X
+    groupLabel: Turntable
+- name: ResolutionY
+  type: INT
+  default: 540
+  minValue: 16
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution Y
+    groupLabel: Turntable
+- name: Samples
+  type: INT
+  description: Cycles render samples. Lower is faster; 32-64 is plenty for a turntable preview.
+  default: 48
+  minValue: 1
+  userInterface:
+    control: SPIN_BOX
+    label: Render Samples
+    groupLabel: Turntable
+
+# Output
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  description: >
+    Working/output directory shared by all steps. Frames are written to
+    OutputDir/frames, the movie and thumbnail to OutputDir.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+- name: FrameRate
+  type: INT
+  default: 24
+  minValue: 1
+  userInterface:
+    control: SPIN_BOX
+    label: Frame Rate (fps)
+    groupLabel: Output
+
+# Flow Production Tracking
+#
+# These parameters are HIDDEN: their values are supplied by the flow_params_from_env.py
+# preSubmission hook, which reads the studio's FLOW_* environment variables and
+# rewrites these defaults at submission time. The defaults below are only
+# placeholders so the template is valid on its own; the hook replaces them.
+- name: EnableFlowPublish
+  type: STRING
+  description: >
+    When TRUE, the PublishToFlow step creates a Version in Flow and uploads the
+    movie and thumbnail. Set to FALSE to run only render + movie + thumbnail.
+    Supplied by the preSubmission hook from the FLOW_PUBLISH environment variable.
+  default: "TRUE"
+  allowedValues: ["TRUE", "FALSE"]
+  userInterface:
+    control: HIDDEN
+- name: FlowSecretArn
+  type: STRING
+  description: >
+    ARN of the AWS Secrets Manager secret holding the Flow script credentials
+    (JSON with keys: site_url, script_name, api_key). The queue role must be
+    granted secretsmanager:GetSecretValue on this ARN. Supplied by the
+    preSubmission hook from the FLOW_SECRET_ARN environment variable.
+  default: ""
+  userInterface:
+    control: HIDDEN
+- name: FlowProjectId
+  type: INT
+  description: >
+    The numeric Flow Project id to publish into. Supplied by the preSubmission
+    hook from the FLOW_PROJECT_ID environment variable.
+  default: 0
+  userInterface:
+    control: HIDDEN
+- name: FlowAssetName
+  type: STRING
+  description: >
+    The Asset code to publish against (created if it does not exist). Supplied
+    by the preSubmission hook from the FLOW_ASSET_NAME environment variable.
+  default: ""
+  userInterface:
+    control: HIDDEN
+- name: FlowAssetType
+  type: STRING
+  description: >
+    The sg_asset_type used when the Asset has to be created. Supplied by the
+    preSubmission hook from the FLOW_ASSET_TYPE environment variable.
+  default: "Prop"
+  userInterface:
+    control: HIDDEN
+- name: FlowStepShortName
+  type: STRING
+  description: >
+    The pipeline Step short name for the review Task (e.g. MDL for Model).
+    Supplied by the preSubmission hook from the FLOW_STEP_SHORT_NAME environment
+    variable.
+  default: "MDL"
+  userInterface:
+    control: HIDDEN
+- name: FlowTaskName
+  type: STRING
+  description: >
+    The Task name (content) on the Asset to attach the Version to (created if
+    absent). Supplied by the preSubmission hook from the FLOW_TASK_NAME
+    environment variable.
+  default: "Turntable"
+  userInterface:
+    control: HIDDEN
+- name: FlowTaskStatus
+  type: STRING
+  description: >
+    The status to set on the Task after publishing. Common review statuses are
+    "rev" (pending review) on studios that define it; this demo site uses the
+    stock short codes wtg/ip/fin, so the placeholder is "fin". Supplied by the
+    preSubmission hook from the FLOW_TASK_STATUS environment variable.
+  default: "fin"
+  userInterface:
+    control: HIDDEN
+
+# Scripts (shipped in the bundle, uploaded via job attachments and path-mapped onto the worker)
+- name: BuildTurntableScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/build_turntable.py
+  description: The Blender Python script that builds the turntable scene and renders a frame.
+  userInterface:
+    control: HIDDEN
+- name: PublishScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/publish_to_flow.py
+  description: The Python script that publishes the render to Flow Production Tracking.
+  userInterface:
+    control: HIDDEN
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  description: Conda packages for the render/encode/publish environment. Requires a conda queue environment.
+  default: "blender ffmpeg python>=3.10 pip"
+  userInterface:
+    control: HIDDEN
+- name: CondaChannels
+  type: STRING
+  description: >
+    Conda channels. Blender is on the deadline-cloud channel; FFmpeg is on the
+    conda-forge community channel.
+  default: "deadline-cloud conda-forge"
+  userInterface:
+    control: HIDDEN
+
+jobEnvironments:
+- name: JobEnvVars
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+steps:
+- name: RenderTurntable
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.FrameRange}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        FRAMES_DIR='{{Param.OutputDir}}/frames'
+        mkdir -p "$FRAMES_DIR"
+
+        # build_turntable.py (shipped in the bundle) builds the scene
+        # procedurally and renders the single assigned frame. Building per-frame
+        # keeps render tasks fully independent (no shared scene file to carry
+        # between tasks). The script appends the zero-padded frame number to the
+        # prefix; Blender does not substitute '#' placeholders for write_still
+        # renders, so the script builds the final filename explicitly.
+        blender --background --python '{{Param.BuildTurntableScript}}' -- \
+          --shape '{{Param.ObjectShape}}' \
+          --frame {{Task.Param.Frame}} \
+          --frame-range '{{Param.FrameRange}}' \
+          --resolution-x {{Param.ResolutionX}} \
+          --resolution-y {{Param.ResolutionY}} \
+          --samples {{Param.Samples}} \
+          --output-prefix "$FRAMES_DIR/turntable_"
+
+- name: GenerateMovie
+  dependencies:
+  - dependsOn: RenderTurntable
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env bash
+        set -xeuo pipefail
+
+        FRAMES_DIR='{{Param.OutputDir}}/frames'
+        FRAME_RANGE='{{Param.FrameRange}}'
+        START=${FRAME_RANGE%%-*}
+        END=${FRAME_RANGE##*-}
+        COUNT=$((END - START + 1))
+
+        echo "Encoding $COUNT frames from $FRAMES_DIR at {{Param.FrameRate}} fps"
+        ls "$FRAMES_DIR" | head
+
+        ffmpeg -y \
+          -r {{Param.FrameRate}} \
+          -start_number "$START" \
+          -i "$FRAMES_DIR/turntable_%04d.png" \
+          -frames:v "$COUNT" \
+          -pix_fmt yuv420p \
+          -vf "scale=in_color_matrix=bt709:out_color_matrix=bt709" \
+          -c:v libx264 \
+          -preset slower \
+          -crf 18 \
+          -color_range tv \
+          -colorspace bt709 \
+          -color_primaries bt709 \
+          -color_trc iec61966-2-1 \
+          -movflags faststart \
+          '{{Param.OutputDir}}/turntable.mp4'
+
+        ls -lh '{{Param.OutputDir}}/turntable.mp4'
+
+- name: GenerateThumbnail
+  dependencies:
+  - dependsOn: RenderTurntable
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env bash
+        set -xeuo pipefail
+
+        FRAMES_DIR='{{Param.OutputDir}}/frames'
+        FRAME_RANGE='{{Param.FrameRange}}'
+        START=${FRAME_RANGE%%-*}
+        END=${FRAME_RANGE##*-}
+
+        # Poster frame = middle of the range. A representative still, not a
+        # separate render, so it costs zero extra render time.
+        MID=$(( (START + END) / 2 ))
+        MID_PADDED=$(printf "%04d" "$MID")
+        SRC="$FRAMES_DIR/turntable_${MID_PADDED}.png"
+        echo "Using mid frame $MID as thumbnail source: $SRC"
+
+        ffmpeg -y -i "$SRC" \
+          -vf "scale='min(640,iw)':-1" \
+          -q:v 3 \
+          '{{Param.OutputDir}}/thumbnail.jpg'
+
+        ls -lh '{{Param.OutputDir}}/thumbnail.jpg'
+
+- name: PublishToFlow
+  dependencies:
+  - dependsOn: GenerateMovie
+  - dependsOn: GenerateThumbnail
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/bin/env bash
+        set -xeuo pipefail
+
+        if [ '{{Param.EnableFlowPublish}}' != "TRUE" ]; then
+          echo "EnableFlowPublish is FALSE; skipping Flow publish."
+          exit 0
+        fi
+
+        if [ -z '{{Param.FlowSecretArn}}' ]; then
+          echo "ERROR: FlowSecretArn is empty but EnableFlowPublish is TRUE." >&2
+          exit 1
+        fi
+
+        # shotgun_api3 is published on PyPI only (not conda-forge), so install it
+        # at runtime into the conda env. boto3 reads the secret. This mixed
+        # conda + pip pattern is normal for Python client libraries that have no
+        # conda package. 'pip' is included in CondaPackages; ensurepip is a
+        # fallback in case the chosen Python build does not ship it.
+        python -m pip --version >/dev/null 2>&1 || python -m ensurepip --upgrade
+        python -m pip install --quiet --disable-pip-version-check shotgun_api3 boto3
+
+        # publish_to_flow.py is shipped in the bundle (the PublishScript
+        # parameter) and uploaded to the worker via job attachments.
+        python '{{Param.PublishScript}}' \
+          --secret-arn '{{Param.FlowSecretArn}}' \
+          --project-id {{Param.FlowProjectId}} \
+          --asset-name '{{Param.FlowAssetName}}' \
+          --asset-type '{{Param.FlowAssetType}}' \
+          --step-short-name '{{Param.FlowStepShortName}}' \
+          --task-name '{{Param.FlowTaskName}}' \
+          --task-status '{{Param.FlowTaskStatus}}' \
+          --movie '{{Param.OutputDir}}/turntable.mp4' \
+          --thumbnail '{{Param.OutputDir}}/thumbnail.jpg'

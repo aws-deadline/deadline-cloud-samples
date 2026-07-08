@@ -35,8 +35,9 @@ parameterDefinitions:
     - label: All Files
       patterns: ["*"]
   description: >
-    Choose the Vray scene file you want to render. Use the 'Job Attachments' tab
-    to add textures and other files that the job needs.
+    Choose the Vray scene file you want to render. Textures and other files
+    referenced in the vrscene are automatically discovered and added to job
+    attachments by the pre-submission hook.
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY

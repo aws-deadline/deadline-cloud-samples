@@ -7,11 +7,12 @@
 
 ## Installation guide
 1. Create a S3 bucket in the same region as your farm.
-2. Download the 3ds Max installer from Autodesk, and zip up the installer as `3ds Max.zip`.
-3. Configure the Windows Service Managed fleet's host configuration using [3ds Max-2024.ps1](./3ds Max-2024.ps1).
-4. Save the fleet configuration.
-5. Configure the Fleet IAM role to have S3 bucket access.
-6. Recommendation: Set the fleet's min worker count to 1. Review a worker's CloudWatch log to ensure the script is executed successfully prior to production use. 
+2. Download the 3ds Max installer from Autodesk, and zip up the installer following [these steps](/host_configuration_scripts/3dsmax/README.md#creating-a-3ds-max-installer-archive-in-zip-format).
+3. Upload to your S3 bucket and save the S3 URI.
+4. Configure the Windows Service Managed fleet's host configuration using [3dsmax-2024.ps1](./3dsmax-2024.ps1).
+5. Save the fleet configuration.
+6. Configure the Fleet IAM role to have S3 bucket access.
+7. Recommendation: Set the fleet's min worker count to 1. Review a worker's CloudWatch log to ensure the script is executed successfully prior to production use. 
 
 ## Detailed Step by Step installation guide
 Blog - [Coming soon]

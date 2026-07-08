@@ -1,8 +1,12 @@
-# Host Configuration for After Effects, Red Giant, and Universe
+# Host Configuration for After Effects and Plugins
 
-This guide covers setting up the required software installers for the After Effects (AE) 2025, Red Giant and Universe (RGU) host config script package build. You'll be fetching the necessary standalone installers from After Effects and Maxon, storing them in S3, and then putting the provided ps1 script to the host configuration script so that it pulls the installer and runs it in silent mode on each Deadline worker launch. This solution has been tested and verified to work on Windows GPU SMF fleets only, but can also be applied to a CMF as well assuming your instance is a GPU Windows instance with the necessary driver installed to support GPU usage (not fully tested but theoretically should work).
+This guide covers setting up host configuration scripts for installing Adobe After Effects and optional plugins on AWS Deadline Cloud workers. You'll be fetching standalone installers, storing them in S3, and using the provided PowerShell script as a host configuration script that pulls and installs the software in silent mode on each worker launch.
 
-> **⚠️ Performance Impact**: This script can add about **15-20 minutes** to worker launch time due to software installation. This number goes down as you vertically scale your instance size up. For example, a g6.xlarge with 4 vCPUs + 16 GiB of memory adds 20 minutes while a g6.4xlarge with 16 vCPUs and 64 GiB memory adds 15 minutes. Plan accordingly for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. Additionally, if you have AE jobs that doesn't require Red Giant, you can have one fleet for just AE renders via Conda and another fleet for AE + RGU using this host configuration.
+This solution has been tested and verified to work on Windows GPU SMF fleets, but can also be applied to a CMF assuming your instance is a GPU Windows instance with the necessary driver installed to support GPU usage (not fully tested but theoretically should work).
+
+> **Performance Note**: Software installation adds time to worker launch (varies with instance size — larger instances with more vCPUs and memory tend to complete faster). Plan accordingly for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. Additionally, if you have AE jobs that don't require Red Giant, you can have one fleet for just AE renders via Conda and another fleet for AE + plugins using this host configuration.
+
+> **Looking for faster subsequent boot times?** See the [`aftereffects_redgiant_persistent`](../aftereffects_redgiant_persistent/) variant which uses persistent volumes to install software once and restore on subsequent boots without reinstalling.
 
 ## Prerequisites
 
@@ -14,24 +18,25 @@ This guide covers setting up the required software installers for the After Effe
 
 ## Required Installers
 
-*🔔 Note: the installer names can differ depending on the software versions, please keep note of differences so that the following script setup goes smoothly*
+*Note: Installer names can differ depending on software versions. Keep note of differences so that the script configuration goes smoothly.*
 
 ### 1. Adobe After Effects
 
-Download from Adobe Admin Console (make sure you're using an enterprise account and you have Administrator permissions):
 1. Log into [Adobe Admin Console](https://adminconsole.adobe.com/)
 2. Navigate to **Packages** > **Create a Package**
 3. Choose **Create Managed Package**
-4. For OS, select Windows 64-bt.
+4. For OS, select Windows 64-bit
 5. Under available applications, select **After Effects 2025** (or latest version). Continue with remaining default settings and don't include any add-ons since that is out-of-scope of this script.
 6. Name the package `After Effects`
 7. Download the resulting package zip file, which should be named something like `After Effects_en_US_WIN_64.zip`.
 
 See the [Adobe pre-generated packages documentation](https://helpx.adobe.com/enterprise/using/pre-generated-packages.html) for more information.
 
-Make sure to update the `$AE_INSTALLER` variable with the name of the package zip file  in the script configuration section.
+Make sure to update the `$AE_INSTALLER` variable with the name of the package zip file in the script configuration section.
 
 ### 2. Red Giant (Optional)
+
+Red Giant now [includes Universe by default as of version 2026.2.0](https://support.maxon.net/hc/en-us/articles/24114684657692-Red-Giant-2026-2-0-December-3-2025), so a separate Universe installer is no longer needed.
 
 Download from Red Giant:
 1. Log into your Maxon account
@@ -42,30 +47,16 @@ To enable Red Giant installation, set `$INSTALL_RED_GIANT = $true` in the script
 
 Make sure to update the `$RED_GIANT_INSTALLER` variable with the name of the Red Giant installer.
 
-### 3. Universe (Optional)
-
-Note that Universe is [now included in Red Giant 2026.2.0 and above by default](https://support.maxon.net/hc/en-us/articles/24114684657692-Red-Giant-2026-2-0-December-3-2025). For older versions of Red Giant, you can download Universe separately following the instructions below.
-
-Download from Red Giant:
-1. Log into your Maxon account
-2. Navigate to the [Maxon Downloads](https://www.maxon.net/en/downloads) section
-3. Download `Universe-2025.3.3_Win.exe` (or latest version) for Windows under the section Red Giant
-
-To enable standalone Universe installation, set `$INSTALL_UNIVERSE = $true` in the script configuration section.
-
-Make sure to update the `$UNIVERSE_INSTALLER` variable with the name of the Universe installer.
-
-### 4. Maxon App (required for Red Giant)
+### 3. Maxon App (required for Red Giant)
 
 This is needed to support Red Giant + Universe licensing since it serves as a proxy between your licensing server and the plugins being run.
 Download from Maxon:
-1. Log into your Maxon account
 2. Navigate to the [Maxon App](https://www.maxon.net/en/downloads) section after you scroll down a bit
 2. Download `Maxon_App_2025.4.2_Win.exe` (or latest version) for Windows under the section Maxon App
 
 Make sure to update the `$MAXON_APP_INSTALLER` variable with the name of the Maxon App installer.
 
-### 5. Microsoft Edge WebView2 Runtime (required for Red Giant)
+### 4. Microsoft Edge WebView2 Runtime (required for Red Giant)
 
 This is needed for the Maxon App installation to go smoothly. Download from Microsoft:
 1. Visit the [Microsoft Edge WebView2 download page](https://developer.microsoft.com/en-us/microsoft-edge/webview2?form=MA13LH#download)
@@ -73,7 +64,7 @@ This is needed for the Maxon App installation to go smoothly. Download from Micr
 
 Make sure to update the `$WEBVIEW2_INSTALLER` variable with the name of the WebView2 installer.
 
-### 6. Boris FX Sapphire (optional)
+### 5. Boris FX Sapphire (Optional)
 
 Download from Boris FX:
 1. Log into your Boris FX account
@@ -86,7 +77,7 @@ To enable Boris FX Sapphire installation, set `$INSTALL_BORIS_SAPPHIRE = $true` 
 
 Make sure to update the `$BORIS_SAPPHIRE_INSTALLER` variable with the name of the Boris FX Sapphire installer.
 
-### 7. Frischluft Lenscare (optional)
+### 6. Frischluft Lenscare (Optional)
 
 Download from Frischluft:
 1. Go to https://www.frischluft.com/lenscare/
@@ -99,7 +90,7 @@ To enable Lenscare installation, set `$INSTALL_LENSCARE = $true` in the script c
 
 Make sure to update the `$LENSCARE_INSTALLER` variable with the name of the Lenscare installer.
 
-### 8. RE:Vision Effects ReelSmart Motion Blur
+### 7. RE:Vision Effects ReelSmart Motion Blur (Optional)
 
 Download from RE:Vision Effects:
 1. Go to https://revisionfx.com/products/rsmb/after-effects/
@@ -113,7 +104,6 @@ To enable ReelSmart Motion Blur installation, set `$INSTALL_RSMB = $true` in the
 
 Make sure to update the `$RSMB_INSTALLER` variable with the name of the ReelSmart Motion Blur installer.
 
-
 ## S3 Bucket Setup
 
 ### 1. Create S3 Bucket Structure
@@ -123,7 +113,6 @@ If you have a job attachments bucket, you can just go ahead and use that. If you
 export INSTALLER_S3_BUCKET=your-installer-bucket
 aws s3api put-object --bucket $INSTALLER_S3_BUCKET --key Installers/
 ```
-
 
 ### 2. Upload Installers
 
@@ -138,9 +127,6 @@ aws s3 cp "After Effects_en_US_WIN_64.zip" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "RedGiant-2026.3.0-Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "Maxon_App_2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 aws s3 cp "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" s3://$INSTALLER_S3_BUCKET/Installers/
-
-# Optional, Maxon Universe is now included in Red Giant 2026.2.0 and above
-aws s3 cp "Universe-2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
 
 # Optional, use if installing Boris FX Sapphire
 aws s3 cp "sapphire-ae-install-2026.exe" s3://$INSTALLER_S3_BUCKET/Installers/
@@ -183,69 +169,73 @@ This allows the host config script to pull down the installers from your S3 buck
 
 ## Usage
 
-### 1. Configure Host Config Installation Script
+### 1. Configure the Script
 
-Before running the installation script, you need to update the configuration variables at the top of the script. All configurable settings are located in the "Script Configuration Variables" section:
+Before deploying, update the configuration variables at the top of the script. All configurable settings are in the "Script Configuration Variables" section:
 
 **Basic Configuration (Required for all deployments):**
-Update with your chosen bucket's name and also change the After Effects version variable if you're not using 2025. For example:
 ```powershell
 $INSTALLER_S3_BUCKET = "your-installer-bucket"
 $AE_VERSION = "2025"
 ```
 
 **Installer File Names (Update if using different versions):**
-Take a look at the names of all of your zip files and executables that you uploaded to S3. Cross-reference them with the variable definitions in the script and update them to match what you have in S3. For example:
+
+Cross-reference the variable definitions in the script with the filenames you uploaded to S3 and update them to match:
 ```powershell
 $AE_INSTALLER = "After Effects_en_US_WIN_64.zip"
-$REDGIANT_INSTALLER = "RedGiant-2025.6.0-Win.exe"
-$UNIVERSE_INSTALLER = "Universe-2025.3.3_Win.exe"
-$MAXON_APP_INSTALLER = "Maxon_App_2025.4.2_Win.exe"
+$RED_GIANT_INSTALLER = "RedGiant-2026.3.0-Win.exe"
+$MAXON_APP_INSTALLER = "Maxon_App_2026.1.0_Win.exe"
 $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 ```
 
-**Customer Managed Fleet (CMF) Configuration (Optional - SMF users can skip this):**
+**Plugin Toggles:**
 
-For SMF deployments, the script works out-of-the-box with the default settings. For CMF, you can create a license endpoint and use it with CMF, see here for information on that: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html.
-
-Once you have that setup, get the VPC endpoint ID provided on the license endpoints console page and set the following variables as shown:
-
+Enable or disable plugins by setting the corresponding flags:
 ```powershell
-$is_cmf = $true  # Set to $true for Customer Managed Fleets
-$vpc_endpoint = "vpce-000000000000000-abcdefg.vpce-svc-000000000000000.us-west-2.vpce.amazonaws.com"  # Your VPC endpoint provided by license endpoints console page
+$INSTALL_RED_GIANT = $true       # Red Giant + Maxon App + WebView2
+$INSTALL_BORIS_SAPPHIRE = $false # Boris FX Sapphire
+$INSTALL_LENSCARE = $false       # Frischluft Lenscare
+$INSTALL_RSMB = $false           # RE:Vision Effects RSMB
 ```
 
-This will set the `redshift_LICENSE` environment variable to `7055@$vpc_endpoint` for Red Giant licensing. If you're not using UBL, you'll need to override the `redshift_LICENSE` environment variable with whatever port number or value you need to connect your CMF instance to your license server.
+**Dev testing without licenses:**
 
-You will also need to install your own Nvidia GPU driver to your CMF instance to support GPU rendering with Red Giant. Otherwise, you will most likely experience hanging or failing jobs.
+Both Lenscare and RSMB support installation without license files for dev testing. The plugins will produce watermarked output but are otherwise fully functional:
+```powershell
+$LENSCARE_HAS_LICENSE = $false  # Installs Lenscare without license — renders will be watermarked
+$RSMB_HAS_LICENSE = $false      # Installs RSMB without license — renders will be watermarked
+```
 
+> Boris FX Sapphire and Red Giant always require licensing (via license server environment variables).
+
+**Customer Managed Fleet (CMF) Configuration (Optional — SMF users can skip this):**
+
+For CMF, set up a license endpoint and configure the VPC endpoint. See the [CMF UBL guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html) for details.
+
+```powershell
+$is_cmf = $true
+$vpc_endpoint = "vpce-000000000000000-abcdefg.vpce-svc-000000000000000.us-west-2.vpce.amazonaws.com"
+```
+
+You will also need to install your own Nvidia GPU driver on your CMF instance to support GPU rendering with Red Giant.
 
 ### 2. Add Host Config Script to Windows GPU Fleet
 
-The contents of the script `.\install-software.ps1` should go in your Configuration Scripts for your fleet, which you can add to your fleet when you go to Fleets, select your fleet, go under Configurations, and add your script under Worker configuration script. Once pasted, scroll down and set the script timeout to **3600 seconds**. For more information, see the [AWS Deadline Cloud SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html).
-
+Copy the script contents into your fleet's **Worker configuration script** and set timeout to **3600 seconds**. See the [SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html) for details on configuring host configuration scripts.
 
 ## Local Dev Testing
-To test the script locally, run Powershell with Admin privileges on a Windows machine, add the credentials to your AWS account in the Powershell windows, and then run the following:
+
+To test the script locally, run PowerShell with Admin privileges on a Windows machine, add the credentials to your AWS account in the PowerShell window, and then run:
 
 ```powershell
-# Run the automated installer
 .\install-software.ps1
 ```
 
-You might see failures on the WebView installation though since your machine probably already has it, but you can splice that out and test the rest.
-
-The script will:
-1. Download all installers from S3
-2. Set environment variables for rendering (including Red Giant license server for CMF)
-3. Install Microsoft Edge WebView2 Runtime
-4. Install After Effects
-5. Install Maxon App
-6. Install Red Giant Suite
-7. Install Universe
+You might see failures on the WebView2 installation since your machine probably already has it, but you can splice that out and test the rest.
 
 ## Troubleshooting
 
 - Ensure all installer files are present in S3 before running
-- Verify enterprise Adobe account has package creation rights if you can't make the standalone After Effects installer package.
-- If your resulting renders are coming out corrupted on CMF, it's possible that you need to do Nvidia driver installation on your CMF to ensure that Red Giant is utilizing your GPU correctly.
+- Verify enterprise Adobe account has package creation rights if you can't make the standalone After Effects installer package
+- If your resulting renders are coming out corrupted on CMF, it's possible that you need to do Nvidia driver installation on your CMF to ensure that Red Giant is utilizing your GPU correctly

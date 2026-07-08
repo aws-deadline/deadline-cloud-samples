@@ -27,7 +27,10 @@ a configured package build queue as documented in the Deadline Cloud developer g
 
 To submit package build jobs, you will need the
 [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
-installed on your workstation.
+installed on your workstation, along with a Python interpreter that has the `deadline`
+library available. Installing the CLI with `pip install deadline` satisfies both requirements.
+See [Python interpreter requirement](#python-interpreter-requirement) below if you installed
+the CLI using the standalone submitter installer.
 
 ## Submitting package build jobs
 
@@ -39,6 +42,36 @@ By default it will submit the job to a queue whose name starts with "Package", a
 use the job attachments bucket of that queue to form the conda channel `s3://<my-job-attachments-bucket>/Conda/Default`.
 
 Run the command `submit-package-job --help` to get a listing of available CLI arguments.
+
+### Python interpreter requirement
+
+The `submit-package-job` command is a thin wrapper that runs
+[submit-package-job-script.py](submit-package-job-script.py) with a Python interpreter that
+has the `deadline` library installed. How it finds that interpreter depends on how you
+installed the Deadline Cloud CLI:
+
+* **`pip install deadline`** (recommended for this workflow): the wrapper discovers the
+  interpreter automatically from the `deadline` entry point script, so no extra setup is
+  needed.
+* **Standalone submitter installer**: the installer ships a self-contained `deadline`
+  executable and does *not* bundle a reusable Python interpreter. In this case the wrapper
+  cannot find a Python to use on its own, and you must point it at one yourself by setting
+  the `DEADLINE_PYTHON` environment variable to a Python that has the `deadline` library
+  installed (`pip install deadline`):
+
+  ```
+  $ DEADLINE_PYTHON=python3 ./submit-package-job blender-4.2
+  ```
+
+  On Windows:
+
+  ```
+  > set DEADLINE_PYTHON=python
+  > submit-package-job blender-4.2
+  ```
+
+  If you run the command without a usable interpreter, it exits with an explanatory error
+  rather than a cryptic failure.
 
 ### Basic job submission
 

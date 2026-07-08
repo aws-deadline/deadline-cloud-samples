@@ -1,0 +1,10 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    buildTool: rattler-build
+  - platform: win-64
+    defaultSubmit: true
+    buildTool: rattler-build
+jobParameters:
+- name: CondaChannels
+  value: conda-forge
