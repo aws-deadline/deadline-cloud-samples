@@ -1,0 +1,66 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Pip Package Job
+
+description: |
+  Demonstrates running a job whose Python dependencies are provided by pip through
+  a queue environment. The job declares the PipPackages and PipIndexUrl parameters
+  that the pip_queue_env.yaml queue environment consumes to build a Python virtual
+  environment before the step runs.
+
+  This mirrors how the Conda samples pass CondaPackages to a Conda queue environment.
+  Add the queue_environments/pip_queue_env.yaml queue environment to your queue for
+  this job to work.
+
+parameterDefinitions:
+- name: Message
+  type: STRING
+  default: "Hello from a pip-managed virtual environment!"
+  description: "The message the cowsay package prints."
+  userInterface:
+    control: LINE_EDIT
+    label: Message
+- name: PipPackages
+  type: STRING
+  default: "cowsay"
+  description: "A space-separated list of pip requirement specifiers the queue environment installs."
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Packages
+    groupLabel: Software Environment
+- name: PipIndexUrl
+  type: STRING
+  default: ""
+  description: "The base Python package index URL. Leave empty to use the default PyPI index."
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Index URL
+    groupLabel: Software Environment
+- name: PipExtraIndexUrls
+  type: STRING
+  default: ""
+  description: "A space-separated list of additional package index URLs."
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Extra Index URLs
+    groupLabel: Software Environment
+
+steps:
+- name: SayHello
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        # cowsay is provided by the pip queue environment's virtual environment,
+        # which is on the PATH for this step.
+        import cowsay
+
+        cowsay.cow("{{Param.Message}}")
