@@ -13,6 +13,20 @@ formatted message to a Slack channel using an [Incoming Webhook](https://api.sla
 You can adapt the Lambda function to do anything else you like with the event — send an email,
 open a ticket, update a dashboard, or trigger a downstream workflow.
 
+## Using a different messaging app
+
+This sample uses Slack, but many messaging apps expose the same style of incoming webhook: you
+create a webhook URL and `POST` a JSON message to it. To target one of these instead, set that
+app's webhook URL as the `SLACK_WEBHOOK_URL` environment variable and adjust the JSON body the
+Lambda function builds to match the app's expected payload (each app formats its message JSON
+differently). The docs below explain how to create a webhook for each:
+
+- [Slack](https://api.slack.com/messaging/webhooks)
+- [Microsoft Teams](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook)
+- [Discord](https://discord.com/developers/docs/resources/webhook)
+- [Google Chat](https://developers.google.com/workspace/chat/quickstart/webhooks)
+- [Mattermost](https://developers.mattermost.com/integrate/webhooks/incoming/)
+
 ## How it works
 
 ```mermaid
