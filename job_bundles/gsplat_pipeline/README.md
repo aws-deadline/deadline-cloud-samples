@@ -37,6 +37,36 @@ on your Deadline Cloud CUDA farm.
 Now you just need a video that captures many viewpoints of a subject to reconstruct in 3D,
 and then you can run the Gaussian Splatting pipeline on your farm.
 
+### Known issues
+
+#### PyTorch 2.6 compatibility with NeRF Studio export (workaround applied)
+
+The `nerfstudio` package on conda-forge (v1.1.5) requires PyTorch 2.6+, which changed `torch.load` to default
+to `weights_only=True`. This breaks NeRF Studio's `ns-export` command when loading checkpoints. A workaround
+is applied in `train_nerfstudio.sh` that patches `torch.load` to restore the previous behavior. This workaround
+can be removed once the upstream fix is merged:
+https://github.com/nerfstudio-project/nerfstudio/pull/3711
+
+#### GSPLAT_SIMPLE_TRAINER and NERFSTUDIO_SPLATFACTOW require the custom nerfstudio package
+
+The `GSPLAT_SIMPLE_TRAINER` and `NERFSTUDIO_SPLATFACTOW` trainer options depend on commands
+(`gsplat_simple_trainer`, `splatfactow_export`) that are only available in the custom-built nerfstudio
+conda package from the [NeRF Studio conda recipe](../../conda_recipes/nerfstudio/). The conda-forge version
+of nerfstudio does not include these. If you want to use these trainers, follow the
+[NeRF Studio sample conda package recipe README](../../conda_recipes/nerfstudio/README.md) to build the
+package into your S3 conda channel.
+
+#### Simplified prerequisites for the default NERFSTUDIO trainer
+
+If you only need the default `NERFSTUDIO` (splatfacto) trainer, you do not need to deploy the CUDA farm
+CloudFormation template or build the custom nerfstudio conda package. The minimum requirements are:
+
+- A Deadline Cloud farm with a GPU fleet
+- A queue environment with `conda-forge` included in the Conda Channels (e.g. `deadline-cloud conda-forge`)
+- Conda packages: `ffmpeg colmap glomap nerfstudio cuda` (edit in GUI submitter)
+
+The full CUDA farm setup and custom package build are only required for the `GSPLAT_SIMPLE_TRAINER` and `NERFSTUDIO_SPLATFACTOW` options.
+
 ## Capture a video of a subject
 
 You can use a video-capable camera like your smartphone to capture a video of a subject for your Gaussian Splatting.

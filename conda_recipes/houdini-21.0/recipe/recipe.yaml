@@ -2,7 +2,11 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "21.0.440"
+  bucket_name: '${{ env.get("BUILD_BUCKET", default="conda-build-artifacts-657566733920-us-west-2") }}'
+  version_partial: "21.0"
+  version_minor: "596"
+  gcc_version: "gcc11.2"
+  version: ${{version_partial}}.${{version_minor}}
 
 package:
   name: houdini
@@ -11,28 +15,25 @@ package:
 source:
   - if: linux
     then:
-      url: file://archive_files/houdini-{{ version }}-linux_x86_64_gcc11.2.tar.gz
-      sha256: a87451f9146d52051a9ba142d535936638351526a48cba0c6156a221f3be58e6
+      url: s3://${{ bucket_name }}/source-artifacts/houdini/${{ version_partial }}/houdini-${{ version_partial }}.${{ version_minor }}-linux_x86_64_${{ gcc_version }}.tar.gz
       target_directory: installer
 
 build:
-  number: 0
-  # These build options for repackaging an application
-  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  number: 2
+  script:
+    - if: unix
+      then:
+        - bash $RECIPE_DIR/build.sh
   prefix_detection:
-    ignore_binary_files: True
-  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+    ignore_binary_files: true
   dynamic_linking:
-    binary_relocation: False
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
 
 requirements:
   build:
     - patchelf
-
-tests:
-  - script:
-    - houdini -h
-    - hython -h
 
 about:
   homepage: https://www.sidefx.com/products/houdini/

@@ -1,0 +1,5 @@
+version: "1.0"
+preSubmission:
+  - command: python3
+    args: [inject_s3_settings.py]
+    timeout: 30

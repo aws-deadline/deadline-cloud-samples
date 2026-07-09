@@ -1,0 +1,154 @@
+specificationVersion: "environment-2023-09"
+parameterDefinitions:
+- name: PipPackages
+  type: STRING
+  description: >
+    This is a space-separated list of pip requirement specifiers to install for
+    the job into a Python virtual environment. E.g. "cowsay" for a job that uses
+    the cowsay package, or "pandas==2.2.* numpy" to pin versions.
+
+    See the pip documentation for the full requirement specifier syntax:
+    https://pip.pypa.io/en/stable/reference/requirement-specifiers/
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Packages
+- name: PipIndexUrl
+  type: STRING
+  description: >
+    The base URL of the Python Package Index to install packages from. Leave
+    this empty to use the default (https://pypi.org/simple), or set it to point
+    at a private index, such as an AWS CodeArtifact repository endpoint.
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Index URL
+- name: PipExtraIndexUrls
+  type: STRING
+  description: >
+    A space-separated list of additional package index URLs to install packages
+    from, in addition to the Pip Index URL. Leave this empty for none.
+  default: ""
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Extra Index URLs
+
+environment:
+  name: Pip
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: pip-queue-env-enter.sh
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+
+        if [ -z '{{Param.PipPackages}}' ]; then
+            echo "Skipping pip virtual environment as PipPackages parameter was empty."
+            exit 0
+        fi
+
+        # Put the pip packages list in a variable, as requirement specifiers can
+        # have characters like '>' and '<' in them.
+        PIP_PACKAGES='{{Param.PipPackages}}'
+
+        # Build the index options from the PipIndexUrl and PipExtraIndexUrls parameters
+        INDEX_OPTS=""
+        if [ -n '{{Param.PipIndexUrl}}' ]; then
+            INDEX_OPTS="--index-url {{Param.PipIndexUrl}}"
+        fi
+        for EXTRA in {{Param.PipExtraIndexUrls}}; do
+            INDEX_OPTS="$INDEX_OPTS --extra-index-url $EXTRA"
+        done
+
+        # Find a Python interpreter. Prefer python3, but fall back to python
+        # (for example, on Windows worker hosts running git bash).
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON=python3
+        else
+            PYTHON=python
+        fi
+
+        echo "Creating a Python virtual environment in the session directory..."
+
+        # Create the virtual environment in the session working directory so it
+        # is cleaned up automatically when the session ends.
+        ENV_DIR="$(mktemp -d '{{Session.WorkingDirectory}}/.venv-XXXXX')"
+        "$PYTHON" -m venv "$ENV_DIR"
+
+        # A venv puts its executables in bin/ on Linux and macOS, and in
+        # Scripts/ on Windows.
+        if [ -d "$ENV_DIR/bin" ]; then
+            VENV_BIN="$ENV_DIR/bin"
+        else
+            VENV_BIN="$ENV_DIR/Scripts"
+        fi
+
+        # Capture the environment variables before activating the virtual environment
+        "$PYTHON" '{{Env.File.OpenJDVarsStart}}' .vars
+
+        # Activate the virtual environment. Disable nounset around the activate
+        # script as it may reference unset variables.
+        set +u
+        source "$VENV_BIN/activate"
+        set -u
+
+        # Upgrade pip so that recent requirement specifiers and wheels resolve,
+        # then install the requested packages. Pass the index options to both
+        # commands so a private PipIndexUrl also works on workers that cannot
+        # reach public PyPI.
+        pip install $INDEX_OPTS --quiet --upgrade pip
+        pip install $INDEX_OPTS $PIP_PACKAGES
+
+        # Capture the environment variables set by activation
+        "$VENV_BIN/python" '{{Env.File.OpenJDVarsCapture}}' .vars
+
+        # Print information about the activated virtual environment
+        echo "Virtual environment created at $ENV_DIR"
+        pip list
+    - name: OpenJDVarsStart
+      filename: openjd-vars-start.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Exclude the env var "_" as it has special meaning to shells
+        before = dict(os.environ)
+        if "_" in before:
+            del before["_"]
+
+        with open(sys.argv[1], "w", encoding="utf8") as f:
+            json.dump(before, f)
+    - name: OpenJDVarsCapture
+      filename: openjd-vars-capture.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+        with open(sys.argv[1], "r", encoding="utf8") as f:
+            before = json.load(f)
+        after = dict(os.environ)
+        # Exclude the env var "_" as it has special meaning to shells
+        if "_" in after:
+            del after["_"]
+
+        # Identify the modified and deleted environment variables
+        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+        vars_to_delete = {k for k in before if k not in after}
+
+        # Print the env var changes following the Open Job Description specification
+        for k, v in vars_to_put.items():
+            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+            print(f"openjd_env: {kv}")
+        for k in vars_to_delete:
+            print(f"openjd_unset_env: {k}")

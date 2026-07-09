@@ -1,0 +1,646 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: "VirtualScreening-{{Param.JobName}}"
+description: |
+  AutoDock VINA virtual screening pipeline for drug discovery.
+  Screens a compound library against a protein target to identify drug candidates.
+
+parameterDefinitions:
+  - name: JobName
+    type: STRING
+    default: "vina-screen"
+    userInterface:
+      control: LINE_EDIT
+      label: "Job Name"
+      groupLabel: "General"
+
+  - name: ReceptorPdb
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    description: "Protein receptor PDB file"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "Receptor PDB"
+      groupLabel: "Inputs"
+      fileFilters:
+        - label: "PDB Files"
+          patterns: ["*.pdb"]
+
+  - name: CompoundLibrary
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+    default: "chembl"
+    description: "Compound library in SDF format, or 'chembl' to download from ChEMBL"
+    userInterface:
+      control: CHOOSE_INPUT_FILE
+      label: "Compound Library (SDF or 'chembl')"
+      groupLabel: "Inputs"
+      fileFilters:
+        - label: "SDF Files"
+          patterns: ["*.sdf", "*.sdf.gz"]
+
+  - name: ChEMBLVersion
+    type: STRING
+    default: "37"
+    description: "ChEMBL database version to download (used when CompoundLibrary='chembl')"
+    userInterface:
+      control: LINE_EDIT
+      label: "ChEMBL Version"
+      groupLabel: "Data Source"
+
+  - name: MaxCompounds
+    type: INT
+    default: 100000
+    minValue: 100
+    maxValue: 2500000
+    description: "Maximum number of drug-like compounds to extract from ChEMBL"
+    userInterface:
+      control: SPIN_BOX
+      label: "Max Compounds"
+      groupLabel: "Data Source"
+
+  - name: MinSmilesLength
+    type: INT
+    default: 15
+    minValue: 5
+    maxValue: 50
+    description: "Minimum SMILES length filter (excludes fragments/salts)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Min SMILES Length"
+      groupLabel: "Data Source"
+
+  - name: MaxSmilesLength
+    type: INT
+    default: 120
+    minValue: 50
+    maxValue: 500
+    description: "Maximum SMILES length filter (excludes peptides/polymers)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Max SMILES Length"
+      groupLabel: "Data Source"
+
+  - name: OutputDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    default: "output"
+    description: "Output directory for results"
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: "Output Directory"
+      groupLabel: "Outputs"
+
+  - name: CompoundsPerChunk
+    type: INT
+    default: 1000
+    minValue: 1
+    maxValue: 100000
+    description: "Number of compounds per parallel docking task"
+    userInterface:
+      control: SPIN_BOX
+      label: "Compounds per Chunk"
+      groupLabel: "Parallelism"
+
+  - name: MaxChunkIndex
+    type: INT
+    default: 999
+    minValue: 0
+    maxValue: 99999
+    description: "Last chunk index (number_of_chunks - 1). Set to ceil(library_size / compounds_per_chunk) - 1"
+    userInterface:
+      control: SPIN_BOX
+      label: "Max Chunk Index"
+      groupLabel: "Parallelism"
+
+  - name: TopN
+    type: INT
+    default: 500
+    minValue: 1
+    maxValue: 100000
+    description: "Number of top-scoring compounds to report"
+    userInterface:
+      control: SPIN_BOX
+      label: "Top N Hits"
+      groupLabel: "Outputs"
+
+  - name: CenterX
+    type: FLOAT
+    default: 0.0
+    description: "Docking box center X coordinate (Angstroms)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Center X"
+      groupLabel: "Docking Box"
+
+  - name: CenterY
+    type: FLOAT
+    default: 0.0
+    description: "Docking box center Y coordinate (Angstroms)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Center Y"
+      groupLabel: "Docking Box"
+
+  - name: CenterZ
+    type: FLOAT
+    default: 0.0
+    description: "Docking box center Z coordinate (Angstroms)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Center Z"
+      groupLabel: "Docking Box"
+
+  - name: SizeX
+    type: FLOAT
+    default: 20.0
+    minValue: 1.0
+    description: "Docking box size X (Angstroms)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Size X"
+      groupLabel: "Docking Box"
+
+  - name: SizeY
+    type: FLOAT
+    default: 20.0
+    minValue: 1.0
+    description: "Docking box size Y (Angstroms)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Size Y"
+      groupLabel: "Docking Box"
+
+  - name: SizeZ
+    type: FLOAT
+    default: 20.0
+    minValue: 1.0
+    description: "Docking box size Z (Angstroms)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Size Z"
+      groupLabel: "Docking Box"
+
+  - name: Exhaustiveness
+    type: INT
+    default: 8
+    minValue: 1
+    maxValue: 64
+    description: "VINA exhaustiveness (higher = more accurate, slower)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Exhaustiveness"
+      groupLabel: "Docking Parameters"
+
+  - name: NumModes
+    type: INT
+    default: 9
+    minValue: 1
+    maxValue: 20
+    description: "Number of binding modes to generate per compound"
+    userInterface:
+      control: SPIN_BOX
+      label: "Num Modes"
+      groupLabel: "Docking Parameters"
+
+  - name: EnergyRange
+    type: FLOAT
+    default: 3.0
+    minValue: 1.0
+    maxValue: 10.0
+    description: "Max energy difference between best and worst mode (kcal/mol)"
+    userInterface:
+      control: SPIN_BOX
+      label: "Energy Range"
+      groupLabel: "Docking Parameters"
+
+  - name: CondaPackages
+    type: STRING
+    default: "openbabel python"
+    description: "Packages to install via the queue's Conda environment. Add autodock-vina once built into your S3 channel."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Packages"
+      groupLabel: "Software Environment"
+
+  - name: CondaChannels
+    type: STRING
+    default: "conda-forge"
+    description: "Conda channels to resolve packages from. Add your S3 channel for autodock-vina."
+    userInterface:
+      control: LINE_EDIT
+      label: "Conda Channels"
+      groupLabel: "Software Environment"
+
+jobEnvironments:
+  - name: VinaToolchain
+    description: "Verify VINA and OpenBabel are available from the Conda queue environment"
+    script:
+      embeddedFiles:
+        - name: Setup
+          type: TEXT
+          filename: "setup_toolchain.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "Verifying toolchain..."
+            vina --version
+            obabel -V
+            python3 --version
+            echo "openjd_env: WORK_DIR={{Session.WorkingDirectory}}"
+            echo "Toolchain ready."
+      actions:
+        onEnter:
+          command: "{{Env.File.Setup}}"
+          timeout: 60
+
+steps:
+  - name: PrepareData
+    description: "Download and filter compound library from ChEMBL (skipped if user provides their own library)"
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 2
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "prepare_data.py"
+          runnable: true
+          data: |
+            #!/usr/bin/env python3
+            """Download compound library from ChEMBL and filter to drug-like molecules."""
+            import gzip
+            import os
+            import subprocess
+            import sys
+            import urllib.request
+
+            library_param = "{{Param.CompoundLibrary}}"
+            output_dir = "{{Param.OutputDir}}"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # If user provided their own library, just copy/link it and skip download
+            if not library_param.endswith("chembl"):
+                print(f"User-provided library: {library_param}")
+                dest = os.path.join(output_dir, "compound_library.sdf.gz")
+                if not os.path.exists(dest):
+                    os.symlink(os.path.abspath(library_param), dest)
+                print("Linked user library to output dir")
+                sys.exit(0)
+
+            # Download ChEMBL chemical representations
+            chembl_version = "{{Param.ChEMBLVersion}}"
+            max_compounds = {{Param.MaxCompounds}}
+            min_smi_len = {{Param.MinSmilesLength}}
+            max_smi_len = {{Param.MaxSmilesLength}}
+
+            url = f"https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_{chembl_version}/chembl_{chembl_version}_chemreps.txt.gz"
+            gz_path = os.path.join(output_dir, f"chembl_{chembl_version}_chemreps.txt.gz")
+            smi_path = os.path.join(output_dir, "compound_library.smi")
+            sdf_path = os.path.join(output_dir, "compound_library.sdf")
+
+            print(f"Downloading ChEMBL {chembl_version} from: {url}")
+            urllib.request.urlretrieve(url, gz_path)
+            print(f"Downloaded: {os.path.getsize(gz_path) / 1024 / 1024:.1f} MB")
+
+            # Filter to drug-like compounds
+            print(f"Filtering: SMILES length {min_smi_len}-{max_smi_len}, no mixtures, max {max_compounds}")
+            count = 0
+            with gzip.open(gz_path, 'rt') as f_in, open(smi_path, 'w') as f_out:
+                header = f_in.readline()
+                for line in f_in:
+                    if count >= max_compounds:
+                        break
+                    parts = line.strip().split('\t')
+                    if len(parts) < 2:
+                        continue
+                    chembl_id, smiles = parts[0], parts[1]
+                    smi_len = len(smiles)
+                    if smi_len < min_smi_len or smi_len > max_smi_len:
+                        continue
+                    if '.' in smiles:
+                        continue
+                    f_out.write(f"{smiles} {chembl_id}\n")
+                    count += 1
+
+            print(f"Extracted {count} drug-like compounds")
+
+            # Convert SMILES to SDF (2D, workers will add 3D during docking)
+            print("Converting to SDF format...")
+            result = subprocess.run(
+                ["obabel", smi_path, "-O", sdf_path, "-e"],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0 and not os.path.exists(sdf_path):
+                print(f"ERROR: {result.stderr[-500:]}", file=sys.stderr)
+                sys.exit(1)
+
+            # Compress
+            print("Compressing...")
+            subprocess.run(["gzip", sdf_path], check=True)
+
+            # Cleanup
+            os.remove(gz_path)
+            os.remove(smi_path)
+
+            final_path = sdf_path + ".gz"
+            print(f"Library ready: {final_path} ({os.path.getsize(final_path) / 1024 / 1024:.1f} MB)")
+            print(f"Compounds: {count}")
+      actions:
+        onRun:
+          command: "python3"
+          args: ["{{Task.File.Run}}"]
+          timeout: 1800
+
+  - name: PrepareReceptor
+    description: "Convert receptor PDB to PDBQT format for VINA"
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 2
+        - name: "amount.worker.memory"
+          min: 4096
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "prepare_receptor.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            mkdir -p "{{Param.OutputDir}}"
+            echo "Converting receptor PDB to PDBQT..."
+            obabel "{{Param.ReceptorPdb}}" -O "{{Param.OutputDir}}/receptor.pdbqt" \
+              --partialcharge gasteiger -xr
+            echo "Receptor ready: $(wc -l < "{{Param.OutputDir}}/receptor.pdbqt") lines"
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 600
+
+  - name: SplitLibrary
+    description: "Split compound library into chunks for parallel docking"
+    dependencies:
+      - dependsOn: PrepareData
+      - dependsOn: PrepareReceptor
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 2
+        - name: "amount.worker.memory"
+          min: 8192
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "split_library.py"
+          runnable: true
+          data: |
+            #!/usr/bin/env python3
+            import os, gzip, glob
+            library_param = "{{Param.CompoundLibrary}}"
+            # Use PrepareData output if ChEMBL was selected, otherwise use user file
+            if library_param.endswith("chembl"):
+                candidates = glob.glob("{{Param.OutputDir}}/compound_library.sdf*")
+                if not candidates:
+                    candidates = glob.glob("/sessions/**/compound_library.sdf*", recursive=True)
+                library_path = candidates[0] if candidates else library_param
+            else:
+                library_path = library_param
+            print(f"Using library: {library_path}")
+            output_dir = "{{Param.OutputDir}}/chunks"
+            compounds_per_chunk = {{Param.CompoundsPerChunk}}
+            os.makedirs(output_dir, exist_ok=True)
+            open_fn = gzip.open if library_path.endswith('.gz') else open
+            chunk_idx = 0
+            mol_count = 0
+            current_mol_lines = []
+            chunk_file = None
+            def start_new_chunk():
+                global chunk_idx, chunk_file
+                if chunk_file:
+                    chunk_file.close()
+                chunk_file = open(os.path.join(output_dir, f"chunk_{chunk_idx:06d}.sdf"), 'w')
+                chunk_idx += 1
+            start_new_chunk()
+            with open_fn(library_path, 'rt') as f:
+                for line in f:
+                    current_mol_lines.append(line)
+                    if line.strip() == '$$$$':
+                        chunk_file.writelines(current_mol_lines)
+                        current_mol_lines = []
+                        mol_count += 1
+                        if mol_count % compounds_per_chunk == 0:
+                            start_new_chunk()
+            if current_mol_lines:
+                chunk_file.writelines(current_mol_lines)
+            if chunk_file:
+                chunk_file.close()
+            print(f"Split {mol_count} compounds into {chunk_idx} chunks")
+            print(f"Set MaxChunkIndex to {chunk_idx - 1}")
+      actions:
+        onRun:
+          command: "python3"
+          args: ["{{Task.File.Run}}"]
+          timeout: 3600
+
+  - name: DockCompounds
+    description: "Run AutoDock VINA on each chunk in parallel"
+    dependencies:
+      - dependsOn: SplitLibrary
+      - dependsOn: PrepareReceptor
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 4
+        - name: "amount.worker.memory"
+          min: 4096
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: ChunkIndex
+          type: INT
+          range: "0-{{Param.MaxChunkIndex}}"
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "dock_chunk.sh"
+          runnable: true
+          data: |
+            #!/bin/bash
+            set -euo pipefail
+            CHUNK_IDX=$(printf "%06d" {{Task.Param.ChunkIndex}})
+            CHUNK_SDF="{{Param.OutputDir}}/chunks/chunk_${CHUNK_IDX}.sdf"
+            RECEPTOR_PDBQT="{{Param.OutputDir}}/receptor.pdbqt"
+            RESULTS_DIR="{{Param.OutputDir}}/results"
+            WORK="{{Session.WorkingDirectory}}/dock_${CHUNK_IDX}"
+            mkdir -p "${RESULTS_DIR}" "${WORK}"
+
+            # Handle missing chunk gracefully (edge case)
+            if [ ! -f "${CHUNK_SDF}" ]; then
+              echo "Chunk ${CHUNK_IDX} does not exist, writing empty result"
+              echo "compound_id,binding_affinity,chunk" > "${RESULTS_DIR}/results_${CHUNK_IDX}.csv"
+              exit 0
+            fi
+
+            # Idempotent: skip if already completed (for Spot restarts)
+            RESULT_FILE="${RESULTS_DIR}/results_${CHUNK_IDX}.csv"
+            if [ -f "${RESULT_FILE}" ] && [ "$(wc -l < "${RESULT_FILE}")" -gt 1 ]; then
+              echo "Results already exist for chunk ${CHUNK_IDX}, skipping"
+              exit 0
+            fi
+
+            echo "Docking chunk ${CHUNK_IDX}..."
+
+            # Copy receptor to work dir (ensures permissions)
+            cp "${RECEPTOR_PDBQT}" "${WORK}/receptor.pdbqt"
+            cd "${WORK}"
+
+            # Convert SDF molecules to PDBQT (--gen3d generates 3D coords if missing)
+            obabel "${CHUNK_SDF}" -O mol_.pdbqt -m --gen3d --partialcharge gasteiger 2>&1 | tail -3 || true
+            NUM_LIGANDS=$(ls mol_*.pdbqt 2>/dev/null | wc -l)
+            echo "Converted ${NUM_LIGANDS} ligands to PDBQT"
+
+            if [ "${NUM_LIGANDS}" -eq 0 ]; then
+              echo "No ligands converted, writing empty result"
+              echo "compound_id,binding_affinity,chunk" > "${RESULT_FILE}"
+              exit 0
+            fi
+
+            # Dock each ligand
+            echo "compound_id,binding_affinity,chunk" > "${RESULT_FILE}.tmp"
+            DOCK_OK=0
+            DOCK_FAIL=0
+            for LIGAND in mol_*.pdbqt; do
+              [ -f "${LIGAND}" ] || continue
+              MOL_ID="${LIGAND%.pdbqt}"
+              OUT="${MOL_ID}_out.pdbqt"
+              VINA_LOG="${MOL_ID}_log.txt"
+
+              vina --receptor receptor.pdbqt \
+                --ligand "${LIGAND}" \
+                --out "${OUT}" \
+                --center_x {{Param.CenterX}} --center_y {{Param.CenterY}} --center_z {{Param.CenterZ}} \
+                --size_x {{Param.SizeX}} --size_y {{Param.SizeY}} --size_z {{Param.SizeZ}} \
+                --exhaustiveness {{Param.Exhaustiveness}} \
+                --num_modes {{Param.NumModes}} \
+                --energy_range {{Param.EnergyRange}} \
+                > "${VINA_LOG}" 2>&1 || true
+
+              # Extract best binding affinity from output PDBQT
+              SCORE=""
+              if [ -f "${OUT}" ]; then
+                SCORE=$(grep -m1 "REMARK VINA RESULT" "${OUT}" | awk '{print $4}' || true)
+              fi
+              # Fallback: parse from VINA stdout (mode 1 score)
+              if [ -z "${SCORE}" ] && [ -f "${VINA_LOG}" ]; then
+                SCORE=$(grep -E "^\s+1\s+" "${VINA_LOG}" | head -1 | awk '{print $2}' || true)
+              fi
+
+              if [ -n "${SCORE}" ]; then
+                echo "${MOL_ID},${SCORE},${CHUNK_IDX}" >> "${RESULT_FILE}.tmp"
+                DOCK_OK=$((DOCK_OK + 1))
+              else
+                DOCK_FAIL=$((DOCK_FAIL + 1))
+              fi
+            done
+
+            # Atomic write
+            mv "${RESULT_FILE}.tmp" "${RESULT_FILE}"
+            echo "Chunk ${CHUNK_IDX}: ${DOCK_OK} docked, ${DOCK_FAIL} failed"
+            rm -rf "${WORK}"
+      actions:
+        onRun:
+          command: "{{Task.File.Run}}"
+          timeout: 7200
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+            notifyPeriodInSeconds: 30
+
+  - name: ScoreAndRank
+    description: "Aggregate results from all chunks and report top-N hits"
+    dependencies:
+      - dependsOn: DockCompounds
+    hostRequirements:
+      amounts:
+        - name: "amount.worker.vcpu"
+          min: 2
+        - name: "amount.worker.memory"
+          min: 4096
+      attributes:
+        - name: "attr.worker.os.family"
+          anyOf: ["linux"]
+    script:
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          filename: "score_and_rank.py"
+          runnable: true
+          data: |
+            #!/usr/bin/env python3
+            import csv, glob, os
+            results_dir = "{{Param.OutputDir}}/results"
+            output_dir = "{{Param.OutputDir}}"
+            top_n = {{Param.TopN}}
+
+            all_scores = []
+            for result_file in sorted(glob.glob(os.path.join(results_dir, "results_*.csv"))):
+                with open(result_file, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        try:
+                            all_scores.append({
+                                'compound_id': row['compound_id'],
+                                'binding_affinity': float(row['binding_affinity']),
+                                'chunk': row['chunk']
+                            })
+                        except (ValueError, KeyError):
+                            continue
+
+            all_scores.sort(key=lambda x: x['binding_affinity'])
+
+            top_hits_path = os.path.join(output_dir, "top_hits.csv")
+            with open(top_hits_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['rank', 'compound_id', 'binding_affinity_kcal_mol', 'source_chunk'])
+                for i, hit in enumerate(all_scores[:top_n], 1):
+                    writer.writerow([i, hit['compound_id'], hit['binding_affinity'], hit['chunk']])
+
+            summary_path = os.path.join(output_dir, "screening_summary.txt")
+            with open(summary_path, 'w') as f:
+                f.write("=== Virtual Screening Summary ===\n")
+                f.write(f"Total compounds docked: {len(all_scores)}\n")
+                f.write(f"Top {top_n} hits saved to: top_hits.csv\n\n")
+                if all_scores:
+                    affinities = [s['binding_affinity'] for s in all_scores]
+                    f.write(f"Best:  {min(affinities):.2f} kcal/mol\n")
+                    f.write(f"Worst: {max(affinities):.2f} kcal/mol\n")
+                    f.write(f"Mean:  {sum(affinities)/len(affinities):.2f} kcal/mol\n")
+
+            print(f"Screening complete! {len(all_scores)} compounds scored.")
+            if all_scores:
+                print(f"Best: {all_scores[0]['compound_id']} ({all_scores[0]['binding_affinity']:.2f} kcal/mol)")
+      actions:
+        onRun:
+          command: "python3"
+          args: ["{{Task.File.Run}}"]
+          timeout: 1800

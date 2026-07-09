@@ -1,0 +1,25 @@
+; Energy minimization parameters for GROMACS
+; Standard steepest descent minimization
+
+integrator  = steep         ; Steepest descent minimization
+emtol       = 1000.0        ; Stop when max force < 1000.0 kJ/mol/nm
+emstep      = 0.01          ; Minimization step size (nm)
+nsteps      = 50000         ; Maximum number of minimization steps
+
+; Neighbor searching
+nstlist         = 10        ; Frequency to update neighbor list
+cutoff-scheme   = Verlet    ; Buffered neighbor searching
+ns_type         = grid      ; Grid-based neighbor searching
+rcoulomb        = 1.0       ; Short-range electrostatic cutoff (nm)
+rvdw            = 1.0       ; Short-range van der Waals cutoff (nm)
+
+; Electrostatics
+coulombtype     = PME       ; Particle Mesh Ewald for long-range electrostatics
+pme_order       = 4         ; Cubic interpolation
+fourierspacing  = 0.16      ; Grid spacing for FFT
+
+; Constraints
+constraints     = none      ; No constraints for minimization
+
+; Periodic boundary conditions
+pbc             = xyz       ; 3D PBC

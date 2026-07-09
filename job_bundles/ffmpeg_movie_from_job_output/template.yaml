@@ -1,0 +1,178 @@
+specificationVersion: jobtemplate-2023-09
+name: FFmpeg Movie from Job Output
+description: |
+  This job downloads the output of another completed job in the same queue and uses
+  FFmpeg to encode the image sequence into a video file.
+
+  It requires FFmpeg from conda-forge and the Deadline Cloud Python library (installed
+  via pip at runtime). On service-managed fleets, use "conda-forge" as the CondaChannels
+  parameter for a conda queue environment.
+
+parameterDefinitions:
+# Source Job
+- name: SourceJobId
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Source Job ID
+    groupLabel: Source Job
+  description: >
+    The Job ID of a completed job in the same queue whose output images will be
+    assembled into a movie. Example: job-0123456789abcdef0123456789abcdef
+- name: SourceStepId
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Source Step ID (optional)
+    groupLabel: Source Job
+  default: ''
+  description: >
+    Optionally restrict the download to a specific step ID from the source job.
+    Leave empty to download all outputs.
+
+# Movie Settings
+- name: FrameRate
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Frame Rate (fps)
+    groupLabel: Movie Settings
+  default: 24
+  minValue: 1
+  maxValue: 120
+  description: The frame rate of the output video.
+- name: PixelFormat
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Pixel Format
+    groupLabel: Movie Settings
+  default: yuv420p
+  allowedValues: [yuv420p, yuv444p]
+  description: >
+    The pixel format for the output video. yuv420p is widely compatible;
+    yuv444p preserves more color detail.
+- name: EncodingPreset
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Encoding Preset
+    groupLabel: Movie Settings
+  default: medium
+  allowedValues: [ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow]
+  description: Controls the encoding speed to compression ratio.
+- name: ConstantRateFactor
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Constant Rate Factor (CRF)
+    groupLabel: Movie Settings
+  default: 18
+  minValue: 0
+  maxValue: 51
+  description: >
+    Quality setting for H.264 encoding. 0 is lossless, 51 is worst quality.
+    17-18 is nearly visually lossless.
+- name: Resolution
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output Resolution (optional)
+    groupLabel: Movie Settings
+  default: ''
+  description: >
+    Optional output resolution as WIDTHxHEIGHT (e.g. 1920x1080). Leave empty
+    to use the source image resolution.
+- name: OutputFilename
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Output Filename
+    groupLabel: Movie Settings
+  default: output.mp4
+  description: The filename for the output video.
+
+# Output
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+  default: output
+  description: The directory where the output video will be saved.
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: ffmpeg
+  description: >
+    Conda packages required by this job. Requires a conda queue environment.
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: conda-forge
+  description: >
+    Conda channels to get packages from. Requires a conda queue environment.
+
+# Injected by pre-submission hook (inject_s3_settings.py)
+- name: S3SettingsFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  default: s3_settings.json
+  description: >
+    JSON file with S3 bucket settings. Created by the pre-submission hook.
+
+# Scripts directory
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  userInterface:
+    control: HIDDEN
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+
+jobEnvironments:
+- name: InstallDeadline
+  description: Installs the Deadline Cloud Python library via pip.
+  script:
+    actions:
+      onEnter:
+        command: pip
+        args: ['install', 'deadline']
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+steps:
+- name: EncodeMovie
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/encode_movie.py'
+        - '{{Param.SourceJobId}}'
+        - '{{Param.SourceStepId}}'
+        - '{{Param.S3SettingsFile}}'
+        - '{{Param.FrameRate}}'
+        - '{{Param.PixelFormat}}'
+        - '{{Param.EncodingPreset}}'
+        - '{{Param.ConstantRateFactor}}'
+        - '{{Param.Resolution}}'
+        - '{{Param.OutputDir}}'
+        - '{{Param.OutputFilename}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

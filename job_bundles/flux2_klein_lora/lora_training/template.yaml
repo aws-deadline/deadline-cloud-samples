@@ -188,3 +188,5 @@ steps:
     amounts:
     - name: amount.worker.gpu
       min: 1
+    - name: amount.worker.memory
+      min: 65536
