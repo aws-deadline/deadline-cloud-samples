@@ -69,6 +69,7 @@ Resources:
         ZipFile: |
           import json
           import os
+          import urllib.error
           import urllib.request
 
           # Deadline Cloud job task-run statuses that represent a finished job.
@@ -113,9 +114,21 @@ Resources:
                   method="POST",
               )
 
-              with urllib.request.urlopen(request, timeout=10) as response:
-                  body = response.read().decode("utf-8")
-                  print(f"Slack responded {response.status}: {body}")
+              # Post to Slack, logging a clear message on failure. A bad webhook
+              # (mistyped, revoked, or rate-limited) raises HTTPError; network
+              # issues raise URLError. We log and return rather than re-raising so
+              # a misconfigured webhook is diagnosable from CloudWatch Logs instead
+              # of triggering opaque asynchronous Lambda retries. Raise instead if
+              # you would rather rely on EventBridge/Lambda retry and DLQ behavior.
+              try:
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      body = response.read().decode("utf-8")
+                      print(f"Slack responded {response.status}: {body}")
+              except urllib.error.HTTPError as error:
+                  body = error.read().decode("utf-8", errors="replace")
+                  print(f"Slack returned an error: HTTP {error.code}: {body}")
+              except urllib.error.URLError as error:
+                  print(f"Failed to reach Slack: {error.reason}")
 
   # Allow EventBridge to invoke the Lambda function.
   JobEventsSlackFunctionPermission:
