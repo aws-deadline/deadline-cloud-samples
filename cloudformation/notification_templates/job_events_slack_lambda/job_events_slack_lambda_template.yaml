@@ -115,11 +115,13 @@ Resources:
               )
 
               # Post to Slack, logging a clear message on failure. A bad webhook
-              # (mistyped, revoked, or rate-limited) raises HTTPError; network
-              # issues raise URLError. We log and return rather than re-raising so
-              # a misconfigured webhook is diagnosable from CloudWatch Logs instead
-              # of triggering opaque asynchronous Lambda retries. Raise instead if
-              # you would rather rely on EventBridge/Lambda retry and DLQ behavior.
+              # (mistyped, revoked, or rate-limited) raises HTTPError; connection
+              # issues raise URLError; a read timeout raises TimeoutError, which is
+              # an OSError but not a URLError. We catch all of them and return
+              # rather than re-raising so a misconfigured webhook is diagnosable
+              # from CloudWatch Logs instead of triggering opaque asynchronous
+              # Lambda retries. Raise instead if you would rather rely on
+              # EventBridge/Lambda retry and DLQ behavior.
               try:
                   with urllib.request.urlopen(request, timeout=10) as response:
                       body = response.read().decode("utf-8")
@@ -129,6 +131,10 @@ Resources:
                   print(f"Slack returned an error: HTTP {error.code}: {body}")
               except urllib.error.URLError as error:
                   print(f"Failed to reach Slack: {error.reason}")
+              except OSError as error:
+                  # Covers socket timeouts (TimeoutError) and other low-level I/O
+                  # errors during the request or response read.
+                  print(f"Failed to post to Slack: {error}")
 
   # Allow EventBridge to invoke the Lambda function.
   JobEventsSlackFunctionPermission:
