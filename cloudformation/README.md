@@ -31,6 +31,14 @@ The [budget_events_notification](notification_templates/budget_events_notificati
 to receive notifications via email and Slack when a budget threshold is reached in the aws.deadline service. It creates an SNS topic,
 an EventBridge rule, and a Chatbot configuration to send the notifications.
 
+## Job event Slack notifications with Lambda
+
+The [job_events_slack_lambda](notification_templates/job_events_slack_lambda/) CloudFormation template demonstrates
+how to connect an AWS Lambda function to Deadline Cloud job events through Amazon EventBridge. It creates an
+EventBridge rule that matches job completion and failure events and invokes a Lambda function that posts a
+notification to a Slack channel via an incoming webhook. Use it as a starting point for reacting to job events
+in your own automation.
+
 ## Scheduled standby workers
 
 The [fleet_standby_scheduling](farm_templates/fleet_standby_scheduling/) sample CloudFormation template schedules

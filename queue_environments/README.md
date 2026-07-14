@@ -8,7 +8,8 @@ follow the environment template specification from
 
 The Conda and Rez queue environments let you provide software applications to jobs in your
 Deadline Cloud queue, so each job only needs a parameter value for `CondaPackages` or `RezPackages`
-to tell it the list of packages to use.
+to tell it the list of packages to use. The pip queue environment does the same for Python
+packages, so a job only needs to provide a value for `PipPackages`.
 
 ## Create a queue environment for your queue
 
@@ -209,6 +210,26 @@ The core enhancement of this queue environment is to use named Conda environment
 jobs. The default environment name uses the hash of the Conda channels and packages, or you can explicitly
 set the name in the job. It also includes a parameter for how long to use an environment without running a package
 update, so that most of the time it will take seconds to activate an environment that's being reused.
+
+### Pip queue environment
+
+The file [pip_queue_env.yaml](pip_queue_env.yaml) lets you provide Python packages to jobs using
+[pip](https://pip.pypa.io/) and the standard library [venv](https://docs.python.org/3/library/venv.html)
+module, rather than a package manager like Conda or Rez. When a job provides a `PipPackages` parameter
+value, the queue environment creates a Python virtual environment in the session working directory,
+installs the requested packages into it with pip, and activates it so subsequent steps run with those
+packages available. If `PipPackages` is empty, the queue environment does nothing, so it is safe to add
+to a queue that also runs jobs which do not use it.
+
+The `PipIndexUrl` and `PipExtraIndexUrls` parameters let jobs install from a private package index, such
+as an [AWS CodeArtifact](https://docs.aws.amazon.com/codeartifact/) repository, instead of the default
+[PyPI](https://pypi.org/) index.
+
+Unlike Conda and Rez, pip and venv are included with Python itself, so worker hosts only need a `python3`
+(or `python`) interpreter on the `PATH`. Deadline Cloud service-managed fleets provide one. The
+[pip_package_job](../job_bundles/pip_package_job) job bundle shows how to submit a job that uses this
+queue environment, and [pip_self_contained_job](../job_bundles/pip_self_contained_job) shows the same
+pip environment defined inline in a job bundle when you do not want to configure a queue environment.
 
 ### Disconnect UBL queue environment
 

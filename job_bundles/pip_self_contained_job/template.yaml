@@ -1,0 +1,170 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Pip Self-Contained Job
+
+description: |
+  Demonstrates managing pip packages entirely within a job bundle, without
+  relying on a queue environment. The job defines its own Open Job Description
+  job environment that creates a Python virtual environment, installs the
+  requested pip packages into it, and adds it to the PATH for all steps.
+
+  Use this style when you want a self-contained job bundle that runs on any
+  Linux worker with python3 available, and you do not want to configure a
+  queue environment. If you would rather share one pip environment definition
+  across many jobs, see the pip_package_job sample and the
+  queue_environments/pip_queue_env.yaml queue environment instead.
+
+parameterDefinitions:
+- name: Message
+  type: STRING
+  default: "Hello from a self-contained pip virtual environment!"
+  description: "The message the cowsay package prints."
+  userInterface:
+    control: LINE_EDIT
+    label: Message
+- name: PipPackages
+  type: STRING
+  default: "cowsay"
+  description: "A space-separated list of pip requirement specifiers to install into the job's virtual environment."
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Packages
+    groupLabel: Software Environment
+- name: PipIndexUrl
+  type: STRING
+  default: ""
+  description: "The base Python package index URL. Leave empty to use the default PyPI index."
+  userInterface:
+    control: LINE_EDIT
+    label: Pip Index URL
+    groupLabel: Software Environment
+
+jobEnvironments:
+- name: PipVirtualEnv
+  description: Creates a Python virtual environment and installs the PipPackages into it.
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args:
+        - "{{Env.File.Enter}}"
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+
+        if [ -z '{{Param.PipPackages}}' ]; then
+            echo "Skipping pip virtual environment as PipPackages parameter was empty."
+            exit 0
+        fi
+
+        PIP_PACKAGES='{{Param.PipPackages}}'
+
+        INDEX_OPTS=""
+        if [ -n '{{Param.PipIndexUrl}}' ]; then
+            INDEX_OPTS="--index-url {{Param.PipIndexUrl}}"
+        fi
+
+        # Find a Python interpreter. Prefer python3, but fall back to python.
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON=python3
+        else
+            PYTHON=python
+        fi
+
+        echo "Creating a Python virtual environment in the session directory..."
+
+        # Create the virtual environment in the session working directory so it
+        # is cleaned up automatically when the session ends.
+        ENV_DIR="$(mktemp -d '{{Session.WorkingDirectory}}/.venv-XXXXX')"
+        "$PYTHON" -m venv "$ENV_DIR"
+
+        # A venv puts its executables in bin/ on Linux and macOS, and in
+        # Scripts/ on Windows.
+        if [ -d "$ENV_DIR/bin" ]; then
+            VENV_BIN="$ENV_DIR/bin"
+        else
+            VENV_BIN="$ENV_DIR/Scripts"
+        fi
+
+        # Capture the environment variables before activating the virtual environment
+        "$PYTHON" '{{Env.File.OpenJDVarsStart}}' .vars
+
+        # Activate the virtual environment.
+        set +u
+        source "$VENV_BIN/activate"
+        set -u
+
+        # Pass the index options to both commands so a private PipIndexUrl also
+        # works on workers that cannot reach public PyPI.
+        pip install $INDEX_OPTS --quiet --upgrade pip
+        pip install $INDEX_OPTS $PIP_PACKAGES
+
+        # Export the environment variables set by activation to all steps
+        "$VENV_BIN/python" '{{Env.File.OpenJDVarsCapture}}' .vars
+
+        echo "Virtual environment created at $ENV_DIR"
+        pip list
+    - name: OpenJDVarsStart
+      filename: openjd-vars-start.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Exclude the env var "_" as it has special meaning to shells
+        before = dict(os.environ)
+        if "_" in before:
+            del before["_"]
+
+        with open(sys.argv[1], "w", encoding="utf8") as f:
+            json.dump(before, f)
+    - name: OpenJDVarsCapture
+      filename: openjd-vars-capture.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import sys
+
+        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
+        with open(sys.argv[1], "r", encoding="utf8") as f:
+            before = json.load(f)
+        after = dict(os.environ)
+        # Exclude the env var "_" as it has special meaning to shells
+        if "_" in after:
+            del after["_"]
+
+        # Identify the modified and deleted environment variables
+        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
+        vars_to_delete = {k for k in before if k not in after}
+
+        # Print the env var changes following the Open Job Description specification
+        for k, v in vars_to_put.items():
+            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
+            print(f"openjd_env: {kv}")
+        for k in vars_to_delete:
+            print(f"openjd_unset_env: {k}")
+
+steps:
+- name: SayHello
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        # cowsay is provided by the PipVirtualEnv job environment, which put its
+        # virtual environment on the PATH for this step.
+        import cowsay
+
+        cowsay.cow("{{Param.Message}}")

@@ -1,0 +1,18 @@
+version: "1.0"
+
+# A preSubmission hook runs as part of every submission (CLI and GUI), just
+# before the job is hashed, uploaded, and created. This one reads the studio's
+# Flow environment variables and rewrites the job template's Flow parameter
+# defaults from them, then prints the modified template on stdout. The Deadline
+# Cloud client applies that template to the submission.
+#
+# The Flow parameters are HIDDEN in the template and have no usable default, so
+# this hook is the single source of their values. If a required environment
+# variable is missing, the hook exits non-zero and the submission is aborted.
+#
+# Bundle hooks are disabled by default. Enable them once with:
+#   deadline config set settings.allow_bundle_hooks true
+preSubmission:
+  - command: python3
+    args: [scripts/flow_params_from_env.py]
+    timeout: 10

@@ -2,11 +2,11 @@
 
 ## Overview
 
-This directory contains a conda build recipe for Houdini 21.0.440, specifically configured for use with AWS Deadline Cloud. This package enables you to run Houdini rendering and processing jobs on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for Houdini 21.0.596, specifically configured for use with AWS Deadline Cloud. This package enables you to run Houdini rendering and processing jobs on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
-- **Application**: Houdini 21.0.440
+- **Application**: Houdini 21.0.596
 - **Supported Platforms**: linux-64
 - **Source**: SideFX Houdini downloads page
 - **License**: SideFXEULA
@@ -32,10 +32,9 @@ Before building this package, ensure you have:
 ### Linux
 
 #### Download from SideFX
-1. Download the `houdini-21.0.440-linux_x86_64_gcc11.2.tar.gz` from SideFX Houdini's downloads page
-2. Verify the SHA256 hash matches: `a87451f9146d52051a9ba142d535936638351526a48cba0c6156a221f3be58e6`
-3. Clone this repository locally.
-4. Place the downloaded file in the `conda_recipes/archive_files` directory 
+1. Download the `houdini-21.0.596-linux_x86_64_gcc11.2.tar.gz` from SideFX Houdini's downloads page
+2. Clone this repository locally.
+3. Place the downloaded file in the `conda_recipes/archive_files` directory 
  
 
 ## Plugin Integration
@@ -87,6 +86,25 @@ $PREFIX/opt/houdini/packages
 3. **Plugin Dependencies**
    - Add this Houdini package as a dependency in your plugin's `recipe.yaml`
    - Specify version constraints: `houdini >=21.0,<21.5`
+
+### Plugin Sync
+
+This recipe includes Plugin Sync support, which allows customers to deliver plugins
+to workers via S3 without building a separate conda package.
+
+To use Plugin Sync, upload your plugin files and a Houdini package descriptor
+(`.json` file) to the S3 path:
+
+```
+s3://<job-attachments-bucket>/<root-prefix>/plugins/linux/houdini/21.0/
+```
+
+The `.json` package descriptor should reference `$DEADLINE_CLOUD_HOUDINI_PLUGIN_SYNC_DIR`
+for plugin file paths. At activation time, the conda package downloads plugins from S3
+and copies `.json` files to `~/houdini21.0/packages/` for Houdini's native discovery.
+
+See the [Plugin Sync documentation](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/plugin-sync.html)
+for more details.
 
 ## Application-Specific Requirements
 
@@ -150,8 +168,10 @@ houdini-21.0/
 ├── README.md                    # This file
 ├── deadline-cloud.yaml          # Deadline Cloud configuration
 └── recipe/
-    ├── recipe.yaml             # Rattler-build recipe
-    └── build.sh                # Linux build script
+    ├── recipe.yaml                             # Rattler-build recipe
+    ├── build.sh                                # Linux build script
+    ├── zzz-houdini-plugin-sync-activate.sh     # Plugin Sync activation script
+    └── zzz-houdini-plugin-sync-deactivate.sh   # Plugin Sync deactivation script
 ```
 
 ## Resources
@@ -160,7 +180,8 @@ houdini-21.0/
 - **AWS Deadline Cloud Developer Guide**: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/
 - **Rattler Build Documentation**: https://prefix-dev.github.io/rattler-build/
 - **Plugin Development**: https://www.sidefx.com/docs/houdini/ref/plugins.html
+- **Plugin Sync**: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/plugin-sync.html
 
 ---
 
-**Note**: This recipe is specifically configured for Houdini 21.0.440 on Linux x86_64 platforms.
+**Note**: This recipe is specifically configured for Houdini 21.0.596 on Linux x86_64 platforms.

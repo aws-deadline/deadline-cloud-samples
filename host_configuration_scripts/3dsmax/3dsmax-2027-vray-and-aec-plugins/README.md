@@ -6,6 +6,7 @@ This sample host configuration script configures your Service Managed Fleet with
 1. Create an S3 bucket in your AWS account.
 2. Download the 3ds Max installer from Autodesk, zip up the installer, and upload it to your S3 bucket.
 3. Download the V-Ray for 3ds Max 2027 installer from Chaos and upload it to your S3 bucket.
+    - WARNING: Do not rename the V-Ray installer executable. The installer may silently fail if you give it a new name after downloading it from the Chaos Group website
 4. Download the Forest Pack and RailClone installers from iToo Software and upload them to your S3 bucket.
 5. Download the FloorGenerator and MultiTexture plugin files and upload them to your S3 bucket.
 6. Configure the Windows Service Managed fleet's host configuration using [3dsmax-2027-vray-and-aec-plugins.ps1](./3dsmax-2027-vray-and-aec-plugins.ps1).

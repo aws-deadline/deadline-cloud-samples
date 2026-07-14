@@ -12,6 +12,7 @@ tyFlow is a powerful particle system and physics simulation plugin for 3ds Max, 
 1. Create an S3 bucket in your AWS account.
 2. Download the 3ds Max installer from Autodesk, zip up the installer following [these steps](/host_configuration_scripts/3dsmax/README.md#creating-a-3ds-max-installer-archive-in-zip-format), and upload it to your S3 bucket.
 3. Download the V-Ray for 3ds Max 2025 installer from Chaos and upload it to your S3 bucket.
+    - WARNING: Do not rename the V-Ray installer executable. The installer may silently fail if you give it a new name after downloading it from the Chaos Group website
 4. Download the tyFlow plugin file and upload it to your S3 bucket.
 5. Configure the Windows Service Managed fleet's host configuration using [3dsmax-2025-vray-and-tyflow.ps1](./3dsmax-2025-vray-and-tyflow.ps1).
     - Note that there are placeholder variables at the start of the script marked with `TODO`. Please replace the values with ones matching your configuration.

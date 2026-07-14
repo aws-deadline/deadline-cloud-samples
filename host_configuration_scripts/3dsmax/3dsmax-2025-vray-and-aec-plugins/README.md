@@ -24,6 +24,7 @@ This script can be adapted for other compatible versions by updating the variabl
 1. Create an S3 bucket in your AWS account.
 2. Download the 3ds Max installer from Autodesk, zip up the installer following [these steps](/host_configuration_scripts/3dsmax/README.md#creating-a-3ds-max-installer-archive-in-zip-format), and upload it to your S3 bucket.
 3. Download the V-Ray for 3ds Max 2025 installer from Chaos and upload it to your S3 bucket.
+    - WARNING: Do not rename the V-Ray installer executable. The installer may silently fail if you give it a new name after downloading it from the Chaos Group website
 4. Download the Forest Pack installer from iToo Software and upload it to your S3 bucket.
 5. Download the RailClone installer from iToo Software and upload it to your S3 bucket.
 6. Download the FloorGenerator and MultiTexture plugin files and upload them to your S3 bucket.
