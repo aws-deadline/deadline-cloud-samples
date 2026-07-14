@@ -15,6 +15,8 @@ conda_recipes/archive_files/vraystd_*
 **/*.exe
 **/*.run
 **/*.pyc
+**/__pycache__/
+.pytest_cache/
 **/*.aex
 **/*.conda
 **/*.safetensors
