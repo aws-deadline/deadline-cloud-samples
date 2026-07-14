@@ -75,9 +75,18 @@ def test_cloudformation_template_passes_cfn_lint(template: Path):
 
     # cfn-lint exit codes: bit 0x2 => error, 0x4 => warning, 0x8 => informational.
     # Only fail the test on errors so style warnings don't block sample PRs.
-    findings = []
+    #
+    # A nonzero exit with no parseable JSON is a tool failure (internal error,
+    # or the process killed by the timeout), NOT a clean bill of health. Treat
+    # it as a failure rather than letting an empty ``[]`` mask it as a pass.
+    stdout = result.stdout.strip()
+    if not stdout:
+        pytest.fail(
+            f"cfn-lint exited {result.returncode} for {rel(template)} with no "
+            f"output:\n{result.stderr}"
+        )
     try:
-        findings = json.loads(result.stdout or "[]")
+        findings = json.loads(stdout)
     except json.JSONDecodeError:
         pytest.fail(
             f"cfn-lint failed for {rel(template)}:\n{result.stdout}\n{result.stderr}"

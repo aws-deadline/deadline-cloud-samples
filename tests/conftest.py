@@ -28,12 +28,12 @@ def require_tool(name: str, install_hint: str) -> str:
     hatch: run the checks with the tools installed, or they fail.
     """
     path = shutil.which(name)
-    if path:
-        return path
-    pytest.fail(
-        f"required tool {name!r} is not installed. Install it with: {install_hint}",
-        pytrace=False,
-    )
+    if not path:
+        pytest.fail(
+            f"required tool {name!r} is not installed. Install it with: {install_hint}",
+            pytrace=False,
+        )
+    return path
 
 # Directories anywhere in the tree whose contents are not part of the samples we
 # ship and should never be validated.

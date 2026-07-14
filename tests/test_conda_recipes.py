@@ -252,7 +252,13 @@ def _render_conda_meta_yaml(meta_yaml: Path) -> object:
         "os": __import__("os"),
     }
 
-    env = jinja2.Environment(undefined=_Undefined, keep_trailing_newline=True)
+    # autoescape is enabled to satisfy static analysis; it only affects the
+    # output of ``{{ }}`` expressions (never the literal template text). Every
+    # substitution here is an inert stand-in or a version/name string with no
+    # HTML-special characters, so escaping does not change the parsed YAML.
+    env = jinja2.Environment(
+        undefined=_Undefined, keep_trailing_newline=True, autoescape=True
+    )
     text = meta_yaml.read_text(encoding="utf-8")
     text = _SELECTOR_RE.sub("", text)
     try:
@@ -261,11 +267,12 @@ def _render_conda_meta_yaml(meta_yaml: Path) -> object:
         pytest.fail(f"{rel(meta_yaml)} failed Jinja rendering:\n{exc}")
 
     try:
-        return yaml.safe_load(rendered)
+        parsed = yaml.safe_load(rendered)
     except yaml.YAMLError as exc:
         pytest.fail(
             f"{rel(meta_yaml)} did not parse as YAML after rendering:\n{exc}"
         )
+    return parsed
 
 
 # NOTE: we intentionally do not check that a platform's ``sourceArchiveDirectory``
