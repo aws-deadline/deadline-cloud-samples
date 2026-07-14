@@ -1,0 +1,2935 @@
+{
+  "schema_version": 1,
+  "taxonomy": {
+    "categories": [
+      {
+        "id": "infrastructure",
+        "label": "Infrastructure as code",
+        "description": "Deploy or operate farms, queues, fleets, storage, and event integrations."
+      },
+      {
+        "id": "job-bundle",
+        "label": "OpenJD job bundles",
+        "description": "Submit rendering, simulation, media, machine learning, and utility workloads."
+      },
+      {
+        "id": "software-package",
+        "label": "Conda recipes and build jobs",
+        "description": "Build applications, adaptors, renderers, and plugins for worker delivery."
+      },
+      {
+        "id": "container",
+        "label": "Worker containers",
+        "description": "Build container images for local compatibility testing or containerized jobs."
+      },
+      {
+        "id": "queue-environment",
+        "label": "Queue environments",
+        "description": "Prepare session-scoped software and licensing for every job on a queue."
+      },
+      {
+        "id": "host-configuration",
+        "label": "Host configuration scripts",
+        "description": "Configure service-managed fleet workers with elevated privileges at startup."
+      },
+      {
+        "id": "submission-hook",
+        "label": "Submission hooks",
+        "description": "Apply organization policy or enrich job templates before submission."
+      },
+      {
+        "id": "utility",
+        "label": "Utility scripts",
+        "description": "Automate supporting Deadline Cloud asset and workflow operations."
+      },
+      {
+        "id": "agent-skill",
+        "label": "Agent skills",
+        "description": "Guide coding agents through repeatable sample authoring and software setup tasks."
+      }
+    ],
+    "tasks": [
+      {
+        "id": "deploy-farm",
+        "label": "Deploy a farm",
+        "description": "Create Deadline Cloud farms and their supporting AWS infrastructure."
+      },
+      {
+        "id": "manage-fleet",
+        "label": "Manage fleet capacity",
+        "description": "Configure worker connectivity, capacity, scheduling, and health."
+      },
+      {
+        "id": "monitor-events",
+        "label": "Monitor events and budgets",
+        "description": "Route Deadline Cloud lifecycle or budget events to operational destinations."
+      },
+      {
+        "id": "submit-job",
+        "label": "Author and submit jobs",
+        "description": "Create or run OpenJD job bundles through Deadline Cloud."
+      },
+      {
+        "id": "render-content",
+        "label": "Render DCC content",
+        "description": "Render scenes and images with digital content creation applications."
+      },
+      {
+        "id": "process-media",
+        "label": "Process media",
+        "description": "Encode, assemble, or publish image sequences and review media."
+      },
+      {
+        "id": "run-simulation",
+        "label": "Run simulations",
+        "description": "Distribute physical, robotics, driving, procedural, or financial simulations."
+      },
+      {
+        "id": "run-ml-workload",
+        "label": "Run machine learning workloads",
+        "description": "Distribute model training, inference, evaluation, or classification."
+      },
+      {
+        "id": "run-scientific-workload",
+        "label": "Run scientific workloads",
+        "description": "Distribute computational biology, chemistry, or molecular workloads."
+      },
+      {
+        "id": "manage-assets",
+        "label": "Move job assets",
+        "description": "Upload, discover, stage, or retrieve job inputs and outputs."
+      },
+      {
+        "id": "build-software",
+        "label": "Build software packages",
+        "description": "Build Conda packages or container images for repeatable delivery."
+      },
+      {
+        "id": "provide-software",
+        "label": "Provide software to workers",
+        "description": "Make applications, runtimes, and dependencies available to jobs."
+      },
+      {
+        "id": "install-plugins",
+        "label": "Install custom plugins",
+        "description": "Package or install DCC renderers, extensions, and plugins."
+      },
+      {
+        "id": "configure-workers",
+        "label": "Configure workers",
+        "description": "Prepare operating systems, software environments, and worker settings."
+      },
+      {
+        "id": "integrate-pipeline",
+        "label": "Integrate a studio pipeline",
+        "description": "Connect submission, execution, publishing, notifications, and studio services."
+      },
+      {
+        "id": "customize-submission",
+        "label": "Customize job submission",
+        "description": "Inspect or modify job bundles before they reach Deadline Cloud."
+      },
+      {
+        "id": "troubleshoot-workers",
+        "label": "Troubleshoot workers",
+        "description": "Create controlled interactive access for diagnosing worker behavior."
+      },
+      {
+        "id": "develop-samples",
+        "label": "Develop samples with an agent",
+        "description": "Use repository agent skills to create and test consistent samples."
+      }
+    ],
+    "journeys": [
+      {
+        "id": "new-application",
+        "label": "Run a new DCC or application",
+        "description": "Choose how to package software, model work, and submit an application job."
+      },
+      {
+        "id": "custom-plugins",
+        "label": "Install custom plugins",
+        "description": "Choose plugin sync, Conda packaging, or privileged host installation."
+      },
+      {
+        "id": "studio-integration",
+        "label": "Integrate studio tools",
+        "description": "Connect tools at submission, session, step, task, and event boundaries."
+      }
+    ]
+  },
+  "inventory": {
+    "roots": [
+      {
+        "path": "cloudformation/farm_templates",
+        "kind": "directory"
+      },
+      {
+        "path": "cloudformation/notification_templates",
+        "kind": "directory"
+      },
+      {
+        "path": "terraform/farm_templates",
+        "kind": "directory"
+      },
+      {
+        "path": "job_bundles",
+        "kind": "directory"
+      },
+      {
+        "path": "job_bundles/custom_submitters",
+        "kind": "directory"
+      },
+      {
+        "path": "conda_recipes",
+        "kind": "directory"
+      },
+      {
+        "path": "containers",
+        "kind": "directory"
+      },
+      {
+        "path": "containers/blender",
+        "kind": "directory"
+      },
+      {
+        "path": "queue_environments",
+        "kind": "file",
+        "pattern": "*.yaml"
+      },
+      {
+        "path": "host_configuration_scripts",
+        "kind": "directory"
+      },
+      {
+        "path": "host_configuration_scripts/3dsmax",
+        "kind": "directory"
+      },
+      {
+        "path": "host_configuration_scripts/aftereffects",
+        "kind": "directory"
+      },
+      {
+        "path": "host_configuration_scripts/cinema4d",
+        "kind": "directory"
+      },
+      {
+        "path": "submission_hooks",
+        "kind": "directory"
+      },
+      {
+        "path": "utility_scripts",
+        "kind": "directory"
+      },
+      {
+        "path": "skills",
+        "kind": "directory"
+      }
+    ],
+    "exclusions": [
+      {
+        "path": "job_bundles/custom_submitters",
+        "reason": "Grouping directory; its concrete submitter sample is discovered from the nested root."
+      },
+      {
+        "path": "job_bundles/job_attachments_devguide_output",
+        "reason": "Support-only output companion consumed by the job attachments developer-guide sample."
+      },
+      {
+        "path": "conda_recipes/archive_files",
+        "reason": "Support-only staging area for vendor archives used while building package recipes."
+      },
+      {
+        "path": "containers/blender",
+        "reason": "Grouping directory; its concrete Blender container sample is discovered from the nested root."
+      },
+      {
+        "path": "host_configuration_scripts/3dsmax",
+        "reason": "Grouping directory; concrete 3ds Max host configuration samples are cataloged below it."
+      },
+      {
+        "path": "host_configuration_scripts/aftereffects",
+        "reason": "Grouping directory; concrete After Effects host configuration samples are cataloged below it."
+      },
+      {
+        "path": "host_configuration_scripts/cinema4d",
+        "reason": "Grouping directory; concrete Cinema 4D host configuration samples are cataloged below it."
+      }
+    ]
+  },
+  "samples": [
+    {
+      "path": "cloudformation/farm_templates/cmf_templates",
+      "title": "Deploying Deadline Cloud fleet health check",
+      "description": "Deploy Lambda and EventBridge resources that continuously monitor and report the health of a customer-managed fleet.",
+      "category": "infrastructure",
+      "tasks": [
+        "manage-fleet",
+        "monitor-events"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/farm_templates/cuda_farm",
+      "title": "AWS Deadline Cloud farm for running CUDA jobs",
+      "description": "This CloudFormation template deploys an AWS Deadline Cloud farm that you can use to run CUDA jobs.",
+      "category": "infrastructure",
+      "tasks": [
+        "deploy-farm",
+        "manage-fleet"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation",
+        "cuda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/farm_templates/fleet_standby_scheduling",
+      "title": "Scheduled Standby Workers for Deadline Cloud Fleets",
+      "description": "This CloudFormation template schedules standby worker count changes on a Deadline Cloud fleet based on a time schedule.",
+      "category": "infrastructure",
+      "tasks": [
+        "deploy-farm",
+        "manage-fleet"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/farm_templates/smf_capacity_manager",
+      "title": "Service-managed fleet capacity manager",
+      "description": "This CloudFormation template implements automated capacity management for hybrid fleet setups that combine Wait and Save and Spot fleets.",
+      "category": "infrastructure",
+      "tasks": [
+        "deploy-farm",
+        "manage-fleet"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/farm_templates/smf_vpc_fsx",
+      "title": "Service-Managed Fleet with VPC Resource Endpoint and FSx for OpenZFS",
+      "description": "This CloudFormation template demonstrates how to set up AWS Deadline Cloud with a service-managed fleet that connects to FSx for OpenZFS storage through a VPC resource endpoint.",
+      "category": "infrastructure",
+      "tasks": [
+        "deploy-farm",
+        "manage-fleet"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/farm_templates/starter_farm",
+      "title": "A starter AWS Deadline Cloud farm",
+      "description": "This CloudFormation template deploys an AWS Deadline Cloud farm you can use to run jobs that render images, reconstruct 3D scenes, or transform your data in custom ways.",
+      "category": "infrastructure",
+      "tasks": [
+        "deploy-farm",
+        "manage-fleet"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation"
+      ],
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/notification_templates/budget_events_notification",
+      "title": "Deadline Budget Threshold Reached Event Integration with Email and Slack",
+      "description": "This CloudFormation template sets up an integration to receive notifications via email and Slack when a budget threshold is reached in the `aws.deadline` service.",
+      "category": "infrastructure",
+      "tasks": [
+        "monitor-events"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "cloudformation/notification_templates/job_events_slack_lambda",
+      "title": "Job event Slack notifications with Lambda and EventBridge",
+      "description": "This CloudFormation template demonstrates the general mechanism for connecting an AWS Lambda function to AWS Deadline Cloud job events through Amazon EventBridge.",
+      "category": "infrastructure",
+      "tasks": [
+        "monitor-events"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "cloudformation",
+        "slack"
+      ],
+      "updated": "2026-07-10",
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/aftereffects-25.1",
+      "title": "Adobe After Effects 25 conda build recipe",
+      "description": "The Windows installer requires Administrator permissions that are not available in most conda package build environments, such as on a Deadline Cloud service-managed fleets.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "aftereffects",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/aftereffects-plugin-bundle",
+      "title": "Conda build recipe for a bundle of After Effects plugins",
+      "description": "This package build recipe creates a conda package that bundles together all the After Effects plugins you provide in an input folder.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "aftereffects",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/aftereffects-saber",
+      "title": "Saber plug-in conda build recipe for After Effects",
+      "description": "Build the Saber After Effects plugin as a Windows Conda package that activates alongside After Effects on workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "aftereffects",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/autodock-vina-1.2.5",
+      "title": "AutoDock Vina 1.2.5 Conda recipe",
+      "description": "Build and publish AutoDock Vina 1.2.5 as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "autodock",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/ayon-launcher",
+      "title": "AYON Launcher Conda Package",
+      "description": "This recipe packages the AYON Launcher as a conda package for AWS Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "studio-integration"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "ayon",
+        "conda"
+      ],
+      "updated": "2026-06-18",
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-4.2",
+      "title": "Blender 4.2 Conda recipe",
+      "description": "Build and publish Blender 4.2 as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-4.3",
+      "title": "Blender 4.3 Conda recipe",
+      "description": "Build and publish Blender 4.3 as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-4.4",
+      "title": "Blender 4.4 Conda recipe",
+      "description": "Build and publish Blender 4.4 as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-4.5",
+      "title": "Blender 4.5 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Blender 4.5, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-5.0",
+      "title": "Blender 5.0 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Blender 5.0, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-5.1",
+      "title": "Blender 5.1 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a rattler-build recipe for packaging Blender 5.1 for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-flipfluids",
+      "title": "FLIP Fluids addon conda build recipe for Blender",
+      "description": "Build and publish FLIP Fluids addon conda build recipe for Blender as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/blender-plugin-bundle",
+      "title": "Blender Plugin Build",
+      "description": "This conda recipe packages multiple Blender addons from a zip archive containing individual addon zip files.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "blender",
+        "conda"
+      ],
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/cinema4d-2024",
+      "title": "Cinema 2024 conda build recipe",
+      "description": "The Windows installer requires Administrator permissions that are not available in most conda package build environments, such as on a Deadline Cloud service-managed fleets.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/cinema4d-2025",
+      "title": "Cinema 2025 conda build recipe",
+      "description": "The Windows installer requires Administrator permissions that are not available in most conda package build environments, such as on a Deadline Cloud service-managed fleets.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/cinema4d-c4dtoa-2025",
+      "title": "Conda build recipe for Arnold C4DtoA",
+      "description": "This package build recipe creates a conda package for the C4DtoA plugin you provide in an input folder.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/cinema4d-insydium-2025",
+      "title": "Conda build recipe for INSYDIUM X-Particles",
+      "description": "This package build recipe creates a conda package for the INSYDIUM plugin you provide in an input folder.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/cinema4d-openjd",
+      "title": "Cinema 4D OpenJD adaptor Conda recipe",
+      "description": "Build and publish Cinema 4D OpenJD adaptor as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "conda",
+        "openjd"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/cinema4d-vray-2025",
+      "title": "Conda build recipe for Cinema 4D V-Ray",
+      "description": "This package build recipe creates a conda package for the vray plugin you provide in an input folder.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "conda",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/conda_build_linux_package",
+      "title": "Conda package build job",
+      "description": "Build a supplied Conda recipe on Deadline Cloud and publish the package to an Amazon S3 channel.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/deadline",
+      "title": "Deadline Cloud CLI Conda recipe",
+      "description": "Build and publish Deadline Cloud CLI as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "deadline"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/houdini-20.5",
+      "title": "Houdini 20.5 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Houdini 20.5.654, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "houdini"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/houdini-21.0",
+      "title": "Houdini 21.0 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Houdini 21.0.596, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "houdini"
+      ],
+      "updated": "2026-07-07",
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/houdini-redshift-2025",
+      "title": "Redshift for Houdini 2025 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Redshift for Houdini 2025.6.0, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "houdini",
+        "redshift"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/houdini-redshift-2026",
+      "title": "Redshift for Houdini 2026 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Redshift for Houdini 2026.1.1, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "houdini",
+        "redshift"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/houdini-vray-7",
+      "title": "V-Ray 7 for Houdini Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for V-Ray 7.10.01 (stable nightly build) for Houdini, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "houdini",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/infinigen-1.19.0",
+      "title": "Infinigen conda package recipe",
+      "description": "This is a rattler-build recipe for Infinigen, a procedural 3D scene generator from Princeton Vision & Learning Lab.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "infinigen"
+      ],
+      "updated": "2026-06-23",
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/keyshot-2025",
+      "title": "KeyShot 2025.2 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for KeyShot 2025.2, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "keyshot"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-2025",
+      "title": "Maya 2025 conda build recipe",
+      "description": "This Maya conda build recipe configures the `MAYA_MODULE_PATH` environment variable to include several paths to search for plugin `.mod` files.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-2026",
+      "title": "Maya 2026 conda build recipe",
+      "description": "This Maya conda build recipe configures the `MAYA_MODULE_PATH` environment variable to include several paths to search for plugin `.mod` files.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-bifrost-2026",
+      "title": "Bifrost for Maya conda build recipe",
+      "description": "This package provides Autodesk Bifrost 2.14.1.0 support for Maya 2026.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-mtoa-2025",
+      "title": "Maya to Arnold 2025 conda build recipe",
+      "description": "Build a Conda package that integrates Arnold (MtoA) with Maya 2025 for repeatable rendering on Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-mtoa-2026",
+      "title": "Maya to Arnold 2026 conda build recipe",
+      "description": "Build a Conda package that integrates Arnold (MtoA) with Maya 2026 for repeatable rendering on Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-openjd",
+      "title": "Maya OpenJD adaptor Conda recipe",
+      "description": "Build and publish Maya OpenJD adaptor as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "openjd"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-redshift-2025",
+      "title": "Redshift 2025.4.2 for Maya conda build recipe",
+      "description": "This package provides Redshift 2025.4.2 support for Maya versions 2025, and 2026.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "redshift"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-redshift-2026",
+      "title": "Redshift 2026.2.1 for Maya conda build recipe",
+      "description": "This package provides Redshift 2026.2.1 support for Maya versions 2025, and 2026.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "redshift"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-vray-2025",
+      "title": "V-Ray 6.20.02 for Maya 2025 Conda Recipe",
+      "description": "Build a Linux conda package for V-Ray 6.20.02 and Maya 2025 for software delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-vray-2026",
+      "title": "V-Ray 7.10.02 for Maya 2026 Conda Recipe",
+      "description": "Build a Linux conda package for V-Ray 7.10.02 and Maya 2026 for software delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-vray-7.2-2025",
+      "title": "V-Ray 7.20.02 for Maya 2025 Conda Recipe",
+      "description": "Build a Linux conda package for V-Ray 7.20.02 and Maya 2025 for software delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/maya-vray-7.2-2026",
+      "title": "V-Ray 7.20.02 for Maya 2026 Conda Recipe",
+      "description": "Build a Linux conda package for V-Ray 7.20.02 and Maya 2026 for software delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "maya",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/nerfstudio",
+      "title": "NeRF Studio conda package recipe",
+      "description": "This is a rattler-build recipe for NeRF Studio and some extras.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/nuke-16.0",
+      "title": "Nuke 16.0 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Nuke 16.0.1, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "nuke"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/nuke-17.0",
+      "title": "Nuke 17.0 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Nuke 17.0.1, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "nuke"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/nuke-denoise",
+      "title": "Nuke DENoise 3.6.9 Conda Recipe for AWS Deadline Cloud",
+      "description": "This directory contains a conda build recipe for Nuke DENoise 3.6.9, specifically configured for use with AWS Deadline Cloud.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "nuke"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/openjd-adaptor-runtime",
+      "title": "OpenJD adaptor runtime Conda recipe",
+      "description": "Build and publish OpenJD adaptor runtime as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "openjd"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/unreal-engine",
+      "title": "Unreal Engine Conda Package Recipe",
+      "description": "This recipe packages Unreal Engine for use in the AWS Deadline Cloud ecosystem.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/unreal-engine-openjd",
+      "title": "Unreal Engine OpenJD adaptor Conda recipe",
+      "description": "Build and publish Unreal Engine OpenJD adaptor as a Conda package for delivery to Deadline Cloud workers.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "conda",
+        "openjd"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/vray",
+      "title": "V-Ray conda package recipe",
+      "description": "This is a rattler-build recipe for the VRay standalone renderer.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/vredcore-2025",
+      "title": "VRED 2025 Conda Recipe",
+      "description": "Download the VRED Core 2025 installation file for Linux (VREDCOre-2025.sh) from Autodesk Account page.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "vred"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "conda_recipes/vredcore-2026",
+      "title": "VRED 2026 Conda Recipe",
+      "description": "Download the VRED Core 2026 installation file for Linux (VREDCOre-2026.sh) from Autodesk Account page.",
+      "category": "software-package",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "conda",
+        "vred"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "containers/al2023-deadline",
+      "title": "AL2023 Deadline Cloud worker-equivalent image",
+      "description": "This Dockerfile replicates the package set of an April 2026 snapshot of the AWS Deadline Cloud service-managed fleet (SMF) worker AMI on top of the base Amazon Linux 2023 image.",
+      "category": "container",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "deadline"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "containers/blender/blender-aswf-ci-base",
+      "title": "Blender container for AWS Deadline Cloud",
+      "description": "This example builds a Docker image that packages Blender with the deadline-cloud-for-blender adaptor and GPU support for rendering on AWS Deadline Cloud.",
+      "category": "container",
+      "tasks": [
+        "build-software",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "blender"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2024",
+      "title": "3ds Max 2024 host configuration",
+      "description": "Install 3ds Max 2024 on Windows service-managed fleet workers with an elevated host configuration script.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2025-and-corona-13",
+      "title": "3ds Max 2025 with Corona 13",
+      "description": "Install 3ds Max 2025 and Corona 13 on Windows service-managed fleet workers during host configuration.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2025-and-vray",
+      "title": "3ds Max 2025 and V-Ray host configuration",
+      "description": "This sample host configuration scripts configures your Service Managed Fleet with 3ds Max 2025 and V-Ray to render your 3ds Max 2025 jobs with V-Ray.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-aec-plugins",
+      "title": "3ds Max 2025, V-Ray, and AEC plugins",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2025, V-Ray, Forest Pack, RailClone, and additional AEC plugins to render your 3ds Max 2025 jobs with V-Ray and architectural visualization plugins.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-tyflow",
+      "title": "3ds Max 2025, V-Ray, and tyFlow",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2025, V-Ray, and tyFlow to render your 3ds Max 2025 jobs with V-Ray and tyFlow plugins.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2027",
+      "title": "3ds Max 2027 host configuration",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2027 to render your 3ds Max 2027 jobs.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2027-and-corona-14",
+      "title": "3ds Max 2027 and Corona 14",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2027 and Corona 14.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2027-and-vray",
+      "title": "3ds Max 2027 and V-Ray",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2027 and V-Ray.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2027-and-vray-and-tyflow",
+      "title": "3ds Max 2027, V-Ray, and tyFlow",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2027, V-Ray, and tyFlow.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/3dsmax/3dsmax-2027-vray-and-aec-plugins",
+      "title": "3ds Max 2027, V-Ray, and AEC plugins",
+      "description": "This sample host configuration script configures your Service Managed Fleet with 3ds Max 2027, V-Ray, Forest Pack, RailClone, FloorGenerator, and MultiTexture.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "3dsmax",
+        "plugin",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/aftereffects/aftereffects_redgiant",
+      "title": "Host Configuration for After Effects and Plugins",
+      "description": "This guide covers setting up host configuration scripts for installing Adobe After Effects and optional plugins on AWS Deadline Cloud workers.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "aftereffects",
+        "plugin",
+        "redgiant"
+      ],
+      "updated": "2026-07-14",
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/cinema4d/cinema4d_redgiant",
+      "title": "Host Configuration for Cinema 4D and Red Giant",
+      "description": "This guide covers setting up the required software installers for Red Giant host config script package build.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "tags": [
+        "cinema4d",
+        "plugin",
+        "redgiant"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/docker_nvidia_container_toolkit",
+      "title": "Docker and NVIDIA Container Toolkit",
+      "description": "Install Docker and the NVIDIA Container Toolkit on Linux service managed fleet workers, enabling GPU-accelerated container workloads.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "tags": [
+        "docker"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/linux_font_installation",
+      "title": "AWS Deadline Cloud Font Installation",
+      "description": "This script installs fonts from an S3 bucket on AWS Deadline Cloud Linux service managed fleet instances, making them available to applications like Nuke.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/overcommit_override_for_smf",
+      "title": "Override Memory Overcommit on Service Managed Fleet Workers",
+      "description": "Override the default `vm.overcommit_memory=2` (strict accounting) on Linux service managed fleet workers.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/sudo_for_job_user",
+      "title": "Passwordless Sudo for Job User",
+      "description": "Grant the Deadline Cloud `job-user` passwordless sudo access on Linux service managed fleet workers.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/swap_for_smf",
+      "title": "Enable Swap on Service Managed Fleet Workers",
+      "description": "Create and enable a swap file on Linux service managed fleet workers.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/worker_configuration",
+      "title": "Worker configuration examples",
+      "description": "These scripts demonstrate common configuration tasks that may be required for your workloads.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "host_configuration_scripts/worker_reboot",
+      "title": "Worker reboot host configuration",
+      "description": "Worker reboots may be required for system configuration changes.",
+      "category": "host-configuration",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/3dsmax_vray_denoiser",
+      "title": "3ds Max V-Ray Denoiser Example",
+      "description": "This job bundle demonstrates rendering 3ds Max scenes with V-Ray, including automatic VRIMG to EXR conversion with denoising preservation and intelligent frame chunking.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "tags": [
+        "3dsmax",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/afterfx_render_one_task",
+      "title": "After Effects Render - one task",
+      "description": "This is an After Effects job bundle that allows the user to submit a job that uses aerender to render a frame range as a single task.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/arnold_standalone_render",
+      "title": "Arnold Standalone Render",
+      "description": "This job bundle renders Arnold `.ass` (Arnold Scene Source) files using the Arnold `kick` command-line renderer that ships with MtoA (Arnold for Maya).",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "arnold"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/autonomous_driving_carla",
+      "title": "Autonomous Driving Simulation Using CARLA",
+      "description": "This job bundle runs a CARLA autonomous driving simulation parameter sweep on AWS Deadline Cloud with configurable multi-sensor capture.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-simulation",
+        "submit-job"
+      ],
+      "tags": [
+        "carla"
+      ],
+      "updated": "2026-06-19",
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/blender_render",
+      "title": "Blender frame render",
+      "description": "Render a Blender scene over a configurable frame range with one parallel Deadline Cloud task per frame.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "blender"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/blender_turntable_to_flow",
+      "title": "Blender Turntable to Autodesk Flow Production Tracking",
+      "description": "This job bundle renders an animated turntable in Blender, encodes it into a review-ready movie, extracts a poster-frame thumbnail, and publishes the result to Autodesk Flow Production Tracking (formerly ShotGrid) as a new `Version` on an `Asset`'s review `Task`.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "process-media",
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "tags": [
+        "blender",
+        "flow"
+      ],
+      "updated": "2026-06-25",
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/cli_job",
+      "title": "CLI script job",
+      "description": "Run a user-provided multi-line shell script against a selected data directory from the Deadline Cloud CLI.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/copy_s3_prefix_to_job_attachments",
+      "title": "Job bundle: Copy S3 prefix to job attachments",
+      "description": "With AWS Deadline Cloud job attachments, you can attach files and directories to the jobs you submit, and that data gets uploaded to the job attachments S3 bucket that is configured on your queue.",
+      "category": "job-bundle",
+      "tasks": [
+        "manage-assets",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/custom_submitters/fuzzypixel_maya",
+      "title": "FuzzyPixel Maya Custom Submitter",
+      "description": "Integrate a custom Deadline Cloud job submitter into Maya, including scene settings, asset collection, and submission UI patterns.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "tags": [
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/esmfold_predict",
+      "title": "ESMFold protein structure prediction",
+      "description": "This job bundle runs protein structure prediction with ESMFold (Meta's `facebook/esmfold_v1`, MIT license).",
+      "category": "job-bundle",
+      "tasks": [
+        "run-ml-workload",
+        "run-scientific-workload",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/ffmpeg_encode_video",
+      "title": "FFmpeg Encode Video job bundle",
+      "description": "This job takes a directory of sequentially numbered image files and encodes them into an MP4 video using FFmpeg.",
+      "category": "job-bundle",
+      "tasks": [
+        "process-media",
+        "submit-job"
+      ],
+      "tags": [
+        "ffmpeg"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/ffmpeg_movie_from_job_output",
+      "title": "FFmpeg Movie from Job Output",
+      "description": "This job bundle downloads the rendered output of another completed job in the same queue and uses FFmpeg to encode the image sequence into an MP4 video file.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "process-media",
+        "submit-job"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "tags": [
+        "ffmpeg"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/flux2_klein_lora",
+      "title": "FLUX.2 Klein LoRA Training and Image Generation",
+      "description": "Train your own AI image models with just 20-50 photos, then generate unlimited new images using Black Forest Labs' fastest model.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-ml-workload",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/gromacs_md",
+      "title": "GROMACS Molecular Dynamics",
+      "description": "Molecular dynamics (MD) simulates the physical movement of atoms in a protein over time, revealing how it folds, binds drugs, or changes shape.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-scientific-workload",
+        "submit-job"
+      ],
+      "tags": [
+        "gromacs"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/gsplat_pipeline",
+      "title": "Gaussian Splatting pipeline for AWS Deadline Cloud",
+      "description": "This job bundle runs a 3D Gaussian Splatting pipeline.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "run-ml-workload",
+        "submit-job"
+      ],
+      "tags": [],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/gui_control_showcase",
+      "title": "Job parameter GUI control showcase",
+      "description": "Preview every OpenJD job-parameter user interface control supported by the Deadline Cloud bundle submitter.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/houdini_husk_usd_render",
+      "title": "SideFX Houdini Husk USD Render",
+      "description": "Husk is a CLI application provided with SideFX Houdini that renders Universal Scene Description(USD) files.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "houdini"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/infinigen_scene_gen",
+      "title": "Infinigen scene generation job bundle",
+      "description": "Generates photorealistic 3D scenes using Infinigen on AWS Deadline Cloud GPU workers.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "run-simulation",
+        "submit-job"
+      ],
+      "tags": [
+        "infinigen"
+      ],
+      "updated": "2026-06-23",
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/job_attachments_devguide",
+      "title": "Job attachments input example",
+      "description": "Demonstrate input path parameters and asset references for Deadline Cloud job attachments.",
+      "category": "job-bundle",
+      "tasks": [
+        "manage-assets",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/job_dev_progression",
+      "title": "Job Development Progression",
+      "description": "Follow four stages that evolve a minimal OpenJD job into a maintainable bundle with scripts, shared code, and a bundled Python package.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/job_env_daemon_process",
+      "title": "Session daemon process environment",
+      "description": "Start a daemon once for an OpenJD session, use it from tasks, and stop it when the session exits.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "submit-job"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/job_env_vars",
+      "title": "Job environment variables",
+      "description": "Set environment variables at the OpenJD job environment level for all steps in a session.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "submit-job"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/job_env_with_new_command",
+      "title": "Job environment command injection",
+      "description": "Add a command to every task in a session by using an OpenJD job environment.",
+      "category": "job-bundle",
+      "tasks": [
+        "integrate-pipeline",
+        "submit-job"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/keyshot_standalone",
+      "title": "KeyShot Standalone",
+      "description": "This is a Windows KeyShot job bundle that allows the user to render a scene with each frame as a separate task.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "tags": [
+        "keyshot"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/list_available_conda_packages",
+      "title": "List Available Conda Packages Job Bundle",
+      "description": "This job bundle lists all available conda packages in the deadline-cloud channel using `conda search -c deadline-cloud '*'` and prints the list into the logs.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/maya_arnold_ass_export_render",
+      "title": "Maya Arnold Export and Render",
+      "description": "This job exports Arnold `.ass` files from a Maya scene and renders them using the Arnold `kick` command-line renderer.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "arnold",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/maya_cli_render",
+      "title": "Maya CLI Render",
+      "description": "This job bundle renders a Maya software renderer scene with the Maya CLI `Render` command.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/monte_carlo_simulation",
+      "title": "Pricing Financial Derivatives",
+      "description": "Prices a portfolio of autocallable structured notes using Monte Carlo simulation with QuantLib's Heston stochastic volatility model.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-simulation",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/mujoco_sim_to_policy",
+      "title": "MuJoCo Sim-to-Policy Pipeline (3-step)",
+      "description": "This sample trains and renders a learned robot-manipulation policy on AWS Deadline Cloud, using a MuJoCo simulation of the Strands Robots so100 arm.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-simulation",
+        "submit-job"
+      ],
+      "updated": "2026-06-25",
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/nuke_render",
+      "title": "Nuke Render Job Bundle",
+      "description": "This job bundle renders Nuke scripts using Nuke's headless rendering mode with the `nuke -x` command.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "nuke"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/pip_package_job",
+      "title": "Pip Package Job",
+      "description": "This job bundle demonstrates providing a job's Python dependencies with pip through a **queue environment**.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "tags": [
+        "pip"
+      ],
+      "updated": "2026-07-08",
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/pip_self_contained_job",
+      "title": "Pip Self-Contained Job",
+      "description": "This job bundle demonstrates managing pip packages entirely **within the job bundle**, with no queue environment required.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "tags": [
+        "pip"
+      ],
+      "updated": "2026-07-08",
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/povray-3.7",
+      "title": "POV-Ray 3.7 AWS Deadline Cloud Job Template",
+      "description": "This OpenJD job template enables POV-Ray 3.7 raytracing rendering on AWS Deadline Cloud using conda package management.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "tags": [
+        "povray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/redshift-2025",
+      "title": "Redshift Rendering Job Template",
+      "description": "This job template allows you to render Redshift scenes using the standalone redshiftCmdLine.exe executable that comes with Cinema 4D 2025.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "tags": [
+        "redshift"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/satellite_classification",
+      "title": "Satellite Imagery Classification",
+      "description": "Classifies satellite image tiles into land-cover categories (water, vegetation, bare soil, rock, cloud) and stitches the results into a single map.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-ml-workload",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/simple_job",
+      "title": "Minimal OpenJD job",
+      "description": "Run a minimal OpenJD shell command as the smallest starting point for a Deadline Cloud job bundle.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/ssh_to_smf",
+      "title": "SSM Managed Node via Deadline Cloud Job",
+      "description": "Register a Deadline Cloud worker as an SSM hybrid managed node, enabling SSH access via Session Manager for the duration of the job.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job",
+        "troubleshoot-workers"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/ssh_to_smf_windows",
+      "title": "SSM Managed Node via Deadline Cloud Job (Windows)",
+      "description": "Register a **Windows** Deadline Cloud worker as an SSM hybrid managed node, enabling RDP, SSH, or PowerShell access via Session Manager for the duration of the job.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job",
+        "troubleshoot-workers"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/task_chunking",
+      "title": "Task Chunking Job Bundle Samples",
+      "description": "These samples demonstrate the Task Chunking extension for Open Job Description, which improves resource utilization by grouping multiple frames or tasks into chunks instead of processing them individually.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/tile_render_maya_ffmpeg_for_blogpost",
+      "title": "Tile Render with Maya/Arnold and Ffmpeg",
+      "description": "Read the blog post Create a tile rendering job with modifications for AWS Deadline Cloud to learn about how this job was created.",
+      "category": "job-bundle",
+      "tasks": [
+        "process-media",
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "ffmpeg",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/tile_render_with_maya_arnold",
+      "title": "Tile render with Maya and Arnold",
+      "description": "Render Maya and Arnold frames as parallel image tiles, then assemble each completed frame.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "arnold",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/tile_render_with_maya_vray",
+      "title": "Tile Render with Maya/V-Ray and OpenImageIO",
+      "description": "This job bundle will submit a tile rendering job using Maya and V-Ray to create EXRs as output.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "maya",
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/tile_render_with_vray_linux",
+      "title": "V-Ray Region Render Sample Job Bundle",
+      "description": "This job bundle renders a V-Ray scene by dividing the image into configurable regions, rendering each region as a separate task, and then merging them into a final image.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/turntable_with_maya_arnold",
+      "title": "Turntable with Maya/Arnold job bundle",
+      "description": "This job takes an OBJ geometry file as input, and outputs a video turntable render.",
+      "category": "job-bundle",
+      "tasks": [
+        "process-media",
+        "render-content",
+        "submit-job"
+      ],
+      "tags": [
+        "arnold",
+        "maya"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/virtual_screening_vina",
+      "title": "Virtual Screening with AutoDock VINA",
+      "description": "Virtual screening is a computational drug discovery technique that searches large libraries of small molecules to find those most likely to bind a protein target (e.g., a viral enzyme or cancer receptor).",
+      "category": "job-bundle",
+      "tasks": [
+        "run-scientific-workload",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/vllm_lm_eval_leaderboard",
+      "title": "vLLM LLM Leaderboard (Matrix Evaluation)",
+      "description": "Evaluate **multiple LLMs \u00d7 multiple benchmarks** in a single Deadline Cloud job.",
+      "category": "job-bundle",
+      "tasks": [
+        "run-ml-workload",
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/vray_render",
+      "title": "V-Ray sample job bundle",
+      "description": "Render a `.vrscene` with V-Ray Standalone on Linux, staging scene dependencies as job attachments and returning the selected image output.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "vray"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/vred_render",
+      "title": "VRED Renderer Job Bundle",
+      "description": "Render VRED Core or VRED Pro scenes in headless mode, with optional tiled rendering and tile assembly.",
+      "category": "job-bundle",
+      "tasks": [
+        "render-content",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "tags": [
+        "vred"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "job_bundles/vtk-latest",
+      "title": "VTK Visualization Job Template",
+      "description": "This OpenJD job template allows users to run VTK (Visualization Toolkit) Python scripts using AWS Deadline Cloud.",
+      "category": "job-bundle",
+      "tasks": [
+        "submit-job"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/conda_queue_env_from_console.yaml",
+      "title": "Default service-managed fleet Conda environment",
+      "description": "Provide Conda packages with the same Rattler-based session environment created by Deadline Cloud console onboarding.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/conda_queue_env_improved_caching.yaml",
+      "title": "Cached service-managed fleet Conda environment",
+      "description": "Reuse hash-keyed Conda environments across service-managed fleet sessions to reduce repeated setup time.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/conda_queue_env_inline.yaml",
+      "title": "Portable inline Conda environment",
+      "description": "Create and activate a Conda environment using portable inline shell actions on customer-managed workers.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/conda_queue_env_inline_improved_caching.yaml",
+      "title": "Portable cached inline Conda environment",
+      "description": "Create reusable Conda environments with inline actions suitable for customer-managed fleet workers.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/conda_queue_env_pyrattler.yaml",
+      "title": "Py-rattler queue environment",
+      "description": "Resolve and activate job-requested Conda packages with the Python bindings for the Rattler library.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/disconnect_ubl_queue_env.yaml",
+      "title": "Disconnect usage-based licensing environment",
+      "description": "Remove Deadline Cloud usage-based licensing variables before configuring a queue to use custom license servers.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/pip_queue_env.yaml",
+      "title": "Pip queue environment",
+      "description": "Create a session-scoped Python virtual environment and install job-requested packages with pip.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "pip"
+      ],
+      "updated": "2026-07-08",
+      "status": "active"
+    },
+    {
+      "path": "queue_environments/rez_queue_env.yaml",
+      "title": "Rez queue environment",
+      "description": "Resolve job-requested Rez packages from a shared repository and activate them for the worker session.",
+      "category": "queue-environment",
+      "tasks": [
+        "configure-workers",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "rez"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "skills/3dsmax-host-config",
+      "title": "3ds Max Host Config",
+      "description": "This skill helps you generate a PowerShell host configuration script for any version of 3ds Max and supported plugin combinations (V-Ray, Corona, tyFlow, Forest Pack, RailClone, and more) for AWS Deadline Cloud Service Managed Fleet workers.",
+      "category": "agent-skill",
+      "tasks": [
+        "configure-workers",
+        "develop-samples"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "3dsmax"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "skills/conda-builder",
+      "title": "Conda recipe builder agent skill",
+      "description": "Guide an AI coding agent through creating, building, and testing a Deadline Cloud DCC Conda recipe.",
+      "category": "agent-skill",
+      "tasks": [
+        "build-software",
+        "develop-samples",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "conda"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "skills/deadline-cloud-job",
+      "title": "Deadline Cloud job authoring agent skill",
+      "description": "Guide an AI coding agent through creating and validating an OpenJD job bundle for Deadline Cloud.",
+      "category": "agent-skill",
+      "tasks": [
+        "develop-samples",
+        "submit-job"
+      ],
+      "journeys": [
+        "new-application"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "deadline"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "skills/host-config-from-installer",
+      "title": "Host Config from Installer",
+      "description": "This skill helps you create a PowerShell host configuration script for any Windows `.exe` software you want to run on AWS Deadline Cloud Service Managed Fleet workers.",
+      "category": "agent-skill",
+      "tasks": [
+        "configure-workers",
+        "develop-samples",
+        "install-plugins",
+        "provide-software"
+      ],
+      "journeys": [
+        "new-application",
+        "custom-plugins"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "installer",
+        "plugin"
+      ],
+      "status": "active"
+    },
+    {
+      "path": "submission_hooks/license_limits",
+      "title": "Enforce Fixed License Limits with Submission Hooks",
+      "description": "This sample demonstrates how to use AWS Deadline Cloud Limits together with a submission hook to enforce a fixed number of concurrent VRay licenses across all job submissions \u2014 without requiring artists to configure anything manually.",
+      "category": "submission-hook",
+      "tasks": [
+        "customize-submission",
+        "integrate-pipeline"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "terraform/farm_templates/starter_farm",
+      "title": "A starter AWS Deadline Cloud farm (Terraform)",
+      "description": "This Terraform configuration deploys an AWS Deadline Cloud farm you can use to run jobs that render images, reconstruct 3D scenes, or transform your data in custom ways.",
+      "category": "infrastructure",
+      "tasks": [
+        "deploy-farm",
+        "manage-fleet"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "tags": [
+        "terraform"
+      ],
+      "featured": true,
+      "status": "active"
+    },
+    {
+      "path": "utility_scripts/upload_to_job_attachments",
+      "title": "AWS Deadline Cloud Job Attachments Uploader",
+      "description": "Upload files and directories from your local workstation to AWS Deadline Cloud job attachments storage.",
+      "category": "utility",
+      "tasks": [
+        "integrate-pipeline",
+        "manage-assets"
+      ],
+      "journeys": [
+        "studio-integration"
+      ],
+      "platforms": [
+        "platform-independent"
+      ],
+      "status": "active"
+    }
+  ]
+}

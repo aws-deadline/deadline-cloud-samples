@@ -4,4 +4,4 @@ This job bundle will submit a tile rendering job using Maya and V-Ray to create 
 
 This job bundle relies on the V-Ray render handler in the Maya adaptor. The template defines a number of X and Y tiles which is used to split the output into evenly sized tiles that can be distributed across multiple render nodes.
 
-See also the job bundle [tiled_region_render_with_maya_arnold](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/tile_render_with_maya_arnold) for an example using Maya and Arnold and using FFMPG to assemble PNG files into the final image.
+See also the job bundle [tile_render_with_maya_arnold](../tile_render_with_maya_arnold/) for an example using Maya and Arnold and using FFmpeg to assemble PNG files into the final image.

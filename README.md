@@ -1,86 +1,109 @@
-## Deadline Cloud samples
+# AWS Deadline Cloud samples
 
-This repository contains a set of samples to use with [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
+Build, submit, and operate real workloads on [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
+Start with the task you want to complete; each sample stays self-contained in its existing directory.
 
-## CloudFormation template samples
+## What do you want to do?
 
-The [cloudformation](cloudformation) directory contains sample CloudFormation templates you can use to
-deploy a Deadline Cloud farm or other infrastructure to work with your farm. The [starter_farm sample](cloudformation/farm_templates/starter_farm/)
-is a good place to start. Other samples include event notification and health checks for customer-managed fleets.
+| Goal | Start here |
+|---|---|
+| Deploy a farm | [CloudFormation starter farm](cloudformation/farm_templates/starter_farm/) or [Terraform starter farm](terraform/farm_templates/starter_farm/) |
+| Learn how a job is structured | [Job development progression](job_bundles/job_dev_progression/) or the [minimal job](job_bundles/simple_job/) |
+| Render with a DCC | [Blender render](job_bundles/blender_render/), [Maya CLI render](job_bundles/maya_cli_render/), or browse [all job bundles](SAMPLES.md#openjd-job-bundles) |
+| Provide applications to workers | [Conda recipes](conda_recipes/), [queue environments](queue_environments/), or [worker containers](containers/) |
+| Install software or plugins | [Custom-plugin journey](docs/sample-navigation.md#install-custom-plugins) and [host configuration scripts](host_configuration_scripts/) |
+| Connect studio systems | [Studio-integration journey](docs/sample-navigation.md#integrate-studio-tools-into-the-job-lifecycle) |
+| Find a specific example | Browse the generated [sample catalog](SAMPLES.md) by goal, type, or journey |
+| Create a sample with an AI agent | Use the task-specific guides in [skills](skills/) |
 
-## Job bundle samples
+The human-edited [`sample_catalog.json`](sample_catalog.json) is also available for tools and automation.
+Its schema is [`sample_catalog.schema.json`](sample_catalog.schema.json).
 
-The [job_bundles](job_bundles) directory contains sample jobs that you can submit to your Deadline Cloud queue. You can use the
-[Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) to submit these jobs to your queues.
+## Quick start
 
-The [Open Job Description Specifications](https://github.com/OpenJobDescription/openjd-specifications) repository
-has more samples that you can use with [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
+1. Configure a Deadline Cloud farm and install the
+   [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html).
+   If you need a farm, deploy one of the starter templates above.
+2. Clone this repository and open its root directory.
+3. Preview a job's submission interface:
 
-### CLI job submission
+   ```console
+   deadline bundle gui-submit job_bundles/gui_control_showcase
+   ```
 
-```
-$ deadline bundle submit job_bundles/cli_job -p DataDir=~/data_dir
-```
+4. Submit the minimal job to your configured queue:
 
-### GUI job submission
-```
-$ deadline bundle gui-submit job_bundles/gui_control_showcase
-```
+   ```console
+   deadline bundle submit job_bundles/simple_job
+   ```
 
-![deadline bundle gui-submit showcase](.images/deadline-bundle-gui-submit-showcase.png)
+Read each sample's README before deployment or submission. Samples can create billable AWS resources
+or run licensed software; review parameters, IAM permissions, licensing, and cleanup instructions first.
 
-## Container samples
+## Featured examples
 
-The [containers](containers) directory contains Dockerfiles for building
-container images compatible with Deadline Cloud worker environments. The
-[al2023-deadline](containers/al2023-deadline/) sample replicates the
-service-managed fleet worker AMI package set on Amazon Linux 2023, useful for
-building and testing conda packages or other software locally.
+* **[Job development progression](job_bundles/job_dev_progression/)** grows one OpenJD job through four maintainable stages.
+* **[Blender turntable to Flow Production Tracking](job_bundles/blender_turntable_to_flow/)** renders, encodes, and publishes review media as a multi-step studio workflow.
+* **[Plugin bundle for Blender](conda_recipes/blender-plugin-bundle/)** packages a collection of add-ons for repeatable delivery.
+* **[Cached Conda queue environment](queue_environments/conda_queue_env_improved_caching.yaml)** reuses software environments across sessions.
+* **[License-limit submission hook](submission_hooks/license_limits/)** injects host requirements before submission.
+* **[After Effects and Red Giant host configuration](host_configuration_scripts/aftereffects/aftereffects_redgiant/)** installs software that needs administrative privileges.
 
-## Conda recipes
+## Recent highlights
 
-The [conda_recipes](conda_recipes) directory contains samples and tooling for building conda packages for your
-Deadline Cloud queues. You can use the `submit-package-job` tool to submit
-build jobs to your queue. See [this blog post](https://aws.amazon.com/blogs/media/create-a-conda-package-and-channel-for-aws-deadline-cloud/)
-for instructions on how to configure your Deadline Cloud farm for building and
-using an Amazon S3 conda channel.
+This is a curated selection of noteworthy additions and updates, not an exhaustive chronology.
 
-## Queue environment samples
+* **2026-07-14 — [After Effects and Red Giant host configuration](host_configuration_scripts/aftereffects/aftereffects_redgiant/):** consolidated application and plugin installation.
+* **2026-07-10 — [Job event Slack notifications](cloudformation/notification_templates/job_events_slack_lambda/):** connects Deadline Cloud events to Lambda through EventBridge.
+* **2026-07-08 — [Pip package delivery](job_bundles/pip_package_job/):** pairs a job with the new [pip queue environment](queue_environments/pip_queue_env.yaml); a [self-contained variant](job_bundles/pip_self_contained_job/) is included too.
+* **2026-07-07 — [Houdini 21.0 recipe](conda_recipes/houdini-21.0/):** adds Plugin Sync support.
+* **2026-06-25 — [Blender turntable to Flow Production Tracking](job_bundles/blender_turntable_to_flow/):** demonstrates render-to-review publishing.
 
-The [queue_environments](queue_environments) directory contains
-sample [queue environments](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html)
-you can attach to your Deadline Cloud queue, to provide software applications to your jobs from
-[Conda](https://docs.conda.io/projects/conda/) or [Rez](https://rez.readthedocs.io/).
+See the catalog's curated [recent highlights](SAMPLES.md#recent-highlights) for more.
 
-## Utility scripts
+## Choose a path for a larger journey
 
-The [utility_scripts](utility_scripts) directory contains sample scripts to help you work with
-AWS Deadline Cloud. This directory contains command-line tools assist with common tasks like managing job attachments, working with queues, and automating workflows.
+The [sample navigation guide](docs/sample-navigation.md) gives short decision paths—not full architecture walkthroughs—for:
 
-## Submission hook samples
+* [running a new DCC or application](docs/sample-navigation.md#run-a-new-dcc-or-application);
+* [installing custom plugins](docs/sample-navigation.md#install-custom-plugins); and
+* [integrating studio tools into the job lifecycle](docs/sample-navigation.md#integrate-studio-tools-into-the-job-lifecycle).
 
-The [submission_hooks](submission_hooks) directory contains sample
-[submission hooks](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md)
-that run custom logic during job submission. The [license_limits](submission_hooks/license_limits/) sample
-demonstrates how to enforce fixed license limits (e.g., V-Ray) using Deadline Cloud's Limits feature
-combined with a pre-submission hook that automatically injects host requirements into job templates.
+Each path links to the canonical Deadline Cloud developer guide for design details and then routes back
+to the strongest implementations in this repository.
 
-## Additional resources
+## Repository map
 
-* [AWS Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/index.html)
+| Area | Use it for |
+|---|---|
+| [CloudFormation](cloudformation/) | Deploy starter farms, fleet support, storage, capacity automation, and notifications. |
+| [Terraform](terraform/) | Deploy a starter farm with Terraform. |
+| [Job bundles](job_bundles/) | Define OpenJD rendering, simulation, ML, scientific, and utility jobs. |
+| [Conda recipes](conda_recipes/) | Build applications, adaptors, renderers, and plugins into versioned packages. |
+| [Containers](containers/) | Build worker-compatible or application container images. |
+| [Queue environments](queue_environments/) | Prepare Conda, Rez, pip, caching, and licensing once per worker session. |
+| [Host configuration scripts](host_configuration_scripts/) | Install privileged software and configure service-managed fleet worker hosts. |
+| [Submission hooks](submission_hooks/) | Inspect or modify job bundles immediately before submission. |
+| [Utility scripts](utility_scripts/) | Automate supporting tasks such as uploading job attachments. |
+| [Agent skills](skills/) | Give coding agents repeatable instructions for authoring jobs, packages, and host configs. |
+
+For every discoverable sample—including explicit support-directory exclusions—use the
+[complete generated catalog](SAMPLES.md).
+
+## Documentation
+
 * [AWS Deadline Cloud developer guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/index.html)
+* [AWS Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/index.html)
 * [AWS Deadline Cloud API reference](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/index.html)
-* [Open Job Description](https://github.com/OpenJobDescription/openjd-specifications/wiki)
+* [Open Job Description specification](https://github.com/OpenJobDescription/openjd-specifications/wiki)
+* [Contributing a sample](CONTRIBUTING.md#adding-or-updating-a-sample)
 
 ## Security
 
-We take all security reports seriously. When we receive such reports, we will
-investigate and subsequently address any potential vulnerabilities as quickly
-as possible. If you discover a potential security issue in this project, please
-notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/)
-or directly via email to [AWS Security](aws-security@amazon.com). Please do not
-create a public GitHub issue in this project.
+If you discover a potential security issue, notify AWS Security through the
+[vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/) or
+[email AWS Security](mailto:aws-security@amazon.com). Do not create a public GitHub issue.
 
 ## License
 
-This library is licensed under the MIT-0 License. See the LICENSE file.
+This repository is licensed under the [MIT-0 License](LICENSE).

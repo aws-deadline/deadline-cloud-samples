@@ -13,6 +13,7 @@ Table of contents:
     * [Finding contributions to work on](#finding-contributions-to-work-on)
     * [Talk with us first](#talk-with-us-first)
     * [Contributing via Pull Requests](#contributing-via-pull-requests)
+    * [Adding or updating a sample](#adding-or-updating-a-sample)
     * [Conventional Commits](#conventional-commits)
 * [Licensing](#licensing)
 
@@ -67,6 +68,31 @@ To send us a pull request, please:
 
 GitHub provides additional documentation on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
 [creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
+
+### Adding or updating a sample
+
+Every discoverable sample is indexed by [`sample_catalog.json`](sample_catalog.json), and the
+human-browsable [`SAMPLES.md`](SAMPLES.md) is generated from it. When you add, rename, or remove a
+sample, you must:
+
+1. Add or update its catalog entry. Use the path as its stable identity, select values from the
+   controlled category/task/journey taxonomies, and write a concise plain-English description.
+2. For a nontrivial sample, include the sections documented in
+   [`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md): purpose, demonstrated
+   capabilities, prerequisites, operation, setup, run instructions, parameters and outputs,
+   security/cost/cleanup, troubleshooting, and related resources.
+3. Regenerate the browsable catalog with `python3 scripts/generate_samples.py`.
+4. Run the complete local static validation from the repository root:
+
+   ```console
+   python3 scripts/validate_repository.py
+   ```
+
+The validation uses only the Python standard library. It checks metadata against the JSON Schema,
+requires exact coverage of the tracked sample inventory (including documented exclusions), detects
+catalog generation drift, and checks local links in all tracked Markdown files. Also run any tests
+specific to the sample you changed; for OpenJD templates, validate and run a representative task
+locally when possible.
 
 ### Conventional commits
 

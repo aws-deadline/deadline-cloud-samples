@@ -97,7 +97,7 @@ sets for the location of Blender and it's Python.
 ### Examples Blender Addons
 
 - [Blender - Flip Fluids](../blender-flipfluids/)
-- [Blender - Plugin Bundle](../blender-plugin-build/)
+- [Blender - Plugin Bundle](../blender-plugin-bundle/)
 
 
 ## Troubleshooting

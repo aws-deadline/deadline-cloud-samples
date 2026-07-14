@@ -15,7 +15,7 @@ to define task parameter values (TileNumberX and TileNumberY) for the tile numbe
 to the runData for the Maya render step. A second step is defined to have a dependency on the render step,
 which uses a bash script to call ffmpeg to assemble the tiles.
 
-See also the job bundle [tiled_region_render_with_maya_arnold](tiled_region_render_with_maya_arnold)
+See also the job bundle [tile_render_with_maya_arnold](../tile_render_with_maya_arnold/)
 that forms the tile bounds in the job and uses region render parameters when calling the Open Job Description
 application interface for rendering Maya.
 

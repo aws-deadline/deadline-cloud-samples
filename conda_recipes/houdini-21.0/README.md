@@ -45,7 +45,7 @@ Houdini supports plugins through the use of package files. A package is a json f
 [Houdini Plugin Reference](https://www.sidefx.com/docs/houdini/ref/plugins.html).
 
 Create your package files in `$PREFIX/opt/houdini/packages` and point them to the location of your plugins. See our Redshift for
-Houdini recipe as [an example](conda_recipes/houdini-redshift-2025).
+Houdini recipe as [an example](../houdini-redshift-2025/).
 
 ### Plugin Installation Paths
 
