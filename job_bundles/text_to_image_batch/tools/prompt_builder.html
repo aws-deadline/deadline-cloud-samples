@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>text_to_image_batch — Prompt Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #1a1a2e; padding: 2rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1rem; margin-bottom: 0.6rem; color: #444; }
+  .subtitle { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+  .style-row { margin-bottom: 1rem; }
+  .style-row label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.3rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .style-row input { width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
+  .style-row input:focus { outline: none; border-color: #4a90d9; }
+  .style-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+  .chip { padding: 0.3rem 0.65rem; background: #eef2f6; border: 1px solid transparent; border-radius: 14px; font-size: 0.75rem; color: #444; cursor: pointer; transition: all 0.15s; }
+  .chip:hover { background: #dfe5ec; }
+  .chip.active { background: #4a90d9; color: #fff; border-color: #357abd; }
+
+  .prompt-row { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #eee; }
+  .prompt-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .prompt-num { font-size: 0.75rem; color: #999; min-width: 1.5rem; padding-top: 0.6rem; }
+  .prompt-fields { flex: 1; }
+  .prompt-main { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; resize: vertical; min-height: 2.5rem; font-family: inherit; }
+  .prompt-main:focus { outline: none; border-color: #4a90d9; }
+  .prompt-opts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+  .prompt-opts input { padding: 0.3rem 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem; }
+  .prompt-opts input.id { width: 110px; }
+  .prompt-opts input.style { flex: 1; min-width: 180px; }
+  .prompt-opts input.num { width: 80px; }
+  .prompt-opts textarea.caption { width: 100%; padding: 0.4rem 0.55rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; resize: vertical; min-height: 2.2rem; font-family: inherit; }
+  .prompt-opts textarea.caption:focus { outline: none; border-color: #4a90d9; }
+  .prompt-opts .opt-group.full { flex-basis: 100%; }
+  .prompt-opts .caption-hint { font-size: 0.7rem; color: #999; margin-top: 0.15rem; }
+  .prompt-opts label { font-size: 0.7rem; color: #666; }
+  .prompt-opts .opt-group { display: flex; flex-direction: column; gap: 0.15rem; }
+  .btn-remove { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.2rem; padding: 0.4rem; line-height: 1; }
+  .btn-remove:hover { color: #e74c3c; }
+  .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500; }
+  .btn-primary { background: #4a90d9; color: #fff; }
+  .btn-primary:hover { background: #357abd; }
+  .btn-secondary { background: #e8ecf0; color: #333; }
+  .btn-secondary:hover { background: #dde2e8; }
+  .btn-danger { background: #fdecea; color: #c0392b; }
+  .btn-danger:hover { background: #f9d6d2; }
+  .stats { font-size: 0.8rem; color: #666; margin-top: 0.75rem; }
+  .toggle-opts { font-size: 0.75rem; color: #4a90d9; cursor: pointer; border: none; background: none; margin-top: 0.3rem; padding: 0; }
+  .hidden { display: none; }
+  .drop-zone { border: 2px dashed #ddd; border-radius: 8px; padding: 1.5rem; text-align: center; color: #999; margin-bottom: 1rem; transition: all 0.2s; font-size: 0.9rem; }
+  .drop-zone.dragover { border-color: #4a90d9; background: #f0f7ff; color: #4a90d9; }
+  .drop-zone .small { font-size: 0.75rem; margin-top: 0.3rem; color: #aaa; }
+  .preview { background: #f8f9fa; border-radius: 4px; padding: 1rem; font-family: monospace; font-size: 0.75rem; max-height: 240px; overflow: auto; white-space: pre; margin-top: 1rem; }
+  .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; background: #fff3cd; color: #856404; font-size: 0.7rem; margin-left: 0.4rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>text_to_image_batch — Prompt Builder</h1>
+  <p class="subtitle">Build a JSONL of image descriptions for batch generation with AWS Deadline Cloud. Add an optional <strong>caption</strong> per prompt to have it composited as readable typography over the image.</p>
+
+  <div class="card">
+    <h2>Style Suffix (applied to all prompts)</h2>
+    <div class="style-row">
+      <label for="globalStyle">Style</label>
+      <input type="text" id="globalStyle" placeholder="e.g. vintage poster, warm tones, hand-drawn illustration"
+             oninput="updateStats()">
+      <div class="style-presets" id="presets"></div>
+    </div>
+    <div class="stats">A per-prompt <code>style</code> field overrides this for an individual prompt. Can also be set as <code>StyleSuffix</code> at job submit time.</div>
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <div>Drop a JSONL file here to import</div>
+    <div class="small">Existing <code>caption</code>, <code>style</code>, and overrides are preserved. <code>vllm_batch</code> output (<code>generated_text</code>) is auto-detected.</div>
+  </div>
+
+  <div class="card">
+    <h2>Image Descriptions</h2>
+    <div id="promptList"></div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="addPrompt()">+ Add Description</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()">Import JSONL</button>
+      <button class="btn btn-danger" onclick="clearAll()">Clear All</button>
+      <input type="file" id="importInput" accept=".jsonl,.json,.txt" style="display:none" onchange="importFile(event)">
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card">
+    <h2>Export</h2>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="exportJsonl()">Download JSONL</button>
+      <button class="btn btn-secondary" onclick="togglePreview()">Preview</button>
+    </div>
+    <div class="preview hidden" id="preview"></div>
+  </div>
+</div>
+
+<script>
+const STYLE_PRESETS = [
+  { label: 'Cinematic poster', value: 'cinematic poster, dramatic lighting, vibrant colors' },
+  { label: 'Hand-drawn illustration', value: 'hand-drawn illustration, watercolor texture, soft edges' },
+  { label: 'Photorealistic product shot', value: 'photorealistic product photography, studio lighting, white background' },
+  { label: 'Vintage poster', value: 'vintage poster, warm tones, retro typography aesthetic' },
+  { label: 'Anime / manga', value: 'anime style, manga illustration, cel shading, vivid colors' },
+  { label: 'Pencil sketch', value: 'detailed pencil sketch, graphite, black and white' },
+  { label: 'Oil painting', value: 'oil painting, impressionist style, visible brush strokes' },
+  { label: 'Cyberpunk', value: 'cyberpunk, neon lighting, futuristic, high detail' },
+  { label: 'Minimalist flat', value: 'minimalist flat illustration, geometric shapes, pastel palette' },
+  { label: 'Editorial magazine', value: 'editorial magazine photography, natural lighting, shallow depth of field' },
+];
+
+let prompts = [];
+
+function renderPresets() {
+  const el = document.getElementById('presets');
+  el.innerHTML = STYLE_PRESETS.map((p, i) => `
+    <button class="chip" type="button" onclick="applyPreset(${i})">${p.label}</button>
+  `).join('');
+}
+
+function applyPreset(i) {
+  document.getElementById('globalStyle').value = STYLE_PRESETS[i].value;
+  document.querySelectorAll('.chip').forEach((c, idx) => c.classList.toggle('active', idx === i));
+  updateStats();
+}
+
+function addPrompt(data) {
+  data = data || {};
+  prompts.push({
+    prompt: data.prompt || '',
+    id: data.id || '',
+    style: data.style || '',
+    caption: data.caption || '',
+    width: data.width || '',
+    height: data.height || '',
+    steps: data.steps || '',
+    seed: data.seed || '',
+  });
+  render();
+  // Focus the newly added textarea so the user can start typing immediately.
+  setTimeout(() => {
+    const textareas = document.querySelectorAll('.prompt-main');
+    if (textareas.length) textareas[textareas.length - 1].focus();
+  }, 0);
+}
+
+function removePrompt(idx) {
+  prompts.splice(idx, 1);
+  render();
+}
+
+function updatePrompt(idx, field, value) {
+  prompts[idx][field] = value;
+  updateStats();
+}
+
+function toggleOpts(idx) {
+  document.getElementById(`opts-${idx}`).classList.toggle('hidden');
+}
+
+function render() {
+  const list = document.getElementById('promptList');
+  list.innerHTML = prompts.map((p, i) => `
+    <div class="prompt-row">
+      <span class="prompt-num">${i + 1}</span>
+      <div class="prompt-fields">
+        <textarea class="prompt-main" placeholder="Describe the image..."
+          oninput="updatePrompt(${i}, 'prompt', this.value)">${esc(p.prompt)}</textarea>
+        <button class="toggle-opts" onclick="toggleOpts(${i})">⚙ options</button>
+        <div class="prompt-opts hidden" id="opts-${i}">
+          <div class="opt-group full">
+            <label>Caption (overlay text — leave empty for no overlay)</label>
+            <textarea class="caption" placeholder='e.g. "AIR TIME!" or "MEANWHILE..."' rows="1"
+              oninput="updatePrompt(${i}, 'caption', this.value)">${esc(p.caption)}</textarea>
+            <div class="caption-hint">Composited over the image with auto-vibe typography. Skipped when empty.</div>
+          </div>
+          <div class="opt-group">
+            <label>ID</label>
+            <input type="text" class="id" value="${esc(p.id)}" placeholder="optional"
+              oninput="updatePrompt(${i}, 'id', this.value)">
+          </div>
+          <div class="opt-group" style="flex:1; min-width:180px;">
+            <label>Style override</label>
+            <input type="text" class="style" value="${esc(p.style)}" placeholder="(uses global style)"
+              oninput="updatePrompt(${i}, 'style', this.value)">
+          </div>
+          <div class="opt-group">
+            <label>Width</label>
+            <input type="number" class="num" value="${esc(p.width)}" placeholder="default"
+              oninput="updatePrompt(${i}, 'width', this.value)">
+          </div>
+          <div class="opt-group">
+            <label>Height</label>
+            <input type="number" class="num" value="${esc(p.height)}" placeholder="default"
+              oninput="updatePrompt(${i}, 'height', this.value)">
+          </div>
+          <div class="opt-group">
+            <label>Steps</label>
+            <input type="number" class="num" value="${esc(p.steps)}" placeholder="default"
+              oninput="updatePrompt(${i}, 'steps', this.value)">
+          </div>
+          <div class="opt-group">
+            <label>Seed</label>
+            <input type="number" class="num" value="${esc(p.seed)}" placeholder="random"
+              oninput="updatePrompt(${i}, 'seed', this.value)">
+          </div>
+        </div>
+      </div>
+      <button class="btn-remove" onclick="removePrompt(${i})" title="Remove">×</button>
+    </div>
+  `).join('');
+  updateStats();
+}
+
+function esc(v) {
+  if (v == null) return '';
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function updateStats() {
+  const filled = prompts.filter(p => p.prompt && p.prompt.trim()).length;
+  const captions = prompts.filter(p => p.prompt && p.prompt.trim() && p.caption && p.caption.trim()).length;
+  const style = (document.getElementById('globalStyle').value || '').trim();
+  let msg = `${filled} prompt${filled !== 1 ? 's' : ''} ready`;
+  if (captions) msg += ` · ${captions} with caption`;
+  if (style) msg += ` · global style applied`;
+  document.getElementById('stats').textContent = msg;
+}
+
+function buildLineForPrompt(p) {
+  const obj = { prompt: p.prompt.trim() };
+  if (p.id) obj.id = p.id;
+  if (p.style) obj.style = p.style;
+  if (p.caption && p.caption.trim()) obj.caption = p.caption.trim();
+  if (p.width) obj.width = parseInt(p.width);
+  if (p.height) obj.height = parseInt(p.height);
+  if (p.steps) obj.steps = parseInt(p.steps);
+  if (p.seed !== '' && p.seed != null) obj.seed = parseInt(p.seed);
+  return JSON.stringify(obj);
+}
+
+function buildJsonl() {
+  return prompts
+    .filter(p => p.prompt && p.prompt.trim())
+    .map(buildLineForPrompt)
+    .join('\n');
+}
+
+function exportJsonl() {
+  const content = buildJsonl();
+  if (!content) { alert('Add at least one description before exporting.'); return; }
+  const blob = new Blob([content + '\n'], { type: 'application/jsonl' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'image_prompts.jsonl';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function togglePreview() {
+  const el = document.getElementById('preview');
+  el.classList.toggle('hidden');
+  if (!el.classList.contains('hidden')) {
+    el.textContent = buildJsonl() || '(no prompts yet)';
+  }
+}
+
+function importFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  readFile(file);
+  event.target.value = '';
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const lines = e.target.result.split('\n').filter(l => l.trim());
+    const imported = [];
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        // vllm_batch output: prefer generated_text as the visual description.
+        const text = obj.prompt || obj.generated_text || obj.text || '';
+        imported.push({
+          prompt: text,
+          id: obj.id || '',
+          style: obj.style || '',
+          caption: obj.caption || '',
+          width: obj.width != null ? String(obj.width) : '',
+          height: obj.height != null ? String(obj.height) : '',
+          steps: obj.steps != null ? String(obj.steps) : '',
+          seed: obj.seed != null ? String(obj.seed) : '',
+        });
+      } catch (err) {
+        // Skip malformed lines silently — common with partial pastes.
+      }
+    }
+    if (!imported.length) {
+      alert('No valid JSONL lines found in that file.');
+      return;
+    }
+    prompts = imported;
+    render();
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  if (prompts.length && !confirm('Clear all prompts?')) return;
+  prompts = [];
+  render();
+}
+
+// Drag and drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+});
+
+renderPresets();
+addPrompt(); // start with one empty row
+</script>
+</body>
+</html>

@@ -1,0 +1,638 @@
+specificationVersion: jobtemplate-2023-09
+extensions:
+- TASK_CHUNKING
+name: Text to Image (Batch)
+description: |
+  Batch image generation that produces marketing-quality posters: clean AI
+  visuals from a diffusion model, with an optional slogan rendered as crisp
+  typography composited on top via PIL. Each prompt becomes one task. The
+  pipeline is loaded once per worker session via a step environment that runs
+  a small local HTTP server — the scheduler distributes tasks across
+  available workers, reusing the loaded pipeline for every task on that
+  worker.
+
+  Caption overlay is enabled by default. When a JSONL line has a "caption" or
+  "generated_text" field, that text is composited over the generated image
+  with auto-vibe font selection (script for rustic, display for playful,
+  serif for elegant, sans for modern, mono for tech). Lines without a caption
+  produce pure imagery — useful as the bundle works equally well as a
+  standalone image generator without overlays.
+
+  The default model is black-forest-labs/FLUX.2-klein-4B — Apache 2.0
+  licensed, no HuggingFace token required, ~13 GB VRAM, distilled to 4-step
+  inference. Other diffusion models loadable via diffusers.DiffusionPipeline
+  (FLUX.2-klein-base-4B, SDXL Turbo, SDXL, SD3.5, etc.) also work; you may
+  need to bump InferenceSteps and GuidanceScale.
+
+  Because Flux2KleinPipeline is only available in bleeding-edge diffusers,
+  this bundle ships an InstallDeps jobEnvironment that pip-installs PyTorch
+  + the latest diffusers from git on top of the queue's Conda environment,
+  and downloads 4 small Google Fonts for the caption overlay. Your queue
+  must still have a Conda queue environment configured.
+
+parameterDefinitions:
+- name: ModelName
+  type: STRING
+  default: black-forest-labs/FLUX.2-klein-4B
+  description: |
+    HuggingFace diffusion model ID. Default is FLUX.2 Klein 4B (Apache 2.0,
+    no auth, ~13 GB VRAM, distilled to 4 steps). Other models loadable via
+    diffusers.DiffusionPipeline also work — FLUX.2-klein-base-4B (undistilled,
+    50 steps), SDXL Turbo, SDXL, SD3.5 (gated), etc.
+  userInterface:
+    control: LINE_EDIT
+    label: Model Name
+    groupLabel: Model Settings
+
+- name: InputFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  description: |
+    JSONL file with one image description per line. Each line should have a
+    "prompt" field (or a "generated_text" field — chained from vllm_batch
+    output). Optional per-line fields: id, style, width, height, steps, seed.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Input JSONL File
+    groupLabel: Input
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  description: Directory where generated images, metadata, and gallery.html will be written.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+
+- name: Prompts
+  type: STRING
+  default: "1-10"
+  description: |
+    Which lines from the JSONL file to process. Examples:
+    "1-10" (first 10 lines), "2-8" (subset),
+    "2,5,8-9" (specific lines and a range), "1,3,5,7" (just those lines),
+    "1-10:2" (stride — every 2nd line: 1,3,5,7,9). Prompts are grouped
+    into chunks of size ChunkSize; each chunk runs as one task.
+  userInterface:
+    control: LINE_EDIT
+    label: Prompt Range
+    groupLabel: Job Settings
+
+- name: ChunkSize
+  type: INT
+  default: 5
+  minValue: 1
+  maxValue: 150
+  description: |
+    How many prompts to process per task. Higher values mean fewer tasks
+    with more prompts each (less scheduling overhead). Lower values mean
+    more parallelism across workers.
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Job Settings
+
+- name: TargetRuntimeSeconds
+  type: INT
+  default: 120
+  minValue: 0
+  maxValue: 3600
+  description: |
+    Target runtime per chunk in seconds. Deadline Cloud may dynamically
+    grow or shrink chunk sizes to approach this target. Set to 0 to
+    disable and always use ChunkSize exactly.
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (sec)
+    groupLabel: Job Settings
+
+- name: StyleSuffix
+  type: STRING
+  default: ""
+  description: |
+    Style description appended to every prompt (e.g. "vintage poster, warm
+    tones, hand-drawn illustration"). A per-line "style" field in the JSONL
+    overrides this for that prompt.
+  userInterface:
+    control: LINE_EDIT
+    label: Style Suffix
+    groupLabel: Generation Settings
+
+- name: OverlayCaption
+  type: STRING
+  default: "true"
+  allowedValues: ["true", "false"]
+  description: |
+    When "true" (default), the slogan text is composited over the image
+    using PIL — small font, rounded pill backdrop, centered horizontally,
+    near the bottom edge. The slogan is NOT fed to the diffusion model, so
+    you get clean readable typography. When "false", the slogan goes into
+    the diffusion prompt and likely renders as gibberish.
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Overlay Caption
+    groupLabel: Caption Overlay
+
+- name: FontStyle
+  type: STRING
+  default: "auto"
+  description: |
+    Font category for the caption overlay. "auto" picks based on style/prompt
+    keywords (elegant -> serif, playful -> display, modern -> sans, rustic ->
+    script, code -> mono). Or set explicitly: sans, serif, display, script,
+    mono. Or pass an absolute path to a custom .ttf file. Per-line "font"
+    field overrides this. Only used when OverlayCaption=true.
+  userInterface:
+    control: LINE_EDIT
+    label: Font Style
+    groupLabel: Caption Overlay
+
+- name: Width
+  type: INT
+  default: 1024
+  minValue: 256
+  maxValue: 2048
+  description: Image width in pixels.
+  userInterface:
+    control: SPIN_BOX
+    label: Width
+    groupLabel: Generation Settings
+
+- name: Height
+  type: INT
+  default: 1024
+  minValue: 256
+  maxValue: 2048
+  description: Image height in pixels.
+  userInterface:
+    control: SPIN_BOX
+    label: Height
+    groupLabel: Generation Settings
+
+- name: InferenceSteps
+  type: INT
+  default: 4
+  minValue: 1
+  maxValue: 100
+  description: |
+    Number of denoising steps. FLUX.2 Klein 4B (default) and SDXL Turbo are
+    distilled to 4 steps; for FLUX.2-klein-base-4B use 50; for SDXL / SD3.5
+    use 25–50.
+  userInterface:
+    control: SPIN_BOX
+    label: Inference Steps
+    groupLabel: Generation Settings
+
+- name: GuidanceScale
+  type: STRING
+  default: "1.0"
+  description: |
+    Classifier-free guidance scale. FLUX.2 Klein 4B (default) uses 1.0
+    (distilled). For FLUX.2-klein-base-4B use 4.0. For SDXL Turbo / SD-Turbo
+    use 0.0. For SDXL / SD3.5 use 5.0–7.5.
+  userInterface:
+    control: LINE_EDIT
+    label: Guidance Scale
+    groupLabel: Generation Settings
+
+- name: Seed
+  type: STRING
+  default: "-1"
+  description: Random seed (-1 = random per task, derived from PromptIndex).
+  userInterface:
+    control: LINE_EDIT
+    label: Seed
+    groupLabel: Generation Settings
+
+- name: HfToken
+  type: STRING
+  default: ""
+  description: |
+    HuggingFace token. Not needed for the default FLUX.2 Klein 4B model
+    (Apache 2.0, ungated). Required only for gated models like FLUX.1-schnell,
+    FLUX.1-dev, or stable-diffusion-3.5.
+  userInterface:
+    control: LINE_EDIT
+    label: HuggingFace Token
+    groupLabel: Model Settings
+
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  userInterface:
+    control: HIDDEN
+
+- name: CondaPackages
+  type: STRING
+  default: "python=3.11 safetensors pillow huggingface_hub"
+  userInterface:
+    control: HIDDEN
+
+- name: CondaChannels
+  type: STRING
+  default: conda-forge
+  userInterface:
+    control: HIDDEN
+
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+- name: InstallDeps
+  description: |
+    Install PyTorch + the latest diffusers from git on top of the conda env.
+    FLUX.2 Klein needs Flux2KleinPipeline, which is only available in the
+    bleeding-edge diffusers — the conda-forge release lags behind.
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ['{{Env.File.Enter}}']
+    embeddedFiles:
+    - name: Enter
+      filename: install_deps.sh
+      type: TEXT
+      data: |
+        #!/bin/bash
+        set -euo pipefail
+
+        echo "Installing PyTorch with CUDA 12.4 support..."
+        pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cu124
+
+        echo "Installing diffusers from git (for Flux2KleinPipeline) + deps..."
+        pip install --quiet \
+          git+https://github.com/huggingface/diffusers.git \
+          transformers \
+          accelerate \
+          sentencepiece \
+          protobuf
+
+        # Sanity check — fail fast here rather than later in the step env.
+        python -c "import torch, diffusers; print(f'torch={torch.__version__} cuda={torch.cuda.is_available()} diffusers={diffusers.__version__}')"
+
+        # Download a curated set of free Google Fonts (SIL Open Font License) for
+        # the caption overlay. Cached per-worker — subsequent jobs skip this.
+        # Total ~600 KB.
+        FONT_DIR="$HOME/.cache/text_to_image_batch/fonts"
+        mkdir -p "$FONT_DIR"
+        download_font() {
+          local name="$1"; local url="$2"
+          local out="$FONT_DIR/$name"
+          if [ -s "$out" ]; then
+            echo "  $name (cached)"
+            return 0
+          fi
+          echo "  $name (downloading)"
+          curl -fsSL --retry 3 --max-time 30 "$url" -o "$out.tmp" && mv "$out.tmp" "$out" || {
+            echo "  WARN: failed to download $name (overlay falls back to system font)"
+            rm -f "$out.tmp"
+          }
+        }
+        echo "Caching caption fonts at $FONT_DIR..."
+        download_font "PlayfairDisplay-Bold.ttf" \
+          "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay%5Bopsz%2Cwght%5D.ttf"
+        download_font "Bungee-Regular.ttf" \
+          "https://github.com/google/fonts/raw/main/ofl/bungee/Bungee-Regular.ttf"
+        download_font "Caveat-Bold.ttf" \
+          "https://github.com/google/fonts/raw/main/ofl/caveat/Caveat%5Bwght%5D.ttf"
+        download_font "JetBrainsMono-Bold.ttf" \
+          "https://github.com/google/fonts/raw/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"
+        echo "openjd_env: TEXT_TO_IMAGE_FONT_DIR=$FONT_DIR"
+
+        echo "Dependencies installed."
+
+steps:
+- name: Generate
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: PromptIndex
+      type: CHUNK[INT]
+      range: "{{Param.Prompts}}"
+      chunks:
+        defaultTaskCount: "{{Param.ChunkSize}}"
+        targetRuntimeSeconds: "{{Param.TargetRuntimeSeconds}}"
+        rangeConstraint: NONCONTIGUOUS
+  stepEnvironments:
+  - name: DiffusersServer
+    description: Starts a local HTTP server that loads the diffusion pipeline once and serves all tasks on this worker.
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args:
+          - '{{Env.File.Enter}}'
+        onExit:
+          command: bash
+          args:
+          - '{{Env.File.Exit}}'
+      embeddedFiles:
+      - name: Enter
+        filename: start-diffusers.sh
+        type: TEXT
+        data: |
+          #!/bin/bash
+          set -euo pipefail
+
+          export HF_TOKEN="{{Param.HfToken}}"
+          export HUGGING_FACE_HUB_TOKEN="{{Param.HfToken}}"
+          # Avoid sharing GPU memory across processes (one-task-at-a-time on each worker).
+          export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
+          echo "Starting diffusers server for {{Param.ModelName}}..."
+          DIFFUSERS_LOG="{{Session.WorkingDirectory}}/diffusers_server.log"
+          echo "openjd_env: DIFFUSERS_LOG=$DIFFUSERS_LOG"
+
+          nohup python "{{Env.File.Server}}" \
+            --model "{{Param.ModelName}}" \
+            --port 8001 \
+            > "$DIFFUSERS_LOG" 2>&1 &
+          DIFFUSERS_PID=$!
+          echo "openjd_env: DIFFUSERS_PID=$DIFFUSERS_PID"
+
+          # Wait for the server to be ready (polls /health and tails the log).
+          python "{{Env.File.WaitScript}}" "$DIFFUSERS_PID" "$DIFFUSERS_LOG" 8001
+      - name: Server
+        filename: diffusers_server.py
+        type: TEXT
+        data: |
+          """Tiny stdlib HTTP server that loads a diffusers pipeline once and
+          serves POST /generate -> PNG bytes for every task on this worker.
+
+          Single-threaded by design: Deadline Cloud runs at most one task at a
+          time per worker, and a diffusion pipeline can only do one generation
+          at a time on a single GPU anyway."""
+          import argparse
+          import io
+          import json
+          import os
+          import sys
+          import traceback
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+
+          import torch
+          # DiffusionPipeline auto-selects the right pipeline class by reading
+          # the model_index.json's _class_name (Flux2KleinPipeline for FLUX.2
+          # Klein, StableDiffusionXLPipeline for SDXL, FluxPipeline for FLUX.1,
+          # etc.). This is more general than AutoPipelineForText2Image and is
+          # what the official FLUX.2 Klein model card recommends.
+          from diffusers import DiffusionPipeline
+
+
+          PIPE = None
+          MODEL_NAME = None
+
+
+          def load_pipeline(model_name):
+              global PIPE, MODEL_NAME
+              MODEL_NAME = model_name
+              # bfloat16 is required for FLUX/FLUX.2; SDXL/SD3 also support it.
+              dtype = torch.bfloat16
+              print(f"[server] loading {model_name} (dtype={dtype})...", flush=True)
+              pipe = DiffusionPipeline.from_pretrained(model_name, torch_dtype=dtype)
+              # CPU offloading lets larger pipelines fit on smaller GPUs.
+              # FLUX.2 Klein 4B is ~13 GB so this is mostly a no-op on hot path
+              # for 24 GB+ GPUs, but it lets us run on 16 GB GPUs too.
+              try:
+                  pipe.enable_model_cpu_offload()
+                  print("[server] enabled model CPU offload", flush=True)
+              except Exception as e:
+                  print(f"[server] could not enable CPU offload, moving to CUDA: {e}", flush=True)
+                  pipe.to("cuda")
+              # Disable the progress bar on every call — it spams the log.
+              try:
+                  pipe.set_progress_bar_config(disable=True)
+              except Exception:
+                  pass
+              PIPE = pipe
+              print(f"[server] {model_name} ready (pipeline class: {type(pipe).__name__})", flush=True)
+
+
+          def generate(payload):
+              prompt = payload["prompt"]
+              width = int(payload.get("width", 1024))
+              height = int(payload.get("height", 1024))
+              steps = int(payload.get("inference_steps", 4))
+              guidance = float(payload.get("guidance_scale", 1.0))
+              seed = int(payload.get("seed", -1))
+
+              kwargs = dict(
+                  prompt=prompt,
+                  width=width,
+                  height=height,
+                  num_inference_steps=steps,
+                  guidance_scale=guidance,
+              )
+              if seed >= 0:
+                  kwargs["generator"] = torch.Generator(device="cuda").manual_seed(seed)
+
+              image = PIPE(**kwargs).images[0]
+              buf = io.BytesIO()
+              image.save(buf, format="PNG")
+              return buf.getvalue()
+
+
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == "/health":
+                      body = b"ok"
+                      self.send_response(200)
+                      self.send_header("Content-Type", "text/plain")
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                      return
+                  self.send_response(404)
+                  self.end_headers()
+
+              def do_POST(self):
+                  if self.path != "/generate":
+                      self.send_response(404)
+                      self.end_headers()
+                      return
+                  try:
+                      length = int(self.headers.get("Content-Length", "0"))
+                      payload = json.loads(self.rfile.read(length).decode())
+                      png = generate(payload)
+                      self.send_response(200)
+                      self.send_header("Content-Type", "image/png")
+                      self.send_header("Content-Length", str(len(png)))
+                      self.end_headers()
+                      self.wfile.write(png)
+                  except Exception as e:
+                      traceback.print_exc()
+                      err = json.dumps({"error": str(e), "type": type(e).__name__}).encode()
+                      self.send_response(500)
+                      self.send_header("Content-Type", "application/json")
+                      self.send_header("Content-Length", str(len(err)))
+                      self.end_headers()
+                      self.wfile.write(err)
+
+              def log_message(self, fmt, *args):
+                  # Default impl writes to stderr — silence routine access logs,
+                  # we already log start/end of each generation in the worker.
+                  return
+
+
+          def main():
+              parser = argparse.ArgumentParser()
+              parser.add_argument("--model", required=True)
+              parser.add_argument("--port", type=int, default=8001)
+              args = parser.parse_args()
+
+              load_pipeline(args.model)
+
+              server = HTTPServer(("127.0.0.1", args.port), Handler)
+              print(f"[server] listening on 127.0.0.1:{args.port}", flush=True)
+              try:
+                  server.serve_forever()
+              except KeyboardInterrupt:
+                  pass
+              finally:
+                  server.server_close()
+
+
+          if __name__ == "__main__":
+              main()
+      - name: WaitScript
+        filename: wait_for_diffusers.py
+        type: TEXT
+        data: |
+          """Wait for the diffusers server to come up.
+
+          Polls /health up to MAX_WAIT seconds; if the server PID dies before
+          that, prints the tail of its log and exits non-zero so the step
+          environment fails fast."""
+          import os
+          import sys
+          import time
+          import urllib.request
+
+          pid = int(sys.argv[1])
+          log_path = sys.argv[2]
+          port = int(sys.argv[3]) if len(sys.argv) > 3 else 8001
+
+          MAX_WAIT = 600  # FLUX is ~24 GB on first download; allow a long warmup
+          last_log_size = 0
+          start = time.time()
+
+          while time.time() - start < MAX_WAIT:
+              # Has the server crashed?
+              try:
+                  os.kill(pid, 0)
+              except OSError:
+                  print("ERROR: diffusers server exited unexpectedly", flush=True)
+                  try:
+                      with open(log_path) as f:
+                          print(f.read()[-4000:])
+                  except Exception:
+                      pass
+                  sys.exit(1)
+
+              # Is it serving yet?
+              try:
+                  with urllib.request.urlopen(f"http://localhost:{port}/health", timeout=5) as resp:
+                      if resp.status == 200:
+                          print(f"diffusers server ready after {int(time.time() - start)}s", flush=True)
+                          sys.exit(0)
+              except Exception:
+                  pass
+
+              # Print log progress every ~30s so the operator can see download progress.
+              elapsed = int(time.time() - start)
+              if elapsed > 0 and elapsed % 30 < 5:
+                  try:
+                      with open(log_path) as f:
+                          f.seek(last_log_size)
+                          chunk = f.read()
+                          last_log_size = f.tell()
+                          if chunk:
+                              print(f"--- diffusers log (t={elapsed}s) ---", flush=True)
+                              print(chunk[-2000:], flush=True)
+                  except Exception:
+                      pass
+
+              time.sleep(5)
+
+          print(f"ERROR: diffusers server did not start within {MAX_WAIT}s", flush=True)
+          try:
+              with open(log_path) as f:
+                  print(f.read()[-4000:])
+          except Exception:
+              pass
+          sys.exit(1)
+      - name: Exit
+        filename: stop-diffusers.sh
+        type: TEXT
+        data: |
+          #!/bin/bash
+          set -euo pipefail
+          echo "Stopping diffusers server (PID ${DIFFUSERS_PID:-unknown})..."
+          if [ -n "${DIFFUSERS_PID:-}" ]; then
+            kill "$DIFFUSERS_PID" 2>/dev/null || true
+            wait "$DIFFUSERS_PID" 2>/dev/null || true
+          fi
+          echo "Diffusers server stopped."
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/run_task.py'
+        - --input-file
+        - '{{Param.InputFile}}'
+        - --prompt-range
+        - '{{Task.Param.PromptIndex}}'
+        - --output-dir
+        - '{{Param.OutputDir}}'
+        - --style-suffix
+        - '{{Param.StyleSuffix}}'
+        - --width
+        - '{{Param.Width}}'
+        - --height
+        - '{{Param.Height}}'
+        - --inference-steps
+        - '{{Param.InferenceSteps}}'
+        - --guidance-scale
+        - '{{Param.GuidanceScale}}'
+        - --seed
+        - '{{Param.Seed}}'
+        - --port
+        - '8001'
+        - --overlay-caption
+        - '{{Param.OverlayCaption}}'
+        - --font-style
+        - '{{Param.FontStyle}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    - name: amount.worker.memory
+      min: 32768
+
+- name: Aggregate
+  dependencies:
+  - dependsOn: Generate
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/aggregate.py'
+        - --output-dir
+        - '{{Param.OutputDir}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

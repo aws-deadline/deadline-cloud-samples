@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vLLM Batch Inference — Prompt Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #1a1a2e; padding: 2rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .subtitle { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .container { max-width: 800px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .prompt-row { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #eee; }
+  .prompt-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .prompt-num { font-size: 0.75rem; color: #999; min-width: 1.5rem; padding-top: 0.6rem; }
+  .prompt-fields { flex: 1; }
+  .prompt-main { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; resize: vertical; min-height: 2.5rem; }
+  .prompt-main:focus { outline: none; border-color: #4a90d9; }
+  .prompt-opts { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+  .prompt-opts input { width: 80px; padding: 0.3rem 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem; }
+  .prompt-opts label { font-size: 0.75rem; color: #666; }
+  .prompt-opts .opt-group { display: flex; flex-direction: column; gap: 0.15rem; }
+  .btn-remove { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.2rem; padding: 0.4rem; }
+  .btn-remove:hover { color: #e74c3c; }
+  .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500; }
+  .btn-primary { background: #4a90d9; color: #fff; }
+  .btn-primary:hover { background: #357abd; }
+  .btn-secondary { background: #e8ecf0; color: #333; }
+  .btn-secondary:hover { background: #dde2e8; }
+  .btn-danger { background: #fdecea; color: #c0392b; }
+  .btn-danger:hover { background: #f9d6d2; }
+  .stats { font-size: 0.8rem; color: #666; margin-top: 0.75rem; }
+  .toggle-opts { font-size: 0.75rem; color: #4a90d9; cursor: pointer; border: none; background: none; margin-top: 0.3rem; }
+  .hidden { display: none; }
+  .drop-zone { border: 2px dashed #ddd; border-radius: 8px; padding: 2rem; text-align: center; color: #999; margin-bottom: 1rem; transition: all 0.2s; }
+  .drop-zone.dragover { border-color: #4a90d9; background: #f0f7ff; color: #4a90d9; }
+  .preview { background: #f8f9fa; border-radius: 4px; padding: 1rem; font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; white-space: pre; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>vLLM Batch Inference — Prompt Builder</h1>
+  <p class="subtitle">Build your input JSONL file for batch inference with AWS Deadline Cloud.</p>
+
+  <div class="drop-zone" id="dropZone">
+    Drop a JSONL file here to import, or use the button below
+  </div>
+
+  <div class="card">
+    <div id="promptList"></div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="addPrompt()">+ Add Prompt</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()">Import JSONL</button>
+      <button class="btn btn-danger" onclick="clearAll()">Clear All</button>
+      <input type="file" id="importInput" accept=".jsonl,.json,.txt" style="display:none" onchange="importFile(event)">
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="btn btn-primary" onclick="exportJsonl()">⬇ Export JSONL</button>
+      <button class="btn btn-secondary" onclick="togglePreview()">Preview</button>
+    </div>
+    <div class="preview hidden" id="preview"></div>
+  </div>
+</div>
+
+<script>
+let prompts = [];
+
+function esc(s) {
+  const el = document.createElement('span');
+  el.textContent = s == null ? '' : String(s);
+  return el.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function addPrompt(data = {}) {
+  prompts.push({
+    prompt: data.prompt || '',
+    id: data.id || '',
+    max_tokens: data.max_tokens || '',
+    temperature: data.temperature || ''
+  });
+  render();
+  // Focus the new prompt textarea
+  setTimeout(() => {
+    const textareas = document.querySelectorAll('.prompt-main');
+    textareas[textareas.length - 1].focus();
+  }, 0);
+}
+
+function removePrompt(idx) {
+  prompts.splice(idx, 1);
+  render();
+}
+
+function updatePrompt(idx, field, value) {
+  prompts[idx][field] = value;
+  updateStats();
+}
+
+function toggleOpts(idx) {
+  const el = document.getElementById(`opts-${idx}`);
+  el.classList.toggle('hidden');
+}
+
+function render() {
+  const list = document.getElementById('promptList');
+  list.innerHTML = prompts.map((p, i) => `
+    <div class="prompt-row">
+      <span class="prompt-num">${i + 1}</span>
+      <div class="prompt-fields">
+        <textarea class="prompt-main" placeholder="Enter your prompt..."
+          oninput="updatePrompt(${i}, 'prompt', this.value)">${esc(p.prompt)}</textarea>
+        <button class="toggle-opts" onclick="toggleOpts(${i})">⚙ options</button>
+        <div class="prompt-opts hidden" id="opts-${i}">
+          <div class="opt-group">
+            <label>ID</label>
+            <input type="text" value="${esc(p.id)}" placeholder="optional"
+              oninput="updatePrompt(${i}, 'id', this.value)">
+          </div>
+          <div class="opt-group">
+            <label>Max tokens</label>
+            <input type="number" value="${esc(p.max_tokens)}" placeholder="default"
+              oninput="updatePrompt(${i}, 'max_tokens', this.value)">
+          </div>
+          <div class="opt-group">
+            <label>Temperature</label>
+            <input type="text" value="${esc(p.temperature)}" placeholder="default"
+              oninput="updatePrompt(${i}, 'temperature', this.value)">
+          </div>
+        </div>
+      </div>
+      <button class="btn-remove" onclick="removePrompt(${i})">×</button>
+    </div>
+  `).join('');
+  updateStats();
+}
+
+function updateStats() {
+  const filled = prompts.filter(p => p.prompt.trim()).length;
+  document.getElementById('stats').textContent = `${filled} prompt${filled !== 1 ? 's' : ''} ready for export`;
+}
+
+function buildJsonl() {
+  return prompts
+    .filter(p => p.prompt.trim())
+    .map(p => {
+      const obj = { prompt: p.prompt.trim() };
+      if (p.id) obj.id = p.id;
+      if (p.max_tokens) obj.max_tokens = parseInt(p.max_tokens);
+      if (p.temperature) obj.temperature = parseFloat(p.temperature);
+      return JSON.stringify(obj);
+    })
+    .join('\n');
+}
+
+function exportJsonl() {
+  const content = buildJsonl();
+  if (!content) { alert('Add at least one prompt before exporting.'); return; }
+  const blob = new Blob([content + '\n'], { type: 'application/jsonl' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'prompts.jsonl';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function togglePreview() {
+  const el = document.getElementById('preview');
+  el.classList.toggle('hidden');
+  if (!el.classList.contains('hidden')) {
+    el.textContent = buildJsonl() || '(no prompts yet)';
+  }
+}
+
+function importFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  readFile(file);
+  event.target.value = '';
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const lines = e.target.result.split('\n').filter(l => l.trim());
+    prompts = [];
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        prompts.push({
+          prompt: obj.prompt || obj.text || '',
+          id: obj.id || '',
+          max_tokens: obj.max_tokens ? String(obj.max_tokens) : '',
+          temperature: obj.temperature ? String(obj.temperature) : ''
+        });
+      } catch (err) {
+        // Skip malformed lines
+      }
+    }
+    render();
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  if (prompts.length && !confirm('Clear all prompts?')) return;
+  prompts = [];
+  render();
+}
+
+// Drag and drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+});
+
+// Start with one empty prompt
+addPrompt();
+</script>
+</body>
+</html>
