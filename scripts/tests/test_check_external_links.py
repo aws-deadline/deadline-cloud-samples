@@ -3,9 +3,8 @@ from __future__ import annotations
 import socket
 import sys
 import tempfile
-import unittest
 from pathlib import Path
-from unittest import mock
+from unittest import TestCase, main, mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -14,7 +13,7 @@ import check_external_links as checker  # noqa: E402
 import check_markdown_links as markdown  # noqa: E402
 
 
-class ExternalLinkCheckerTests(unittest.TestCase):
+class ExternalLinkCheckerTests(TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
@@ -79,6 +78,15 @@ class ExternalLinkCheckerTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaisesRegex(
                 checker.UnsafeTarget, "multicast IP address"
             ):
+                checker.parse_target(url)
+
+    def test_rejects_ipv4_mapped_and_6to4_ipv6_literals(self) -> None:
+        for url in (
+            "http://[::ffff:169.254.169.254]/latest/meta-data/",  # IPv4-mapped link-local
+            "http://[::ffff:10.0.0.1]/",  # IPv4-mapped private
+            "http://[2002:0a00:0001::1]/",  # 6to4 wrapping 10.0.0.1
+        ):
+            with self.subTest(url=url), self.assertRaises(checker.UnsafeTarget):
                 checker.parse_target(url)
 
     def test_rejects_dns_answer_set_containing_private_address(self) -> None:
@@ -230,4 +238,4 @@ class ExternalLinkCheckerTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

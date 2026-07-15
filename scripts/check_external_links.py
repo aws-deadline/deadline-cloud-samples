@@ -92,6 +92,13 @@ class CheckResult:
 
 def _require_public_unicast(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> None:
     """Reject every address class that CI must not contact, including multicast."""
+    # Unwrap IPv4-in-IPv6 forms before classification. Older interpreters do not
+    # always classify the embedded IPv4 (e.g. ::ffff:169.254.169.254 or a 6to4
+    # address wrapping a private range) as non-global, so evaluate the IPv4 directly.
+    if isinstance(address, ipaddress.IPv6Address):
+        embedded = address.ipv4_mapped or address.sixtofour
+        if embedded is not None:
+            address = embedded
     if address.is_multicast:
         raise UnsafeTarget(f"multicast IP address {address} is not allowed")
     if not address.is_global:

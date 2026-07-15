@@ -25,7 +25,7 @@ EXTENDED_URL_AUTOLINK = re.compile(
 )
 AUTOLINK_TRAILING_PUNCTUATION = "?!.,:*_~"
 OPENING_FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
-ATX_HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+|$)(.*)$")
+ATX_HEADING = re.compile(r"^ {0,3}#{1,6}(?=[ \t]|$)[ \t]*(.*)$")
 SETEXT_HEADING = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 HTML_ANCHOR = re.compile(
     r"<(?:a\b[^>]*\b(?:id|name)|[A-Za-z][A-Za-z0-9:-]*\b[^>]*\bid)\s*=\s*"
@@ -133,7 +133,9 @@ def inline_target_spans(text: str) -> list[tuple[str, int, int]]:
     """Return inline-link targets with each complete link's source span."""
     targets: list[tuple[str, int, int]] = []
     position = 0
-    link_start = re.compile(r"!?\[(?:\\.|[^]])*?\]\(", re.DOTALL)
+    # Exclude the backslash from the negated class so an escaped character is only
+    # consumed by the `\\.` branch. Overlapping branches cause exponential backtracking.
+    link_start = re.compile(r"!?\[(?:\\.|[^]\\])*?\]\(", re.DOTALL)
     while True:
         match = link_start.search(text, position)
         if not match:
