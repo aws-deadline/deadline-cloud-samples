@@ -298,6 +298,8 @@ def check_target(source: Path, raw_target: str, heading_cache: dict[Path, set[st
     path_part = unquote(parsed.path)
     source_name = source.relative_to(REPOSITORY_ROOT)
     if path_part:
+        # A leading "/" is resolved against the repository root, matching how GitHub
+        # rewrites root-relative links when rendering Markdown in this repository.
         resolved = (
             (REPOSITORY_ROOT / path_part.lstrip("/"))
             if path_part.startswith("/")

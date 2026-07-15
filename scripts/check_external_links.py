@@ -425,7 +425,25 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--backoff", type=float, default=1.0)
     parser.add_argument("--max-redirects", type=int, default=5)
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=Path,
+        help="Markdown files to check; defaults to every tracked Markdown file when omitted",
+    )
     return parser.parse_args()
+
+
+def _selected_markdown(paths: list[Path]) -> list[Path]:
+    """Resolve requested Markdown paths, ignoring non-Markdown or untracked entries."""
+    tracked = {path.resolve(): path for path in markdown.tracked_markdown()}
+    selected: list[Path] = []
+    for path in paths:
+        resolved = (path if path.is_absolute() else (REPOSITORY_ROOT / path)).resolve()
+        tracked_path = tracked.get(resolved)
+        if tracked_path is not None and tracked_path not in selected:
+            selected.append(tracked_path)
+    return selected
 
 
 def main() -> int:
@@ -445,7 +463,14 @@ def main() -> int:
         print(f"Cannot load external-link ignore file: {error}", file=sys.stderr)
         return 2
 
-    links = collect_external_links()
+    if arguments.paths:
+        selected = _selected_markdown(arguments.paths)
+        if not selected:
+            print("No tracked Markdown files selected; nothing to check")
+            return 0
+        links = collect_external_links(selected)
+    else:
+        links = collect_external_links()
     ignored: dict[str, tuple[str, str]] = {}
     to_check: list[str] = []
     malformed: list[CheckResult] = []

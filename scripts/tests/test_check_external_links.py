@@ -212,6 +212,22 @@ class ExternalLinkCheckerTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     checker.load_ignore_file(ignore_file)
 
+    def test_selected_markdown_keeps_only_tracked_markdown(self) -> None:
+        tracked = self.write("docs/guide.md", "# Guide\n")
+        self.write("docs/untracked.md", "# Untracked\n")
+        self.write("docs/notes.txt", "notes\n")
+        with mock.patch.object(markdown, "tracked_markdown", return_value=[tracked]):
+            selected = checker._selected_markdown(
+                [
+                    Path("docs/guide.md"),  # tracked, relative
+                    tracked,  # tracked, duplicate absolute -> deduplicated
+                    Path("docs/untracked.md"),  # not tracked -> dropped
+                    Path("docs/notes.txt"),  # not Markdown -> dropped
+                    Path("docs/missing.md"),  # nonexistent -> dropped
+                ]
+            )
+        self.assertEqual([tracked], selected)
+
 
 if __name__ == "__main__":
     unittest.main()
