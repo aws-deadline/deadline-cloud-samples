@@ -16,3 +16,5 @@ rez.readthedocs.io
 www.autodesk.com
 # 2026-07-14: HEAD and minimal Range GET both returned a self-referential HTTP 302 without a browser session.
 manage.autodesk.com
+# 2026-07-15: HEAD and minimal Range GET both returned HTTP 403 for public product pages that load in a browser.
+www.keyshot.com
