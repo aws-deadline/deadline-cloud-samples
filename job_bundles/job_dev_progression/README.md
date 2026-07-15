@@ -50,12 +50,12 @@ like `ModuleNotFoundError: No module named 'polars'`.
 $ openjd run stage_1_self_contained_template/template.yaml
 ```
 
-If you run the jobs with the [conda_queue_env_console_equivalent](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/queue_environments/conda_queue_env_console_equivalent.yaml)
+If you run the jobs with the [console-equivalent Conda queue environment](../../queue_environments/conda_queue_env_from_console.yaml)
 sample, it will create a conda virtual environment within the job's session directory.
 This creates a fresh conda environment every time you run the job.
 
 ```bash
-$ openjd run --environment ../../queue_environments/conda_queue_env_console_equivalent.yaml stage_1_self_contained_template/template.yaml
+$ openjd run --environment ../../queue_environments/conda_queue_env_from_console.yaml stage_1_self_contained_template/template.yaml
 ```
 
 If you run the jobs with the [conda_queue_env_improved_caching](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/queue_environments/conda_queue_env_improved_caching.yaml)

@@ -9,15 +9,12 @@ Start with the task you want to complete; each sample stays self-contained in it
 |---|---|
 | Deploy a farm | [CloudFormation starter farm](cloudformation/farm_templates/starter_farm/) or [Terraform starter farm](terraform/farm_templates/starter_farm/) |
 | Learn how a job is structured | [Job development progression](job_bundles/job_dev_progression/) or the [minimal job](job_bundles/simple_job/) |
-| Render with a DCC | [Blender render](job_bundles/blender_render/), [Maya CLI render](job_bundles/maya_cli_render/), or browse [all job bundles](SAMPLES.md#openjd-job-bundles) |
+| Render with a DCC | [Blender render](job_bundles/blender_render/), [Maya CLI render](job_bundles/maya_cli_render/), or browse the [job bundles](job_bundles/) |
 | Provide applications to workers | [Conda recipes](conda_recipes/), [queue environments](queue_environments/), or [worker containers](containers/) |
 | Install software or plugins | [Custom-plugin journey](docs/sample-navigation.md#install-custom-plugins) and [host configuration scripts](host_configuration_scripts/) |
 | Connect studio systems | [Studio-integration journey](docs/sample-navigation.md#integrate-studio-tools-into-the-job-lifecycle) |
-| Find a specific example | Browse the generated [sample catalog](SAMPLES.md) by goal, type, or journey |
+| Find a specific example | Use the [repository map](#repository-map), then browse that area's folder README |
 | Create a sample with an AI agent | Use the task-specific guides in [skills](skills/) |
-
-The human-edited [`sample_catalog.json`](sample_catalog.json) is also available for tools and automation.
-Its schema is [`sample_catalog.schema.json`](sample_catalog.schema.json).
 
 ## Quick start
 
@@ -59,7 +56,8 @@ This is a curated selection of noteworthy additions and updates, not an exhausti
 * **2026-07-07 — [Houdini 21.0 recipe](conda_recipes/houdini-21.0/):** adds Plugin Sync support.
 * **2026-06-25 — [Blender turntable to Flow Production Tracking](job_bundles/blender_turntable_to_flow/):** demonstrates render-to-review publishing.
 
-See the catalog's curated [recent highlights](SAMPLES.md#recent-highlights) for more.
+Browse the repository map below, then inspect the filesystem directly for the exhaustive inventory.
+Folder READMEs are curated introductions and may intentionally highlight only recommended samples.
 
 ## Choose a path for a larger journey
 
@@ -87,8 +85,9 @@ to the strongest implementations in this repository.
 | [Utility scripts](utility_scripts/) | Automate supporting tasks such as uploading job attachments. |
 | [Agent skills](skills/) | Give coding agents repeatable instructions for authoring jobs, packages, and host configs. |
 
-For every discoverable sample—including explicit support-directory exclusions—use the
-[complete generated catalog](SAMPLES.md).
+The filesystem in each area is the exhaustive inventory. Area READMEs, the task table, featured
+examples, and [journey guide](docs/sample-navigation.md) are curated introductions that may intentionally
+highlight only recommended samples.
 
 ## Documentation
 

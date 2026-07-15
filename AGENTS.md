@@ -14,22 +14,23 @@ python3 scripts/validate_repository.py
 ```
 
 Run it after every repository change, in addition to tests or validation owned by the sample you edit.
-
-## Find and query samples
-
-[`sample_catalog.json`](sample_catalog.json) is the human-edited, machine-readable source of truth.
-[`SAMPLES.md`](SAMPLES.md) is generated for browsing and must not be edited directly. Query catalog
-metadata without third-party dependencies, for example:
+External Markdown links use a separate network-dependent command:
 
 ```console
-python3 scripts/query_samples.py --task render-content
-python3 scripts/query_samples.py --journey custom-plugins --platform windows
-python3 scripts/query_samples.py --category job-bundle --tag blender
+python3 scripts/check_external_links.py
 ```
 
-Run `python3 scripts/query_samples.py --help` for all filters. Paths are stable sample identities.
-Discovery roots and intentional support-only exclusions are declared in the catalog's `inventory`
-section and enforced against tracked Git files.
+Use `--no-ignore` to audit the narrowly documented domain ignore list before changing it; genuine
+broken links must be fixed rather than ignored.
+
+## Find samples
+
+The filesystem is the exhaustive sample inventory. Browse the top-level area directories directly and
+search their paths or contents (for example, with `find` and `git grep`) when looking for a specific
+application, renderer, workflow, or platform. Start with the task table and repository map in
+[`README.md`](README.md) when you want recommendations. Folder READMEs and
+[`docs/sample-navigation.md`](docs/sample-navigation.md) are curated introductions; they may
+intentionally highlight only recommended canonical examples and are not complete inventories.
 
 ## Where things live
 
@@ -45,10 +46,8 @@ deadline-cloud-samples/
 ├── submission_hooks/           Pre-submission Deadline Cloud CLI hooks
 ├── utility_scripts/            Standalone workflow helpers
 ├── skills/                     Task-specific guides for coding agents
-├── docs/                       Navigation and contributor contracts
-├── scripts/                    Catalog generation and repository validation
-├── sample_catalog.json         Human-edited sample metadata and inventory policy
-└── SAMPLES.md                  Generated browseable sample index
+├── docs/                       Curated navigation and contributor contracts
+└── scripts/                    Standard-library repository validation
 ```
 
 Read the relevant sample `README.md` before modifying its files. Use
@@ -81,16 +80,17 @@ Skills are auto-discovered through `.claude/skills` and `.kiro/skills` symlinks.
   `deadline-cloud.yaml`.
 * For OpenJD templates, run `openjd check` and `openjd run --tasks <one>` to verify a representative
   task locally before submitting the full parameter range when possible.
-* New, renamed, or removed samples must update `sample_catalog.json`; run
-  `python3 scripts/generate_samples.py` after editing metadata.
+* Keep the filesystem as the inventory; update curated folder, root, or journey guidance only when
+  recommended starting points change.
 * Do not add third-party runtime dependencies to repository validation.
 
 ## Pre-PR checklist
 
-* [ ] Run `python3 scripts/validate_repository.py` successfully.
+* [ ] Run `python3 scripts/validate_repository.py` successfully (unit tests and static local-link checks).
+* [ ] Run `python3 scripts/check_external_links.py` successfully when Markdown links change.
 * [ ] Run the affected sample's own relevant tests or static checks.
 * [ ] Update the sample README when behavior, prerequisites, parameters, outputs, or risks change.
-* [ ] Update catalog metadata and regenerate `SAMPLES.md` when sample inventory or metadata changes.
+* [ ] Update curated folder or journey guidance only when recommended starting points change.
 * [ ] Use a [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) title.
 * [ ] Sign off every commit under the [Developer Certificate of Origin](https://developercertificate.org/).
 * [ ] Check changed content for inclusive language.

@@ -71,28 +71,52 @@ GitHub provides additional documentation on [forking a repository](https://help.
 
 ### Adding or updating a sample
 
-Every discoverable sample is indexed by [`sample_catalog.json`](sample_catalog.json), and the
-human-browsable [`SAMPLES.md`](SAMPLES.md) is generated from it. When you add, rename, or remove a
-sample, you must:
+The filesystem under each top-level sample area is the exhaustive inventory. Folder READMEs, the root
+README, and [`docs/sample-navigation.md`](docs/sample-navigation.md) are curated introductions and may
+intentionally highlight only recommended or canonical samples. Do not maintain a second exhaustive
+list. When you add, rename, or remove a sample:
 
-1. Add or update its catalog entry. Use the path as its stable identity, select values from the
-   controlled category/task/journey taxonomies, and write a concise plain-English description.
-2. For a nontrivial sample, include the sections documented in
+1. Put it in the appropriate top-level area and give a nontrivial sample its own README.
+2. Update a folder README, the root README, or the journey guide only when the sample should become a
+   recommended starting point or changes existing curated guidance.
+3. For a nontrivial sample, include the sections documented in
    [`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md): purpose, demonstrated
    capabilities, prerequisites, operation, setup, run instructions, parameters and outputs,
    security/cost/cleanup, troubleshooting, and related resources.
-3. Regenerate the browsable catalog with `python3 scripts/generate_samples.py`.
-4. Run the complete local static validation from the repository root:
+4. Run the complete local unit and static validation from the repository root:
 
    ```console
    python3 scripts/validate_repository.py
    ```
 
-The validation uses only the Python standard library. It checks metadata against the JSON Schema,
-requires exact coverage of the tracked sample inventory (including documented exclusions), detects
-catalog generation drift, and checks local links in all tracked Markdown files. Also run any tests
-specific to the sample you changed; for OpenJD templates, validate and run a representative task
-locally when possible.
+The top-level command uses only the Python standard library. It runs all checker unit tests and checks
+local links, including same-document and cross-document anchors, in every tracked Markdown file. Also
+run tests specific to the sample you changed; for OpenJD templates, validate and run a representative
+task locally when possible.
+
+Live external links are intentionally a separate network-dependent validation mode:
+
+```console
+python3 scripts/check_external_links.py
+```
+
+The live checker aggregates source locations, validates every URL, redirect, and DNS answer against
+public-network-only rules, tries `HEAD` before a minimal one-byte `GET`, and does not honor environment
+proxy settings. It checks all external Markdown links on pull requests, mainline pushes, the weekly
+schedule, and manual workflow runs.
+
+The narrow [external-link ignore file](.github/external-link-ignore.txt) is only for domains that
+empirically reject both checker requests as bot traffic. Before adding an exact domain, run the audit:
+
+```console
+python3 scripts/check_external_links.py --no-ignore
+```
+
+Confirm the failure is a repeatable bot rejection rather than a missing page, then add the exact domain
+with an immediately preceding dated comment that records the observed status or error. Entries match
+the domain and true subdomains by DNS-label boundary only; wildcards and substring matching are not
+supported. Ignores apply only to original link hosts, never redirect destinations. Fix genuine broken
+links, including HTTP 404 responses, instead of ignoring them.
 
 ### Conventional commits
 

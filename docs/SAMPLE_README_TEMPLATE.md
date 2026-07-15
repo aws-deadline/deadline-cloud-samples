@@ -6,7 +6,8 @@ Contributor contract for a nontrivial sample:
 * Keep the summary task-oriented and name the Deadline Cloud capability demonstrated.
 * Document prerequisites, permissions, software/licensing, cost-bearing resources, and cleanup.
 * Use repository-relative links for other samples and canonical AWS documentation for detailed design.
-* Add or update the entry in sample_catalog.json and run python3 scripts/validate_repository.py.
+* Run `python3 scripts/validate_repository.py`.
+* Update curated navigation only if this sample should be a recommended starting point.
 -->
 
 One or two sentences explaining what the sample accomplishes and when a user should choose it.

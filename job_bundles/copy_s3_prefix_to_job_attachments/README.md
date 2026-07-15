@@ -9,9 +9,9 @@ volume of data, or are submitting a job that depends on a lot of new data like a
 can be a longer wait for the job attachments upload.
 
 Because job attachments never re-uploads files that are already in job attachments, you can use alternative
-upload tools like [AWS Snowball](https://aws.amazon.com/snowball/), [AWS DataSync](https://aws.amazon.com/datasync/),
-or [Nimble Studio File Transfer](https://docs.aws.amazon.com/nimble-studio/latest/filetransfer-guide/what-is-file-transfer.html)
-to first copy that data to S3, then use this job to copy it into the job attachments for your queue.
+upload tools like [AWS Snowball](https://aws.amazon.com/snowball/) or
+[AWS DataSync](https://aws.amazon.com/datasync/) to first copy that data to S3, then use this job to
+copy it into the job attachments for your queue.
 
 ## How to submit this job
 

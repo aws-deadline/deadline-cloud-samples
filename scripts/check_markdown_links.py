@@ -18,7 +18,13 @@ HTML_TARGET = re.compile(
     r"\b(?:href|src)\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>'\"]+))",
     re.IGNORECASE,
 )
-OPENING_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+ANGLE_AUTOLINK = re.compile(r"<((?:https?)://[^<>\s]+)>", re.IGNORECASE)
+EXTENDED_URL_AUTOLINK = re.compile(
+    r"(^|[\s*_~(])(https?://([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)[^\s<]*)",
+    re.IGNORECASE | re.MULTILINE,
+)
+AUTOLINK_TRAILING_PUNCTUATION = "?!.,:*_~"
+OPENING_FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 ATX_HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+|$)(.*)$")
 SETEXT_HEADING = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 HTML_ANCHOR = re.compile(
@@ -33,7 +39,8 @@ def tracked_markdown() -> list[Path]:
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=REPOSITORY_ROOT,
     ).decode("utf-8")
-    return [REPOSITORY_ROOT / path for path in output.split("\0") if path.endswith(".md")]
+    paths = [REPOSITORY_ROOT / path for path in output.split("\0") if path.endswith(".md")]
+    return [path for path in paths if path.is_file()]
 
 
 def strip_html_comments(line: str, in_comment: bool) -> tuple[str, bool]:
@@ -79,18 +86,21 @@ def strip_inline_code(line: str) -> str:
 
 
 def strip_code(text: str, *, remove_inline_code: bool = True) -> str:
-    """Remove fenced code and HTML comments while preserving line boundaries."""
+    """Remove fenced/indented code and HTML comments while preserving line boundaries."""
     visible: list[str] = []
     fence: tuple[str, int] | None = None
+    in_indented_code = False
+    previous_line_blank = True
     in_comment = False
     for original_line in text.splitlines(keepends=True):
         newline = "\n" if original_line.endswith(("\n", "\r")) else ""
         line = original_line.rstrip("\r\n")
         if fence:
             marker, minimum_length = fence
-            if re.fullmatch(rf" {{0,3}}{re.escape(marker)}{{{minimum_length},}}[ \t]*", line):
+            if re.fullmatch(rf"[ \t]*{re.escape(marker)}{{{minimum_length},}}[ \t]*", line):
                 fence = None
             visible.append(newline)
+            previous_line_blank = not line.strip()
             continue
 
         line, in_comment = strip_html_comments(line, in_comment)
@@ -98,13 +108,30 @@ def strip_code(text: str, *, remove_inline_code: bool = True) -> str:
         if opening and not (opening.group(1).startswith("`") and "`" in opening.group(2)):
             fence = (opening.group(1)[0], len(opening.group(1)))
             visible.append(newline)
+            previous_line_blank = False
             continue
+
+        indented = line.startswith("\t") or line.startswith("    ")
+        if in_indented_code:
+            if not line.strip() or indented:
+                visible.append(newline)
+                previous_line_blank = not line.strip()
+                continue
+            in_indented_code = False
+        if previous_line_blank and line.strip() and indented:
+            in_indented_code = True
+            visible.append(newline)
+            previous_line_blank = False
+            continue
+
         visible.append((strip_inline_code(line) if remove_inline_code else line) + newline)
+        previous_line_blank = not line.strip()
     return "".join(visible)
 
 
-def inline_targets(text: str) -> list[str]:
-    targets: list[str] = []
+def inline_target_spans(text: str) -> list[tuple[str, int, int]]:
+    """Return inline-link targets with each complete link's source span."""
+    targets: list[tuple[str, int, int]] = []
     position = 0
     link_start = re.compile(r"!?\[(?:\\.|[^]])*?\]\(", re.DOTALL)
     while True:
@@ -125,7 +152,7 @@ def inline_targets(text: str) -> list[str]:
             elif character == ")":
                 depth -= 1
                 if depth == 0:
-                    targets.append(text[start:index].strip())
+                    targets.append((text[start:index].strip(), match.start(), index + 1))
                     position = index + 1
                     break
         else:
@@ -133,12 +160,70 @@ def inline_targets(text: str) -> list[str]:
     return targets
 
 
-def extract_targets(text: str) -> list[str]:
-    visible = strip_code(text)
-    targets = inline_targets(visible)
-    targets.extend(match.group(1) or match.group(2) for match in REFERENCE_DEFINITION.finditer(visible))
-    targets.extend(next(group for group in match.groups() if group is not None) for match in HTML_TARGET.finditer(visible))
+def inline_targets_with_positions(text: str) -> list[tuple[str, int]]:
+    return [(target, start) for target, start, _ in inline_target_spans(text)]
+
+
+def inline_targets(text: str) -> list[str]:
+    return [target for target, _ in inline_targets_with_positions(text)]
+
+
+def _trim_extended_autolink(candidate: str) -> str:
+    """Apply GFM extended-autolink path validation to one URL candidate."""
+    previous = ""
+    while candidate != previous:
+        previous = candidate
+        candidate = candidate.rstrip(AUTOLINK_TRAILING_PUNCTUATION)
+        candidate = re.sub(r"&[A-Za-z0-9]+;$", "", candidate)
+        while (
+            candidate.endswith(")")
+            and candidate.count(")") > candidate.count("(")
+        ):
+            candidate = candidate[:-1]
+    return candidate
+
+
+def bare_url_targets_with_positions(text: str) -> list[tuple[str, int]]:
+    """Return rendered GFM bare http/https autolinks and their source offsets."""
+    targets: list[tuple[str, int]] = []
+    for match in EXTENDED_URL_AUTOLINK.finditer(text):
+        domain_labels = match.group(3).split(".")
+        if any("_" in label for label in domain_labels[-2:]):
+            continue
+        target = _trim_extended_autolink(match.group(2))
+        if target:
+            targets.append((target, match.start(2)))
     return targets
+
+
+def extract_targets_with_lines(text: str) -> list[tuple[str, int]]:
+    """Return visible Markdown targets and their one-based source lines."""
+    visible = strip_code(text)
+    inline_spans = inline_target_spans(visible)
+    positioned = [(target, start) for target, start, _ in inline_spans]
+    positioned.extend(
+        (match.group(1) or match.group(2), match.start())
+        for match in REFERENCE_DEFINITION.finditer(visible)
+    )
+    positioned.extend(
+        (next(group for group in match.groups() if group is not None), match.start())
+        for match in HTML_TARGET.finditer(visible)
+    )
+    positioned.extend((match.group(1), match.start()) for match in ANGLE_AUTOLINK.finditer(visible))
+    bare_visible = list(visible)
+    for _, start, end in inline_spans:
+        bare_visible[start:end] = (
+            character if character in "\r\n" else " " for character in bare_visible[start:end]
+        )
+    positioned.extend(bare_url_targets_with_positions("".join(bare_visible)))
+    targets_with_lines = {
+        (target, visible.count("\n", 0, position) + 1) for target, position in positioned
+    }
+    return sorted(targets_with_lines, key=lambda item: (item[1], item[0]))
+
+
+def extract_targets(text: str) -> list[str]:
+    return [target for target, _ in extract_targets_with_lines(text)]
 
 
 def normalize_target(raw_target: str) -> str:

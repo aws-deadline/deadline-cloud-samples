@@ -98,7 +98,6 @@ nuke-16.0/
 - **Nuke Documentation**: https://learn.foundry.com/nuke/
 - **AWS Deadline Cloud Developer Guide**: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/
 - **Conda Build Documentation**: https://docs.conda.io/projects/conda-build/
-- **Plugin Development**: https://learn.foundry.com/nuke/developers/
 
 ---
 

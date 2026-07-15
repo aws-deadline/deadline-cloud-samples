@@ -20,13 +20,6 @@ CHECKS = (
         "-p",
         "test_*.py",
     ),
-    ("sample catalog", sys.executable, str(REPOSITORY_ROOT / "scripts" / "validate_catalog.py")),
-    (
-        "generated sample index",
-        sys.executable,
-        str(REPOSITORY_ROOT / "scripts" / "generate_samples.py"),
-        "--check",
-    ),
     ("Markdown links", sys.executable, str(REPOSITORY_ROOT / "scripts" / "check_markdown_links.py")),
 )
 

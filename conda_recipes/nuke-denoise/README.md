@@ -113,7 +113,7 @@ nuke-denoise/
 - **OpenFX Standard**: http://openeffects.org/
 - **AWS Deadline Cloud Developer Guide**: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/
 - **Conda Build Documentation**: https://docs.conda.io/projects/conda-build/
-- **Nuke Plugin Development**: https://learn.foundry.com/nuke/developers/
+- **Nuke Documentation**: https://learn.foundry.com/nuke/
 
 ---
 
