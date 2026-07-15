@@ -35,8 +35,7 @@ informative; this is the model that we follow.
 ### Finding contributions to work on
 
 If you are not sure what you would like to contribute, then looking at the existing issues is a great way to find
-something to contribute on. Looking at 
-[issues that have the "help wanted" or "good first issue" labels](https://github.com/aws-deadline/deadline-cloud-samples/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22)
+something to contribute on. [Issues that have the "help wanted" or "good first issue" labels](https://github.com/aws-deadline/deadline-cloud-samples/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22)
 are a good place to start, but please dive into any issue that interests you whether it has those labels or not.
 
 ### Talk with us first
@@ -71,19 +70,20 @@ GitHub provides additional documentation on [forking a repository](https://help.
 
 ### Adding or updating a sample
 
-The filesystem under each top-level sample area is the exhaustive inventory. Folder READMEs, the root
-README, and [`docs/sample-navigation.md`](docs/sample-navigation.md) are curated introductions and may
-intentionally highlight only recommended or canonical samples. Do not maintain a second exhaustive
-list. When you add, rename, or remove a sample:
+Each sample area and nested collection declares its tracked scope in a category README. Its table is
+the complete index of user-selectable samples in that scope; implementation files and support
+infrastructure can be documented in nearby prose instead. Do not add a generated catalog, metadata
+schema, or other parallel inventory. When you add, rename, move, or delete a sample:
 
 1. Put it in the appropriate top-level area and give a nontrivial sample its own README.
-2. Update a folder README, the root README, or the journey guide only when the sample should become a
-   recommended starting point or changes existing curated guidance.
-3. For a nontrivial sample, include the sections documented in
-   [`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md): purpose, demonstrated
-   capabilities, prerequisites, operation, setup, run instructions, parameters and outputs,
-   security/cost/cleanup, troubleshooting, and related resources.
-4. Run the complete local unit and static validation from the repository root:
+2. Update the nearest category table so its relative link and task-oriented description remain
+   accurate. If a move crosses category boundaries, update both affected tables.
+3. Change the root README navigation only when a recommended path or starting point changes; do not
+   duplicate the category's exhaustive index at the root.
+4. Use [`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md) as a suggested starting point
+   for a nontrivial sample. Adapt it freely: remove irrelevant prompts, rename/reorder/combine
+   sections, and add material that helps users choose, run, and clean up the sample.
+5. Run the complete local unit and static validation from the repository root:
 
    ```console
    python3 scripts/validate_repository.py
@@ -121,7 +121,7 @@ links, including HTTP 404 responses, instead of ignoring them.
 ### Conventional commits
 
 The commits in this repository are all required to use [conventional commit syntax](https://www.conventionalcommits.org/en/v1.0.0/)
-in their title to help us identify the kind of change that is being made, automatically generate the changelog, and 
+in their title to help us identify the kind of change that is being made, automatically generate the changelog, and
 automatically identify next release version number. Only the first commit that deviates from mainline in your pull request
 must adhere to this requirement.
 
@@ -132,16 +132,16 @@ We ask that you use these commit types in your commit titles:
 * `test` - When the pull request is only implementing an addition or change to tests or the testing infrastructure;
 * `docs` - When the pull request is primarily implementing an addition or change to the package's documentation;
 * `refactor` - When the pull request is implementing only a refactor of existing code;
-* `ci` - When the pull request is implementing a change to the CI infrastructure of the packge;
+* `ci` - When the pull request is implementing a change to the CI infrastructure of the package;
 * `chore` - When the pull request is a generic maintenance task.
 
-We also require that the type in your conventional commit title end in an exclaimation point (e.g. `feat!` or `fix!`)
+We also require that the type in your conventional commit title end in an exclamation point (e.g. `feat!` or `fix!`)
 if the pull request should be considered to be a breaking change in some way. Please also include a "BREAKING CHANGE" footer
 in the description of your commit in this case ([example](https://www.conventionalcommits.org/en/v1.0.0/#commit-message-with-both--and-breaking-change-footer)).
-Examples of breaking changes include any that implements a backwards-imcompatible change to a public Python interface,
-the command-line interface, or the like. 
+Examples of breaking changes include any change that implements a backwards-incompatible change to a public Python interface,
+the command-line interface, or the like.
 
-If you need change a commit message, then please see the
+If you need to change a commit message, then please see the
 [GitHub documentation on the topic](https://docs.github.com/en/pull-requests/committing-changes-to-your-project/creating-and-editing-commits/changing-a-commit-message)
 to guide you.
 

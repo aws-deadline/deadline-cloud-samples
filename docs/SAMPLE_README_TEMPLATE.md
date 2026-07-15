@@ -1,41 +1,42 @@
 # Sample title
 
 <!--
-Contributor contract for a nontrivial sample:
-* Replace every instructional comment and remove sections that genuinely do not apply.
-* Keep the summary task-oriented and name the Deadline Cloud capability demonstrated.
-* Document prerequisites, permissions, software/licensing, cost-bearing resources, and cleanup.
-* Use repository-relative links for other samples and canonical AWS documentation for detailed design.
-* Run `python3 scripts/validate_repository.py`.
-* Update curated navigation only if this sample should be a recommended starting point.
+This document is a suggested starting point, not a mandatory fixed structure. Keep the content that
+helps someone choose, run, and clean up the sample. You may remove irrelevant sections; rename,
+reorder, or combine sections; and add diagrams, examples, reference material, or any other content
+that helps users.
+
+At minimum, a useful sample README should explain what the sample does, what users need before they
+start, how to run it, and any material security, cost, licensing, or cleanup implications. The
+headings below are optional prompts for information that commonly matters; they are not a checklist.
+Use repository-relative links for other samples, canonical AWS documentation for detailed design,
+and run `python3 scripts/validate_repository.py` after editing.
 -->
 
 One or two sentences explaining what the sample accomplishes and when a user should choose it.
 
 ## What this sample demonstrates
 
-* Deadline Cloud capability or OpenJD pattern.
-* Important delivery, lifecycle, or integration choice.
-* Expected result.
+Describe the Deadline Cloud capability or OpenJD pattern, the important delivery or lifecycle choice,
+and the expected result. Omit or combine this section if the introduction already makes that clear.
 
 ## Prerequisites
 
-* Required AWS resources and permissions.
-* Required local tools and versions.
-* Required application, plugin, and license access.
+Document required AWS resources and permissions, local tools and versions, and any application,
+plugin, or license access users must provide.
 
 ## How it works
 
-Describe the important components and data flow. Keep detailed architecture in canonical documentation
-or a focused design document; make this section sufficient to operate the sample safely.
+Explain the components and data flow needed to operate the sample safely. Link detailed architecture
+to canonical documentation or a focused design document rather than repeating it here.
 
 ## Setup
 
-Provide deterministic setup instructions, including configuration values users must replace.
+Provide deterministic setup instructions and identify configuration values users must replace.
 
 ## Run or submit
 
-Show the shortest working command first, then document meaningful variants.
+Show the shortest working command first, followed by meaningful variants when useful.
 
 ```console
 # command
@@ -43,12 +44,13 @@ Show the shortest working command first, then document meaningful variants.
 
 ## Parameters and outputs
 
-Document inputs, defaults, output locations, and any artifacts or resources the sample creates.
+Describe important inputs, defaults, output locations, and artifacts or resources the sample creates.
+A compact table is often useful, but use whichever format fits the sample.
 
 ## Security, cost, and cleanup
 
-State the permission boundary, secret-handling expectations, network exposure, billable resources,
-and exact cleanup steps. Do not embed credentials or private data.
+Call out permission boundaries, secret handling, network exposure, billable resources, licensing,
+and cleanup steps that apply. Do not embed credentials or private data.
 
 ## Troubleshooting
 
@@ -56,5 +58,5 @@ List likely, diagnosable failures and where users can find relevant worker, job,
 
 ## Related resources
 
-* Link to the canonical AWS Deadline Cloud developer guide topic.
-* Link to closely related samples in this repository.
+Link canonical AWS Deadline Cloud documentation and closely related samples when those links help the
+reader choose a next step.

@@ -25,12 +25,10 @@ broken links must be fixed rather than ignored.
 
 ## Find samples
 
-The filesystem is the exhaustive sample inventory. Browse the top-level area directories directly and
-search their paths or contents (for example, with `find` and `git grep`) when looking for a specific
-application, renderer, workflow, or platform. Start with the task table and repository map in
-[`README.md`](README.md) when you want recommendations. Folder READMEs and
-[`docs/sample-navigation.md`](docs/sample-navigation.md) are curated introductions; they may
-intentionally highlight only recommended canonical examples and are not complete inventories.
+Start with the task paths and repository map in [`README.md`](README.md), then use the nearest area or
+collection README. Its index table is complete for the scope it declares. Search tracked paths or
+contents directly when you need implementation or support files that are intentionally excluded from
+user-selectable sample tables.
 
 ## Where things live
 
@@ -46,28 +44,15 @@ deadline-cloud-samples/
 ├── submission_hooks/           Pre-submission Deadline Cloud CLI hooks
 ├── utility_scripts/            Standalone workflow helpers
 ├── skills/                     Task-specific guides for coding agents
-├── docs/                       Curated navigation and contributor contracts
+├── docs/                       Contributor guidance and documentation starting points
 └── scripts/                    Standard-library repository validation
 ```
 
 Read the relevant sample `README.md` before modifying its files. Use
-[`docs/sample-navigation.md`](docs/sample-navigation.md) to choose an application, plugin, or studio
-integration path, and [`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md) when adding
-a nontrivial sample.
+[`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md) as an adaptable starting point when
+adding a nontrivial sample.
 
-## Skills — task-specific instructions
-
-Before starting sample implementation, check [`skills/`](skills/) for a matching guide and read it.
-Each skill has YAML frontmatter followed by instructions, references, and examples.
-
-| Skill | Use when |
-|---|---|
-| [`skills/deadline-cloud-job/`](skills/deadline-cloud-job/SKILL.md) | Creating or updating an OpenJD job bundle under `job_bundles/` |
-| [`skills/conda-builder/`](skills/conda-builder/SKILL.md) | Creating or updating a DCC Conda recipe under `conda_recipes/` |
-| [`skills/3dsmax-host-config/`](skills/3dsmax-host-config/SKILL.md) | Creating or updating a 3ds Max host configuration script |
-| [`skills/host-config-from-installer/`](skills/host-config-from-installer/SKILL.md) | Creating a Windows host configuration script from a vendor installer |
-
-Skills are auto-discovered through `.claude/skills` and `.kiro/skills` symlinks.
+Before implementing a sample, inspect [`skills/`](skills/) for a matching `SKILL.md` guide.
 
 ## Repository conventions
 
@@ -80,8 +65,9 @@ Skills are auto-discovered through `.claude/skills` and `.kiro/skills` symlinks.
   `deadline-cloud.yaml`.
 * For OpenJD templates, run `openjd check` and `openjd run --tasks <one>` to verify a representative
   task locally before submitting the full parameter range when possible.
-* Keep the filesystem as the inventory; update curated folder, root, or journey guidance only when
-  recommended starting points change.
+* Add, rename, move, or delete a sample in the nearest category table. Change root navigation only
+  when a recommended path changes.
+* Keep indexes in Markdown; do not add catalog or metadata-generation machinery.
 * Do not add third-party runtime dependencies to repository validation.
 
 ## Pre-PR checklist
@@ -90,7 +76,8 @@ Skills are auto-discovered through `.claude/skills` and `.kiro/skills` symlinks.
 * [ ] Run `python3 scripts/check_external_links.py` successfully when Markdown links change.
 * [ ] Run the affected sample's own relevant tests or static checks.
 * [ ] Update the sample README when behavior, prerequisites, parameters, outputs, or risks change.
-* [ ] Update curated folder or journey guidance only when recommended starting points change.
+* [ ] Update the nearest category table when a sample is added, renamed, moved, or deleted.
+* [ ] Update root task paths only when a recommended starting point changes.
 * [ ] Use a [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) title.
 * [ ] Sign off every commit under the [Developer Certificate of Origin](https://developercertificate.org/).
 * [ ] Check changed content for inclusive language.

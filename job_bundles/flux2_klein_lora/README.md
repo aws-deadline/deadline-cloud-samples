@@ -17,7 +17,16 @@ These AWS Deadline Cloud job bundles use [diffusers](https://github.com/huggingf
 - AWS Deadline Cloud farm with a GPU-enabled queue (Linux fleet with NVIDIA GPU)
 - [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) installed
 
-## Job bundles
+## Job bundle index
+
+This table covers every immediate job bundle in `flux2_klein_lora/`.
+
+| Sample | What it demonstrates | Start here when |
+|---|---|---|
+| [LoRA training](lora_training/) | Fine-tuning FLUX.2 Klein from an image-and-caption dataset | You need to create a reusable adapter for a subject or style |
+| [Image generation](image_generation/) | Parallel inference with a trained LoRA adapter | You have LoRA weights and want to generate a set of images |
+
+## Bundle details
 
 ### 1. lora_training
 

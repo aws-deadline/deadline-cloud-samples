@@ -10,11 +10,39 @@ Start with the task you want to complete; each sample stays self-contained in it
 | Deploy a farm | [CloudFormation starter farm](cloudformation/farm_templates/starter_farm/) or [Terraform starter farm](terraform/farm_templates/starter_farm/) |
 | Learn how a job is structured | [Job development progression](job_bundles/job_dev_progression/) or the [minimal job](job_bundles/simple_job/) |
 | Render with a DCC | [Blender render](job_bundles/blender_render/), [Maya CLI render](job_bundles/maya_cli_render/), or browse the [job bundles](job_bundles/) |
-| Provide applications to workers | [Conda recipes](conda_recipes/), [queue environments](queue_environments/), or [worker containers](containers/) |
-| Install software or plugins | [Custom-plugin journey](docs/sample-navigation.md#install-custom-plugins) and [host configuration scripts](host_configuration_scripts/) |
-| Connect studio systems | [Studio-integration journey](docs/sample-navigation.md#integrate-studio-tools-into-the-job-lifecycle) |
-| Find a specific example | Use the [repository map](#repository-map), then browse that area's folder README |
-| Create a sample with an AI agent | Use the task-specific guides in [skills](skills/) |
+| Run a new DCC or application | Follow the [application delivery path](#run-a-new-dcc-or-application), then browse jobs, packages, host scripts, or containers |
+| Deliver custom plugins | Follow the [plugin delivery path](#deliver-custom-plugins), then compare package, Plugin Sync, and host-install examples |
+| Connect studio systems | Follow the [job lifecycle path](#integrate-studio-tools-into-the-job-lifecycle) for submission, session, task, and event integrations |
+| Find a specific example | Use the [repository map](#repository-map), then browse that area's complete category table |
+| Create a sample with an AI agent | Inspect [skills](skills/) for a matching task guide |
+
+### Run a new DCC or application
+
+Read the developer guide on [deploying custom software on workers](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/deploy-custom-software.html)
+and [building jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/building-jobs.html), then choose the narrowest delivery boundary:
+use [Conda recipes](conda_recipes/) and [queue environments](queue_environments/) for versioned user-space software,
+[host configuration scripts](host_configuration_scripts/) for privileged installation, or [containers](containers/) for container-first workloads.
+Model the work with [job development progression](job_bundles/job_dev_progression/) or start from a DCC example in the
+[job bundle table](job_bundles/README.md#job-bundle-index).
+
+### Deliver custom plugins
+
+Start with the developer guide for [Plugin Sync](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/plugin-sync.html)
+and [custom software delivery](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/deploy-custom-software.html).
+Use Plugin Sync for frequently changing supported-DCC files, a [Conda recipe](conda_recipes/) for versioned plugins that install without
+administrator access, or a [host configuration script](host_configuration_scripts/) for machine-wide vendor installers.
+Compare the [Blender plugin bundle](conda_recipes/blender-plugin-bundle/), [Houdini 21 with Plugin Sync](conda_recipes/houdini-21.0/),
+and [3ds Max plugin combinations](host_configuration_scripts/3dsmax/).
+
+### Integrate studio tools into the job lifecycle
+
+Use the canonical guides for [submitting from an application](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/from-within-applications.html),
+[configuring jobs with environments](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs.html), and
+[Deadline Cloud EventBridge events](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/eventbridge-integration.html).
+Choose [submission hooks](submission_hooks/) or a [custom submitter](job_bundles/custom_submitters/) before submission;
+[queue environments](queue_environments/) or job environments for session setup; OpenJD steps for task and publishing actions, as in
+[Blender turntable to Flow](job_bundles/blender_turntable_to_flow/); and [notification templates](cloudformation/notification_templates/)
+for service-event integrations.
 
 ## Quick start
 
@@ -46,30 +74,6 @@ or run licensed software; review parameters, IAM permissions, licensing, and cle
 * **[License-limit submission hook](submission_hooks/license_limits/)** injects host requirements before submission.
 * **[After Effects and Red Giant host configuration](host_configuration_scripts/aftereffects/aftereffects_redgiant/)** installs software that needs administrative privileges.
 
-## Recent highlights
-
-This is a curated selection of noteworthy additions and updates, not an exhaustive chronology.
-
-* **2026-07-14 — [After Effects and Red Giant host configuration](host_configuration_scripts/aftereffects/aftereffects_redgiant/):** consolidated application and plugin installation.
-* **2026-07-10 — [Job event Slack notifications](cloudformation/notification_templates/job_events_slack_lambda/):** connects Deadline Cloud events to Lambda through EventBridge.
-* **2026-07-08 — [Pip package delivery](job_bundles/pip_package_job/):** pairs a job with the new [pip queue environment](queue_environments/pip_queue_env.yaml); a [self-contained variant](job_bundles/pip_self_contained_job/) is included too.
-* **2026-07-07 — [Houdini 21.0 recipe](conda_recipes/houdini-21.0/):** adds Plugin Sync support.
-* **2026-06-25 — [Blender turntable to Flow Production Tracking](job_bundles/blender_turntable_to_flow/):** demonstrates render-to-review publishing.
-
-Browse the repository map below, then inspect the filesystem directly for the exhaustive inventory.
-Folder READMEs are curated introductions and may intentionally highlight only recommended samples.
-
-## Choose a path for a larger journey
-
-The [sample navigation guide](docs/sample-navigation.md) gives short decision paths—not full architecture walkthroughs—for:
-
-* [running a new DCC or application](docs/sample-navigation.md#run-a-new-dcc-or-application);
-* [installing custom plugins](docs/sample-navigation.md#install-custom-plugins); and
-* [integrating studio tools into the job lifecycle](docs/sample-navigation.md#integrate-studio-tools-into-the-job-lifecycle).
-
-Each path links to the canonical Deadline Cloud developer guide for design details and then routes back
-to the strongest implementations in this repository.
-
 ## Repository map
 
 | Area | Use it for |
@@ -84,10 +88,12 @@ to the strongest implementations in this repository.
 | [Submission hooks](submission_hooks/) | Inspect or modify job bundles immediately before submission. |
 | [Utility scripts](utility_scripts/) | Automate supporting tasks such as uploading job attachments. |
 | [Agent skills](skills/) | Give coding agents repeatable instructions for authoring jobs, packages, and host configs. |
+| [Contributor documentation](docs/) | Use the adaptable sample README starting point. |
+| [Repository validation](scripts/) | Run unit, local-link, and live external-link checks. |
 
-The filesystem in each area is the exhaustive inventory. Area READMEs, the task table, featured
-examples, and [journey guide](docs/sample-navigation.md) are curated introductions that may intentionally
-highlight only recommended samples.
+Each sample area README declares its tracked scope and provides a complete local index. Nested collection
+READMEs provide their own complete tables, while the root routes users to recommended paths rather than
+duplicating every sample.
 
 ## Documentation
 

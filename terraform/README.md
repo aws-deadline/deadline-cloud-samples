@@ -1,28 +1,23 @@
 # AWS Deadline Cloud sample Terraform configurations
 
-With [Terraform](https://www.terraform.io/), you can use infrastructure as code to deploy infrastructure
-such as a Deadline Cloud farm to your AWS account. Use the samples provided here directly or as a starting point
-to create your own custom configurations.
+With [Terraform](https://www.terraform.io/), you can deploy Deadline Cloud infrastructure as code. These configurations use the [AWS Cloud Control (AWSCC) provider](https://registry.terraform.io/providers/hashicorp/awscc/latest), which supports AWS Deadline Cloud resource types.
 
-These Terraform configurations use the [AWS Cloud Control (AWSCC) provider](https://registry.terraform.io/providers/hashicorp/awscc/latest)
-for Deadline Cloud resources, which offers full support for AWS Deadline Cloud resource types.
+## Sample index
 
-## Starter farm
+This table covers every immediate sample directory below `terraform/farm_templates/`.
 
-The [starter_farm](farm_templates/starter_farm/) sample Terraform configuration deploys a Deadline Cloud farm you can use to run jobs that render images,
-reconstruct 3D scenes, or transform your data in custom ways. This is the Terraform equivalent of the
-[CloudFormation starter_farm template](../cloudformation/farm_templates/starter_farm/).
-Sample jobs to submit are available in the [deadline-cloud-samples on GitHub](https://github.com/aws-deadline/deadline-cloud-samples).
-Deadline Cloud provides many integrated submitter plugins for applications, and you can build your own jobs. The deployed farm includes the ability to
-[build custom conda packages](../conda_recipes/README.md) for providing additional application support.
+| Sample | What it demonstrates | Start here when |
+|---|---|---|
+| [Starter farm](farm_templates/starter_farm/) | A farm, queue, service-managed fleets, and package-build support using AWSCC resources | Your team manages infrastructure with Terraform |
+
+The starter farm can run rendering, reconstruction, and data-transformation jobs from the [job bundle index](../job_bundles/). It is the Terraform equivalent of the [CloudFormation starter farm](../cloudformation/farm_templates/starter_farm/) and includes support for [building custom Conda packages](../conda_recipes/).
 
 ## CloudFormation vs Terraform
 
-Both CloudFormation and Terraform configurations in this repository create equivalent infrastructure.
-Choose based on your team's preferences and existing tooling:
+Both starter configurations create equivalent infrastructure. Choose based on your team's existing tooling and state-management practices.
 
 | Aspect | CloudFormation | Terraform |
-|--------|---------------|-----------|
-| Provider | AWS native | HashiCorp |
+|---|---|---|
+| Provider | AWS native | HashiCorp AWSCC |
 | Deadline resources | `AWS::Deadline::*` | `awscc_deadline_*` |
 | State | Managed by AWS | Local or remote backend |
