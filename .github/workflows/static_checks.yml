@@ -1,0 +1,82 @@
+name: Static Checks
+
+# Runs fast, offline static validation of the sample assets (OpenJD templates,
+# host configuration scripts, CloudFormation templates, and Conda recipes) so
+# that problems -- for example a host configuration script that exceeds the
+# service's size limit -- are caught in CI instead of by a customer.
+#
+# Every external validator (openjd, cfn-lint, rattler-build, bash, pwsh) is
+# installed below. The test suite is designed to FAIL rather than skip when a
+# tool is missing, so if an install step regresses the checks turn red instead
+# of silently passing.
+
+on:
+  push:
+    branches: ["mainline"]
+  pull_request:
+    branches: ["mainline"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # rattler-build is a standalone binary (not on PyPI). Pin the version and the
+  # SHA-256 of the Linux x86_64 binary so the download is reproducible and
+  # tamper-evident.
+  RATTLER_BUILD_VERSION: "0.68.0"
+  RATTLER_BUILD_SHA256: "09182ae841bd803435c8ed34017811522d18a709bb727bb8e31241119562ca60"
+
+jobs:
+  static-checks:
+    name: Static validation
+    # ubuntu-latest ships with both bash and PowerShell (pwsh) preinstalled,
+    # which the host configuration script syntax checks require.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.12"
+          # Cache pip downloads keyed on the test requirements file so the
+          # openjd-cli / cfn-lint install is restored from cache on unchanged runs.
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tests/requirements.txt
+
+      - name: Install rattler-build
+        run: |
+          set -euo pipefail
+          url="https://github.com/prefix-dev/rattler-build/releases/download/v${RATTLER_BUILD_VERSION}/rattler-build-x86_64-unknown-linux-musl"
+          curl --fail --location --silent --show-error --output rattler-build "$url"
+          echo "${RATTLER_BUILD_SHA256}  rattler-build" | sha256sum --check --status
+          chmod +x rattler-build
+          sudo mv rattler-build /usr/local/bin/rattler-build
+          rattler-build --version
+
+      - name: Verify required tools are present
+        # Fail early with a clear message if any validator is missing, rather
+        # than discovering it partway through the test run.
+        run: |
+          set -euo pipefail
+          for tool in openjd cfn-lint rattler-build bash pwsh; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+              echo "::error::required tool '$tool' is not installed"
+              exit 1
+            fi
+            echo "found $tool: $(command -v "$tool")"
+          done
+
+      - name: Run static checks
+        working-directory: tests
+        run: python -m pytest -v
