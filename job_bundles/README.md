@@ -20,6 +20,7 @@ Nested collections provide their own complete indexes where applicable.
 | [CARLA autonomous-driving simulation](autonomous_driving_carla/) | GPU container simulation, parameter sweeps, and multi-sensor capture | You want to distribute autonomous-driving scenarios |
 | [Blender render](blender_render/) | A compact frame-parallel DCC render job with application packages | You need a minimal Blender or general CLI-render starting point |
 | [Blender turntable to Flow](blender_turntable_to_flow/) | Rendering, encoding, thumbnail extraction, and publishing to Flow Production Tracking | You are building a render-to-review studio workflow |
+| [Blender wedge render from CSV](blender_wedge_from_csv/) | A pre-submission hook that expands CSV rows into task parameters | A spreadsheet defines your wedge variations, shot list, or parameter sweep |
 | [Bash CLI job](cli_job/) | Submitting a multi-line shell script with an attached data directory | You want to run an ad hoc command-line workload |
 | [Copy S3 prefix to job attachments](copy_s3_prefix_to_job_attachments/) | Distributed hashing and copying into content-addressable job attachment storage | Existing S3 datasets should be staged without workstation uploads |
 | [Custom submitters](custom_submitters/) | A collection of in-application submission interfaces, including Maya | Artist context and DCC state require a custom submission UI |

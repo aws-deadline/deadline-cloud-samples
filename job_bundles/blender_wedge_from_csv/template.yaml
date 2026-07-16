@@ -1,0 +1,124 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Blender Wedge Render from CSV
+
+description: >
+  Renders one Blender image per row of a wedge CSV file. A pre-submission hook
+  (see hooks.yaml) reads the CSV and expands its rows into this template's task
+  parameter ranges, so each CSV row becomes one task with its own material
+  roughness, sun rotation, and sample count.
+
+parameterDefinitions:
+
+# Wedge Parameters
+- name: WedgeCsvFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: wedges.csv
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Wedge CSV File
+    groupLabel: Wedge Parameters
+    fileFilters:
+    - label: CSV Files
+      patterns: ["*.csv"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    CSV file with one wedge variant per row. Required columns: wedge, roughness,
+    sun_rotation, samples. The pre-submission hook reads this file and expands its
+    rows into the render step's task parameters, then the file is uploaded with the
+    job as a record of what was requested.
+
+# Render Parameters
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Directory where the wedge images are written.
+- name: ResolutionX
+  type: INT
+  default: 960
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution X
+    groupLabel: Render Parameters
+  description: Render resolution width in pixels.
+- name: ResolutionY
+  type: INT
+  default: 540
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution Y
+    groupLabel: Render Parameters
+  description: Render resolution height in pixels.
+- name: RenderWedgeScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/render_wedge.py
+  userInterface:
+    control: HIDDEN
+  description: The Blender Python script that builds the wedge scene and renders it.
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    control: HIDDEN
+  default: blender
+  description: >
+    If you have a Queue Environment that creates a Conda environment from a parameter
+    called CondaPackages, this will set the default packages to use for the job.
+
+steps:
+- name: RenderWedge
+  parameterSpace:
+    # The ranges below are placeholders for a single wedge. At submission time the
+    # pre-submission hook (scripts/expand_wedge_csv.py) replaces each range with one
+    # entry per CSV row. The combination expression zips the four parameters
+    # together so row N of the CSV becomes task N, instead of the default cross
+    # product of all values.
+    combination: "(WedgeName, Roughness, SunRotation, Samples)"
+    taskParameterDefinitions:
+    - name: WedgeName
+      type: STRING
+      range: [placeholder]
+    - name: Roughness
+      type: FLOAT
+      range: [0.5]
+    - name: SunRotation
+      type: FLOAT
+      range: [20.0]
+    - name: Samples
+      type: INT
+      range: [16]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+      - name: Run
+        type: TEXT
+        data: |
+          set -xeuo pipefail
+
+          mkdir -p '{{Param.OutputDir}}'
+
+          # render_wedge.py (shipped in the bundle) builds the wedge scene
+          # procedurally and renders one image, so every task is fully
+          # independent — no shared scene file to pass between tasks.
+          blender --background --python '{{Param.RenderWedgeScript}}' -- \
+            --wedge-name '{{Task.Param.WedgeName}}' \
+            --roughness {{Task.Param.Roughness}} \
+            --sun-rotation {{Task.Param.SunRotation}} \
+            --samples {{Task.Param.Samples}} \
+            --resolution-x {{Param.ResolutionX}} \
+            --resolution-y {{Param.ResolutionY}} \
+            --output-dir '{{Param.OutputDir}}'
