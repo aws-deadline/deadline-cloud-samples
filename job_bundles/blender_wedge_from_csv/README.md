@@ -5,6 +5,8 @@ one image per variation — where the variations are rows of a CSV file. Choose 
 defines your job's task list: wedge variations, shot lists, simulation parameter sweeps, per-asset
 QC checks, and similar structured data that does not fit a numeric frame range.
 
+![The wedges.csv file expanded by the pre-submission hook into one render task per row, shown as a grid of the six output images.](screenshot.png)
+
 ## What this sample demonstrates
 
 A [pre-submission hook](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md)
