@@ -177,7 +177,7 @@ Each CSV row produces one image, `<OutputDir>/wedge_<name>.png`, applied as:
 
 | CSV column | Applied as |
 |---|---|
-| `wedge` | Output image name, `wedge_<name>.png` |
+| `wedge` | Output image name, `wedge_<name>.png` (letters, digits, `_`, `.`, and `-` only) |
 | `roughness` | Principled BSDF roughness on the subject's material |
 | `sun_rotation` | Sun lamp rotation around the vertical axis, in degrees |
 | `samples` | Cycles sample count (denoising off, so sample wedges stay visible) |

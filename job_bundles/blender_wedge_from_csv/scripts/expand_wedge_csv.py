@@ -31,6 +31,7 @@ anything is uploaded.
 import csv
 import json
 import os
+import re
 import sys
 
 import yaml
@@ -70,7 +71,13 @@ def read_wedge_rows(csv_path):
 
         rows = []
         for line_number, row in enumerate(reader, start=2):
-            row = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+            # DictReader collects values beyond the header's columns under a None
+            # key as a list; drop them rather than crashing on a stray comma.
+            row = {
+                (k or "").strip().lower(): v.strip()
+                for k, v in row.items()
+                if isinstance(v, str)
+            }
             if not any(row.values()):
                 continue  # Skip blank lines
             values = {}
@@ -83,8 +90,14 @@ def read_wedge_rows(csv_path):
                         f"{coerce.__name__} value for column '{column}' "
                         f"(got {row.get(column)!r})."
                     )
-            if not values["WedgeName"]:
-                fail(f"CSV file {csv_path} line {line_number}: 'wedge' must not be empty.")
+            # The wedge name is substituted into the render step's shell command
+            # and becomes part of the output filename, so restrict it to
+            # filename-safe characters.
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+", values["WedgeName"]):
+                fail(
+                    f"CSV file {csv_path} line {line_number}: 'wedge' must contain only "
+                    f"letters, digits, '_', '.', and '-' (got {values['WedgeName']!r})."
+                )
             if values["Samples"] <= 0:
                 fail(f"CSV file {csv_path} line {line_number}: 'samples' must be > 0.")
             rows.append(values)
