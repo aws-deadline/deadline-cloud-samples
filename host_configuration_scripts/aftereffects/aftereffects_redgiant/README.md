@@ -20,43 +20,41 @@ This solution has been tested and verified to work on Windows GPU SMF fleets, bu
 
 ## S3 Bucket Setup
 
-### 1. Create S3 Bucket Structure
+### 1. Choose or Create an S3 Bucket
 
-If you have a job attachments bucket, you can just go ahead and use that. If you want a separate bucket, go ahead and create one. Then, add a folder called Installers to the S3 bucket. These steps can be done on the AWS console or completed by doing the following:
-```bash
-export INSTALLER_S3_BUCKET=your-installer-bucket
-aws s3api put-object --bucket $INSTALLER_S3_BUCKET --key Installers/
-```
+If you have a job attachments bucket, you can just go ahead and use that. If you want a separate bucket, go ahead and create one.
+
+The script downloads each installer from the full S3 URI you set in its `CONFIG` block, so you're free to organize the objects however you like — at the bucket root, under a shared prefix (e.g. `Installers/`), or in per-software folders. There is no required folder structure. Whatever locations you choose, note down each object's full S3 URI (format `s3://bucket/key`), since you'll paste those URIs into the script config in the [Usage](#usage) step.
 
 ### 2. Upload Installers
 
-To upload the installers to S3, you can upload the `.zip` and `.exe` files to your bucket under the Installers folder via the AWS S3 console. For a programmatic approach, navigate to your local folder where you downloaded your installers (for ex. Downloads) and run the following:
+Upload the `.zip` and `.exe` files to your bucket via the AWS S3 console, or programmatically. The examples below upload to the bucket root; if you prefer a prefix, append it to the destination (e.g. `s3://$INSTALLER_S3_BUCKET/Installers/`) and adjust your config URIs to match.
 
 ```bash
 export INSTALLER_S3_BUCKET=your-installer-bucket
 
-aws s3 cp "After Effects_en_US_WIN_64.zip" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "After Effects_en_US_WIN_64.zip" s3://$INSTALLER_S3_BUCKET/
 
 # Optional, use if installing Red Giant
-aws s3 cp "RedGiant-2026.3.0-Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "Maxon_App_2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "RedGiant-2026.3.0-Win.exe" s3://$INSTALLER_S3_BUCKET/
+aws s3 cp "Maxon_App_2026.0.1_Win.exe" s3://$INSTALLER_S3_BUCKET/
+aws s3 cp "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" s3://$INSTALLER_S3_BUCKET/
 
 # Optional, use if installing Boris FX Sapphire
-aws s3 cp "sapphire-ae-install-2026.exe" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "sapphire-ae-install-2026.exe" s3://$INSTALLER_S3_BUCKET/
 
 # Optional, use if installing Frischluft Lenscare
-aws s3 cp "lenscare_ae_v1.5.5(win).zip" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "Lenscare_ae.key" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "lenscare_ae_v1.5.5(win).zip" s3://$INSTALLER_S3_BUCKET/
+aws s3 cp "Lenscare_ae.key" s3://$INSTALLER_S3_BUCKET/
 
 # Optional, use if installing ReelSmart Motion Blur
-aws s3 cp "RSMB6AEInstaller.zip" s3://$INSTALLER_S3_BUCKET/Installers/
-aws s3 cp "FloatingLicensing.zip" s3://$INSTALLER_S3_BUCKET/Installers/
+aws s3 cp "RSMB6AEInstaller.zip" s3://$INSTALLER_S3_BUCKET/
+aws s3 cp "FloatingLicensing.zip" s3://$INSTALLER_S3_BUCKET/
 ```
 
 ### 3. Update IAM Role Permissions
 
-Then, go to your Fleet role and add the following inline policy to that role:
+Then, go to your Fleet role and add the following inline policy to that role. Scope the `Resource` to wherever you uploaded your installers — the whole bucket as shown below, or narrow it to a prefix (e.g. `arn:aws:s3:::<your bucket>/Installers/*`) if you grouped the objects under one:
 ```json
 {
     "Version": "2012-10-17",
@@ -68,7 +66,7 @@ Then, go to your Fleet role and add the following inline policy to that role:
                 "s3:GetObject"
             ],
             "Resource": [
-                "arn:aws:s3:::<your bucket>/Installers*"
+                "arn:aws:s3:::<your bucket>/*"
             ],
             "Condition": {
                 "StringEquals": {
@@ -139,7 +137,7 @@ The script runs in strict mode (`$ErrorActionPreference = "Stop"`), so any unhan
 
 See the [Adobe pre-generated packages documentation](https://helpx.adobe.com/enterprise/using/pre-generated-packages.html) for more information.
 
-Set `$AE_INSTALLER_S3_URI` in the script's CONFIG block to the full S3 URI of the package zip (format `s3://bucket/key.zip`, e.g., `s3://<your-installer-bucket>/Installers/After Effects_en_US_WIN_64.zip`).
+Set `$AE_INSTALLER_S3_URI` in the script's CONFIG block to the full S3 URI of the package zip (format `s3://bucket/key.zip`, e.g., `s3://<your-installer-bucket>/After Effects_en_US_WIN_64.zip`).
 
 ### 2. Red Giant (Optional)
 
@@ -193,7 +191,7 @@ To install Boris FX Sapphire, set `$BORIS_SAPPHIRE_S3_URI` to the full S3 URI of
 Download from Frischluft:
 1. Go to https://www.frischluft.com/lenscare/
 2. Select download for After Effects on windows
-3. Upload your `Lenscare_ae.key` license file to the S3 bucket at `s3://<your-installer-bucket>/Installers/Lenscare_ae.key`
+3. Upload your `Lenscare_ae.key` license file to your S3 bucket (e.g. `s3://<your-installer-bucket>/Lenscare_ae.key`)
 
 For Frischluft Lenscare, you will need to bring your own licenses. Lenscare is licensed by copying the `Lenscare_ae.key` license file to the same folder as the plugin. In this sample host config script, you will upload your license file to S3 and the host config script will download the license file from S3 to `C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore\Lenscare_ae.key` on the worker. For more information about licensing Lenscare, review the "Install Key File" section of the `readme.txt` inside the downloaded Lenscare zip file.
 

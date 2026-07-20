@@ -201,9 +201,11 @@ if ($RSMB_S3_URI) {
 $aeStartTime = Get-Date
 Write-Host "Installing After Effects..."
 Wait-Download $aeDownload
-Expand-Archive -Path $aeDownload.FilePath -DestinationPath $DOWNLOADS_PATH -Force
-if (-not (Test-Path "$DOWNLOADS_PATH\After Effects\Build\setup.exe")) { throw "After Effects installer not found" }
-Invoke-WithErrorCapture "$DOWNLOADS_PATH\After Effects\Build\setup.exe" "--silent"
+$aeTempExtract = "$DOWNLOADS_PATH\ae_temp"
+Expand-Archive -Path $aeDownload.FilePath -DestinationPath $aeTempExtract -Force
+$aeSetup = Get-ChildItem -Path $aeTempExtract -Filter "setup.exe" -Recurse | Select-Object -First 1
+if (-not $aeSetup) { throw "After Effects installer (setup.exe) not found in archive" }
+Invoke-WithErrorCapture $aeSetup.FullName "--silent"
 Set-AERenderEnvVar
 Write-Duration $aeStartTime "After Effects"
 
