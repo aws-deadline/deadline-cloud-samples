@@ -30,7 +30,7 @@ output format, or proprietary knowledge.
 - An AWS Deadline Cloud farm with a **GPU-enabled queue** (Linux fleet, NVIDIA GPU with 16 GB+ VRAM)
 - [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) installed
 - A dataset in JSONL format uploaded to an S3 bucket the queue role can read
-- (Optional) A HuggingFace token if you want to fine-tune a gated model (e.g. Llama, Mistral)
+- (Optional) A HuggingFace token — only needed if you repoint the bundle at a gated model (e.g. Llama, Gemma). All models in the dropdown are public.
 
 ### Fleet recommendations
 
@@ -85,7 +85,7 @@ See [`sample_data/`](./sample_data/) for the bundled example dataset that ships 
 | Parameter | Default | Description |
 |---|---|---|
 | **BaseModel** | `Qwen/Qwen2.5-7B` | HuggingFace model ID. Dropdown accepts any HF model ID. 7B recommended for fact-memorization; 1.5B for faster style-transfer training. |
-| **HuggingFaceToken** | (empty) | Required only for gated models (Llama, Mistral, Gemma). |
+| **HuggingFaceToken** | (empty) | Optional. Dropdown models are public and need no token; provide one only for a gated model (e.g. Llama, Gemma) or to avoid HuggingFace rate limits. |
 | **UseQLoRA** | `yes` | 4-bit quantization. Recommended for models >3B params. |
 | **DatasetS3Uri** | (placeholder) | `s3://your-bucket/path/to/train.jsonl` |
 | **InstructionColumn** | `instruction` | Field name in the JSONL for the user prompt. |
@@ -276,7 +276,7 @@ JSONL files, or point the `DatasetPath` parameter at a different folder.
 1. **Loss should monotonically decrease.** If it doesn't, lower the learning rate (try `1e-4`).
 2. **Memory pressure?** Lower `PerDeviceBatchSize` (try 1 or 2) and raise `GradAccumSteps` to keep the effective batch size constant.
 3. **Style transfer vs fact memorization** are different difficulty levels. Style transfer often works with 3-5 epochs and ~50-200 samples. Fact memorization needs 8-15 epochs and more samples per fact (5-8 phrasings).
-4. **Gated models** (Llama, Mistral, Gemma): set `HuggingFaceToken` parameter. For production, prefer to set `HF_TOKEN` as an env var on the queue itself rather than passing as a parameter.
+4. **Gated models** (e.g. Llama, Gemma): if you repoint the bundle at one, set the `HuggingFaceToken` parameter. For production, prefer to set `HF_TOKEN` as an env var on the queue itself rather than passing as a parameter.
 5. **Model cache**: the bundle uses `/mnt/persistent/hf_cache` by default, which lives on the worker's persistent volume — base models are cached across jobs, so subsequent runs are much faster.
 6. **Cost optimization**: most LoRA fine-tunes for 1B-7B models complete in 5-30 minutes. Use spot/on-demand based on tolerance for interruption.
 

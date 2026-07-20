@@ -16,7 +16,6 @@ parameterDefinitions:
   - "Qwen/Qwen2.5-1.5B"
   - "Qwen/Qwen2.5-7B"
   - "Qwen/Qwen2.5-0.5B"
-  - "meta-llama/Llama-3.1-8B"
   - "mistralai/Mistral-7B-v0.3"
   - "microsoft/Phi-3.5-mini-instruct"
   description: HuggingFace model ID to fine-tune. Larger models require more VRAM but produce better fact recall.
@@ -28,7 +27,7 @@ parameterDefinitions:
     label: HuggingFace Token (optional)
     groupLabel: Model
   default: ""
-  description: Required only for gated models (Llama, Mistral). Leave empty otherwise.
+  description: Optional. All models in the dropdown are public and need no token. Provide one only if you repoint the bundle at a gated model (e.g. Llama, Gemma) or hit HuggingFace download rate limits.
 
 - name: UseQLoRA
   type: STRING

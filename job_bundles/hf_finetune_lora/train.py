@@ -106,8 +106,12 @@ def download_dataset_from_s3(s3_uri: str, local_dir: str) -> list[str]:
         for obj in page.get("Contents", []):
             if not obj["Key"].endswith(".jsonl"):
                 continue
-            fname = os.path.basename(obj["Key"])
-            local_path = os.path.join(local_dir, fname)
+            # Preserve the key's path relative to the prefix so files with the
+            # same basename under different sub-prefixes don't collide (e.g.
+            # lunch/menu.jsonl vs dinner/menu.jsonl). Mirrors the local rglob path.
+            rel_key = obj["Key"][len(prefix):]
+            local_path = os.path.join(local_dir, rel_key)
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
             s3.download_file(bucket, obj["Key"], local_path)
             downloaded.append(local_path)
             log(f"  Downloaded {obj['Size']} bytes -> {local_path}")
@@ -195,7 +199,9 @@ def main() -> int:
     if torch.cuda.is_available():
         log(f"GPU: {torch.cuda.get_device_name(0)}, "
             f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
-    log(f"Args: {vars(args)}")
+    # Redact the HF token so it never lands in worker logs (shipped to CloudWatch).
+    safe_args = {**vars(args), "hf_token": "***" if args.hf_token else ""}
+    log(f"Args: {safe_args}")
 
     # HuggingFace token (only needed for gated models)
     if args.hf_token:
@@ -229,6 +235,18 @@ def main() -> int:
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, cache_dir=args.hf_cache_dir)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    # Some *base* checkpoints (e.g. mistralai/Mistral-7B-v0.3) ship without a
+    # chat_template, so apply_chat_template() would raise. Install a minimal
+    # ChatML fallback so any listed base model trains consistently.
+    if tokenizer.chat_template is None:
+        log("Tokenizer has no chat_template; installing a ChatML fallback.")
+        tokenizer.chat_template = (
+            "{% for message in messages %}"
+            "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n' }}"
+            "{% endfor %}"
+            "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
+        )
 
     # 3. Model (with optional 4-bit quantization for QLoRA)
     quant_config = None

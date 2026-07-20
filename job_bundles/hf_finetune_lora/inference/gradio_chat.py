@@ -9,9 +9,11 @@ Usage:
     python3 gradio_chat.py --adapter-path /path/to/your-adapter
 
 Optional flags:
-    --share       Create a temporary *.gradio.live URL (handy for sharing
-                  during a Zoom or sending a link to a teammate). The session
-                  expires after 72 hours.
+    --share       Create a temporary *.gradio.live URL. WARNING: this tunnel is
+                  PUBLIC and UNAUTHENTICATED — anyone with the link can query
+                  your model (and thus anything your adapter learned from your
+                  training data) with no login. The URL expires after 72 hours.
+                  Only use it for non-sensitive models on a trusted network.
     --port N      Use a different local port (default 7860).
 """
 from __future__ import annotations
@@ -45,7 +47,9 @@ def parse_args():
     p.add_argument("--temperature", type=float, default=0.0,
                    help="0 = greedy (deterministic), >0 = sampled")
     p.add_argument("--share", action="store_true",
-                   help="Generate a public *.gradio.live URL")
+                   help="Generate a PUBLIC, UNAUTHENTICATED *.gradio.live URL "
+                        "(anyone with the link can query your model). Use only "
+                        "for non-sensitive models.")
     p.add_argument("--port", type=int, default=7860)
     p.add_argument("--title", default="LoRA Fine-Tuned Chatbot")
     return p.parse_args()
@@ -143,11 +147,11 @@ def main():
     model.eval()
     print("Ready. Launching web UI...")
 
-    def chat_fn(message: str, history: list[list[str]],
+    def chat_fn(message: str, _history: list[dict],
                 use_adapter: bool, max_new_tokens: int) -> str:
         """Gradio ChatInterface callback.
 
-        Note: we ignore `history` because the underlying model was trained on
+        Note: we ignore `_history` because the underlying model was trained on
         single-turn instruction/response data — feeding back prior turns would
         produce confused outputs. Each user message is treated as a standalone
         prompt. (To support multi-turn, you'd train with multi-turn data.)

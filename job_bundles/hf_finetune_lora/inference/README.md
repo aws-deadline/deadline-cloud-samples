@@ -98,6 +98,11 @@ python3 gradio_chat.py --adapter-path /tmp/lora-output/my-adapter --share
 
 Gradio will print a `https://*.gradio.live` URL that anyone can open (URL valid for ~72 hours).
 
+> **⚠️ Security note:** the `--share` tunnel is **public and unauthenticated**.
+> Anyone who obtains the link can query your model — and a fine-tuned adapter can
+> reproduce facts from your training data. Use `--share` only for non-sensitive
+> models, and stop the server (Ctrl-C) as soon as you're done to tear the tunnel down.
+
 ## Tuning generation behavior
 
 | Flag | Default | What it does |
