@@ -1,47 +1,60 @@
-# Sample Host Configuration scripts to install 3ds Max to Service Managed Fleets for AWS Deadline Cloud
+# 3ds Max host configuration scripts for AWS Deadline Cloud
 
-This folder contains sample host configuration scripts you can use to configure your AWS Deadline Cloud Windows Service Managed Fleets to install and run 3ds Max jobs on your workers.
-Please see the README.md in each sample script for more steps on how to set it up.
+These Windows host configuration scripts install 3ds Max and selected renderers or plugins on AWS Deadline Cloud service-managed fleet workers. 3ds Max requires administrative installation, so host configuration is the recommended delivery boundary.
 
-## 3ds Max
-3ds Max is a popular Digital Content Creation tool provided by Autodesk. 3ds Max runs on Windows, and requires administrative access to install onto a host. Because of the administrative requirement, Deadline Cloud recommends installing 3ds Max on to the worker host using Host Configuration Scripts.
+## Sample index
 
-- Note: While the example installs 3ds Max 2024 and 2025, Deadline Cloud's submitter supports 3ds Max 2026 and 2027 as well. The installation script should work equivalently for 3ds Max 2026 and 2027.
+This table covers every immediate sample directory in `host_configuration_scripts/3dsmax/`.
 
-## Generating a script for your version using Kiro
+| Sample | What it demonstrates | Start here when |
+|---|---|---|
+| [3ds Max 2024](3dsmax-2024/) | Installing the base 2024 application | You need 3ds Max 2024 without bundled render plugins |
+| [3ds Max 2025 and Corona 13](3dsmax-2025-and-corona-13/) | Installing 3ds Max with Corona Renderer | Your 2025 scenes render with Corona 13 |
+| [3ds Max 2025 and V-Ray](3dsmax-2025-and-vray/) | Installing 3ds Max and V-Ray together | Your 2025 scenes use V-Ray |
+| [3ds Max 2025, V-Ray, and AEC plugins](3dsmax-2025-vray-and-aec-plugins/) | Adding Forest Pack, RailClone, and architectural visualization plugins | A 2025 V-Ray workload uses common AEC plugins |
+| [3ds Max 2025, V-Ray, and tyFlow](3dsmax-2025-vray-and-tyflow/) | Installing V-Ray and tyFlow with 3ds Max | A 2025 workload combines rendering and particle simulation |
+| [3ds Max 2027](3dsmax-2027/) | Installing the base 2027 application | You need 3ds Max 2027 without bundled render plugins |
+| [3ds Max 2027 and Corona 14](3dsmax-2027-and-corona-14/) | Installing the first Corona version supporting 3ds Max 2027 | Your 2027 scenes render with Corona 14 |
+| [3ds Max 2027 and V-Ray](3dsmax-2027-and-vray/) | Installing 3ds Max 2027 and V-Ray | Your 2027 scenes use V-Ray |
+| [3ds Max 2027, V-Ray, and tyFlow](3dsmax-2027-and-vray-and-tyflow/) | Installing V-Ray and tyFlow with 3ds Max 2027 | A 2027 workload combines rendering and particle simulation |
+| [3ds Max 2027, V-Ray, and AEC plugins](3dsmax-2027-vray-and-aec-plugins/) | Adding Forest Pack, RailClone, FloorGenerator, and MultiTexture | A 2027 V-Ray workload uses architectural visualization plugins |
 
-The sample scripts in this folder cover specific version combinations. If you need a script for a different version of 3ds Max, a different renderer, or a different plugin combination, you can use [Kiro](https://kiro.dev) to generate one for you.
+The samples currently cover 3ds Max 2024, 2025, and 2027. The Deadline Cloud submitter also supports 3ds Max 2026; adapt the nearest script for that installer and verify all product-specific silent-install options.
+
+## Generate a script for another version with Kiro
+
+The samples cover specific combinations. To create a script for another 3ds Max version, renderer, or plugin combination, you can use [Kiro](https://kiro.dev) with this repository.
 
 ### Prerequisites
 
-- [Kiro](https://kiro.dev) installed
-- This repository cloned and opened as a workspace in Kiro
+* Install [Kiro](https://kiro.dev).
+* Clone this repository and open it as the Kiro workspace.
 
 ### Steps
 
-1. In the Kiro chat, type a request like:
-   - `"Create a host configuration script for 3ds Max 2026"`
-   - `"Create a host configuration script for 3ds Max 2026 and V-Ray 8"`
-   - `"Create a host configuration script for 3ds Max 2027 and Corona 14"`
-   - `"Add a host configuration script for 3ds Max 2026 with Forest Pack 10"`
-2. Kiro will read the skill in `skills/3dsmax-host-config/SKILL.md` and generate the correct script and README for your version combination.
-3. Review the generated script, fill in the `TODO` variables at the top (your S3 bucket name, installer file names), and configure your fleet.
+1. Ask for the combination you need, for example:
+   * `Create a host configuration script for 3ds Max 2026`
+   * `Create a host configuration script for 3ds Max 2026 and V-Ray 8`
+   * `Create a host configuration script for 3ds Max 2027 and Corona 14`
+   * `Add a host configuration script for 3ds Max 2026 with Forest Pack 10`
+2. Kiro reads [`skills/3dsmax-host-config/SKILL.md`](../../skills/3dsmax-host-config/SKILL.md) and generates a script and README for the requested combination.
+3. Review and test the generated script, replace its `TODO` values with your S3 bucket and installer names, and then configure the fleet.
 
-## Common Prerequisites
-- Each sample requires you to have the 3ds Max installer in an S3 bucket in your AWS account. You can download the 3ds Max installer directly from Autodesk. See the next section for instructions on how to properly package the installer files.
-- The host configuration scripts will download the installers from your S3 bucket, so your Fleet roles will need to be granted s3:GetObject permissions for the installers in S3.
+## Common prerequisites
+
+* Download each licensed installer from its vendor and place it in an S3 bucket in your account.
+* Grant the fleet role `s3:GetObject` for the installer objects.
+* Review installer versions, checksums where available, silent flags, licensing, and restart requirements before using a script.
 
 ## Creating a 3ds Max installer archive in .zip format
-Autodesk provides 3ds Max as a .7z archive which cannot be easily extracted from the command line without 3rd party software like [7-zip](https://www.7-zip.org/). To get around this problem, the examples in this folder expect a .zip archive instead. You can create a .zip archive with the following steps:
 
-1. Navigate to the [Products and Services page on the Autodesk Website](https://manage.autodesk.com/products), sign into your Autodesk account, and click View details under 3ds Max.
-<img width="1431" height="703" alt="image" src="https://github.com/user-attachments/assets/b0df83ac-0eaa-431f-8216-763db29c5705" />
+Autodesk distributes 3ds Max as a `.7z` archive plus an extraction executable. The samples expect a ZIP so Windows can extract it without third-party software such as [7-Zip](https://www.7-zip.org/).
 
-2. Select your version and then click the dropdown icon next to the **Download** button and choose **Direct Download**. Note that this dropdown has different options than the one on the previous page. This will download a .7z and a .exe file.
-<img width="587" height="645" alt="image" src="https://github.com/user-attachments/assets/32faf766-e26c-4dea-94ac-c8fde7dc8ccd" />
-
-3. With both the .7z and .exe file in the same folder, double-click the .exe file and wait for it to extract the .7z for you. When the extraction is done, choose **Open in folder**.
-<img width="514" height="154" alt="image" src="https://github.com/user-attachments/assets/42450f53-800f-4703-8b63-353bca2bed83" />
-
-4. Finally, select all files in the resulting folder and right-click them to bring up the context menu. Choose **Send to > Compressed (zipped) folder**.
-<img width="925" height="547" alt="image" src="https://github.com/user-attachments/assets/48ba83fe-f1e8-4396-ac3b-ded1f10bf55f" />
+1. Open the [Autodesk Products and Services page](https://manage.autodesk.com/products), sign in, and choose **View details** for 3ds Max.
+   <img width="1431" height="703" alt="Autodesk product details page" src="https://github.com/user-attachments/assets/b0df83ac-0eaa-431f-8216-763db29c5705" />
+2. Select the version, open the menu beside **Download**, and choose **Direct Download**. Keep the downloaded `.7z` and `.exe` in the same folder.
+   <img width="587" height="645" alt="Autodesk direct download menu" src="https://github.com/user-attachments/assets/32faf766-e26c-4dea-94ac-c8fde7dc8ccd" />
+3. Run the `.exe`, wait for extraction, and choose **Open in folder**.
+   <img width="514" height="154" alt="Autodesk extraction completion dialog" src="https://github.com/user-attachments/assets/42450f53-800f-4703-8b63-353bca2bed83" />
+4. Select all extracted files and choose **Send to > Compressed (zipped) folder**.
+   <img width="925" height="547" alt="Windows compressed folder menu" src="https://github.com/user-attachments/assets/48ba83fe-f1e8-4396-ac3b-ded1f10bf55f" />

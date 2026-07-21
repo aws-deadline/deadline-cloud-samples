@@ -1,0 +1,20 @@
+# Exact original-link domains that consistently reject this repository's live checker.
+# Entries may cover true subdomains by DNS-label boundary; wildcards and substrings are forbidden.
+# Each domain must be immediately preceded by: # YYYY-MM-DD: empirically observed bot rejection.
+
+# 2026-07-14: HEAD and minimal Range GET both returned HTTP 403 for public API documentation.
+docs.blender.org
+# 2026-07-14: HEAD and minimal Range GET both returned HTTP 403 for public release downloads.
+download.blender.org
+# 2026-07-14: HEAD and minimal Range GET both returned HTTP 429 after bounded retries.
+docs.vllm.ai
+# 2026-07-14: HEAD and minimal Range GET both returned HTTP 429 after bounded retries.
+pip.pypa.io
+# 2026-07-14: HEAD and minimal Range GET both returned HTTP 429 after bounded retries.
+rez.readthedocs.io
+# 2026-07-14: HEAD and minimal Range GET both returned HTTP 403 for public product pages.
+www.autodesk.com
+# 2026-07-14: HEAD and minimal Range GET both returned a self-referential HTTP 302 without a browser session.
+manage.autodesk.com
+# 2026-07-15: HEAD and minimal Range GET both returned HTTP 403 for public product pages that load in a browser.
+www.keyshot.com

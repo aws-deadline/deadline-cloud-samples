@@ -285,4 +285,4 @@ Push a new host-config via `aws deadline update-fleet --host-configuration file:
 ## See Also
 
 - [`ssh_to_smf`](../ssh_to_smf/README.md) — the Linux version this bundle is cloned from
-- [`.kiro/specs/ssh-to-smf-windows/design.md`](../../../.kiro/specs/ssh-to-smf-windows/design.md) — full design doc
+- [Linux sibling design reference](../ssh_to_smf/DESIGN.md) — background for the shared SSM activation pattern

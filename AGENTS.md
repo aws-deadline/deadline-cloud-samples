@@ -1,105 +1,91 @@
 # AGENTS.md — deadline-cloud-samples
 
-This file gives AI coding assistants (Codex CLI, Aider, Cline, Continue,
-Cursor, Copilot, Gemini, ChatGPT, Claude Code, Kiro, etc.) the context they
-need to work effectively in this repository.
+This file gives AI coding assistants the context they need to work effectively in this repository.
 
 ## What this repo is
 
 `deadline-cloud-samples` is a public collection of samples for
-[AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/). It is **not** a
-single buildable package — there is no top-level build, test, or lint command.
-Each sample is self-contained.
+[AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/). It is not a single buildable package;
+each sample is self-contained. The repository does have one top-level, standard-library-only static
+validation command:
+
+```console
+python3 scripts/validate_repository.py
+```
+
+Run it after every repository change, in addition to tests or validation owned by the sample you edit.
+External Markdown links use a separate network-dependent command:
+
+```console
+python3 scripts/check_external_links.py
+```
+
+Use `--no-ignore` to audit the narrowly documented domain ignore list before changing it; genuine
+broken links must be fixed rather than ignored.
+
+## Find samples
+
+Start with the task paths and repository map in [`README.md`](README.md), then use the nearest area or
+collection README. Its index table is complete for the scope it declares. Search tracked paths or
+contents directly when you need implementation or support files that are intentionally excluded from
+user-selectable sample tables.
 
 ## Where things live
 
-```
+```text
 deadline-cloud-samples/
-├── job_bundles/          OpenJD job bundle samples (template.yaml + assets)
-├── conda_recipes/        Conda recipes for DCC packages used by Deadline Cloud
-├── queue_environments/   Queue environment YAMLs (Conda/Rez software providers)
-├── host_configuration_scripts/  Per-OS scripts for service-managed fleet workers
-├── submission_hooks/     Pre-submission Python hooks for the Deadline Cloud CLI
-├── containers/           Dockerfiles (e.g. AL2023 worker-equivalent for local builds)
-├── cloudformation/       CloudFormation farm + infra templates
-├── terraform/            Terraform farm + infra templates
-├── utility_scripts/      Standalone CLI helpers
-└── skills/               LLM-agnostic, task-specific guides (see below)
+├── cloudformation/             CloudFormation farm and infrastructure templates
+├── terraform/                  Terraform farm and infrastructure templates
+├── job_bundles/                OpenJD job bundles (template.yaml plus assets)
+├── conda_recipes/              DCC and application Conda recipes
+├── containers/                 Worker-compatible and application containers
+├── queue_environments/         Session software environments (Conda, Rez, and pip)
+├── host_configuration_scripts/ Privileged service-managed fleet setup scripts
+├── submission_hooks/           Pre-submission Deadline Cloud CLI hooks
+├── utility_scripts/            Standalone workflow helpers
+├── skills/                     Task-specific guides for coding agents
+├── docs/                       Contributor guidance and documentation starting points
+└── scripts/                    Standard-library repository validation
 ```
 
-**Most samples have their own `README.md`** with prerequisites, parameters,
-and run/submit instructions. Read the relevant `README.md` before modifying
-or adding to a sample directory.
+Read the relevant sample `README.md` before modifying its files. Use
+[`docs/SAMPLE_README_TEMPLATE.md`](docs/SAMPLE_README_TEMPLATE.md) as an adaptable starting point when
+adding a nontrivial sample.
 
-## Skills — task-specific instructions
+Before implementing a sample, inspect [`skills/`](skills/) for a matching `SKILL.md` guide.
 
-The [`skills/`](./skills/) directory contains self-contained, LLM-agnostic
-guides for common tasks. Each skill is a Markdown file with YAML frontmatter
-(`name`, `description`, `tags`) followed by step-by-step instructions,
-references, and examples.
+## Repository conventions
 
-**Before starting work, check `skills/` for a matching guide and read it.**
-The `description` field tells you when to use each skill.
-
-| Skill | Use when |
-|-------|----------|
-| [`skills/deadline-cloud-job/`](./skills/deadline-cloud-job/SKILL.md) | Creating or updating a Deadline Cloud job (OpenJD job bundle) under `job_bundles/` |
-| [`skills/conda-builder/`](./skills/conda-builder/SKILL.md) | Creating or updating a DCC conda recipe under `conda_recipes/` |
-| [`skills/3dsmax-host-config/`](./skills/3dsmax-host-config/SKILL.md) | Creating or updating a 3ds Max host configuration script |
-| [`skills/host-config-from-installer/`](./skills/host-config-from-installer/SKILL.md) | Creating a host configuration script from a vendor installer |
-
-Skills are auto-discovered via `.claude/skills` and `.kiro/skills` symlinks.
-For other tools, point your assistant at the relevant `SKILL.md` directly
-(paste, `@`-mention, or include in context).
-
-## Repo conventions
-
-- **Inclusive language** — avoid `master`/`slave`, `whitelist`/`blacklist`.
-  Use `primary`/`replica`, `allowlist`/`denylist`.
-- **Python install commands** — use `pip install ...` (works on Windows,
-  macOS, and Linux). Avoid `pip3` unless the sample is Linux/macOS-only.
-- **Job bundles** live under `job_bundles/<name>/` with a `template.yaml`,
-  optional `parameter_values.yaml`, and a `README.md`.
-- **Conda recipes** live under `conda_recipes/<package>-<version>/` with a
-  `recipe/` subdirectory and a `deadline-cloud.yaml`.
-- **Iterate locally before submitting** — for OpenJD templates, run
-  `openjd check` and `openjd run --tasks <one>` to verify a single task end-
-  to-end before submitting the full parameter range to a Deadline Cloud farm.
+* Use inclusive language: prefer `primary`/`replica` and `allowlist`/`denylist`.
+* Use `pip install ...` in cross-platform Python instructions; avoid `pip3` unless the sample is
+  explicitly Linux/macOS-only.
+* Job bundles live under `job_bundles/<name>/` with a `template.yaml`, optional
+  `parameter_values.yaml`, and a `README.md` for nontrivial samples.
+* Conda recipes live under `conda_recipes/<package>-<version>/` with a `recipe/` directory and
+  `deadline-cloud.yaml`.
+* For OpenJD templates, run `openjd check` and `openjd run --tasks <one>` to verify a representative
+  task locally before submitting the full parameter range when possible.
+* Add, rename, move, or delete a sample in the nearest category table. Change root navigation only
+  when a recommended path changes.
+* Keep indexes in Markdown; do not add catalog or metadata-generation machinery.
+* Do not add third-party runtime dependencies to repository validation.
 
 ## Pre-PR checklist
 
-Before opening a pull request, make sure every commit on the branch satisfies the following:
+* [ ] Run `python3 scripts/validate_repository.py` successfully (unit tests and static local-link checks).
+* [ ] Run `python3 scripts/check_external_links.py` successfully when Markdown links change.
+* [ ] Run the affected sample's own relevant tests or static checks.
+* [ ] Update the sample README when behavior, prerequisites, parameters, outputs, or risks change.
+* [ ] Update the nearest category table when a sample is added, renamed, moved, or deleted.
+* [ ] Update root task paths only when a recommended starting point changes.
+* [ ] Use a [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) title.
+* [ ] Sign off every commit under the [Developer Certificate of Origin](https://developercertificate.org/).
+* [ ] Check changed content for inclusive language.
 
-- [ ] **Conventional commit title** — every commit title MUST use
-  [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) syntax
-  (see the type table below). PRs without it will be blocked by CI.
-- [ ] **Signed-off commits** — every commit MUST carry a `Signed-off-by` trailer
-  ([Developer Certificate of Origin](https://developercertificate.org/)). Create
-  commits with `git commit -s`, or add the trailer to an existing commit with
-  `git commit --amend -s`.
-- [ ] **Sample README updated** — if you changed a sample's behavior, prerequisites,
-  or parameters, update its `README.md`.
-- [ ] **Inclusive language** — no `master`/`slave`, `whitelist`/`blacklist`.
-
-### Conventional commit types
-
-| Type       | Use for                                                   |
-|------------|-----------------------------------------------------------|
-| `feat`     | New sample, new feature in an existing sample             |
-| `fix`      | Bug fix                                                   |
-| `docs`     | Documentation only                                        |
-| `test`     | Test additions or changes only                            |
-| `refactor` | Code refactor with no behavior change                     |
-| `ci`       | CI infrastructure changes                                 |
-| `chore`    | Generic maintenance                                       |
-| `feat!` / `fix!` | Breaking change (also add `BREAKING CHANGE:` footer) |
-
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full contribution workflow.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contribution and licensing workflow.
 
 ## External references
 
-- [AWS Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/index.html)
-- [AWS Deadline Cloud developer guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/index.html)
-- [Open Job Description spec](https://github.com/OpenJobDescription/openjd-specifications/wiki)
-- [`README.md`](./README.md) — directory overview and high-level usage
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — full contribution workflow, MIT-0 licensing, security reporting
+* [AWS Deadline Cloud developer guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/index.html)
+* [AWS Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/index.html)
+* [Open Job Description specification](https://github.com/OpenJobDescription/openjd-specifications/wiki)

@@ -94,7 +94,7 @@ keyshot-2025/
 ## Resources
 
 - **KeyShot Documentation**: https://www.keyshot.com/resources/
-- **KeyShot Scripting**: https://www.keyshot.com/scripting/
+- **KeyShot Scripting**: https://manual.keyshot.com/manual/scripting-2/
 - **AWS Deadline Cloud Developer Guide**: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/
 - **Conda Build Documentation**: https://docs.conda.io/projects/conda-build/
 - **KeyShot Network Rendering**: https://www.keyshot.com/network-rendering/

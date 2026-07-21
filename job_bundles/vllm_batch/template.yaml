@@ -1,0 +1,267 @@
+specificationVersion: jobtemplate-2023-09
+extensions:
+- TASK_CHUNKING
+name: vLLM Batch Inference
+description: "Batch inference using vLLM on a JSONL file of prompts. Prompts are\n\
+  grouped into chunks (configurable ChunkSize) and each chunk becomes one task.\n\
+  The vLLM model is loaded once per worker session via a step environment, and\n\
+  each task processes its chunk of prompts against the local vLLM server.\n\n\
+  Uses the Open Job Description Task Chunking extension, which is a Deadline\n\
+  Cloud feature that reduces scheduling overhead by processing multiple prompts\n\
+  per task while keeping the option to run only a subset via the Prompts\n\
+  parameter.\n\nDependencies (vLLM, PyTorch) are provided by the queue's Conda\n\
+  queue environment via the CondaPackages parameter. Your queue must have a\n\
+  Conda queue environment configured.\n"
+parameterDefinitions:
+- name: ModelName
+  type: STRING
+  default: Qwen/Qwen2.5-7B-Instruct
+  description: HuggingFace model ID.
+  userInterface:
+    control: LINE_EDIT
+    label: Model Name
+    groupLabel: Model Settings
+- name: InputFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  description: JSONL file with one prompt per line. Each line must have a "prompt"
+    field.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Input JSONL File
+    groupLabel: Input
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  description: Directory for per-task results and the final output.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+- name: Prompts
+  type: STRING
+  default: "1-10"
+  description: "Which lines from the JSONL file to process. Examples: '1-10' (lines 1 through 10), '2-8' (subset), '2,5,8-9' (specific lines and a range), '1,3,5,7,9' (specific lines). Prompts are grouped into chunks of size ChunkSize; each chunk runs as one task."
+  userInterface:
+    control: LINE_EDIT
+    label: Prompt Range
+    groupLabel: Job Settings
+- name: ChunkSize
+  type: INT
+  default: 5
+  minValue: 1
+  maxValue: 150
+  description: "How many prompts to process per task. Higher values mean fewer tasks with more prompts each (less scheduling overhead). Lower values mean more parallelism across workers."
+  userInterface:
+    control: SPIN_BOX
+    label: Chunk Size
+    groupLabel: Job Settings
+- name: TargetRuntimeSeconds
+  type: INT
+  default: 120
+  minValue: 0
+  maxValue: 3600
+  description: "Target runtime per chunk in seconds. Deadline Cloud may dynamically grow or shrink chunk sizes to approach this target. Set to 0 to disable and always use ChunkSize exactly."
+  userInterface:
+    control: SPIN_BOX
+    label: Target Runtime (sec)
+    groupLabel: Job Settings
+- name: MaxTokens
+  type: INT
+  default: 512
+  minValue: 1
+  maxValue: 32768
+  description: Maximum output tokens per completion.
+  userInterface:
+    control: SPIN_BOX
+    label: Max Output Tokens
+    groupLabel: Generation Settings
+- name: Temperature
+  type: STRING
+  default: '0.7'
+  description: Sampling temperature (0.0 = deterministic).
+  userInterface:
+    control: LINE_EDIT
+    label: Temperature
+    groupLabel: Generation Settings
+- name: GpuMemoryUtilization
+  type: STRING
+  default: '0.90'
+  description: Fraction of GPU memory for vLLM KV cache.
+  userInterface:
+    control: LINE_EDIT
+    label: GPU Memory Utilization
+    groupLabel: Model Settings
+- name: MaxModelLen
+  type: INT
+  default: 4096
+  minValue: 512
+  maxValue: 32768
+  description: Max sequence length for vLLM.
+  userInterface:
+    control: SPIN_BOX
+    label: Max Model Length
+    groupLabel: Model Settings
+- name: HfToken
+  type: STRING
+  default: ''
+  description: HuggingFace token for gated models. Leave empty if not needed.
+  userInterface:
+    control: LINE_EDIT
+    label: HuggingFace Token
+    groupLabel: Model Settings
+- name: JobScriptDir
+  description: Directory containing bundled scripts.
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  userInterface:
+    control: HIDDEN
+- name: CondaPackages
+  type: STRING
+  default: python=3.11 vllm=0.19.1=cuda* cuda-toolkit=12.9
+  userInterface:
+    control: HIDDEN
+- name: CondaChannels
+  type: STRING
+  default: conda-forge
+  userInterface:
+    control: HIDDEN
+jobEnvironments:
+- name: UnbufferedOutput
+  variables:
+    PYTHONUNBUFFERED: 'True'
+steps:
+- name: Infer
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: PromptIndex
+      type: CHUNK[INT]
+      range: '{{Param.Prompts}}'
+      chunks:
+        defaultTaskCount: '{{Param.ChunkSize}}'
+        targetRuntimeSeconds: '{{Param.TargetRuntimeSeconds}}'
+        rangeConstraint: NONCONTIGUOUS
+  stepEnvironments:
+  - name: VllmServer
+    description: Starts a vLLM server that persists across all tasks on this worker.
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args:
+          - '{{Env.File.Enter}}'
+        onExit:
+          command: bash
+          args:
+          - '{{Env.File.Exit}}'
+      embeddedFiles:
+      - name: Enter
+        filename: start-vllm.sh
+        type: TEXT
+        data: "#!/bin/bash\nset -euo pipefail\n\nexport HF_TOKEN=\"{{Param.HfToken}}\"\
+          \n\n# Bypass user-local site-packages (~/.local/lib/...) so Python only\
+          \ uses\n# the conda env. Avoids conflicts with stale packages on the worker\
+          \ AMI\n# (e.g. old typing_extensions missing TypeIs that breaks newer Starlette).\n\
+          export PYTHONNOUSERSITE=1\n\necho \"Starting vLLM server for {{Param.ModelName}}...\"\
+          \nVLLM_LOG=\"{{Session.WorkingDirectory}}/vllm_server.log\"\necho \"openjd_env:\
+          \ VLLM_LOG=$VLLM_LOG\"\n\nnohup python \"{{Env.File.VllmLauncher}}\" \\\n\
+          \  --model \"{{Param.ModelName}}\" \\\n  --dtype auto \\\n  --port 8000\
+          \ \\\n  --gpu-memory-utilization {{Param.GpuMemoryUtilization}} \\\n  --max-model-len\
+          \ {{Param.MaxModelLen}} \\\n  --no-enable-log-requests \\\n  --enforce-eager\
+          \ \\\n  > \"$VLLM_LOG\" 2>&1 &\nVLLM_PID=$!\necho \"openjd_env: VLLM_PID=$VLLM_PID\"\
+          \n\n# Wait for server to be ready using the embedded Python wait script\n\
+          python \"{{Env.File.WaitScript}}\" \"$VLLM_PID\" \"$VLLM_LOG\"\n"
+      - name: VllmLauncher
+        filename: vllm_launcher.py
+        type: TEXT
+        data: "import runpy\nrunpy.run_module(\"vllm.entrypoints.openai.api_server\"\
+          , run_name=\"__main__\", alter_sys=True)\n"
+      - name: WaitScript
+        filename: wait_for_vllm.py
+        type: TEXT
+        data: "import sys, os, time, urllib.request\n\npid = int(sys.argv[1])\nlog_path\
+          \ = sys.argv[2]\nstart = time.time()\nmax_wait = 300\nlast_log_size = 0\n\
+          \nwhile time.time() - start < max_wait:\n    try:\n        os.kill(pid,\
+          \ 0)\n    except OSError:\n        print(\"ERROR: vLLM exited unexpectedly\"\
+          , flush=True)\n        try:\n            with open(log_path) as f:\n   \
+          \             print(f.read()[-4000:])\n        except Exception:\n     \
+          \       pass\n        sys.exit(1)\n\n    try:\n        urllib.request.urlopen(\"\
+          http://localhost:8000/v1/models\", timeout=5)\n        print(f\"vLLM ready\
+          \ after {int(time.time() - start)}s\", flush=True)\n        sys.exit(0)\n\
+          \    except Exception:\n        pass\n\n    # Print progress every 30 seconds\n\
+          \    elapsed = int(time.time() - start)\n    if elapsed > 0 and elapsed\
+          \ % 30 < 5:\n        try:\n            with open(log_path) as f:\n     \
+          \           f.seek(last_log_size)\n                new_content = f.read()\n\
+          \                last_log_size = f.tell()\n                if new_content:\n\
+          \                    print(f\"--- vLLM log (t={elapsed}s) ---\", flush=True)\n\
+          \                    print(new_content[-2000:], flush=True)\n        except\
+          \ Exception:\n            pass\n\n    time.sleep(5)\n\nprint(f\"ERROR: vLLM\
+          \ did not start within {max_wait}s\", flush=True)\ntry:\n    with open(log_path)\
+          \ as f:\n        print(f.read()[-4000:])\nexcept Exception:\n    pass\n\
+          sys.exit(1)\n"
+      - name: Exit
+        filename: stop-vllm.sh
+        type: TEXT
+        data: '#!/bin/bash
+
+          set -euo pipefail
+
+          echo "Stopping vLLM server (PID ${VLLM_PID:-unset})..."
+
+          kill "${VLLM_PID:-}" 2>/dev/null || true
+
+          wait "${VLLM_PID:-}" 2>/dev/null || true
+
+          echo "vLLM server stopped."
+
+          '
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/run_task.py'
+        - --input-file
+        - '{{Param.InputFile}}'
+        - --prompt-range
+        - '{{Task.Param.PromptIndex}}'
+        - --output-dir
+        - '{{Param.OutputDir}}/output/results'
+        - --max-tokens
+        - '{{Param.MaxTokens}}'
+        - --temperature
+        - '{{Param.Temperature}}'
+        - --model
+        - '{{Param.ModelName}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    - name: amount.worker.memory
+      min: 32768
+- name: Aggregate
+  dependencies:
+  - dependsOn: Infer
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - '{{Param.JobScriptDir}}/aggregate.py'
+        - --results-dir
+        - '{{Param.OutputDir}}/output/results'
+        - --output
+        - '{{Param.OutputDir}}/output/output.jsonl'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux

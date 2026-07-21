@@ -14,6 +14,6 @@ package, place its `.mod` file in one of these so that Maya loads the plugin at 
 
 Download the Autodesk_Maya_2026_ML_Linux_64bit.tgz full download file from Autodesk, and
 place it in the `conda_recipes/archive_files` directory in your git clone of the
-[https://github.com/aws-deadline/deadline-cloud-samples](deadline-cloud-samples) repository for
+[deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for
 submitting package build jobs.
 

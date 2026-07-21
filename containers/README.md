@@ -1,18 +1,14 @@
 # AWS Deadline Cloud container samples
 
-The container samples in this directory provide Dockerfiles and related resources
-for building container images compatible with
-[AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/) worker environments.
+These samples provide Dockerfiles and related resources for building container images compatible with [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/) worker environments.
 
-Use these to build and test software locally with the same system libraries,
-toolchains, and runtime environment as Deadline Cloud workers.
+## Sample index
 
-## Samples
+This table covers both user-selectable container samples below `containers/`; supporting scripts and image assets remain with their sample.
 
-### AL2023 worker-equivalent image
+| Sample | What it demonstrates | Start here when |
+|---|---|---|
+| [AL2023 worker-equivalent image](al2023-deadline/) | Reproducing a point-in-time service-managed fleet package set on Amazon Linux 2023 | You need to test packages or software against worker-compatible system libraries |
+| [Blender application container](blender/blender-aswf-ci-base/) | Packaging Blender, the Deadline Cloud adaptor, and GPU support in an application image | You want to render Blender workloads from a purpose-built container |
 
-The [al2023-deadline](al2023-deadline/) sample provides a Dockerfile that
-replicates the package set of the Deadline Cloud service-managed fleet (SMF)
-worker AMI on top of the base Amazon Linux 2023 image. Use it to build and test
-[conda packages](../conda_recipes/) or other software that must be compatible
-with the worker runtime.
+The worker-equivalent image is useful for local compatibility work and package builds. The Blender image is an application-container example and includes its own deployment resources and instructions.

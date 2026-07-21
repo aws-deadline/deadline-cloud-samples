@@ -1,0 +1,10 @@
+# Dependencies for the static validation test suite (tests/).
+# Pinned loosely; CI caches the resolved install (see the static_checks workflow).
+pytest>=7,<10
+PyYAML>=6,<7
+Jinja2>=3,<4
+openjd-cli>=0.7,<1
+cfn-lint>=1,<2
+# NOTE: rattler-build is a standalone binary (not on PyPI). CI installs it by
+# downloading the pinned release binary directly via curl and verifying its
+# SHA-256 checksum; see .github/workflows/static_checks.yml.

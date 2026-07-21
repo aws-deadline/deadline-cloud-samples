@@ -1,6 +1,6 @@
 specificationVersion: jobtemplate-2023-09
 
-name: "CondaBuild: {{Param.RecipeDir}}"
+name: "CondaBuild: {{RawParam.RecipeDir}}"
 description: |
   This job uses conda-build to build a Conda package for the conda build recipe and optional attached source archive.
 

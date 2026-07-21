@@ -1,0 +1,7 @@
+wedge,roughness,sun_rotation,samples
+mirror,0.05,20,64
+glossy,0.2,20,64
+satin,0.45,20,64
+matte,0.8,20,64
+backlit,0.2,160,64
+noisy_preview,0.2,20,8

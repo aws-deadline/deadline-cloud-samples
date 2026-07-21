@@ -1,0 +1,18 @@
+version: "1.0"
+
+# A preSubmission hook runs as part of every submission (CLI and GUI), just
+# before the job is hashed, uploaded, and created. This one reads the wedge
+# CSV file (from the WedgeCsvFile job parameter) and expands its rows into the
+# RenderWedge step's task parameter ranges, then prints the modified template
+# on stdout. The Deadline Cloud client applies that template to the
+# submission, so each CSV row becomes one task on the farm.
+#
+# If the CSV is missing or malformed, the hook exits non-zero and the
+# submission is aborted before anything is uploaded.
+#
+# Bundle hooks are disabled by default. Enable them once with:
+#   deadline config set settings.allow_bundle_hooks true
+preSubmission:
+  - command: python3
+    args: [scripts/expand_wedge_csv.py]
+    timeout: 10

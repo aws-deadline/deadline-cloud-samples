@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Sends a Slack notification via an AWS Lambda function whenever a Deadline Cloud
+  job completes (SUCCEEDED) or fails (FAILED). Demonstrates connecting a Lambda
+  function to Deadline Cloud job events through Amazon EventBridge.
+
+Parameters:
+  EventSource:
+    Type: String
+    Default: "aws.deadline"
+    AllowedValues:
+      - "aws.deadline"
+    Description: >-
+      The EventBridge event source for Deadline Cloud events.
+
+  FarmId:
+    Type: String
+    Default: ""
+    Description: >-
+      Optional. Restrict notifications to a single farm by its farm ID
+      (e.g. farm-0123456789abcdef0123456789abcdef). Leave blank to notify on
+      jobs from every farm in this account and Region.
+
+  SlackWebhookUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: >-
+      Optional. The Slack Incoming Webhook URL to post notifications to. You can
+      leave this blank and set the SLACK_WEBHOOK_URL environment variable on the
+      Lambda function manually after deployment (see the README).
+
+Conditions:
+  HasFarmFilter: !Not [!Equals [!Ref FarmId, ""]]
+
+Resources:
+  # IAM role for the notification Lambda function.
+  JobEventsSlackFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      # Grants only CloudWatch Logs write access. The function needs no other
+      # permissions because Slack is reached over HTTPS with the webhook URL.
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  # Lambda function that formats a job event and posts it to Slack.
+  JobEventsSlackFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Posts a Slack message when a Deadline Cloud job succeeds or fails
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 15
+      Role: !GetAtt JobEventsSlackFunctionRole.Arn
+      Environment:
+        Variables:
+          # The webhook URL is intentionally kept as an environment variable so it
+          # can be rotated without redeploying the stack. It can be provided via
+          # the SlackWebhookUrl parameter or set manually after deployment.
+          SLACK_WEBHOOK_URL: !Ref SlackWebhookUrl
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          # Deadline Cloud job task-run statuses that represent a finished job.
+          TERMINAL_STATUSES = {"SUCCEEDED", "FAILED"}
+
+
+          def handler(event, context):
+              """Handle a Deadline Cloud "Job Run Status Change" EventBridge event."""
+              print("Received event: " + json.dumps(event))
+
+              webhook_url = os.environ.get("SLACK_WEBHOOK_URL", "").strip()
+              if not webhook_url:
+                  print("SLACK_WEBHOOK_URL is not set; skipping Slack notification.")
+                  return
+
+              detail = event.get("detail", {})
+              status = detail.get("taskRunStatus")
+
+              # The EventBridge rule already filters to SUCCEEDED/FAILED, but we
+              # guard here too so the function is safe to invoke with any event.
+              if status not in TERMINAL_STATUSES:
+                  print(f"Ignoring non-terminal taskRunStatus: {status}")
+                  return
+
+              farm_id = detail.get("farmId", "unknown")
+              queue_id = detail.get("queueId", "unknown")
+              job_id = detail.get("jobId", "unknown")
+
+              text = (
+                  f"*Deadline Cloud job {status.lower()}*\n"
+                  f"Job: `{job_id}`\n"
+                  f"Queue: `{queue_id}`\n"
+                  f"Farm: `{farm_id}`\n"
+                  f"Region: `{event.get('region', 'unknown')}`"
+              )
+
+              payload = json.dumps({"text": text}).encode("utf-8")
+              request = urllib.request.Request(
+                  webhook_url,
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+
+              # Post to Slack, logging a clear message on failure. A bad webhook
+              # (mistyped, revoked, or rate-limited) raises HTTPError; connection
+              # issues raise URLError; a read timeout raises TimeoutError, which is
+              # an OSError but not a URLError. We catch all of them and return
+              # rather than re-raising so a misconfigured webhook is diagnosable
+              # from CloudWatch Logs instead of triggering opaque asynchronous
+              # Lambda retries. Raise instead if you would rather rely on
+              # EventBridge/Lambda retry and DLQ behavior.
+              try:
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      body = response.read().decode("utf-8")
+                      print(f"Slack responded {response.status}: {body}")
+              except urllib.error.HTTPError as error:
+                  body = error.read().decode("utf-8", errors="replace")
+                  print(f"Slack returned an error: HTTP {error.code}: {body}")
+              except urllib.error.URLError as error:
+                  print(f"Failed to reach Slack: {error.reason}")
+              except OSError as error:
+                  # Covers socket timeouts (TimeoutError) and other low-level I/O
+                  # errors during the request or response read.
+                  print(f"Failed to post to Slack: {error}")
+
+  # Allow EventBridge to invoke the Lambda function.
+  JobEventsSlackFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref JobEventsSlackFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt JobEventsRule.Arn
+
+  # EventBridge rule that matches Deadline Cloud job completion/failure events
+  # and targets the Lambda function.
+  JobEventsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: >-
+        Matches Deadline Cloud "Job Run Status Change" events with a terminal
+        (SUCCEEDED or FAILED) status and forwards them to the Slack Lambda.
+      EventPattern:
+        source:
+          - !Ref EventSource
+        detail-type:
+          - "Job Run Status Change"
+        detail:
+          taskRunStatus:
+            - "SUCCEEDED"
+            - "FAILED"
+          # When a FarmId is provided, only that farm's events match. Otherwise
+          # AWS::NoValue removes the farmId key so events from any farm match.
+          farmId: !If
+            - HasFarmFilter
+            - - !Ref FarmId
+            - !Ref AWS::NoValue
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt JobEventsSlackFunction.Arn
+          Id: JobEventsSlackFunctionTarget
+
+Outputs:
+  FunctionName:
+    Description: Name of the Slack notification Lambda function
+    Value: !Ref JobEventsSlackFunction
+
+  FunctionArn:
+    Description: ARN of the Slack notification Lambda function
+    Value: !GetAtt JobEventsSlackFunction.Arn
+
+  EventRuleArn:
+    Description: ARN of the EventBridge rule matching job events
+    Value: !GetAtt JobEventsRule.Arn

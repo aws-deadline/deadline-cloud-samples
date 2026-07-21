@@ -5,7 +5,7 @@
 This CloudFormation template deploys an [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/) farm
 you can use to run jobs that render images, reconstruct 3D scenes, or transform your data
 in custom ways. Sample jobs to submit are available in the
-[deadline-cloud-samples on GitHub](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles#readme),
+[deadline-cloud-samples on GitHub](../../../job_bundles/),
 Deadline Cloud provides many [integrated submitter plugins for applications](https://github.com/aws-deadline/#integrations),
 and you can [build your own jobs](https://docs.aws.amazon.com/en_us/deadline-cloud/latest/developerguide/building-jobs.html).
 
@@ -53,7 +53,7 @@ your AWS Account. The AWS region should be the same as the one you use to deploy
    prerequisites, and any parameter customizations:
    1. If you want to use the [conda-forge channel](https://conda-forge.org/), change the parameter
       value for ProdCondaChannels to "deadline-cloud conda-forge". The sample job bundle
-      [Turntable with Maya/Arnold](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/turntable_with_maya_arnold)
+      [Turntable with Maya/Arnold](../../../job_bundles/turntable_with_maya_arnold/)
       shows how you can use the FFmpeg provided by conda-forge to encode a video.
    2. Edit the fleet configuration parameters if you need a higher vCPU count, more RAM, more EBS bandwidth, etc.
 5. Follow the CloudFormation console steps to complete stack creation.
@@ -99,10 +99,10 @@ added `conda-forge` to the ProdCondaChannels parameter to the CloudFormation tem
    [download it as a ZIP](https://github.com/aws-deadline/deadline-cloud-samples/archive/refs/heads/mainline.zip).
 2. From the `conda_recipes` directory of `deadline-cloud-samples`, run the following command. If you deployed
    different fleets than the default, you may need to adjust the conda platforms expression. See
-   [the conda recipe samples README](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes#readme)
+   [the conda recipe samples README](../../../conda_recipes/)
    to learn more about this command.
    ```
-   $ ./submit-package-build deadline -p "linux-64*"
+   $ ./submit-package-job deadline -p "linux-64*"
    ```
 3. From Deadline Cloud monitor, navigate to the package build queue to watch the job you submitted.
    When it is running, right click on the task and select "View logs". It may take several minutes as Deadline Cloud
@@ -222,10 +222,10 @@ such as [bioconda](https://bioconda.github.io/).
 
 The CloudFormation template includes a queue environment that creates conda virtual environments for jobs
 to use. By default, this is the sample queue environment
-[conda_queue_env_improved_caching.yaml](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/queue_environments/conda_queue_env_improved_caching.yaml). You can run the provided Python script
+[conda_queue_env_improved_caching.yaml](../../../queue_environments/conda_queue_env_improved_caching.yaml). You can run the provided Python script
 [apply-conda-queue-env.py](../apply-conda-queue-env.py) to substitute a different queue environment.
 For example, the following command would switch it to the sample
-[conda_queue_env_from_console.yaml](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/queue_environments/conda_queue_env_from_console.yaml):
+[conda_queue_env_from_console.yaml](../../../queue_environments/conda_queue_env_from_console.yaml):
 
 ```
 $ python ../apply-conda-queue-env.py \

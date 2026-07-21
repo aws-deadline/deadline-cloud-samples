@@ -15,6 +15,71 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 * Supports [rattler-build](https://prefix-dev.github.io/rattler-build/),
   and (as deprecated) [conda-build](https://docs.conda.io/projects/conda-build/).
 
+## Recipe index
+
+This table covers all 49 immediate user-selectable recipe directories in `conda_recipes/`.
+
+| Sample | What it demonstrates | Start here when |
+|---|---|---|
+| [After Effects 25.1](aftereffects-25.1/) | Packaging Adobe After Effects for Windows workers | You need the base After Effects 25 application |
+| [After Effects plugin bundle](aftereffects-plugin-bundle/) | Bundling multiple supplied After Effects plugins | You want one versioned package for a studio plugin set |
+| [After Effects Saber](aftereffects-saber/) | Installing the Saber plugin into an After Effects package | You need a small single-plugin recipe example |
+| [AutoDock Vina 1.2.5](autodock-vina-1.2.5/) | Building the AutoDock Vina molecular docking application | You run virtual-screening or docking jobs |
+| [AYON Launcher](ayon-launcher/) | Packaging the AYON pipeline runtime for headless publishing | Deadline Cloud workers must participate in an AYON pipeline |
+| [Blender 4.2](blender-4.2/) | Packaging Blender 4.2 for Linux and Windows | Your jobs require Blender 4.2 |
+| [Blender 4.3](blender-4.3/) | Packaging Blender 4.3 for Linux and Windows | Your jobs require Blender 4.3 |
+| [Blender 4.4](blender-4.4/) | Packaging Blender 4.4 for Linux and Windows | Your jobs require Blender 4.4 |
+| [Blender 4.5](blender-4.5/) | Packaging Blender 4.5 for Deadline Cloud | Your jobs require Blender 4.5 |
+| [Blender 5.0](blender-5.0/) | Packaging Blender 5.0 with plugin-sync support | Your jobs require Blender 5.0 |
+| [Blender 5.1](blender-5.1/) | Packaging Blender 5.1 with tested plugin-sync scripts | Your jobs require Blender 5.1 |
+| [Blender FLIP Fluids](blender-flipfluids/) | Installing the FLIP Fluids add-on into Blender | You need a Blender simulation add-on recipe |
+| [Blender plugin bundle](blender-plugin-bundle/) | Packaging multiple Blender add-on ZIP files together | You deliver a changing studio collection of Blender plugins |
+| [Cinema 4D 2024](cinema4d-2024/) | Packaging Cinema 4D 2024 for Windows | Your jobs require Cinema 4D 2024 |
+| [Cinema 4D 2025](cinema4d-2025/) | Packaging Cinema 4D 2025 for Windows | Your jobs require Cinema 4D 2025 |
+| [Arnold for Cinema 4D 2025](cinema4d-c4dtoa-2025/) | Packaging the C4DtoA renderer plugin | Cinema 4D 2025 jobs render with Arnold |
+| [INSYDIUM for Cinema 4D 2025](cinema4d-insydium-2025/) | Packaging supplied INSYDIUM plugin files | Cinema 4D jobs use X-Particles or related plugins |
+| [Cinema 4D OpenJD adaptor](cinema4d-openjd/) | Packaging the Cinema 4D integration adaptor | Cinema 4D jobs need OpenJD session integration |
+| [V-Ray for Cinema 4D 2025](cinema4d-vray-2025/) | Packaging the V-Ray plugin for Cinema 4D | Cinema 4D 2025 jobs render with V-Ray |
+| [Deadline Cloud CLI](deadline/) | Building the `deadline` Python package and command line tools | Another package or worker environment needs the Deadline client |
+| [Houdini 20.5](houdini-20.5/) | Packaging Houdini 20.5 with plugin activation support | Your jobs require Houdini 20.5 |
+| [Houdini 21.0](houdini-21.0/) | Packaging Houdini 21.0 with Plugin Sync activation | Your jobs require Houdini 21 or frequently updated plugins |
+| [Redshift for Houdini 2025](houdini-redshift-2025/) | Packaging Redshift for Houdini 2025 | Houdini 20.5 jobs render with Redshift |
+| [Redshift for Houdini 2026](houdini-redshift-2026/) | Packaging Redshift for Houdini 2026 | Houdini 21 jobs render with Redshift |
+| [V-Ray 7 for Houdini](houdini-vray-7/) | Packaging V-Ray for Houdini | Houdini jobs render with V-Ray 7 |
+| [Infinigen 1.19.0](infinigen-1.19.0/) | Packaging the procedural scene generator and dependencies | You generate synthetic indoor or outdoor scenes |
+| [KeyShot 2025](keyshot-2025/) | Packaging KeyShot 2025.2 for Windows | Your jobs render with KeyShot |
+| [Maya 2025](maya-2025/) | Packaging Maya and configuring module/plugin search paths | Your jobs require Maya 2025 |
+| [Maya 2026](maya-2026/) | Packaging Maya with Plugin Sync activation | Your jobs require Maya 2026 or frequently updated plugins |
+| [Bifrost for Maya 2026](maya-bifrost-2026/) | Packaging Autodesk Bifrost for Maya | Maya 2026 jobs use Bifrost graphs or simulations |
+| [Arnold for Maya 2025](maya-mtoa-2025/) | Packaging MtoA against the Maya 2025 package | Maya 2025 jobs render with Arnold |
+| [Arnold for Maya 2026](maya-mtoa-2026/) | Packaging MtoA against the Maya 2026 package | Maya 2026 jobs render with Arnold |
+| [Maya OpenJD adaptor](maya-openjd/) | Packaging the Maya integration adaptor | Maya jobs need OpenJD session integration |
+| [Redshift for Maya 2025](maya-redshift-2025/) | Packaging Redshift 2025 for supported Maya versions | Maya jobs use Redshift 2025 |
+| [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya jobs use Redshift 2026 |
+| [V-Ray for Maya 2025](maya-vray-2025/) | Packaging V-Ray for Maya 2025 | Maya 2025 jobs render with V-Ray |
+| [V-Ray for Maya 2026](maya-vray-2026/) | Packaging V-Ray for Maya 2026 | Maya 2026 jobs render with V-Ray |
+| [V-Ray 7.2 for Maya 2025](maya-vray-7.2-2025/) | Pinning V-Ray 7.20.02 to Maya 2025 | You need the exact V-Ray 7.2/Maya 2025 combination |
+| [V-Ray 7.2 for Maya 2026](maya-vray-7.2-2026/) | Pinning V-Ray 7.20.02 to Maya 2026 | You need the exact V-Ray 7.2/Maya 2026 combination |
+| [Nerfstudio](nerfstudio/) | Packaging Nerfstudio and Gaussian Splatting extras | You train NeRF or Gaussian Splatting models |
+| [Nuke 16.0](nuke-16.0/) | Packaging Nuke 16 with plugin activation support | Your compositing jobs require Nuke 16 |
+| [Nuke 17.0](nuke-17.0/) | Packaging Nuke 17 with Plugin Sync activation | Your compositing jobs require Nuke 17 or changing plugins |
+| [Nuke DENoise](nuke-denoise/) | Packaging the DENoise plugin for Nuke | Nuke jobs need the DENoise node on workers |
+| [OpenJD adaptor runtime](openjd-adaptor-runtime/) | Packaging the shared runtime used by DCC adaptors | You are building Maya, Cinema 4D, or other adaptor packages |
+| [Unreal Engine](unreal-engine/) | Packaging Unreal Engine, including custom source builds | Unreal workloads need an engine package on workers |
+| [Unreal Engine OpenJD adaptor](unreal-engine-openjd/) | Packaging the Unreal integration adaptor | Unreal jobs need OpenJD session integration |
+| [V-Ray standalone](vray/) | Packaging the standalone V-Ray renderer | Jobs render `.vrscene` files without a DCC |
+| [VRED Core 2025](vredcore-2025/) | Packaging Autodesk VRED Core 2025 for Linux | Automotive visualization jobs require VRED 2025 |
+| [VRED Core 2026](vredcore-2026/) | Packaging Autodesk VRED Core 2026 for Linux | Automotive visualization jobs require VRED 2026 |
+
+## Build and archive support
+
+[`conda_build_linux_package/`](conda_build_linux_package/) is the reusable OpenJD package-build job,
+not a package recipe, so it is intentionally excluded from the recipe table. The top-level
+`submit-package-job`, `submit-package-job.bat`, `submit-package-job-script.py`, and
+`conda_platform_host_requirements.yaml` files are its submission and platform-support tooling.
+[`archive_files/`](archive_files/) stores source or generated package archives and is also excluded;
+it is not a user-selectable recipe.
+
 ## Infrastructure setup prerequisites
 
 See the Deadline Cloud developer guide documentation
@@ -22,7 +87,7 @@ See the Deadline Cloud developer guide documentation
 for instructions on how to set up a Deadline Cloud farm for building packages into an Amazon S3 conda channel.
 Name your package build queue "Package Build Queue" for the job submission command to select it by default.
 
-To make this process faster and simpler, you can use our provided starter farm CloudFormation template [here](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/cloudformation/farm_templates/starter_farm) to deploy your Deadline infrastructure along with
+To make this process faster and simpler, you can use our provided [starter farm CloudFormation template](../cloudformation/farm_templates/starter_farm/) to deploy your Deadline infrastructure along with
 a configured package build queue as documented in the Deadline Cloud developer guide linked above.
 
 To submit package build jobs, you will need the
@@ -34,8 +99,7 @@ the CLI using the standalone submitter installer.
 
 ## Submitting package build jobs
 
-The command `submit-package-job` is a CLI command for submitting package job provided in this `conda_recipes`
-directory. It runs the script [submit-package-job-script.py](submit-package-job-script.py) using the Python
+The `submit-package-job` command submits package-build jobs from this `conda_recipes` directory. It runs the script [submit-package-job-script.py](submit-package-job-script.py) using the Python
 for the Deadline Cloud CLI so it can rely on the `deadline` library dependency being available without additional setup.
 
 By default it will submit the job to a queue whose name starts with "Package", and will
@@ -190,9 +254,9 @@ This allows you to customize the build process with any supported conda-build or
 
 The build arguments are parsed as space-separated values and added to the build command. Use quotes to group arguments that contain spaces.
 
-## Recipe directory structure for `submit-package-build`
+## Recipe directory structure for `submit-package-job`
 
-The `submit-package-build` command expects rattler-build recipes in a specific directory structure. It's inspired by the
+The `submit-package-job` command expects rattler-build recipes in a specific directory structure. It's inspired by the
 [conda-forge feedstock repository structure](https://conda-forge.org/docs/maintainer/adding_pkgs/#feedstock-repository-structure).
 
 **recipe**
@@ -201,7 +265,7 @@ This folder contains the rattler-build recipe, including `recipe.yaml` and packa
 
 **deadline-cloud.yaml**
 
-This file is used by the `submit-package-build` command to configure how it submits package build jobs
+This file is used by the `submit-package-job` command to configure how it submits package build jobs
 to Deadline Cloud.
 
 **other files**
@@ -294,7 +358,7 @@ condaPlatforms:
 
 #### The jobParameters list
 
-This list lets the recipe provide parameter values to the job bundle that the `submit-package-job` comamnd uses.
+This list lets the recipe provide parameter values to the job bundle that the `submit-package-job` command uses.
 The format is the same as the
 [parameter_values.yaml](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-parameters.html)
 file of a job bundle.
