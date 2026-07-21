@@ -1,0 +1,26 @@
+# Copy to terraform.tfvars and fill in. All values below are examples.
+
+# Region A — KNFSD cache, VPC Lattice resource endpoint, and the SMF live here.
+compute_region = "us-west-2"
+
+# Region B — the FSx for OpenZFS origin filer. MUST differ from compute_region;
+# the cross-region distance is what the cache absorbs (stands in for on-prem).
+origin_region = "us-east-1"
+
+name_prefix = "dl-knfsd-xr"
+
+# Build this first with Packer from awslabs/knfsd-file-cache, in compute_region
+# (see README "Build the KNFSD proxy AMI").
+knfsd_proxy_ami = "ami-0123456789abcdef0"
+
+# Optional overrides:
+# compute_vpc_cidr             = "10.10.0.0/16"   # must not overlap origin_vpc_cidr
+# origin_vpc_cidr              = "10.20.0.0/16"
+# compute_az_suffix            = "a"
+# origin_az_suffix             = "a"
+# knfsd_instance_type          = "i3en.2xlarge"
+# knfsd_node_count             = 1
+# fsx_storage_capacity_gib     = 1024
+# fsx_throughput_capacity_mbps = 512
+# fleet_max_workers            = 2
+# fleet_market_type            = "spot"

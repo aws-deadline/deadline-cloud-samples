@@ -1,0 +1,8 @@
+# Local Terraform state and config
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfstate
+*.tfstate.*
+*.plan
+crash.log
