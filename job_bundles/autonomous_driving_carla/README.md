@@ -97,7 +97,7 @@ From the bundle directory:
 In the **Job-specific settings** tab:
 
 1. **Scenario Settings**: Configure ego speeds, NPC speeds and NPC distances (comma-separated integers). The cross-product creates your task grid.
-2. **Camera Viewpoints**. Select which cameras to capture (Front is enabled by default). Available positions: Front, Front Left, Front Right, Rear, Rear Left, Rear Right.
+2. **Camera Viewpoints**. Select which cameras to capture (Front is enabled by default). Available positions are Front, Front Left, Front Right, Rear, Rear Left, and Rear Right.
 3. **Advanced**: Set your Container Image URI to `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16` and the AWS Region where your ECR lives.
 
 Alternatively, submit via CLI:

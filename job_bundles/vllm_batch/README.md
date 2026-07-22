@@ -111,7 +111,7 @@ The `Prompts` parameter controls **which lines** from the JSONL file get process
 | `1-10:2` | Stride: every 2nd line starting at 1 → 1, 3, 5, 7, 9 |
 | `1-3,7-15:3` | Combined: lines 1-3 plus every 3rd from 7-15 → 1, 2, 3, 7, 10, 13 |
 
-The syntax lets you process a subset for testing and retry only failed lines from a large input file.
+The syntax gives you fine control. Process a subset for testing, retry only failed lines, or batch through different chunks of a large input file.
 
 ## Chunk size and adaptive sizing
 
