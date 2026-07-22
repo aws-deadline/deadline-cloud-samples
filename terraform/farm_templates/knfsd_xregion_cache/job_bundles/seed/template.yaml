@@ -1,0 +1,73 @@
+# Seed job — populates the KNFSD-cached share with a synthetic "asset library"
+# that resembles a render/VFX read workload:
+#   - many medium files (textures / geo caches): the re-read HOT set
+#   - a few large files (sim caches / EXR sequences): throughput-bound reads
+#
+# Run this ONCE before benchmarking. It writes through KNFSD to the cross-region
+# FSx origin, so later benchmark reads can be served from the KNFSD cache.
+#
+#   deadline bundle submit ./job_bundles/seed \
+#     --farm-id <farm> --queue-id <queue> \
+#     -p NfsMountPath=/mnt/knfsd -p LibraryFileCount=2000 -p LibraryFileMiB=16 \
+#     -p LargeFileCount=4 -p LargeFileMiB=4096
+
+specificationVersion: "jobtemplate-2023-09"
+name: KNFSD-Xregion-Seed
+
+parameterDefinitions:
+  - name: NfsMountPath
+    type: STRING
+    default: /mnt/knfsd
+    description: Worker path where the KNFSD-cached share is mounted.
+  - name: LibraryFileCount
+    type: INT
+    default: 2000
+    description: Number of medium "asset" files in the shared hot set.
+  - name: LibraryFileMiB
+    type: INT
+    default: 16
+    description: Size (MiB) of each medium asset file.
+  - name: LargeFileCount
+    type: INT
+    default: 4
+    description: Number of large sequence/sim files.
+  - name: LargeFileMiB
+    type: INT
+    default: 4096
+    description: Size (MiB) of each large file.
+
+steps:
+  - name: SeedAssetLibrary
+    script:
+      actions:
+        onRun:
+          command: bash
+          args: ["{{ Task.File.Run }}"]
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          runnable: true
+          data: |
+            #!/usr/bin/env bash
+            set -euo pipefail
+
+            LIB="{{ Param.NfsMountPath }}/assets"
+            BIG="{{ Param.NfsMountPath }}/sequences"
+            mkdir -p "$LIB" "$BIG"
+
+            echo "Seeding $LIB with {{ Param.LibraryFileCount }} x {{ Param.LibraryFileMiB }} MiB asset files"
+            for i in $(seq 1 {{ Param.LibraryFileCount }}); do
+              f="$LIB/asset_$(printf '%05d' "$i").dat"
+              [ -f "$f" ] || dd if=/dev/urandom of="$f" bs=1M count={{ Param.LibraryFileMiB }} status=none
+            done
+
+            echo "Seeding $BIG with {{ Param.LargeFileCount }} x {{ Param.LargeFileMiB }} MiB sequence files"
+            for i in $(seq 1 {{ Param.LargeFileCount }}); do
+              f="$BIG/seq_$(printf '%03d' "$i").dat"
+              [ -f "$f" ] || dd if=/dev/urandom of="$f" bs=1M count={{ Param.LargeFileMiB }} status=none
+            done
+
+            sync
+            echo "Seed complete:"
+            echo "  assets:    $(ls -1 "$LIB" | wc -l) files, $(du -sh "$LIB" | cut -f1)"
+            echo "  sequences: $(ls -1 "$BIG" | wc -l) files, $(du -sh "$BIG" | cut -f1)"

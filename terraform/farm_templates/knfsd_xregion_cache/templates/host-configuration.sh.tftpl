@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# Deadline Cloud fleet host configuration script.
+# Runs once, with administrator privileges, as each service-managed fleet
+# worker starts up.
+#
+# Responsibility: mount the KNFSD-cached NFS share, reached via the Deadline
+# Cloud VPC resource endpoint:
+#   <resource_config_id>.resource-endpoints.deadline.<region>.amazonaws.com
+#
+# IMPORTANT: this script is written to be NON-FATAL. A hung or failed NFS mount
+# must never prevent the worker from starting or block it until the host-config
+# timeout — that just recycles the worker with no diagnostics. So we do NOT use
+# `set -e`, we bound the mount with `timeout`, and we always exit 0. If the
+# mount fails, the worker still comes up and the job task reports the problem.
+
+NFS_HOST="${resource_config_id}.resource-endpoints.deadline.${region}.amazonaws.com"
+MOUNT_PATH="${nfs_mount_path}"
+# KNFSD re-exports the origin's export PATH verbatim (e.g. FSx OpenZFS exports
+# /fsx). Mounting the wrong path (e.g. "/") returns "access denied by server".
+EXPORT_PATH="${nfs_export_path}"
+
+echo "[host-config] Ensuring NFS client tooling is present"
+if command -v dnf >/dev/null 2>&1; then
+  dnf install -y nfs-utils || true
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y nfs-utils || true
+elif command -v apt-get >/dev/null 2>&1; then
+  apt-get update -y && apt-get install -y nfs-common || true
+fi
+
+echo "[host-config] Creating mount point $MOUNT_PATH"
+mkdir -p "$MOUNT_PATH"
+
+# Resolve the endpoint first so we can distinguish DNS vs mount failures.
+echo "[host-config] Resolving $NFS_HOST"
+getent hosts "$NFS_HOST" || echo "[host-config] WARN: could not resolve $NFS_HOST"
+
+# Mount options for the resource-endpoint path:
+#   nfsvers=3   KNFSD re-exports the FSx for OpenZFS origin over NFSv3.
+#   proto=tcp   The resource endpoint is TCP; do not attempt UDP.
+#   soft/retry=0/timeo=100  Fail fast instead of hanging (this is startup).
+#   noresvport  Traffic is NAT'd from non-privileged source ports.
+#   nolock      NLM lock/callback traffic cannot traverse the one-way NAT.
+echo "[host-config] Mounting KNFSD share $NFS_HOST:$EXPORT_PATH at $MOUNT_PATH"
+if timeout 90 mount -t nfs \
+     -o nfsvers=3,proto=tcp,soft,retry=0,timeo=100,retrans=2,noresvport,nolock \
+     "$NFS_HOST:$EXPORT_PATH" "$MOUNT_PATH"; then
+  echo "[host-config] MOUNT OK"
+  mount | grep -E "$MOUNT_PATH|:/" || true
+  # The task runs as an unprivileged session user (job-user). FSx OpenZFS root
+  # volume is root-owned by default, so make it world-readable/writable for the
+  # demo. For production, manage ownership/permissions on the origin instead.
+  chmod 0777 "$MOUNT_PATH" 2>/dev/null || echo "[host-config] NOTE: could not chmod $MOUNT_PATH (read-only or perms)"
+else
+  rc=$?
+  echo "[host-config] MOUNT FAILED (rc=$rc) — worker will still start; task will report missing mount"
+fi
+
+echo "[host-config] Done"
+exit 0

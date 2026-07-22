@@ -1,0 +1,87 @@
+# Benchmark job — reads the seeded asset library through the KNFSD-cached mount
+# and reports read throughput and latency. Designed to show the cache's value:
+#
+#   FAN-OUT: the task runs once per value in the Fanout range parameter, so N
+#   tasks read the SAME shared library concurrently across the fleet's workers.
+#   Without a cache, those reads contend on the cross-region origin's bandwidth;
+#   with KNFSD, they are served from the proxy's RAM (L1) / local NVMe (L2).
+#
+#   COLD vs WARM: the first task on a given KNFSD node populates the cache
+#   (miss -> cross-region fetch); subsequent tasks/workers reading the same
+#   files hit the cache. Compare early vs later task timings, and watch the
+#   FSx origin's throughput in CloudWatch stay flat as fan-out grows.
+#
+#   deadline bundle submit ./job_bundles/benchmark \
+#     --farm-id <farm> --queue-id <queue> \
+#     -p NfsMountPath=/mnt/knfsd -p FanoutTasks=16 -p ReadFilesPerTask=200
+
+specificationVersion: "jobtemplate-2023-09"
+name: KNFSD-Xregion-Benchmark
+
+parameterDefinitions:
+  - name: NfsMountPath
+    type: STRING
+    default: /mnt/knfsd
+    description: Worker path where the KNFSD-cached share is mounted.
+  - name: FanoutTasks
+    type: INT
+    default: 16
+    description: Number of concurrent reader tasks (the fan-out width).
+  - name: ReadFilesPerTask
+    type: INT
+    default: 200
+    description: How many asset files each task reads.
+
+steps:
+  - name: FanoutRead
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: TaskIndex
+          type: INT
+          range: "1-{{ Param.FanoutTasks }}"
+    script:
+      actions:
+        onRun:
+          command: bash
+          args: ["{{ Task.File.Run }}"]
+      embeddedFiles:
+        - name: Run
+          type: TEXT
+          runnable: true
+          data: |
+            #!/usr/bin/env bash
+            set -euo pipefail
+
+            LIB="{{ Param.NfsMountPath }}/assets"
+            N={{ Param.ReadFilesPerTask }}
+            TASK={{ Task.Param.TaskIndex }}
+
+            if [ ! -d "$LIB" ]; then
+              echo "ERROR: $LIB not found — run the seed job first, and confirm the mount."
+              exit 1
+            fi
+
+            # Each task reads a rotating window of the shared library so tasks
+            # overlap heavily (drives cache reuse) but don't all read identically.
+            mapfile -t FILES < <(ls -1 "$LIB"/asset_*.dat | sort)
+            total="${#FILES[@]}"
+            [ "$total" -gt 0 ] || { echo "ERROR: no asset files in $LIB"; exit 1; }
+
+            echo "=== Task $TASK: reading $N of $total shared files from $LIB ==="
+            start_ns=$(date +%s%N)
+            bytes=0
+            for k in $(seq 0 $((N - 1))); do
+              idx=$(( (TASK * 7 + k) % total ))
+              f="${FILES[$idx]}"
+              # Drop nothing locally on purpose: we want to measure the KNFSD
+              # path. The worker's own page cache is cold per fresh Spot host.
+              sz=$(stat -c%s "$f")
+              dd if="$f" of=/dev/null bs=4M status=none
+              bytes=$((bytes + sz))
+            done
+            end_ns=$(date +%s%N)
+
+            secs=$(awk "BEGIN{print ($end_ns-$start_ns)/1e9}")
+            mib=$(awk "BEGIN{print $bytes/1048576}")
+            mibps=$(awk "BEGIN{print $mib/$secs}")
+            echo "RESULT task=$TASK files=$N bytes_MiB=$mib seconds=$secs throughput_MiBps=$mibps"
