@@ -74,8 +74,10 @@ resource "aws_iam_role_policy" "fleet_worker_logs" {
 }
 
 # ---- Queue role ----------------------------------------------------------
-# Session role handed to jobs. Scoped to S3 job attachments + logs here; extend
-# as your jobs need (e.g. read from other buckets).
+# Session role handed to jobs. This example grants only CloudWatch Logs, which
+# is all the bundled seed/benchmark jobs need (they run embedded scripts and
+# read/write the NFS mount; the queue has no job attachments). If you enable job
+# attachments or read other data, add the S3 permissions your jobs require.
 
 data "aws_iam_policy_document" "queue_assume" {
   statement {

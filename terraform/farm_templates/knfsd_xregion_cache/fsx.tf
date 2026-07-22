@@ -37,6 +37,12 @@ resource "aws_fsx_openzfs_file_system" "origin" {
   }
 
   tags = merge(var.tags, { Name = "${var.name_prefix}-fsx-origin" })
+
+  # FSx validates at creation time that its security group already permits
+  # inbound NFS on 2049. The ingress rules are separate resources that only
+  # depend on the SG, not on this file system, so without an explicit ordering
+  # Terraform may create FSx before the rules exist and fail nondeterministically.
+  depends_on = [aws_vpc_security_group_ingress_rule.fsx_from_compute]
 }
 
 # SINGLE_AZ_1 FSx for OpenZFS does not populate `endpoint_ip_address` (that

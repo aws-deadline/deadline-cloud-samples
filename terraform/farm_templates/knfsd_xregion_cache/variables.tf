@@ -104,13 +104,13 @@ variable "fsx_throughput_capacity_mbps" {
 }
 
 variable "deadline_worker_os" {
-  description = "Operating system family for the Deadline Cloud service-managed fleet workers."
+  description = "Operating system family for the SMF workers. Only LINUX is supported: the host configuration is a bash script (mount, dnf/apt-get, chmod) that cannot run on Windows."
   type        = string
   default     = "LINUX"
 
   validation {
-    condition     = contains(["LINUX", "WINDOWS"], var.deadline_worker_os)
-    error_message = "deadline_worker_os must be LINUX or WINDOWS. This example's host configuration script targets LINUX."
+    condition     = contains(["LINUX"], var.deadline_worker_os)
+    error_message = "deadline_worker_os must be LINUX. This sample's host configuration script only supports Linux workers."
   }
 }
 
