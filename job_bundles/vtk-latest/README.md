@@ -57,8 +57,6 @@ A sample VTK script (`flow_simulation_visualization.py`) is provided in the `sam
 - Creating a 3D airfoil geometry
 - Generating a flow field
 - Calculating pressure distribution
-<!-- vale ai-tells.OverusedVocabulary = NO -->
 - Visualizing the simulation with streamlines
-<!-- vale ai-tells.OverusedVocabulary = YES -->
 - Saving the output as an image file
 This script is sourced from [here](https://github.com/djeada/Vtk-Examples/blob/main/src/02_advanced_shapes/flow_simulation_visualization.py#L4) and is licensed under the MIT license.

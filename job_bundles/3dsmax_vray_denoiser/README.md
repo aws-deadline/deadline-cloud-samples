@@ -37,9 +37,7 @@ The job renders to V-Ray's native VRIMG format in a temporary directory, then co
 
 - All denoising elements and passes
 - Multi-channel data
-<!-- vale ai-tells.OverusedVocabulary = NO -->
 - High dynamic range
-<!-- vale ai-tells.OverusedVocabulary = YES -->
 - Complete V-Ray render information
 
 ## Usage

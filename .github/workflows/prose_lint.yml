@@ -8,8 +8,10 @@ name: Prose Lint
 # it never reports on pre-existing issues in files it did not touch. Run it
 # locally over the whole repository with `vale sync && vale .`.
 #
-# This check is ADVISORY: the lint step uses continue-on-error so Vale findings
-# are surfaced in the job log without failing the check or blocking a merge.
+# The job fails (red) when Vale reports findings. It is intended to be ADVISORY:
+# keep it out of the repository's required status checks so a failure surfaces
+# the findings without blocking a merge (configured in branch protection, not
+# here).
 
 on:
   pull_request:
@@ -76,6 +78,4 @@ jobs:
 
       - name: Run Vale on changed files
         if: steps.changed.outputs.count != '0'
-        # Advisory only: surface findings in the log but never fail the check.
-        continue-on-error: true
         run: xargs -0 -a changed_md.txt vale

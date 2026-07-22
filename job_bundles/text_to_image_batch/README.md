@@ -215,8 +215,6 @@ A per-line `font` field overrides the job-level `FontStyle` for that prompt.
 
 ### Auto-vibe rules
 
-<!-- vale ai-tells.OverusedVocabulary = NO -->
-<!-- The keywords below are literal strings the auto-vibe matcher keys on, not prose. -->
 | Style/prompt mentions… | Category |
 |---|---|
 | handwritten, rustic, warm, nostalgic, cozy, homemade, heartfelt, calligraphy, vintage | **script** |
@@ -225,7 +223,6 @@ A per-line `font` field overrides the job-level `FontStyle` for that prompt.
 | elegant, luxury, wedding, bridal, editorial, magazine, romantic, moody | **serif** |
 | modern, minimal, clean, tech, product, photographic, corporate | **sans** |
 | (no match) | **sans** (default) |
-<!-- vale ai-tells.OverusedVocabulary = YES -->
 
 Applied to the bundled `sample_prompts.jsonl` (10 bakery slogans from `vllm_batch`), auto-vibe picks: sourdough → script (rustic), kids' birthday → display, wedding → serif, college → display, grandparent cookies → script, luxury macarons → serif, gluten-free → sans, croissants → serif (moody), cake pops → display, anniversary → script.
 
