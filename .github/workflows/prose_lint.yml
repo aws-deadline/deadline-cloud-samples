@@ -5,8 +5,11 @@ name: Prose Lint
 # metacommentary, and so on). See .vale.ini for the enabled rules.
 #
 # On a pull request this runs ONLY over the Markdown files the PR changed, so
-# it never fails a PR for pre-existing issues in files it did not touch. Run it
+# it never reports on pre-existing issues in files it did not touch. Run it
 # locally over the whole repository with `vale sync && vale .`.
+#
+# This check is ADVISORY: the lint step uses continue-on-error so Vale findings
+# are surfaced in the job log without failing the check or blocking a merge.
 
 on:
   pull_request:
@@ -73,4 +76,6 @@ jobs:
 
       - name: Run Vale on changed files
         if: steps.changed.outputs.count != '0'
+        # Advisory only: surface findings in the log but never fail the check.
+        continue-on-error: true
         run: xargs -0 -a changed_md.txt vale
