@@ -18,3 +18,13 @@ www.autodesk.com
 manage.autodesk.com
 # 2026-07-15: HEAD and minimal Range GET both returned HTTP 403 for public product pages that load in a browser.
 www.keyshot.com
+# 2026-07-22: HEAD and minimal Range GET both returned HTTP 403 for public support articles that load in a browser.
+support.borisfx.com
+# 2026-07-22: HEAD and minimal Range GET both returned HTTP 403 for public support articles that load in a browser.
+support.maxon.net
+# 2026-07-22: HEAD returned HTTP 302 and minimal Range GET returned HTTP 403 for public product pages that load in a browser.
+www.maxon.net
+# 2026-07-22: HEAD and minimal Range GET both returned HTTP 403 for public portfolio pages that load in a browser.
+www.artstation.com
+# 2026-07-22: HEAD and minimal Range GET both returned HTTP 403 for public article pages that load in a browser.
+www.science.org
