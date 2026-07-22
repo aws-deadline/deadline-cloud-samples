@@ -1,0 +1,58 @@
+# Studio-wide defaults.
+#
+# This is the root of the config hierarchy. Every shot inherits these values
+# unless a project, sequence, or shot overrides them. The launcher
+# (studio_pipe) merges this file with the project, sequence, and shot configs
+# to produce the "resolved context" for a shot — the single dictionary that
+# drives both the DCC launch on the workstation and the render job on the farm.
+#
+# Hierarchy (lowest precedence first):
+#   studio.yaml  <  projects/<project>/project.yaml
+#                <  projects/<project>/sequences/<seq>/sequence.yaml
+#                <  projects/<project>/sequences/<seq>/shots/<shot>/shot.yaml
+#
+# Keys here are intentionally the things a studio sets globally and rarely
+# changes per-shot: the DCC + plugin versions everyone is standardized on, the
+# Flow site, and house render defaults.
+
+studio_name: Moonrise Studios
+
+# Software the pipeline standardizes on. Names + versions become Conda package
+# specs (name=version) that the render job hands to the Conda queue environment;
+# the DCC and plugins are pulled from the channels below and cached on the worker.
+# Bumping a version here (after building/publishing that package to a channel)
+# rolls the whole studio onto new software.
+software:
+  dcc:
+    name: blender
+    version: "4.2"          # Conda match spec; resolves the latest 4.2.x build
+  # Studio Blender add-ons, installed into the same Conda environment as the DCC
+  # and enabled by the render step. moonrise_scatter is an in-house add-on that
+  # scatters greeble geometry over the shot's subject.
+  plugins:
+    - name: moonrise_scatter
+      version: "1.0.0"
+      module: moonrise_scatter   # add-on module the render step enables
+  # Conda channels to resolve the above from, in priority order. "deadline-cloud"
+  # is the service-provided channel; the studio channel hosts in-house packages
+  # (moonrise_scatter). Set the studio channel to your S3 channel URI, e.g.
+  # s3://<bucket>/Conda, built with rattler-build + aws s3 sync (see the README).
+  conda_channels:
+    - deadline-cloud
+    - s3://REPLACE-WITH-YOUR-STUDIO-CONDA-CHANNEL
+
+# Render defaults. Any shot can override resolution, frame range, samples, etc.
+render:
+  resolution: [1920, 1080]
+  frame_rate: 24
+  samples: 64
+  engine: CYCLES
+
+# Flow Production Tracking (ShotGrid) site-wide settings. The per-shot config
+# supplies the project id / asset, and the API credentials live in AWS Secrets
+# Manager (never in these files). See the bundle README.
+flow:
+  enabled: true
+  # The status set on the review Task after a successful publish. Many sites use
+  # "rev" (pending review); this demo uses the stock code "fin".
+  task_status: fin

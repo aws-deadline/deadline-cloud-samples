@@ -1,0 +1,2 @@
+# Placeholder. The launcher (studio-pipe submit) always supplies a real
+# .blend asset path via -p ShotAsset=... from the resolved shot context.

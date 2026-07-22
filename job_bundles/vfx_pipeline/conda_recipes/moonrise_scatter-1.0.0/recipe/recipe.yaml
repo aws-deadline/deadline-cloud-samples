@@ -1,0 +1,50 @@
+# Recipe for the in-house Blender add-on `moonrise_scatter`, in rattler-build
+# format. See https://prefix-dev.github.io/rattler-build/latest/
+#
+# This is the whole point of the conda approach for a studio: your own tools are
+# packaged the same way the DCC is. The add-on's source lives right next to this
+# recipe (recipe/moonrise_scatter/), so the package is built from studio source
+# rather than downloaded. `requirements.run: blender` makes the package depend on
+# Blender, so `conda create ... blender=4.2 moonrise_scatter=1.0` resolves both
+# together and the add-on is discoverable the moment the environment activates.
+
+context:
+  version: "1.0.0"
+
+package:
+  name: moonrise_scatter
+  version: ${{ version }}
+
+source:
+  - path: moonrise_scatter
+    target_directory: moonrise_scatter
+
+build:
+  number: 0
+  # Pure-Python add-on, no compiled files; keep conda's relocation machinery off.
+  noarch: generic
+  script:
+    - bash $RECIPE_DIR/build.sh
+
+requirements:
+  run:
+    - blender
+
+tests:
+  - script:
+    # Prove the add-on is importable and enable-able in the same environment.
+    - |
+      cat <<EOF > test.py
+      import bpy
+      bpy.ops.preferences.addon_enable(module="moonrise_scatter")
+      assert hasattr(bpy.ops.moonrise, "scatter"), "operator not registered"
+      print("moonrise_scatter enabled OK")
+      EOF
+    - blender --background --python test.py
+
+about:
+  license: MIT-0
+  summary: >
+    Moonrise Studios' in-house Blender add-on: scatters instanced greeble
+    geometry over a target mesh. Stands in for a studio-authored tool that the
+    render pipeline drives headlessly (bpy.ops.moonrise.scatter).

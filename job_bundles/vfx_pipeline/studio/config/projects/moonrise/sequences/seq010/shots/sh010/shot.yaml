@@ -1,0 +1,23 @@
+# Shot: seq010_sh010
+#
+# Shot-level config — the most specific layer; these values win over everything.
+# This is where the actual creative work is pinned: which asset to render, the
+# frame range, and the shot's final resolution.
+
+shot_code: sh010
+
+# The asset to render, relative to studio/assets. The launcher attaches this
+# file to the job; the render step opens it on the worker.
+asset: moonrise/seq010/sh010/hero_vehicle.blend
+
+# This shot is a quick 48-frame turntable of the hero vehicle for model review.
+render:
+  frame_range: "1-48"
+  resolution: [1920, 1080]
+
+# Flow: publish a Version against this asset's review Task.
+flow:
+  asset_name: "Hero Vehicle"
+  asset_type: Vehicle
+  task_name: "Turntable"
+  step_short_name: MDL

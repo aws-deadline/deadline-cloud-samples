@@ -1,0 +1,20 @@
+# Shot: seq010_sh020
+#
+# A second shot in the same sequence, with a different asset, a longer frame
+# range, and a heavier sample count for a hero render. It inherits the
+# sequence's frame rate and the project's 2K resolution (it does not override
+# resolution, so the project value wins).
+
+shot_code: sh020
+
+asset: moonrise/seq010/sh020/robot_droid.blend
+
+render:
+  frame_range: "1-72"
+  samples: 128
+
+flow:
+  asset_name: "Robot Droid"
+  asset_type: Character
+  task_name: "Turntable"
+  step_short_name: MDL

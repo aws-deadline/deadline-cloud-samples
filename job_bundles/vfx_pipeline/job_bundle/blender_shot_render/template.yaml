@@ -1,0 +1,383 @@
+specificationVersion: jobtemplate-2023-09
+name: Blender Shot Render ({{Param.ShotId}})
+description: |
+  Renders a shot's Blender asset on AWS Deadline Cloud, encodes a review movie
+  and a thumbnail, and publishes the result to Autodesk Flow Production Tracking
+  (formerly ShotGrid).
+
+  This is the farm half of the sample VFX pipeline. It is a STATIC, parameterized
+  job bundle: the studio_pipe launcher fills these parameters from a shot's
+  resolved context and submits the bundle unchanged. Nothing about the bundle is
+  generated per submission.
+
+  Software delivery via Conda: the studio's DCC (Blender) and add-ons are built as
+  Conda packages (see ../../conda_recipes) and published to an S3-hosted Conda
+  channel. This job carries only the Conda specs (CondaPackages, CondaChannels);
+  the Conda queue environment attached to the queue solves and caches the
+  environment on the worker and puts Blender on PATH BEFORE this job runs, so
+  there is no software-staging step here. The queue environment reuses a cached
+  environment across jobs on a warm worker. The shot's .blend asset does travel as
+  a job attachment (the ShotAsset parameter), which is the right tool for a small,
+  per-shot input. See the README for how to attach the Conda queue environment.
+
+  The step graph is:
+
+    RenderShot
+       |-- GenerateMovie     (depends: RenderShot)   PNG sequence -> H.264 mp4
+       |-- GenerateThumbnail (depends: RenderShot)   mid frame -> jpg
+       +-- PublishToFlow     (depends: GenerateMovie, GenerateThumbnail)
+
+  GenerateMovie and GenerateThumbnail run in parallel because neither depends on
+  the other. PublishToFlow waits for both because it uploads both artifacts. Each
+  is a first-class OpenJD step: independently observable, retryable, and
+  schedulable. The movie and thumbnail are produced with Blender's bundled
+  FFmpeg/image writers, so the only software the job stages is Blender itself.
+
+  Flow credentials are stored in AWS Secrets Manager; PublishToFlow reads them at
+  runtime with the worker's queue role. The Flow parameters are filled by the
+  preSubmission hook from the studio's FLOW_* environment variables. See the
+  README for setup.
+
+parameterDefinitions:
+
+# --- Shot identity ---
+- name: ShotId
+  type: STRING
+  description: Flat shot identifier, e.g. moonrise_seq010_sh010. Used to name outputs.
+  default: shot
+  userInterface:
+    control: LINE_EDIT
+    label: Shot Id
+    groupLabel: Shot
+
+# --- Render settings (filled from the resolved shot context) ---
+- name: FrameRange
+  type: STRING
+  description: Frame range of the turntable. A full 360 rotation is spread across it.
+  default: 1-48
+  userInterface:
+    control: LINE_EDIT
+    label: Frame Range
+    groupLabel: Render
+- name: ResolutionX
+  type: INT
+  default: 1920
+  minValue: 16
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution X
+    groupLabel: Render
+- name: ResolutionY
+  type: INT
+  default: 1080
+  minValue: 16
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution Y
+    groupLabel: Render
+- name: Samples
+  type: INT
+  description: Cycles render samples.
+  default: 64
+  minValue: 1
+  userInterface:
+    control: SPIN_BOX
+    label: Render Samples
+    groupLabel: Render
+- name: FrameRate
+  type: INT
+  default: 24
+  minValue: 1
+  userInterface:
+    control: SPIN_BOX
+    label: Frame Rate (fps)
+    groupLabel: Render
+
+# --- Output ---
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  description: >
+    Working/output directory shared by all steps. Frames go to OutputDir/frames,
+    the movie and thumbnail to OutputDir. studio-pipe submits this as an absolute
+    path under studio/renders/<shot_id>, so Deadline Cloud's auto-downloader
+    (`deadline queue sync-output`) restores the outputs straight onto the studio
+    drive.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output
+
+# --- Shot asset (attached via job attachments) ---
+- name: ShotAsset
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: placeholder/shot.blend
+  description: >
+    The shot's .blend scene file. Attached to the job and path-mapped onto the
+    worker; RenderShot opens it. Always supplied by the launcher (-p ShotAsset=...)
+    from the resolved shot context; the default is only a bundle-local placeholder.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Shot Asset (.blend)
+    groupLabel: Shot
+
+# --- Software (DCC + plugins delivered by the Conda queue environment) ---
+# The studio's software is NOT carried by this job. It is published once to an
+# S3-hosted Conda channel (rattler-build + aws s3 sync) and pulled at run time by
+# the Conda queue environment attached to the queue
+# (queue_environments/conda_queue_env_improved_caching.yaml). These two
+# parameters are the interface to that queue environment: the launcher fills them
+# from the shot's resolved software, and the queue environment solves the
+# environment and puts `blender` on PATH before any step below runs.
+- name: CondaPackages
+  type: STRING
+  default: "blender=4.2 moonrise_scatter=1.0.0"
+  description: >
+    Space-separated Conda package specs for the shot's software (DCC + plugins),
+    e.g. "blender=4.2 moonrise_scatter=1.0.0". Read by the Conda queue
+    environment. Filled by the launcher from the resolved shot context.
+  userInterface:
+    control: HIDDEN
+- name: CondaChannels
+  type: STRING
+  default: "deadline-cloud"
+  description: >
+    Space-separated Conda channels to install from. "deadline-cloud" (the
+    service-provided channel) plus the studio's own channel for in-house packages
+    like moonrise_scatter. Filled by the launcher.
+  userInterface:
+    control: HIDDEN
+- name: PluginModules
+  type: STRING
+  default: ""
+  description: >
+    Space-separated Blender add-on modules to enable for the render (e.g.
+    "moonrise_scatter"). The Conda packages make these importable; the render
+    script enables them by name. Empty means no plugins. Supplied by the launcher.
+  userInterface:
+    control: HIDDEN
+
+# --- Scripts shipped in the bundle (attached + path-mapped) ---
+- name: RenderScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/render_shot.py
+  userInterface: {control: HIDDEN}
+- name: MovieScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/encode_movie.py
+  userInterface: {control: HIDDEN}
+- name: ThumbnailScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/make_thumbnail.py
+  userInterface: {control: HIDDEN}
+- name: PublishScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: scripts/publish_to_flow.py
+  userInterface: {control: HIDDEN}
+
+# --- Flow Production Tracking (HIDDEN; filled by the preSubmission hook) ---
+- name: EnableFlowPublish
+  type: STRING
+  default: "TRUE"
+  allowedValues: ["TRUE", "FALSE"]
+  description: When TRUE, PublishToFlow creates a Version and uploads media. From FLOW_PUBLISH.
+  userInterface: {control: HIDDEN}
+- name: FlowSecretArn
+  type: STRING
+  default: ""
+  description: Secrets Manager ARN with {site_url, script_name, api_key}. From FLOW_SECRET_ARN.
+  userInterface: {control: HIDDEN}
+- name: FlowProjectId
+  type: INT
+  default: 0
+  description: Numeric Flow Project id. From FLOW_PROJECT_ID.
+  userInterface: {control: HIDDEN}
+- name: FlowAssetName
+  type: STRING
+  default: ""
+  description: Asset code (found-or-created). From FLOW_ASSET_NAME.
+  userInterface: {control: HIDDEN}
+- name: FlowAssetType
+  type: STRING
+  default: "Prop"
+  description: sg_asset_type used if the Asset is created. From FLOW_ASSET_TYPE.
+  userInterface: {control: HIDDEN}
+- name: FlowStepShortName
+  type: STRING
+  default: "MDL"
+  description: Pipeline Step short name for the review Task. From FLOW_STEP_SHORT_NAME.
+  userInterface: {control: HIDDEN}
+- name: FlowTaskName
+  type: STRING
+  default: "Turntable"
+  description: Task content/name on the Asset (found-or-created). From FLOW_TASK_NAME.
+  userInterface: {control: HIDDEN}
+- name: FlowTaskStatus
+  type: STRING
+  default: "fin"
+  description: Status set on the Task after publishing. From FLOW_TASK_STATUS.
+  userInterface: {control: HIDDEN}
+
+jobEnvironments:
+- name: JobEnvVars
+  variables:
+    PYTHONUNBUFFERED: "True"
+
+# Software (Blender + the moonrise_scatter add-on) is made present by the Conda
+# QUEUE environment attached to the queue, not by this job. Deadline Cloud runs
+# queue environments before the job's own actions, so by the time RenderShot runs
+# `blender` is already on PATH and the add-on is importable. The job only carries
+# the CondaPackages/CondaChannels parameters that tell that queue environment what
+# to install. See the README ("Getting software onto the worker") for how to
+# attach queue_environments/conda_queue_env_improved_caching.yaml to the queue.
+
+steps:
+- name: RenderShot
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.FrameRange}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        FRAMES_DIR='{{Param.OutputDir}}/frames'
+        mkdir -p "$FRAMES_DIR"
+
+        # Studio add-ons the shot asked for. Their Conda packages already put them
+        # on Blender's add-on search path (BLENDER_USER_SCRIPTS, set by the package
+        # on environment activation), so the render script only needs the module
+        # names to enable, with no directory to point at. Route the parameter
+        # through a shell variable so the empty case (no plugins) is a runtime
+        # word-split that iterates zero times, not an empty literal after `in`.
+        PLUGIN_MODULES='{{Param.PluginModules}}'
+        ADDON_ARGS=()
+        for MODULE in $PLUGIN_MODULES; do
+          ADDON_ARGS+=(--addon-module "$MODULE")
+        done
+
+        # Open the attached shot asset and render the assigned frame. Blender is
+        # on PATH thanks to the Conda queue environment. Rendering per-frame keeps
+        # every task independent (no shared scene state carried between tasks).
+        blender --background '{{Param.ShotAsset}}' \
+          --python '{{Param.RenderScript}}' -- \
+          --frame {{Task.Param.Frame}} \
+          --frame-range '{{Param.FrameRange}}' \
+          --resolution-x {{Param.ResolutionX}} \
+          --resolution-y {{Param.ResolutionY}} \
+          --samples {{Param.Samples}} \
+          --output-prefix "$FRAMES_DIR/{{Param.ShotId}}_" \
+          ${ADDON_ARGS[@]+"${ADDON_ARGS[@]}"}
+
+- name: GenerateMovie
+  dependencies:
+  - dependsOn: RenderShot
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        FRAMES_DIR='{{Param.OutputDir}}/frames'
+        # Encode with Blender's bundled FFmpeg writer (no separate ffmpeg needed).
+        blender --background --python '{{Param.MovieScript}}' -- \
+          --frames-dir "$FRAMES_DIR" \
+          --prefix '{{Param.ShotId}}_' \
+          --frame-range '{{Param.FrameRange}}' \
+          --frame-rate {{Param.FrameRate}} \
+          --output '{{Param.OutputDir}}/{{Param.ShotId}}.mp4'
+
+        ls -lh '{{Param.OutputDir}}/{{Param.ShotId}}.mp4'
+
+- name: GenerateThumbnail
+  dependencies:
+  - dependsOn: RenderShot
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        FRAMES_DIR='{{Param.OutputDir}}/frames'
+        blender --background --python '{{Param.ThumbnailScript}}' -- \
+          --frames-dir "$FRAMES_DIR" \
+          --prefix '{{Param.ShotId}}_' \
+          --frame-range '{{Param.FrameRange}}' \
+          --max-width 640 \
+          --output '{{Param.OutputDir}}/{{Param.ShotId}}_thumbnail.jpg'
+
+        ls -lh '{{Param.OutputDir}}/{{Param.ShotId}}_thumbnail.jpg'
+
+- name: PublishToFlow
+  dependencies:
+  - dependsOn: GenerateMovie
+  - dependsOn: GenerateThumbnail
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -xeuo pipefail
+
+        if [ '{{Param.EnableFlowPublish}}' != "TRUE" ]; then
+          echo "EnableFlowPublish is FALSE; skipping Flow publish."
+          exit 0
+        fi
+
+        if [ -z '{{Param.FlowSecretArn}}' ]; then
+          echo "ERROR: FlowSecretArn is empty but EnableFlowPublish is TRUE." >&2
+          exit 1
+        fi
+
+        # shotgun_api3 is PyPI-only (not on conda-forge / not bundled with
+        # Blender), so install it into a system Python at runtime. boto3 reads the
+        # secret. We deliberately use python3 here, NOT Blender's Python, because
+        # this step talks to web services and does not touch the scene.
+        python3 -m pip --version >/dev/null 2>&1 || python3 -m ensurepip --upgrade
+        python3 -m pip install --quiet --disable-pip-version-check shotgun_api3 boto3
+
+        python3 '{{Param.PublishScript}}' \
+          --secret-arn '{{Param.FlowSecretArn}}' \
+          --project-id {{Param.FlowProjectId}} \
+          --asset-name '{{Param.FlowAssetName}}' \
+          --asset-type '{{Param.FlowAssetType}}' \
+          --step-short-name '{{Param.FlowStepShortName}}' \
+          --task-name '{{Param.FlowTaskName}}' \
+          --task-status '{{Param.FlowTaskStatus}}' \
+          --movie '{{Param.OutputDir}}/{{Param.ShotId}}.mp4' \
+          --thumbnail '{{Param.OutputDir}}/{{Param.ShotId}}_thumbnail.jpg' \
+          --frames-dir '{{Param.OutputDir}}/frames'

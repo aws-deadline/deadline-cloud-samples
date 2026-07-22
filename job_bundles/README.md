@@ -60,6 +60,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Maya V-Ray tiled render](tile_render_with_maya_vray/) | V-Ray tile rendering followed by OpenImageIO assembly | You need tiled EXR output from Maya and V-Ray |
 | [V-Ray Linux region render](tile_render_with_vray_linux/) | Region rendering, asset discovery, path mapping, and image merge | You render `.vrscene` files in parallel regions on Linux |
 | [Maya Arnold turntable](turntable_with_maya_arnold/) | Building a scene around an OBJ, then rendering frames and encoding video | You need an easy-to-submit 3D asset review utility |
+| [Studio VFX shot pipeline](vfx_pipeline/) | A launcher, static render bundle, Conda software delivery, and Flow publishing mapped onto a studio's existing pipeline | You are porting a studio shot pipeline to Deadline Cloud |
 | [AutoDock Vina virtual screening](virtual_screening_vina/) | Parallel molecular docking and ranked result aggregation | You want to screen many ligands against a protein target |
 | [vLLM evaluation leaderboard](vllm_lm_eval_leaderboard/) | Parallel model evaluation and final CSV/Markdown aggregation | You need to compare multiple LLMs across benchmarks |
 | [V-Ray standalone render](vray_render/) | Rendering with a Conda-provided V-Ray executable | You need a basic standalone V-Ray bundle |

@@ -1,0 +1,13 @@
+# Sequence: seq010 ("Rooftop chase")
+#
+# Sequence-level overrides. A sequence often shares a look, a frame rate, or a
+# set of plugins across all its shots. Values here win over the project but lose
+# to the individual shot.
+
+sequence_code: seq010
+title: "Rooftop chase"
+
+# This sequence is graded for a 48-frame review cadence by default; individual
+# shots still set their own frame ranges.
+render:
+  frame_rate: 24

@@ -1,0 +1,199 @@
+<mxfile host="hand-authored" type="device">
+  <diagram name="vfx-pipeline" id="vfx-pipeline">
+    <mxGraphModel dx="1600" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="Sample VFX render pipeline on AWS Deadline Cloud"
+          style="text;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="450" y="16" width="900" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="studio" value="Studio (on-prem)"
+          style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#EEF6FB;strokeColor=#9CC3DB;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontStyle=1;fontSize=15;fontColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="340" height="530" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="workstation" value="Artist workstation&#10;(studio-pipe)"
+          style="sketch=0;outlineConnect=0;dashed=0;html=1;fontColor=#232F3E;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;align=center;shape=mxgraph.aws4.user;fillColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="92" y="150" width="64" height="64" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="autodl" value="Auto-downloader&#10;(deadline queue sync-output)"
+          style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#57606A;fontColor=#232F3E;fontSize=12;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="80" y="330" width="230" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="storage" value="Shared storage&#10;(assets, renders)"
+          style="sketch=0;outlineConnect=0;dashed=0;html=1;fontColor=#232F3E;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;align=center;shape=mxgraph.aws4.file_storage;fillColor=#7AA116;"
+          vertex="1" parent="1">
+          <mxGeometry x="163" y="490" width="64" height="64" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="aws" value="AWS"
+          style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#B4C4D4;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontStyle=1;fontSize=15;fontColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="460" y="90" width="1100" height="530" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="bucket" value="Amazon S3&#10;(shot attachments +&#10;Conda channel)"
+          style="sketch=0;html=1;verticalLabelPosition=top;labelBackgroundColor=none;verticalAlign=bottom;align=center;outlineConnect=0;fontColor=#232F3E;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;fillColor=#7AA116;gradientColor=#4D852F;strokeColor=#ffffff;"
+          vertex="1" parent="1">
+          <mxGeometry x="506" y="272" width="68" height="68" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="farm" value="AWS Deadline Cloud farm"
+          style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#EAF3FB;strokeColor=#A9C7E0;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontStyle=1;fontSize=14;fontColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="600" y="110" width="920" height="400" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="queue" value="Queue"
+          style="sketch=0;html=1;verticalLabelPosition=bottom;labelBackgroundColor=none;verticalAlign=top;align=center;outlineConnect=0;fontColor=#232F3E;fontSize=12;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.deadline_cloud;fillColor=#ED7100;gradientColor=#C8500A;strokeColor=#ffffff;"
+          vertex="1" parent="1">
+          <mxGeometry x="638" y="272" width="68" height="68" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fleet" value="Fleet"
+          style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F3F7FB;strokeColor=#C2D4E4;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fontColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="768" y="150" width="730" height="320" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="worker" value="Worker"
+          style="sketch=0;html=1;verticalLabelPosition=bottom;labelBackgroundColor=none;verticalAlign=top;align=center;outlineConnect=0;fontColor=#232F3E;fontSize=12;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;fillColor=#ED7100;gradientColor=#C8500A;strokeColor=#ffffff;"
+          vertex="1" parent="1">
+          <mxGeometry x="800" y="272" width="68" height="68" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="steps" value="Worker session (Open Job Description)"
+          style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4EEFC;strokeColor=#C9B6EC;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fontColor=#232F3E;"
+          vertex="1" parent="1">
+          <mxGeometry x="920" y="200" width="560" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="stage" value="Conda queue env&#10;installs Blender + add-on&#10;(cached per host)"
+          style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFF3E8;strokeColor=#ED7100;fontColor=#232F3E;fontSize=10;strokeWidth=2;spacingLeft=2;spacingRight=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="934" y="273" width="124" height="66" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="render" value="Render frames&#10;(one task / frame)"
+          style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8C4FFF;fontColor=#232F3E;fontSize=12;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1078" y="280" width="116" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="thumb" value="Make thumbnail"
+          style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8C4FFF;fontColor=#232F3E;fontSize=12;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1214" y="224" width="120" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="movie" value="Make preview movie"
+          style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8C4FFF;fontColor=#232F3E;fontSize=12;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1214" y="336" width="120" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="publish" value="Publish for review"
+          style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8C4FFF;fontColor=#232F3E;fontSize=12;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1356" y="280" width="110" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="flow" value="Autodesk Flow&#10;/ ShotGrid"
+          style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#57606A;fontColor=#232F3E;fontSize=12;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1650" y="280" width="120" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_rw" value="reads / writes"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#7D8590;strokeWidth=2;startArrow=none;endArrow=none;fontSize=11;fontColor=#4D5358;labelBackgroundColor=#EEF6FB;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="workstation" target="storage">
+          <mxGeometry x="0.7" relative="1" as="geometry">
+            <Array as="points"><mxPoint x="58" y="182"/><mxPoint x="58" y="522"/></Array>
+            <mxPoint as="offset"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e_write" value="write renders"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#3F8624;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#3F8624;labelBackgroundColor=#EEF6FB;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="autodl" target="storage">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="1. upload shot"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#146EB4;strokeWidth=3;endArrow=block;fontSize=12;fontColor=#146EB4;labelBackgroundColor=#EEF3F8;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="workstation" target="bucket">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="470" y="182"/><mxPoint x="470" y="296"/></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e2" value="2. submit job"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#C8500A;strokeWidth=3;endArrow=block;fontSize=12;fontColor=#C8500A;labelBackgroundColor=#EEF3F8;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="workstation" target="queue">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="672" y="163"/></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e3" value="3. schedule job"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#7D8590;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#4D5358;labelBackgroundColor=#EAF3FB;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="queue" target="worker">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" y="-10"/></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e4" value="4. pull shot + Conda packages"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#146EB4;strokeWidth=3;endArrow=block;fontSize=12;fontColor=#146EB4;labelBackgroundColor=#EAF3FB;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="bucket" target="worker">
+          <mxGeometry x="0.55" relative="1" as="geometry">
+            <Array as="points"><mxPoint x="614" y="306"/><mxPoint x="614" y="248"/><mxPoint x="834" y="248"/></Array>
+            <mxPoint as="offset"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e_runs" value="enters env,&#10;then runs steps"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#7D8590;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#4D5358;labelBackgroundColor=#F3F7FB;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="worker" target="stage">
+          <mxGeometry x="0.3" relative="1" as="geometry"><mxPoint as="offset" y="-28"/></mxGeometry>
+        </mxCell>
+
+        <mxCell id="s1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage" target="render"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="render" target="thumb"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="render" target="movie"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="s4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="thumb" target="publish"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="s5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="movie" target="publish"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e_pub" value="publish review"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#8C4FFF;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#8C4FFF;labelBackgroundColor=#EEF3F8;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="publish" target="flow">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e5" value="5. upload outputs"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#3F8624;strokeWidth=3;endArrow=block;fontSize=12;fontColor=#3F8624;labelBackgroundColor=#EAF3FB;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="worker" target="bucket">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="834" y="450"/><mxPoint x="540" y="450"/></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e6" value="6. download outputs"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#3F8624;strokeWidth=3;endArrow=block;fontSize=12;fontColor=#3F8624;labelBackgroundColor=#EEF3F8;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;"
+          edge="1" parent="1" source="bucket" target="autodl">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="420" y="320"/><mxPoint x="420" y="360"/></Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

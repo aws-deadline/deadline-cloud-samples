@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "studio-pipe"
+version = "0.1.0"
+description = "Sample VFX pipeline launcher for AWS Deadline Cloud — resolves shot context, launches DCCs, and submits render jobs."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT-0"
+dependencies = [
+    "pyyaml>=6.0",
+    # The Deadline Cloud CLI/client. studio-pipe shells out to the `deadline`
+    # command for submission and output download. Requires >=0.52.1 for the
+    # `deadline queue sync-output` auto-downloader used by autodownload.py.
+    "deadline>=0.52.1",
+]
+
+[project.scripts]
+# A single entry point with subcommands. The same package is installed on the
+# workstation (for resolve/launch/submit/autodownload) and, optionally, used by
+# the worker-side staging script.
+studio-pipe = "studio_pipe.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["studio_pipe"]

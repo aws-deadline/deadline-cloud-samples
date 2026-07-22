@@ -1,0 +1,11 @@
+# The "shared drive" holds large, generated content that does not belong in git.
+# Only the config hierarchy is committed; the assets and renders below are
+# produced by the asset tool or by renders. (Software lives in conda_recipes/ and
+# is published to an S3 Conda channel — not here.)
+
+# Generated sample assets (.blend files) and render outputs.
+assets/
+renders/
+
+# Keep the directory structure so paths resolve on a fresh checkout.
+!.gitkeep

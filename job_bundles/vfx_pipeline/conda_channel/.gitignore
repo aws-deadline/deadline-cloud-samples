@@ -1,0 +1,10 @@
+# This directory is a committed sample Conda channel (see README.md). The repo
+# root ignores **/*.conda to keep built packages out of git, but this one small
+# package is committed on purpose so the channel is browsable on GitHub.
+!/noarch/*.conda
+
+# Scratch directories rattler-build leaves behind when it builds into a channel
+# with --output-dir. Never commit these.
+.tmp/
+bld/
+src_cache/

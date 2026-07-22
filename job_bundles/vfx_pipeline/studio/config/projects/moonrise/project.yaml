@@ -1,0 +1,18 @@
+# Project: Moonrise
+#
+# Project-level overrides. These win over studio.yaml but lose to the sequence
+# and shot configs. A project typically pins its own delivery resolution, the
+# Flow project it publishes into, and any project-specific software.
+
+project_code: moonrise
+title: "Moonrise"
+
+# The numeric Flow Production Tracking project id this show publishes into.
+# Replace 0 with your real project id (Flow URL: /page/project_overview?project_id=N).
+flow:
+  project_id: 0
+
+# Moonrise delivers at 2K and renders a little cleaner than the studio default.
+render:
+  resolution: [2048, 1080]
+  samples: 96
