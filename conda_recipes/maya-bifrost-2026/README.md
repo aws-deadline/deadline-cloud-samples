@@ -43,7 +43,7 @@ To adapt this recipe for different Maya or Bifrost versions:
 1. **Edit `recipe/recipe.yaml`**:
    - Change `major_version: "2026"` to your Maya version (e.g., "2025", "2024")
    - Change `minor_version: "2.14.1.0"` to your Bifrost version
-   - Update the `version` context variable to match
+   - Update the `version` context variable to match the new Bifrost version
    - Update the `sha256` hash to match your Bifrost installer file
 
 2. **Edit `recipe/build.sh`**:

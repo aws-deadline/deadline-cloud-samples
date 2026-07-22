@@ -31,7 +31,7 @@ it travels with the job in `hooks.yaml` and applies only to this bundle's submis
   ```
 
 The hook runs `python3`. On Windows, or if only `python` is on your PATH, edit
-the `command` in [`hooks.yaml`](hooks.yaml) to match.
+the `command` in [`hooks.yaml`](hooks.yaml) to match your Python executable.
 
 ## How it works
 

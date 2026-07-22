@@ -8,7 +8,7 @@ for a Maya plugin can integrate.
 ## Build Notes
 The build script uses patchelf to set relative paths (RPATH) for shared libraries. The paths 
 (e.g., '$ORIGIN/../../maya2026/lib') are relative to the Maya installation directory structure. 
-If the Maya installation directory layout is modified, these paths in build.sh may need to be updated to match.
+If the Maya installation directory layout is modified, these paths in build.sh may need to be updated to match the new layout.
 
 Symlinks are created to make utilities accessible from the command line. 
 Additional symlinks may be needed if new utilities are added in future versions.
