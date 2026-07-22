@@ -3,7 +3,7 @@
 ## Instructions for Maya plugin packages
 
 This Maya conda build recipe configures the `MAYA_MODULE_PATH` environment variable
-to include several paths to search for plugin `.mod` files. When creating a plugin
+to include multiple paths to search for plugin `.mod` files. When creating a plugin
 package, place its `.mod` file in one of these so that Maya loads the plugin at startup.
 
 * `$PREFIX/usr/autodesk/maya$MAYA_VERSION/modules`
@@ -28,7 +28,7 @@ for use by the conda build recipe.
     1. From the AWS EC2 management console, select the option to Launch instance.
     2. Enter instance name "Create Windows Maya archive".
     3. Select "Microsoft Windows Server 2022 Base" for the AMI. (As of writing, Windows Server 2025 did not work with these instructions.)
-    4. Select an instance type with enough vCPUs and RAM, for example c5.4xlarge has 8 vCPUs and 16 GiB RAM.
+    4. Select an instance type with enough vCPUs and RAM, such as c5.4xlarge with 8 vCPUs and 16 GiB RAM.
     5. Select "Proceed without a key pair" for the "Key pair (login)" option.
     6. We will use SSM port forwarding to avoid sending RDP protocol traffic directly over the internet.
         1. Make sure that "Allow RDP traffic" is unchecked.
@@ -52,14 +52,14 @@ for use by the conda build recipe.
         2. User name: `Administrator`
     5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
 3. Install Maya 2025 on the instance.
-    1. Download the Maya 2025 Direct Downloads self-extracting files you got from Autodesk. For example, the files
+    1. Download the Maya 2025 Direct Downloads self-extracting files you got from Autodesk, such as the files
        `Autodesk_Maya_2025_Windows_64bit_dlm_001_002.sfx.exe` and `Autodesk_Maya_2025_Windows_64bit_dlm_002_002.sfx.exe`.
        If you have placed them on S3, you can use a PowerShell command like `Read-S3Object -BucketName MY_BUCKET_NAME -Key MY_UPLOADED_KEY_NAME -File MY_FILE_NAME`.
     2. Run the self-extracting file. Accept the prompts to continue.
     3. The Maya installer will launch. Proceed to install as normal with the components you want included.
     4. Restart the instance to ensure that changes from the installation took effect.
     5. Log in with a powershell window again, either from the EC2 management console session manager or reconnecting to RDP.
-    5. Run the following commands to create the archive. Note specifically that we are making a copy of the ProductInformation.pit file, so that we
+    5. Run the following commands to create the archive. We are making a copy of the ProductInformation.pit file, so that we
        can use it to tell the applications about available licenses via the thin client features.
         1. `cd 'C:\Program Files\Autodesk\'`
         2. `$MAYA_VERSION = '2025'`

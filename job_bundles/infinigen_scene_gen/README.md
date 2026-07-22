@@ -5,7 +5,7 @@ on AWS Deadline Cloud GPU workers. Supports indoor rooms (dining room,
 bedroom, kitchen, etc.) and outdoor nature landscapes (desert, forest,
 mountain, etc.).
 
-Each seed produces a completely unique scene — different room layout,
+Each seed produces a unique scene: different room layout,
 furniture, materials, terrain, and vegetation. Seeds fan out as independent
 tasks for parallel execution across the GPU fleet.
 
@@ -98,12 +98,12 @@ deadline bundle gui-submit job_bundles/infinigen_scene_gen/
 
 Each scene produces:
 
-- `coarse/scene.blend` — 3D scene file (openable in Blender).
-- `frames/Image/camera_0/Image_*.png` — rendered RGB image (1280×720).
-- `frames/Image/camera_0/Image_*.exr` — HDR render.
-- `frames/MaterialSegmentation/` — per-pixel material ID labels.
-- `frames/DiffCol/DiffDir/GlossCol/AO/...` — render passes.
-- `frames/camview/` — camera intrinsics/extrinsics.
+- `coarse/scene.blend`: 3D scene file (openable in Blender).
+- `frames/Image/camera_0/Image_*.png`: rendered RGB image (1280×720).
+- `frames/Image/camera_0/Image_*.exr`: HDR render.
+- `frames/MaterialSegmentation/`: per-pixel material ID labels.
+- `frames/DiffCol/DiffDir/GlossCol/AO/...`: render passes.
+- `frames/camview/`: camera intrinsics/extrinsics.
 
 When `RenderGroundTruth=True`, a second pass with flat shading is rendered
 into the same `frames/` directory to provide accurate depth, normals, and
@@ -134,5 +134,5 @@ iterating, then drop it for final renders.
 ### Empty `.blend` viewport
 
 The intermediate `.blend` files show placeholder bounding boxes when opened
-in the Blender viewport — this is by design. Full geometry is generated
+in the Blender viewport, which is by design. Full geometry is generated
 during the Cycles render pass and is not stored back into the `.blend`.

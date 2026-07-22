@@ -2,7 +2,7 @@
 
 ## Use case for this job
 
-This is a Windows KeyShot job bundle that allows the user to render a scene with
+This Windows KeyShot job bundle lets the user render a scene with
 each frame as a separate task.
 
 The bundle accepts the following job parameters that modify the render:

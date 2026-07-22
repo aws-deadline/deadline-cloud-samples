@@ -64,7 +64,7 @@ This table covers all 49 immediate user-selectable recipe directories in `conda_
 | [Nuke 16.0](nuke-16.0/) | Packaging Nuke 16 with plugin activation support | Your compositing jobs require Nuke 16 |
 | [Nuke 17.0](nuke-17.0/) | Packaging Nuke 17 with Plugin Sync activation | Your compositing jobs require Nuke 17 or changing plugins |
 | [Nuke DENoise](nuke-denoise/) | Packaging the DENoise plugin for Nuke | Nuke jobs need the DENoise node on workers |
-| [OpenJD adaptor runtime](openjd-adaptor-runtime/) | Packaging the shared runtime used by DCC adaptors | You are building Maya, Cinema 4D, or other adaptor packages |
+| [OpenJD adaptor runtime](openjd-adaptor-runtime/) | Packaging the shared runtime used by DCC adaptors | You are building adaptor packages such as Maya or Cinema 4D |
 | [Unreal Engine](unreal-engine/) | Packaging Unreal Engine, including custom source builds | Unreal workloads need an engine package on workers |
 | [Unreal Engine OpenJD adaptor](unreal-engine-openjd/) | Packaging the Unreal integration adaptor | Unreal jobs need OpenJD session integration |
 | [V-Ray standalone](vray/) | Packaging the standalone V-Ray renderer | Jobs render `.vrscene` files without a DCC |
@@ -117,8 +117,8 @@ installed the Deadline Cloud CLI:
 * **`pip install deadline`** (recommended for this workflow): the wrapper discovers the
   interpreter automatically from the `deadline` entry point script, so no extra setup is
   needed.
-* **Standalone submitter installer**: the installer ships a self-contained `deadline`
-  executable and does *not* bundle a reusable Python interpreter. In this case the wrapper
+* **Standalone submitter installer**: the installer includes a self-contained `deadline`
+  executable and does not bundle a reusable Python interpreter. In this case the wrapper
   cannot find a Python to use on its own, and you must point it at one yourself by setting
   the `DEADLINE_PYTHON` environment variable to a Python that has the `deadline` library
   installed (`pip install deadline`):
@@ -233,7 +233,7 @@ by adding the `--fast-build` or `-f` flag:
 $ ./submit-package-job blender-4.2 --fast-build
 ```
 
-This enables:
+The fast-build flag enables:
 - **rattler-build**: Uses `--package-format conda:min` for optimized package format
 - **conda-build** (deprecated): Uses `--zstd-compression-level 1` for faster compression with a larger package size
 
@@ -248,7 +248,7 @@ You can pass additional arguments to the conda-build or rattler-build command us
 $ ./submit-package-job blender-4.2 --extra-build-tool-args "--no-test --quiet"
 ```
 
-This allows you to customize the build process with any supported conda-build or rattler-build arguments:
+Any supported conda-build or rattler-build argument works here:
 - **conda-build**: Examples include `--no-test`, `--quiet`, `--debug`
 - **rattler-build**: Examples include `--quiet`, `--debug`, `--skip-existing`
 
@@ -324,7 +324,7 @@ condaPlatforms:
     sourceDownloadInstructions: 'Copy from internal drive /mnt/tools/internal/source'
 ```
 
-If you want to build different variants on a platform, for instance with CUDA support
+If you want to build different variants on a platform, such as with CUDA support
 and without, you can add a variant field along with additional host requirements to append.
 You can also control the value of a `variant_config.yaml` file to provide parameter
 values to the conda variants (See [conda-build variants](https://docs.conda.io/projects/conda-build/en/latest/resources/variants.html)
@@ -412,8 +412,8 @@ in the Deadline Cloud developer guide to learn how you can create package recipe
 2. Install the [grayskull](https://github.com/conda/grayskull) conda recipe creator,
     by running `pip install grayskull` or `conda install grayskull`.
 3. In the `conda_recipes` directory, create a new subdirectory named as the PyPI package,
-    then run `grayskull` to create the recipe within. This will download the sdist from PyPI
-    to analyze its metadata, and then create the recipe. Here's an example for `deadline`.
+    then run `grayskull` to create the recipe within. Grayskull downloads the sdist from PyPI
+    to analyze its metadata, and then creates the recipe. Here's an example for `deadline`.
     ```
     $ mkdir deadline
     $ cd deadline
@@ -441,7 +441,7 @@ in the Deadline Cloud developer guide to learn how you can create package recipe
     ```
 4. We found we needed to change `{{ PYTHON }}` to `python`, because during the build it was producing a path that didn't contain
    the Python binary. In some cases, we also had to change some of the dependency rules.
-5. If the package name is different from the module name, for example because it adds to a namespace package,
+5. If the package name is different from the module name, such as when it adds to a namespace package,
    you'll need to update the `imports` tests it creates.
 
 ### Create a patch for a recipe
@@ -449,7 +449,7 @@ in the Deadline Cloud developer guide to learn how you can create package recipe
 Sometimes the source code has bugs, or won't build without modifications. You can create
 patch files to include in the recipe.
 
-For example, the source tarballs we generate on GitHub do not work with this process,
+The source tarballs we generate on GitHub do not work with this process,
 so the recipes generated by grayskull fail during the build process.
 
 Here is a procedure for generating a patch and adding it to the recipe.

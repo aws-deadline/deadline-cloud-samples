@@ -1,7 +1,7 @@
 # tyFlow Add-on
 
-tyFlow is a particle system and physics simulation plugin for 3ds Max. It ships as a single
-`.dlo` file — no installer needed.
+tyFlow is a particle system and physics simulation plugin for 3ds Max. It comes as a single
+`.dlo` file, with no installer needed.
 
 ## Reference Script
 
@@ -15,5 +15,5 @@ See `host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-tyflow/3dsmax-2025-v
 
 ## Important notes
 
-- No environment variables are needed — 3ds Max loads plugins automatically from the plugins directory
-- The `.dlo` file name includes the 3ds Max year — make sure it matches the version being installed
+- No environment variables are needed. 3ds Max loads plugins automatically from the plugins directory
+- The `.dlo` file name includes the 3ds Max year, so make sure it matches the version being installed

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a conda build recipe for Nuke 16.0.1, specifically configured for use with AWS Deadline Cloud. With this package you can run Nuke compositing and processing jobs on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for Nuke 16.0.1, configured for use with AWS Deadline Cloud. With this package you can run Nuke compositing and processing jobs on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
@@ -101,4 +101,4 @@ nuke-16.0/
 
 ---
 
-**Note**: This recipe is specifically configured for Nuke 16.0.1 on Linux x86_64 platforms. The build process automatically handles EULA acceptance and system dependency installation.
+This recipe is configured for Nuke 16.0.1 on Linux x86_64 platforms. The build process automatically handles EULA acceptance and system dependency installation.

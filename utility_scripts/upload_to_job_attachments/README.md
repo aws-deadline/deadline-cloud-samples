@@ -13,7 +13,7 @@ This script uploads files to the job attachments S3 bucket in content-addressabl
 - Automatic deduplication (skips files already in S3)
 - Progress reporting and statistics
 - Retry logic with exponential backoff
-- Two configuration modes: direct S3 specification or queue lookup
+- Configuration modes: direct S3 specification or queue lookup
 
 ## Requirements
 
@@ -110,7 +110,7 @@ python upload_to_job_attachments.py \
 
 ### Transfer Configuration for Large Files
 
-For very large files or bandwidth constraints, you can customize the S3 transfer behavior:
+For large files or bandwidth constraints, you can customize the S3 transfer behavior:
 
 ```bash
 # Large files (>100MB) - use bigger chunks for efficiency
@@ -212,7 +212,7 @@ Upload completed successfully!
 
 - **File read errors**: Logs warning and continues with remaining files
 - **S3 upload failures**: Retries up to 3 times with exponential backoff
-- **Network errors**: Retries with backoff, reports failures in summary
+- **Network errors**: Retries with backoff, reports failures in the final summary
 - **Configuration errors**: Provides clear error messages and exits
 
 ## Performance Tips

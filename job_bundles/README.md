@@ -35,7 +35,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Infinigen scene generation](infinigen_scene_gen/) | Procedural indoor and outdoor scene generation on GPU workers | You need synthetic photorealistic datasets |
 | [Job attachments input guide](job_attachments_devguide/) | Input path metadata and attached script files | You are learning how job attachment inputs are materialized |
 | [Job attachments output guide](job_attachments_devguide_output/) | Collecting declared job output files | You are learning how job attachment outputs are returned |
-| [Job development progression](job_dev_progression/) | Four stages from inline commands to a tested bundled Python package | You want to grow a maintainable job without starting complex |
+| [Job development progression](job_dev_progression/) | A staged path from inline commands to a tested bundled Python package | You want to grow a maintainable job without starting complex |
 | [Daemon-process environment](job_env_daemon_process/) | Starting a background process once and sharing it across tasks | Application startup should be amortized within a session |
 | [Environment variables](job_env_vars/) | Setting variables at job and step scope with OpenJD environments | Tasks need consistent runtime configuration |
 | [Environment-provided command](job_env_with_new_command/) | Creating a command and adding it to `PATH` for job steps | Setup should expose reusable tooling to every step |
@@ -59,7 +59,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Maya Arnold tiled render](tile_render_with_maya_arnold/) | A three-dimensional task space and FFmpeg tile assembly | Arnold images should render as distributed tiles |
 | [Maya V-Ray tiled render](tile_render_with_maya_vray/) | V-Ray tile rendering followed by OpenImageIO assembly | You need tiled EXR output from Maya and V-Ray |
 | [V-Ray Linux region render](tile_render_with_vray_linux/) | Region rendering, asset discovery, path mapping, and image merge | You render `.vrscene` files in parallel regions on Linux |
-| [Maya Arnold turntable](turntable_with_maya_arnold/) | Building a scene around an OBJ, rendering frames, and encoding video | You need an easy-to-submit 3D asset review utility |
+| [Maya Arnold turntable](turntable_with_maya_arnold/) | Building a scene around an OBJ, then rendering frames and encoding video | You need an easy-to-submit 3D asset review utility |
 | [AutoDock Vina virtual screening](virtual_screening_vina/) | Parallel molecular docking and ranked result aggregation | You want to screen many ligands against a protein target |
 | [vLLM evaluation leaderboard](vllm_lm_eval_leaderboard/) | Parallel model evaluation and final CSV/Markdown aggregation | You need to compare multiple LLMs across benchmarks |
 | [V-Ray standalone render](vray_render/) | Rendering with a Conda-provided V-Ray executable | You need a basic standalone V-Ray bundle |
@@ -68,7 +68,7 @@ Nested collections provide their own complete indexes where applicable.
 
 ### Developer guide companion samples
 
-Several compact bundles are intended to be read alongside reference documentation. The [simple job](simple_job/template.yaml)
+These compact bundles are intended to be read alongside reference documentation. The [simple job](simple_job/template.yaml)
 accompanies the developer guide's [developer farm walkthrough](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/getting-started-dev.html).
 The [environment variables](job_env_vars/template.yaml), [environment-provided command](job_env_with_new_command/template.yaml), and
 [daemon-process environment](job_env_daemon_process/template.yaml) bundles accompany [Control the job environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/control-the-job-environment.html)

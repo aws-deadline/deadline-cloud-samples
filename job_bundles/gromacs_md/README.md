@@ -1,6 +1,6 @@
 # GROMACS Molecular Dynamics
 
-[Molecular dynamics (MD)](https://en.wikipedia.org/wiki/Molecular_dynamics) simulates the physical movement of atoms in a protein over time, revealing how it folds, binds drugs, or changes shape. It's used to validate virtual screening hits, predict protein stability, and study binding mechanisms at atomic resolution.
+[Molecular dynamics (MD)](https://en.wikipedia.org/wiki/Molecular_dynamics) simulates the physical movement of atoms in a protein over time, revealing how it folds, binds drugs, or changes shape. It's used to validate virtual screening hits and predict protein stability, and to study binding mechanisms at atomic resolution.
 
 This job bundle uses [GROMACS](https://www.gromacs.org/), an open-source MD engine. It runs the full simulation pipeline from raw protein structure to analyzed trajectory, and supports parallel fan-out across independent replica simulations.
 
@@ -17,9 +17,9 @@ This job bundle uses [GROMACS](https://www.gromacs.org/), an open-source MD engi
 
 ## Example Output
 
-![Energy minimization of lysozyme — potential energy converges to -362,000 kJ/mol](example_energy_minimization.png)
+![Energy minimization of lysozyme: potential energy converges to -362,000 kJ/mol](example_energy_minimization.png)
 
-*The system starts with high energy (atoms clashing after solvation) and rapidly converges to a stable minimum — this confirms the simulation setup is physically valid before running the expensive dynamics.*
+*The system starts with high energy (atoms clashing after solvation) and rapidly converges to a stable minimum. This confirms the simulation setup is physically valid before running the expensive dynamics.*
 
 ## How It Works
 
@@ -57,7 +57,7 @@ For multi-replica campaigns, all replicas run through the full pipeline independ
 
 ## Sample Data
 
-Sample data for a quick test — hen egg-white lysozyme (PDB: 1AKI), the standard GROMACS tutorial system:
+Sample data for a quick test uses hen egg-white lysozyme (PDB: 1AKI), the standard GROMACS tutorial system:
 
 - **Protein**: Download from the RCSB Protein Data Bank:
   ```bash
@@ -70,8 +70,8 @@ Sample data for a quick test — hen egg-white lysozyme (PDB: 1AKI), the standar
 
 | File | Source | License |
 |------|--------|---------|
-| protein.pdb | [RCSB PDB 1AKI](https://www.rcsb.org/structure/1AKI) — Hen egg-white lysozyme (Diamond, 1974, J Mol Biol) | CC0 1.0 (Public Domain) |
-| mdp/*.mdp | Original work — standard GROMACS simulation parameters | Apache-2.0 (this repo) |
+| protein.pdb | [RCSB PDB 1AKI](https://www.rcsb.org/structure/1AKI), Hen egg-white lysozyme (Diamond, 1974, J Mol Biol) | CC0 1.0 (Public Domain) |
+| mdp/*.mdp | Original work: standard GROMACS simulation parameters | Apache-2.0 (this repo) |
 
 ## Usage
 
@@ -123,11 +123,11 @@ For longer simulations, consider larger instances (c5.4xlarge, 16 vCPU) or GPU i
 
 ## Software Setup
 
-GROMACS is installed via the queue's Conda environment from conda-forge. No host configuration script or custom conda recipe needed — just add `gromacs` to your queue's Conda packages.
+GROMACS is installed via the queue's Conda environment from conda-forge. No host configuration script or custom conda recipe needed. Add `gromacs` to your queue's Conda packages.
 
 ## Use Cases
 
-- **Drug binding studies** — simulate protein-ligand complexes to validate virtual screening hits
-- **Protein stability** — compare wild-type vs mutant dynamics (fan out across variants)
-- **Free energy perturbation** — parallel lambda windows for binding affinity prediction
-- **Conformational sampling** — multiple replicas for enhanced sampling statistics
+- **Drug binding studies**: simulate protein-ligand complexes to validate virtual screening hits
+- **Protein stability**: compare wild-type vs mutant dynamics (fan out across variants)
+- **Free energy perturbation**: parallel lambda windows for binding affinity prediction
+- **Conformational sampling**: multiple replicas for enhanced sampling statistics

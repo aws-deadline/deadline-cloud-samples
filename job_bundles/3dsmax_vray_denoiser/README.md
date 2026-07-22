@@ -33,11 +33,13 @@ The template intelligently handles different frame range formats:
 
 ## Output Format
 
-The job renders to V-Ray's native VRIMG format in a temporary directory, then converts to EXR format in the specified output directory. VRIMG files conserve all denoising elements including noise passes, beauty passes, and denoising data. This workflow preserves:
+The job renders to V-Ray's native VRIMG format in a temporary directory, then converts to EXR format in the specified output directory. VRIMG files conserve all denoising elements, including noise passes, beauty passes and denoising data. This workflow preserves:
 
 - All denoising elements and passes
 - Multi-channel data
+<!-- vale ai-tells.OverusedVocabulary = NO -->
 - High dynamic range
+<!-- vale ai-tells.OverusedVocabulary = YES -->
 - Complete V-Ray render information
 
 ## Usage

@@ -3,15 +3,15 @@
 ## Introduction
 
 This CloudFormation template implements automated capacity management for hybrid fleet setups that combine
-Wait and Save and Spot fleets. It uses AWS Lambda and Amazon EventBridge Scheduler to dynamically balance
-fleet sizes while maintaining constant total capacity. The capacity manager monitors your Wait and Save fleet's active worker count and automatically adjusts your Spot fleet's maximum worker count to maintain your desired total capacity, optimizing for cost-effective Wait and Save capacity while ensuring any deficit is covered by
+Wait and Save and Spot fleets. It uses AWS Lambda and Amazon EventBridge Scheduler to balance
+fleet sizes in real time while maintaining constant total capacity. The capacity manager monitors your Wait and Save fleet's active worker count and automatically adjusts your Spot fleet's maximum worker count to maintain your desired total capacity, optimizing for cost-effective Wait and Save capacity while ensuring any deficit is covered by
 Spot instances.
 
 ```
 Total Capacity = Wait and Save Workers + Spot Workers (adjusted automatically)
 ```
 
-For example, with a target max worker count of 20 workers:
+With a target max worker count of 20 workers:
 - Wait and Save has 15 workers → Spot fleet max is set to 5
 - Wait and Save scales down to 8 → Spot fleet max increases to 12
 - Wait and Save scales up to 18 → Spot fleet max decreases to 2
@@ -115,8 +115,8 @@ avoid Lambda invocation costs:
 2. Find the `FleetCapacityManager` schedule
 3. Select **Actions > Disable**
 
-Since `minWorkerCount` is 0 in the fleet configurations, no workers will start without jobs. To resume,
-simply enable the schedule again.
+Since `minWorkerCount` is 0 in the fleet configurations, workers start only when jobs are present. To resume,
+enable the schedule again.
 
 ## Cleanup
 

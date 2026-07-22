@@ -1,4 +1,4 @@
-# AGENTS.md — deadline-cloud-samples
+# AGENTS.md: deadline-cloud-samples
 
 This file gives AI coding assistants the context they need to work effectively in this repository.
 
@@ -13,14 +13,14 @@ validation command:
 python3 scripts/validate_repository.py
 ```
 
-Run it after every repository change, in addition to tests or validation owned by the sample you edit.
+Run it after every repository change, along with tests or validation owned by the sample you edit.
 External Markdown links use a separate network-dependent command:
 
 ```console
 python3 scripts/check_external_links.py
 ```
 
-Use `--no-ignore` to audit the narrowly documented domain ignore list before changing it; genuine
+Use `--no-ignore` to audit the narrowly documented domain ignore list before changing it. Real
 broken links must be fixed rather than ignored.
 
 ## Find samples
@@ -67,7 +67,7 @@ Before implementing a sample, inspect [`skills/`](skills/) for a matching `SKILL
   task locally before submitting the full parameter range when possible.
 * Add, rename, move, or delete a sample in the nearest category table. Change root navigation only
   when a recommended path changes.
-* Keep indexes in Markdown; do not add catalog or metadata-generation machinery.
+* Keep indexes in Markdown. Do not add catalog or metadata-generation machinery.
 * Do not add third-party runtime dependencies to repository validation.
 
 ## Pre-PR checklist

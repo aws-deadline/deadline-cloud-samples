@@ -1,6 +1,6 @@
 # Redshift Rendering Job Template 
 
-This job template allows you to render Redshift scenes using the standalone redshiftCmdLine.exe executable that comes with Cinema 4D 2025. The template is designed for Windows systems only and uses the Redshift command line renderer directly. Cinema4D is used as this is included in the deadline-cloud conda channel and it includes the redshift CLI renderer.
+This job template allows you to render Redshift scenes using the standalone redshiftCmdLine.exe executable that comes with Cinema 4D 2025. The template is designed for Windows systems only and uses the Redshift command line renderer directly. Cinema4D is used because the deadline-cloud conda channel includes it along with the redshift CLI renderer.
 
 ## Overview
 

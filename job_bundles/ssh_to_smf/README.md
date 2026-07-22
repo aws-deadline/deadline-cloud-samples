@@ -5,7 +5,7 @@ Register a Deadline Cloud worker as an SSM hybrid managed node, enabling SSH acc
 ## How It Works
 
 1. The submit script creates a one-time SSM hybrid activation (`aws ssm create-activation`)
-2. The Deadline Cloud job runs on a worker, downloads `ssm-setup-cli`, and registers the worker as a managed node
+2. The Deadline Cloud job runs on a worker, downloads `ssm-setup-cli`, then registers the worker as a managed node
 3. The job prints the `mi-*` managed node ID to the log
 4. You connect with `aws ssm start-session --target mi-XXXXXXXXX`
 5. After the configured session duration, the job deregisters the node and cleans up
@@ -33,7 +33,7 @@ aws iam attach-role-policy --role-name SSMServiceRole \
 
 ### 2. Enable Advanced-Instances Tier
 
-Session Manager requires the advanced-instances tier for hybrid `mi-*` nodes. This is a one-time setting per region.
+Session Manager requires the advanced-instances tier for hybrid `mi-*` nodes. This tier is a one-time setting per region.
 
 ```bash
 aws ssm update-service-setting \
@@ -104,7 +104,7 @@ aws ssm start-session --target mi-XXXXXXXXX --region us-west-2
 
 #### Port forwarding
 
-Forward a remote port on the worker to your local machine. Useful for accessing web UIs, Jupyter notebooks, or other services running on the worker:
+Forward a remote port on the worker to your local machine, so you can reach services running on the worker such as web UIs and Jupyter notebooks:
 
 ```bash
 # Forward worker port 8888 to localhost:8888

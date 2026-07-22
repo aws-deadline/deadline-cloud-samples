@@ -23,8 +23,7 @@ If you are setting up notifications to Slack, you need to configure the Slack cl
 
 1. Add AWS Chatbot to the Slack workspace:
 
-   a. In Slack, on the left navigation pane, choose Automations.
-   ###### Note: If you do not see Automations in the left navigation pane, choose More, then choose Automations.
+   a. In Slack, on the left navigation pane, choose Automations. If you do not see Automations there, choose More to find it.
 
    b. If AWS Chatbot is not listed, choose the Browse Apps Directory button.
    Browse the directory for the AWS Chatbot app and then choose Add to add AWS Chatbot to your workspace.

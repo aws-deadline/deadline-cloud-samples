@@ -3,7 +3,7 @@
 ## 3ds Max
 3ds Max is a popular Digital Content Creation tool provided by Autodesk. 3ds Max runs on Windows, and requires administrative access to install onto a host. Because of the administrative requirement, Deadline Cloud recommends installing 3ds Max on to the worker host using Host Configuration Scripts.
 
-- Note: While the example installs 3ds Max 2024, Deadline Cloud's submitter supports 3ds Max 2025, 2026 as well. The installation script should work equivalently for 3ds Max 2025, 2026.
+- While the example installs 3ds Max 2024, Deadline Cloud's submitter supports 3ds Max 2025 and 2026 as well. The installation script should work equivalently for 3ds Max 2025 and 2026.
 
 ## Installation guide
 1. Create a S3 bucket in the same region as your farm.

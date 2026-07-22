@@ -2,7 +2,7 @@
 
 ## Package contents
 
-This is a [rattler-build](http://rattler.build/) recipe for NeRF Studio and some extras. If you build this package, you can
+This recipe is a [rattler-build](http://rattler.build/) recipe for NeRF Studio and some extras. If you build this package, you can
 use it to train Gaussian Splatting on AWS Deadline Cloud.
 
 The package you build from this recipe will include the following:
@@ -63,7 +63,7 @@ the Deadline Cloud samples github as follows. If you need to customize this, see
 $ ./submit-package-job nerfstudio
 ```
 
-The recipe pins dependency package versions to ranges around versions that ran correctly together. This should
+The recipe pins dependency package versions to ranges around versions that ran correctly together. These pins should
 keep the recipe stable over time as new versions are released, but please open an issue or a pull request if you
 try to build it and run into errors.
 
@@ -71,7 +71,7 @@ try to build it and run into errors.
 
 We recommend that you use the sample queue environment
 [conda_queue_env_improved_caching.yaml](../../queue_environments/conda_queue_env_improved_caching.yaml) to reuse conda environments between jobs.
-This queue environment can save significant time and bandwidth as the dependency closure of NeRF Studio consists of
+This queue environment can save considerable time and bandwidth as the dependency closure of NeRF Studio consists of
 many packages containing multiple gigabytes of data.
 
 ## Gaussian Splatting on Deadline Cloud

@@ -4,7 +4,7 @@ These samples provide Dockerfiles and related resources for building container i
 
 ## Sample index
 
-This table covers both user-selectable container samples below `containers/`; supporting scripts and image assets remain with their sample.
+This table covers both user-selectable container samples below `containers/`. Supporting scripts and image assets remain with their sample.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|

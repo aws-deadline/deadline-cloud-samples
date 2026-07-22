@@ -1,7 +1,7 @@
 # AWS Deadline Cloud samples
 
 Build, submit, and operate real workloads on [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
-Start with the task you want to complete; each sample stays self-contained in its existing directory.
+Start with the task you want to complete. Each sample stays self-contained in its existing directory.
 
 ## What do you want to do?
 

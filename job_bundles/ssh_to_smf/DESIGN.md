@@ -1,4 +1,4 @@
-# SSM Managed Node via Deadline Cloud Job — Design
+# SSM Managed Node via Deadline Cloud Job: Design
 
 ## Overview
 
@@ -41,10 +41,10 @@ A Deadline Cloud job bundle that registers the worker as an SSM hybrid managed n
 
 The job template (`job/template.yaml`) implements four phases:
 
-1. **Install & Register** — Downloads `ssm-setup-cli` and registers the worker as a managed node using the activation credentials
-2. **Extract Node ID** — Reads the `mi-*` managed node ID from `/var/lib/amazon/ssm/registration` and prints it to the job log
-3. **Keep Alive** — Loops for `SessionMinutes`, printing status every 60s (same pattern as the VNC/DCV jobs in this project)
-4. **Cleanup / Deregister** — Deregisters the managed node and stops the SSM agent
+1. **Install & Register**: Downloads `ssm-setup-cli` and registers the worker as a managed node using the activation credentials
+2. **Extract Node ID**: Reads the `mi-*` managed node ID from `/var/lib/amazon/ssm/registration` and prints it to the job log
+3. **Keep Alive**: Loops for `SessionMinutes`, printing status every 60s (same pattern as the VNC/DCV jobs in this project)
+4. **Cleanup / Deregister**: Deregisters the managed node and stops the SSM agent
 
 See `job/template.yaml` for the full implementation.
 
@@ -55,7 +55,7 @@ See `job/template.yaml` for the full implementation.
   - **IMPORTANT**: This role must be created before first use. It requires:
     1. A trust policy allowing `ssm.amazonaws.com` to assume the role
     2. The `AmazonSSMManagedInstanceCore` managed policy attached
-  - The submit script defaults to `SSMServiceRole` — if this role doesn't exist, `create-activation` will fail with `Nonexistent role or missing ssm service principal in trust policy`
+  - The submit script defaults to `SSMServiceRole`. If this role doesn't exist, `create-activation` will fail with `Nonexistent role or missing ssm service principal in trust policy`
   - Create it once per account:
     ```bash
     aws iam create-role --role-name SSMServiceRole \
@@ -65,7 +65,7 @@ See `job/template.yaml` for the full implementation.
     ```
 - The worker must have outbound internet access to reach `amazon-ssm-{region}.s3.{region}.amazonaws.com`
 - The submitter needs `ssm:CreateActivation` permissions
-- The SSM advanced-instances tier must be enabled in the account/region to use `aws ssm start-session` with hybrid `mi-*` nodes. This is a one-time setting per region:
+- The SSM advanced-instances tier must be enabled in the account/region to use `aws ssm start-session` with hybrid `mi-*` nodes. Set this once per region:
   ```bash
   aws ssm update-service-setting \
     --setting-id "arn:aws:ssm:<region>:<account-id>:servicesetting/ssm/managed-instance/activation-tier" \
@@ -85,8 +85,8 @@ ssh_ssm_managed_node/
 
 ## Security Notes
 
-- The activation code is a secret — treat it like a password. The activation ID is not secret and can be shared safely.
+- The activation code is a secret, so treat it like a password. The activation ID is not secret and can be shared safely.
 - Activation codes are single-use (registration-limit=1) and short-lived (24h default expiry)
-- The activation code/ID are passed as job parameters — they are not persisted or stored on disk beyond the job session
+- The activation code/ID are passed as job parameters. They are not persisted or stored on disk beyond the job session
 - The managed node is deregistered when the job ends
 - No credentials are hardcoded; the activation is generated at submission time

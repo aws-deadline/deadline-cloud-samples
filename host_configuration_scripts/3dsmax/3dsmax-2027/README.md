@@ -12,4 +12,4 @@ This sample host configuration script configures your Service Managed Fleet with
 6. Recommendation: Set the fleet's min worker count to 1. Review a worker's CloudWatch log to ensure the script executes successfully prior to production use.
     - Log group: `/aws/deadline/farm-<farm-id>/fleet-<fleet-id>`
 
-> **Note:** Host configuration changes only affect Workers launched after the update is applied. Existing workers will not be updated.
+> Host configuration changes only affect Workers launched after the update is applied. Existing workers will not be updated.

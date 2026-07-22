@@ -1,6 +1,6 @@
 # vLLM LLM Leaderboard (Matrix Evaluation)
 
-Evaluate **multiple LLMs × multiple benchmarks** in a single Deadline Cloud job. Each model becomes one task in a parameter sweep; tasks run in parallel across workers. A final step aggregates the per-model results into a ranked leaderboard.
+Evaluate **multiple LLMs × multiple benchmarks** in a single Deadline Cloud job. Each model becomes one task in a parameter sweep, and tasks run in parallel across workers. A final step aggregates the per-model results into a ranked leaderboard.
 
 ## How it works
 
@@ -24,7 +24,7 @@ Evaluate **multiple LLMs × multiple benchmarks** in a single Deadline Cloud job
 └─────────────────────────────────────────────────────┘
 ```
 
-Each task in `EvalModels` runs one model end-to-end: starts a local [vLLM](https://github.com/vllm-project/vllm) server, runs every benchmark via [EleutherAI's lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) against the local endpoint, then stops vLLM. Models load directly from HuggingFace Hub — no job attachments needed.
+Each task in `EvalModels` runs one model end-to-end. It starts a local [vLLM](https://github.com/vllm-project/vllm) server and runs every benchmark via [EleutherAI's lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) against the local endpoint, then stops vLLM. Models load directly from HuggingFace Hub, so no job attachments are needed.
 
 ## Set up your farm
 
@@ -47,10 +47,10 @@ A HuggingFace token is only needed for gated models (Llama, etc.).
 
 If your fleet doesn't scale up workers, the most common cause is an EC2 vCPU quota. GPU instance limits are per-region and per-instance-family, and may be capped below what you need on accounts that haven't previously launched these instances. Open the [Service Quotas console](https://console.aws.amazon.com/servicequotas/home/services/ec2/quotas) under **EC2** and confirm you have headroom for:
 
-- **Running On-Demand G and VT instances** — vCPU count, not instance count. The default 3-model run on `g5.xlarge` (4 vCPU each) needs ≥12 vCPU running concurrently.
-- **All G and VT Spot Instance Requests** — only if your fleet uses spot.
+- **Running On-Demand G and VT instances**: vCPU count, not instance count. The default 3-model run on `g5.xlarge` (4 vCPU each) needs ≥12 vCPU running concurrently.
+- **All G and VT Spot Instance Requests**: only if your fleet uses spot.
 
-Quota increases for these can take anywhere from minutes to a couple of business days, so request them before you submit.
+Quota increases can take anywhere from minutes to a couple of business days, so request them before you submit.
 
 ## Quick start
 
@@ -95,13 +95,13 @@ parameterSpace:
     - "EleutherAI/pythia-1.4b"
 ```
 
-The default list is a small, ungated, fast-loading mix that fits comfortably on a single A10G/L4: two models from the same family at different sizes (Qwen2.5 0.5B vs 1.5B) so you can see scaling within a family, plus one from a different family (Pythia 1.4B) at a comparable size so you can see cross-family differences. It's just a starting point; swap in whatever models you actually want to compare.
+The default list is a small, ungated, fast-loading mix that fits comfortably on a single A10G/L4: two models from the same family at different sizes (Qwen2.5 0.5B vs 1.5B) so you can see scaling within a family, plus one from a different family (Pythia 1.4B) at a comparable size so you can see cross-family differences. It's a starting point. Swap in whatever models you want to compare.
 
 To add or remove models, edit the `range` list. Each entry becomes a task visible in the Monitor UI. Model IDs must be supported by vLLM (see the [vLLM supported models list](https://docs.vllm.ai/en/latest/models/supported_models.html)).
 
 ## Choosing benchmarks
 
-The `Benchmarks` job parameter is a comma-separated list of lm-evaluation-harness task names. The default set is a standard **commonsense reasoning** suite, a well-known benchmark category that tests whether a model can apply everyday world knowledge (picking the most plausible continuation of a scenario, resolving an ambiguous pronoun, answering grade-school science questions). It's cheap to run and a reasonable smoke test for general capability:
+The `Benchmarks` job parameter is a comma-separated list of lm-evaluation-harness task names. The default set is a standard **commonsense reasoning** suite, a well-known benchmark category that tests whether a model can apply everyday world knowledge, such as picking the most plausible continuation of a scenario or answering grade-school science questions. It's cheap to run and a reasonable smoke test for general capability:
 
 ```
 hellaswag,arc_easy,arc_challenge,winogrande

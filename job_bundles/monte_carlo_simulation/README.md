@@ -1,6 +1,6 @@
 # Pricing Financial Derivatives
 
-Prices a portfolio of autocallable structured notes using Monte Carlo simulation with QuantLib's Heston stochastic volatility model. This is a Deadline Cloud port of the [Pricing Financial Derivatives with AWS Batch](https://ec2spotworkshops.com/monte-carlo-with-batch.html) workshop, using the same Eurostoxx 50 vol surface and sample portfolio dataset from the original workshop.
+Prices a portfolio of autocallable structured notes using Monte Carlo simulation with QuantLib's Heston stochastic volatility model. This sample is a Deadline Cloud port of the [Pricing Financial Derivatives with AWS Batch](https://ec2spotworkshops.com/monte-carlo-with-batch.html) workshop, using the same Eurostoxx 50 vol surface and sample portfolio dataset from the original workshop.
 
 The pricing code is based on [Mikael Katajamäki's](http://mikejuniperhill.blogspot.com/2019/11/quantlib-python-heston-monte-carlo.html) QuantLib autocallable valuation example. The market data such as spot price and vol surface are defined inside the script, so whilst the results are not accurate for production use, they are a good example of how to use QuantLib without getting caught up in the details of connecting to market data sources.
 
@@ -42,12 +42,12 @@ The pricing code is based on [Mikael Katajamäki's](http://mikejuniperhill.blogs
 
 Two-step pipeline defined in `template.yaml`:
 
-1. **PricePositions** — One task per portfolio position. Tasks are grouped into chunks that calibrate the Heston model once and price all positions in the chunk.
-2. **AggregateResults** — Collects all per-position results into a portfolio summary.
+1. **PricePositions**: One task per portfolio position. Tasks are grouped into chunks that calibrate the Heston model once and price all positions in the chunk.
+2. **AggregateResults**: Collects all per-position results into a portfolio summary.
 
 ## Prerequisites
 
-1. **Deadline Cloud farm** — You need a farm with a queue that has a conda queue
+1. **Deadline Cloud farm**: You need a farm with a queue that has a conda queue
    environment. You can create one in either of these ways:
    - **Console**: Use the [Deadline Cloud management console](https://console.aws.amazon.com/deadlinecloud/home)
      to create a farm, queue, and service-managed fleet through the guided setup wizard.
@@ -60,13 +60,13 @@ Two-step pipeline defined in `template.yaml`:
    When configuring your fleet, consider adjusting the vCPU and RAM settings based on
    your workload requirements.
 
-2. **Deadline CLI** — Install the Deadline Cloud client tools:
+2. **Deadline CLI**: Install the Deadline Cloud client tools:
    ```bash
    pip install deadline
    ```
 
-3. **conda-forge channel** — This job bundle requires packages from
-   [conda-forge](https://conda-forge.org/) (specifically `quantlib-python`).
+3. **conda-forge channel**: This job bundle requires packages from
+   [conda-forge](https://conda-forge.org/), namely `quantlib-python`.
    When deploying the CloudFormation template, set the **ProdCondaChannels** parameter
    to `deadline-cloud conda-forge` to enable conda-forge alongside the default
    deadline-cloud channel. If your farm is already deployed without conda-forge, you
@@ -115,8 +115,8 @@ deadline bundle submit monte_carlo_simulation/ \
 
 ## Output
 
-- `results/result_N.json` — Per-position pricing result (PV, greeks, model params)
-- `results/portfolio_summary.json` — Aggregated portfolio summary with total PV
+- `results/result_N.json`: Per-position pricing result (PV, greeks, model params)
+- `results/portfolio_summary.json`: Aggregated portfolio summary with total PV
 
 To download results after the job completes:
 
@@ -135,7 +135,7 @@ amortizing the calibration cost.
 By default, `ChunkSize` is 1 and `ChunkTargetRuntime` is 180 seconds (3 minutes).
 The scheduler starts by dispatching individual positions, observes how long they take,
 and then automatically grows the chunk size so that each chunk runs for approximately
-the target runtime. This provides good load balancing without needing to know the
+the target runtime. The chunking balances load without needing to know the
 per-position runtime ahead of time:
 
 - **Fast positions**: the scheduler grows chunks to group more together, amortizing
@@ -167,4 +167,4 @@ including the application requirements as `CondaPackages` and scripts to run.
 
 ## Future
 
-The `PositionRange` parameter requires knowing the number of positions up front. The [VAR_DATA_FLOW](https://github.com/OpenJobDescription/openjd-specifications/discussions/111) feature proposed for Open Job Description would allow replacing this with a dynamic step that counts positions from the portfolio file.
+The `PositionRange` parameter requires knowing the number of positions up front. The [VAR_DATA_FLOW](https://github.com/OpenJobDescription/openjd-specifications/discussions/111) feature proposed for Open Job Description would allow replacing this with a step that counts positions from the portfolio file at runtime.

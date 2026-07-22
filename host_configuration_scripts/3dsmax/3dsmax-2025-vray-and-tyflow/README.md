@@ -16,8 +16,8 @@ tyFlow is a powerful particle system and physics simulation plugin for 3ds Max, 
 4. Download the tyFlow plugin file and upload it to your S3 bucket.
 5. Configure the Windows Service Managed fleet's host configuration using [3dsmax-2025-vray-and-tyflow.ps1](./3dsmax-2025-vray-and-tyflow.ps1).
     - Note that there are placeholder variables at the start of the script marked with `TODO`. Please replace the values with ones matching your configuration.
-    - **Note**: The tyFlow installation section (lines 57-62) can be adapted for other 3ds Max versions by updating the plugins directory path to match your target version.
+    - The tyFlow installation section (lines 57-62) can be adapted for other 3ds Max versions by updating the plugins directory path to match your target version.
 6. Save the fleet configuration.
-    - **Important**: Configuration changes only affect Worker instances launched after this update is applied. Existing Workers will continue using the previous configuration.
+    - Configuration changes only affect Worker instances launched after this update is applied. Existing Workers will continue using the previous configuration.
 7. Configure your Fleet's IAM role to have read access to your S3 bucket.
 8. For testing: Set the fleet's min Worker count to 1 which will spin up a Worker and run the Host Configuration script on it. Review Worker's CloudWatch logs (found in the `/aws/deadline/farm-<farm-id>/fleet-<fleet-id>` log group) to ensure the script is executed successfully on the Worker prior to production use.

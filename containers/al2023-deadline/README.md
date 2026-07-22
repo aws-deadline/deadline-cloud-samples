@@ -2,7 +2,7 @@
 
 This Dockerfile replicates the package set of an April 2026 snapshot of the
 AWS Deadline Cloud service-managed fleet (SMF) worker AMI on top of the base
-Amazon Linux 2023 image. It is a point-in-time capture — the actual worker AMI
+Amazon Linux 2023 image. It is a point-in-time capture, and the actual worker AMI
 may drift as packages are added or updated.
 
 ## Use cases
@@ -64,7 +64,7 @@ docker run --rm --gpus all al2023-deadline:latest nvidia-smi
 
 ## Limitations
 
-- This is a **point-in-time snapshot** (April 2026). The actual SMF worker AMI
+- The image is a **point-in-time snapshot** (April 2026). The actual SMF worker AMI
   may have newer or additional packages.
 - Docker-in-Docker is not enabled by default. Mount the host Docker socket or
   use `--privileged` if you need it.

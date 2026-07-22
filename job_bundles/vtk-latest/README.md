@@ -8,7 +8,7 @@ This job template is designed to be generalizable for any VTK-based Python scrip
 1. Accepts command-line parameters for output path, width, and height
 2. Saves visualization output to a specified location
 
-The template accepts a user-provided Python script, runs it with the specified parameters, and saves the visualization output to the designated location.
+The template accepts a user-provided Python script and runs it with the specified parameters, saving the visualization output to the designated location.
 
 ## Parameters
 
@@ -28,7 +28,7 @@ The template accepts a user-provided Python script, runs it with the specified p
 - **CondaPackages**: Conda packages to install (default: "vtk numpy"). These packages must be available in the Conda Channels configured in the queue environment
 
 ### Additional Parameters
-- **ExtraParams**: Additional parameters to pass to the script (format: '--param1 value1 --param2 value2')
+- **ExtraParams**: Additional parameters to pass to the script (format: `--param1 value1 --param2 value2`)
 
 ## Usage
 
@@ -57,6 +57,8 @@ A sample VTK script (`flow_simulation_visualization.py`) is provided in the `sam
 - Creating a 3D airfoil geometry
 - Generating a flow field
 - Calculating pressure distribution
+<!-- vale ai-tells.OverusedVocabulary = NO -->
 - Visualizing the simulation with streamlines
+<!-- vale ai-tells.OverusedVocabulary = YES -->
 - Saving the output as an image file
 This script is sourced from [here](https://github.com/djeada/Vtk-Examples/blob/main/src/02_advanced_shapes/flow_simulation_visualization.py#L4) and is licensed under the MIT license.

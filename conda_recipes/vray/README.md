@@ -1,6 +1,6 @@
 # V-Ray conda package recipe
 
-This is a [rattler-build](http://rattler.build/) recipe for
+This directory holds a [rattler-build](http://rattler.build/) recipe for
 the [VRay standalone renderer](https://docs.chaos.com/display/VNS/V-Ray+Standalone+Home).
 See the [sample conda recipes README](../README.md) to learn more about the structure
 of the recipe, and [Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html) in the AWS Deadline Cloud developer guide.
@@ -21,4 +21,4 @@ $ ./submit-package-job vray
 
 The `submit-package-job` command can be run from any platform (macOS, Windows, or Linux) - it submits a job to Deadline Cloud where a Linux worker builds the package and uploads it to your S3 conda channel.
 
-**Note**: The queue's IAM role needs `s3:PutObject` permission for the `Conda/*` prefix in the job attachments bucket to publish the built package.
+The queue's IAM role needs `s3:PutObject` permission for the `Conda/*` prefix in the job attachments bucket to publish the built package.

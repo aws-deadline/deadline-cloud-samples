@@ -11,11 +11,11 @@ This example builds a Docker image that packages Blender with the [deadline-clou
 
 | Component | Description |
 |-----------|-------------|
-| Base image | `aswf/ci-base:2026` — Rocky Linux 8, CUDA 12.9, VFX Platform 2026 (industry standard) |
+| Base image | `aswf/ci-base:2026` (Rocky Linux 8 with CUDA 12.9 and VFX Platform 2026, an industry standard) |
 | Blender | Configurable version (default 4.5.0), downloaded from blender.org |
-| Adaptor | `deadline-cloud-for-blender` — the OpenJD adaptor that Deadline Cloud invokes to drive renders |
+| Adaptor | `deadline-cloud-for-blender`: the OpenJD adaptor that Deadline Cloud invokes to drive renders |
 | Plugins | Optional addon `.zip` files placed in `plugins/` are installed and enabled at build time |
-| CloudFormation | `cloudformation.yaml` — deploys the queue, fleet, and queue environment in one stack |
+| CloudFormation | `cloudformation.yaml`: deploys the queue, fleet, and queue environment in one stack |
 
 ## Project structure
 
@@ -104,7 +104,7 @@ aws cloudformation deploy \
         JobAttachmentsBucket=my-deadline-bucket
 ```
 
-This creates:
+The stack creates:
 - A **queue** with job attachment settings and the container queue environment attached
 - A **fleet** with GPU instances, Docker host configuration, and NVIDIA Container Toolkit
 - A **queue-fleet association** connecting the two
@@ -133,18 +133,18 @@ aws cloudformation delete-stack --stack-name blender-aswf-ci-base-stack
 
 ## How it works
 
-1. **Build** — The Dockerfile installs Blender, the adaptor, and any plugins into an ASWF VFX Platform base image with CUDA.
-2. **Host config** — When a fleet instance launches, the host configuration script installs Docker and the NVIDIA Container Toolkit.
-3. **Queue environment** — On each session, the enter script pulls the image, starts the container, and installs a `blender-openjd` wrapper that forwards adaptor calls into the container via `docker exec`.
-4. **Render** — The Deadline Cloud worker invokes `blender-openjd` as usual; the wrapper transparently runs it inside the container with GPU access.
+1. **Build**: The Dockerfile installs Blender and the adaptor (plus any plugins) into an ASWF VFX Platform base image with CUDA.
+2. **Host config**: When a fleet instance launches, the host configuration script installs Docker and the NVIDIA Container Toolkit.
+3. **Queue environment**: On each session, the enter script pulls the image and starts the container. It then installs a `blender-openjd` wrapper that forwards adaptor calls into the container via `docker exec`.
+4. **Render**: The Deadline Cloud worker invokes `blender-openjd` as usual. The wrapper runs it inside the container with GPU access.
 
 ## Adding plugins
 
 1. Download addon `.zip` files from the vendor
 2. Place them in the `plugins/` directory
-3. Rebuild the image — the build process extracts, installs, and enables them automatically
+3. Rebuild the image. The build process extracts, installs, and enables them automatically
 
-> **Note:** Do not redistribute proprietary plugins in public images. Users must supply their own licensed copies.
+Do not redistribute proprietary plugins in public images. Users must supply their own licensed copies.
 
 ## GPU support
 

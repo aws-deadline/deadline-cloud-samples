@@ -21,3 +21,9 @@ conda_recipes/archive_files/vraystd_*
 **/*.conda
 **/*.safetensors
 conda_recipes/archive_files/
+
+# Vale style packages downloaded by `vale sync` (regenerated, not committed).
+# The custom DeadlineSamples style below is kept under version control.
+styles/ai-tells/
+styles/write-good/
+styles/config/

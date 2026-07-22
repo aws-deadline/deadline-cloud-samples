@@ -1,6 +1,6 @@
 # V-Ray Region Render Sample Job Bundle
 
-This job bundle renders a V-Ray scene by dividing the image into configurable regions, rendering each region as a separate task, and then merging them into a final image. Optionally creates a movie from rendered frames.
+This job bundle renders a V-Ray scene by dividing the image into configurable regions. It renders each region as a separate task, then merges them into a final image. Optionally creates a movie from rendered frames.
 
 ## Features
 
@@ -107,7 +107,7 @@ Refer to the [Chaos V-Ray documentation](https://documentation.chaos.com/space/V
 
 ## Job Submission
 
-> **Note:** This bundle includes a pre-submission hook that automatically discovers textures and files referenced in the vrscene. You must enable bundle hooks before submitting:
+> This bundle includes a pre-submission hook that automatically discovers textures and files referenced in the vrscene. You must enable bundle hooks before submitting:
 > ```bash
 > deadline config set settings.allow_bundle_hooks true
 > ```
@@ -167,7 +167,7 @@ For a 1920×1080 image with 2 columns and 2 rows:
 
 - **More regions = more parallelism** but also more overhead
 - For small images, fewer regions may be faster
-- For large images or complex scenes, more regions can significantly reduce total render time
+- For large images or complex scenes, more regions can reduce total render time
 - Consider your worker pool size when choosing region count
 
 ## Customization

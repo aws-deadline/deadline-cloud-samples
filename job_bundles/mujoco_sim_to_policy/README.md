@@ -16,9 +16,9 @@ single submitted job that runs three dependent steps on managed GPU workers:
  └──────────── shared OutputDir (job attachment) ────────────┘
 ```
 
-You hand it a robot and a task instruction; it generates training data in
-simulation, finetunes a policy on that data, and renders a video of the learned
-policy driving the sim.
+You hand it a robot and a task instruction. It generates training data in
+simulation and finetunes a policy on that data, then renders a video of the
+learned policy driving the sim.
 
 ![The finetuned so100 policy lifting the cube in the rendered MuJoCo rollout](https://downloads.deadlinecloud.amazonaws.com/samples/mujoco_sim_to_policy/policy_render_final_frame.png)
 
@@ -30,26 +30,26 @@ policy flails. This pipeline closes that gap by training on images rendered from
 the same simulator the policy will run in. The training data and the deployment
 target share a renderer, so what the policy learns transfers.
 
-The three steps are wired with Open Job Description (OpenJD) `dependsOn`
+The steps are wired with Open Job Description (OpenJD) `dependsOn`
 dependencies and share one `OutputDir` that flows `INOUT`:
 
 | Step | Reads | Writes | What it does |
 |------|-------|--------|--------------|
-| Datagen | — | `OutputDir/dataset/` | Scripted joint-space pick of a cube in MuJoCo, recorded as a LeRobot dataset. Each episode is verified by a cube-height check (did the block leave the floor?) and discarded if it fails. |
+| Datagen | (none) | `OutputDir/dataset/` | Scripted joint-space pick of a cube in MuJoCo, recorded as a LeRobot dataset. Each episode is verified by a cube-height check (did the block leave the floor?) and discarded if it fails. |
 | Train | `OutputDir/dataset/` | `OutputDir/checkpoint/` | Finetunes a LeRobot ACT policy on the generated dataset (`lerobot-train`, CUDA). |
 | Render | `OutputDir/checkpoint/` | `OutputDir/*.mp4`, `*.png` | Drives a MuJoCo `so100` rollout with the finetuned policy and records the result. |
 
 Because the steps are independent and share the work directory, you can re-run a
-single step — for example, re-render with a new camera without re-generating
+single step. You can re-render with a new camera without re-generating
 data or re-training.
 
 ## Why these design choices
 
-- **Genuine grasp, no weld.** Datagen performs a physical pinch: the arm reaches
+- **Genuine physical grasp.** Datagen performs a physical pinch: the arm reaches
   from home, descends onto the cube with the gripper open, closes, and lifts.
-  The grip is marginal, so each episode is verified — it checks that the cube
+  The grip is marginal, so each episode is verified. It checks that the cube
   actually left the floor and discards (then retries) any episode that didn't.
-  Roughly 70–80% of randomized attempts hold, and only those reach the dataset,
+  Roughly 70 to 80% of randomized attempts hold, and only those reach the dataset,
   so a slipped grasp doesn't poison the training data.
 - **Tuned for the learned policy, not the scripted demo.** The grasp pose is
   deliberately error-tolerant. A low, centered, wide-open grip looks cleaner in
@@ -64,9 +64,9 @@ data or re-training.
   checkpoint with the same LeRobot version we render with, so it always loads.
 - **Reproducible environment.** The `CondaPackages` / `CondaChannels` job
   parameters (default `python=3.12 pip git ffmpeg` on `conda-forge`) are consumed
-  by the Conda queue environment attached to the queue — the same job parameters
-  the repo's `conda_queue_env_*` templates read — which solves them into the
-  per-job environment. On top of that, each step `pip install`s the Strands
+  by the Conda queue environment attached to the queue (the same job parameters
+  the repo's `conda_queue_env_*` templates read), which solves them into the
+  per-job environment. Each step also `pip install`s the Strands
   package spec at runtime, so every worker gets the same environment.
 
 ## About the instruction
@@ -150,16 +150,16 @@ openjd summary template.yaml -p OutputDir=output
 
 ## Running a subset
 
-The three steps are independent and share the work directory, so you can run
+The steps are independent and share the work directory, so you can run
 part of the flow by re-running individual steps:
 
-- **Re-render only** — once `OutputDir/checkpoint/` exists, re-run the `Render`
+- **Re-render only:** once `OutputDir/checkpoint/` exists, re-run the `Render`
   step (e.g. with a new camera) without re-generating data or re-training.
-- **Re-train only** — re-run `Train` (and `Render`) against an existing
+- **Re-train only:** re-run `Train` (and `Render`) against an existing
   `OutputDir/dataset/` without re-running `Datagen`.
-- **Datagen only** — run just the first step to produce the LeRobot dataset.
+- **Datagen only:** run only the first step to produce the LeRobot dataset.
 
-> Note: the `Datagen` step regenerates from scratch each time it runs — it
+> Note: the `Datagen` step regenerates from scratch each time it runs. It
 > clears `OutputDir/dataset/` before recording. To finetune on a dataset you
 > supply yourself, skip `Datagen` and place your dataset at `OutputDir/dataset/`
 > before running `Train`.
@@ -167,7 +167,7 @@ part of the flow by re-running individual steps:
 > **A note for engineers on running datagen at scale.** Generating data in a
 > batch on a farm surfaces bugs that one-off local testing hides. Example: the
 > arm is teleported back to its home pose between episodes, which resets joint
-> *positions* but not *velocities*. A single-episode local render looks perfect —
+> *positions* but not *velocities*. A single-episode local render looks perfect,
 > but in a 150-episode batch, residual velocity from episode 1's lift carried
 > into episode 2's grasp, so only the first episode would grip and the rest
 > silently slipped. The fix (zeroing velocity on reset) is in the datagen

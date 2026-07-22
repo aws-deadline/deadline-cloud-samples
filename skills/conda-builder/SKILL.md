@@ -53,8 +53,8 @@ Use this skill when:
   creates symlinks, and sets environment variables via `env_vars.d` JSON files
 - DCC-specific runtime library requirements (X11, EGL, etc.) are listed in each
   per-DCC guide
-- SHA256 hashes should always come from the DCC vendor's official hash file —
-  never guess or compute them from downloads
+- SHA256 hashes should always come from the DCC vendor's official hash file.
+  Never guess or compute them from downloads
 
 ## Workflow
 
@@ -63,7 +63,7 @@ You **MUST** follow these steps in order.
 ### Step 1: Identify the DCC and version
 
 Ask the user which DCC and which version. Then **read the matching guide in
-`dcc/<dcc>.md`** — it contains the vendor-specific download URLs, hash sources,
+`dcc/<dcc>.md`**. It contains the vendor-specific download URLs, hash sources,
 and required system libraries. Do not proceed without reading it.
 
 If the DCC is not listed in the "Supported DCCs" table above, stop and direct the
@@ -89,14 +89,14 @@ directory. Read all files from it to use as the template:
 Create `deadline-cloud-samples/conda_recipes/<dcc>-X.Y/` mirroring the previous
 recipe. Update:
 
-- `recipe/recipe.yaml` — `context.version`, `context.major_minor_version`, and both
-  `sha256` values (linux + windows). URLs are usually templated from context
+- `recipe/recipe.yaml`: `context.version`, `context.major_minor_version`, and both
+  `sha256` values (linux + windows). URLs are typically templated from context
   variables and update automatically.
-- `recipe/build.sh` and `recipe/build_win.sh` — copy unchanged unless the DCC guide
+- `recipe/build.sh` and `recipe/build_win.sh`: copy unchanged unless the DCC guide
   says otherwise. These scripts should be version-agnostic (use `$PKG_VERSION`).
-- `deadline-cloud.yaml` — `sourceArchiveFilename` and `sourceDownloadInstructions`
+- `deadline-cloud.yaml`: `sourceArchiveFilename` and `sourceDownloadInstructions`
   for both platforms.
-- `README.md` — version numbers throughout.
+- `README.md`: version numbers throughout.
 
 ### Step 5: Set up the AL2023 Docker build container
 
@@ -104,7 +104,7 @@ Build (or reuse) an AL2023 image from the
 [`containers/al2023-deadline/Dockerfile.worker-equivalent`](../../containers/al2023-deadline/Dockerfile.worker-equivalent)
 Dockerfile in `deadline-cloud-samples`. This image replicates an April 2026
 snapshot of the SMF worker AMI, so GLIBC and runtime libraries match what the
-DCC will see on a real worker — no need to install system packages ad-hoc.
+DCC will see on a real worker. No need to install system packages ad-hoc.
 
 Check for an existing container:
 
@@ -156,7 +156,7 @@ docker exec al2023-conda-build bash -c '
 
 If the per-DCC guide calls for additional system libraries beyond what the
 worker-equivalent image provides, install them with `yum install -y` as a
-fallback — but first confirm they're actually missing by checking the image.
+fallback, but first confirm they're actually missing by checking the image.
 
 ### Step 6: Build the package
 
@@ -170,7 +170,7 @@ docker exec al2023-conda-build bash -c '
 '
 ```
 
-The recipe's built-in test may require DCC-specific runtime libraries — see the
+The recipe's built-in test may require DCC-specific runtime libraries. See the
 per-DCC guide. To skip the test: `--no-test`.
 
 ### Step 7: Index the channel
@@ -195,7 +195,7 @@ docker exec al2023-conda-build bash -c '
 '
 ```
 
-### Step 9: Optional — test with openjd-cli
+### Step 9: Optional test with openjd-cli
 
 For a full end-to-end test using the Deadline Cloud job bundle, install
 `openjd-cli` and run the matching job template. See the per-DCC guide for the
@@ -203,12 +203,12 @@ exact commands.
 
 ## Common Mistakes
 
-- Building outside AL2023 — GLIBC mismatch causes runtime failures on SMF workers
-- Missing DCC-specific runtime libraries in the container — the DCC won't launch
+- Building outside AL2023: GLIBC mismatch causes runtime failures on SMF workers
+- Missing DCC-specific runtime libraries in the container: the DCC won't launch
   and the recipe test will fail
-- Forgetting `conda index` after building — the package won't be discoverable
-- Guessing SHA256 hashes — always fetch from the vendor's official hash file
-- Running a full-resolution render for a smoke test — use low resolution + low
+- Forgetting `conda index` after building: the package won't be discoverable
+- Guessing SHA256 hashes: always fetch from the vendor's official hash file
+- Running a full-resolution render for a smoke test: use low resolution + low
   samples for a fast check (~5-10 seconds)
 
 ## Quick Reference

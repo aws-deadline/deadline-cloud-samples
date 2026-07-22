@@ -63,8 +63,8 @@ If you already have a farm, you need:
 | Length | VRAM | Recommended GPU |
 |---|---|---|
 | up to 400 aa | ~12 GB | g5.xlarge (A10G 24 GB) |
-| 400–700 aa | ~16–22 GB | g5.2xlarge (A10G 24 GB) |
-| 700–1000 aa | ~32–40 GB | p4d.24xlarge (A100 40 GB) |
+| 400-700 aa | ~16-22 GB | g5.2xlarge (A10G 24 GB) |
+| 700-1000 aa | ~32-40 GB | p4d.24xlarge (A100 40 GB) |
 | over 1024 aa | unsupported | (rejected at the split step) |
 
 ### Service quotas
@@ -120,7 +120,7 @@ Sequences are validated up front (length up to 1024 aa, only the 20 standard ami
 | `Parallelism` | `2` | Number of GPU tasks to fan out across. Sequences are round-robin distributed by length. |
 | `ReferencePdbDir` | (empty) | Optional directory of `<seq_id>.pdb` experimental references. Enables the `Validate` step. |
 | `ChunkSize` | `64` | ESMFold axial-attention chunk size. Lower values reduce VRAM at the cost of speed. |
-| `OutputDir` | `esmfold_runs` | Output directory. Predictions land at `<OutputDir>/results/<seq_id>/`. |
+| `OutputDir` | `esmfold_runs` | Output directory. Predictions are written to `<OutputDir>/results/<seq_id>/`. |
 
 ## Output
 
@@ -186,31 +186,31 @@ pymol esmfold_runs/results/1vii/1vii.pdb \
 
 The bundle validates its output at three layers, in increasing rigor.
 
-**Layer 1 — structural sanity** (in `fold.py`). After every prediction, the bundle parses the written PDB to confirm the atom count matches the sequence length, no coordinates are NaN, and pLDDT values fall in `[0, 100]`. The task fails on violation. This catches silent inference corruption such as CUDA OOM that swallows half the output, or model rescaling bugs.
+**Layer 1: structural sanity** (in `fold.py`). After every prediction, the bundle parses the written PDB to confirm the atom count matches the sequence length and no coordinates are NaN. It also checks that pLDDT values fall in `[0, 100]`. The task fails on violation. This check catches silent inference corruption such as CUDA OOM that swallows half the output, or model rescaling bugs.
 
-**Layer 2 — self-consistency** (in `summary.json`). Mean pLDDT is recorded per structure. ESMFold's confidence convention: below 50 is low confidence, 50–70 is unreliable, 70–90 is confident, and above 90 is very confident. This does not fail the task — a confident but wrong prediction still passes layer 2.
+**Layer 2: self-consistency** (in `summary.json`). Mean pLDDT is recorded per structure. ESMFold's confidence bands run from low (below 50) through unreliable (50 to 70) and confident (70 to 90) up to high confidence (above 90). Layer 2 does not fail the task, since a confident but wrong prediction still passes it.
 
-**Layer 3 — ground truth** (in `validate.py`, the optional `Validate` step). When `ReferencePdbDir` is provided, the bundle computes three metrics against each experimental reference:
+**Layer 3: ground truth** (in `validate.py`, the optional `Validate` step). When `ReferencePdbDir` is provided, the bundle computes three metrics against each experimental reference:
 
-- **TM-score** (via biotite's native `tm_score`). Global structural similarity, alignment-aware. Range `[0, 1]`. Above 0.5 indicates the same fold; above 0.8 is essentially identical.
-- **RMSD**. Average atom-to-atom distance after optimal superposition. Sub-1 Å is excellent on small proteins.
-- **pLDDT–error Pearson r**. For each residue, the predicted confidence (pLDDT) is plotted against the actual distance from the experimental structure. A well-calibrated model produces a strongly negative correlation: high pLDDT corresponds to small error. This catches confidently-wrong predictions that layer 2 misses.
+- **TM-score** (via biotite's native `tm_score`). Global structural similarity, alignment-aware. Range `[0, 1]`. Above 0.5 indicates the same fold. Above 0.8 is nearly identical.
+- **RMSD**. Average atom-to-atom distance after optimal superposition. Sub-1 Å is a strong result on small proteins.
+- **pLDDT-error Pearson r**. For each residue, the predicted confidence (pLDDT) is plotted against the actual distance from the experimental structure. A well-calibrated model produces a strongly negative correlation: high pLDDT corresponds to small error. This catches confidently-wrong predictions that layer 2 misses.
 
-The bundle ships a per-sequence calibration plot:
+The bundle includes a per-sequence calibration plot:
 
 ![Per-residue pLDDT calibration for 1VII](.readme_images/1vii_calibration.png)
 
-Each dot is one residue. The horizontal axis is predicted confidence, the vertical axis is actual distance from experimental. Pearson r = −0.59 indicates high-confidence residues cluster at low error and the two outliers at 7–8 Å sit at lower pLDDT (75–88), so the model correctly reduced its confidence on the residues it got wrong.
+Each dot is one residue. The horizontal axis is predicted confidence, the vertical axis is actual distance from experimental. Pearson r = −0.59 indicates high-confidence residues cluster at low error and the two outliers at 7 to 8 Å sit at lower pLDDT (75 to 88), so the model correctly reduced its confidence on the residues it got wrong.
 
 ### TM-score on short proteins
 
-TM-score is normalized for proteins of about 30 residues or more. For very short sequences (the demo's 20-aa trp-cage targets), TM values can read low (0.45–0.6) even when the prediction is correct. Read the RMSD column for those.
+TM-score is normalized for proteins of about 30 residues or more. For short sequences (the demo's 20-aa trp-cage targets), TM values can read low (0.45 to 0.6) even when the prediction is correct. Read the RMSD column for those.
 
 ## Notes
 
 **Cold-start weight download.** `facebook/esmfold_v1` weights cache into `<OutputDir>/.hf_cache/` so they persist within a single job, but a new job on a fresh worker downloads them again. For production runs, pre-stage the weights as a job attachment input by passing a pre-downloaded HuggingFace cache directory as a `dataFlow: IN` PATH parameter and pointing `HF_HOME` at it before importing transformers.
 
-**Monomer only.** ESMFold accepts multiple chains via the `:` separator, but quality is significantly weaker than AlphaFold-Multimer. For multimer prediction, use AlphaFold-Multimer or AF3.
+**Monomer only.** ESMFold accepts multiple chains via the `:` separator, but quality is much weaker than AlphaFold-Multimer. For multimer prediction, use AlphaFold-Multimer or AF3.
 
 ## Choosing a model
 
@@ -218,13 +218,13 @@ The bundle is pinned to `facebook/esmfold_v1`:
 
 - License: MIT, ungated on HuggingFace.
 - Maintenance: `facebookresearch/esm` was archived in August 2024. `facebook/esmfold_v1` on HuggingFace is the current reference implementation. The HuggingFace transformers integration removes the OpenFold custom-CUDA-kernel dependency that the original `fair-esm[esmfold]` install path required.
-- Single-environment install: no MSA pipeline, no multi-stage data pipeline.
+- Single-environment install: a single Conda environment, with the MSA and multi-stage data pipelines removed.
 
-For state-of-the-art accuracy on hard targets, use AlphaFold2 instead. ESMFold trails AF2 by roughly 10–20% GDT-TS on orphan or de novo sequences because it does not use evolutionary information from MSAs.
+For the highest accuracy on hard targets, use AlphaFold2 instead. ESMFold trails AF2 by roughly 10 to 20% GDT-TS on orphan or de novo sequences because it does not use evolutionary information from MSAs.
 
 ## References
 
-- [Lin et al. 2023, *Science*](https://www.science.org/doi/10.1126/science.ade2574) — original ESMFold paper.
-- [HuggingFace `facebook/esmfold_v1`](https://huggingface.co/facebook/esmfold_v1) — model card.
-- [HuggingFace transformers ESM docs](https://huggingface.co/docs/transformers/en/model_doc/esm) — API reference.
-- [biotite `tm_score`](https://www.biotite-python.org/latest/apidoc/biotite.structure.tm_score.html) — TM-score implementation used by `validate.py`.
+- [Lin et al. 2023, *Science*](https://www.science.org/doi/10.1126/science.ade2574): original ESMFold paper.
+- [HuggingFace `facebook/esmfold_v1`](https://huggingface.co/facebook/esmfold_v1): model card.
+- [HuggingFace transformers ESM docs](https://huggingface.co/docs/transformers/en/model_doc/esm): API reference.
+- [biotite `tm_score`](https://www.biotite-python.org/latest/apidoc/biotite.structure.tm_score.html): TM-score implementation used by `validate.py`.

@@ -32,5 +32,5 @@ You can submit a test job bundle included in this example script (`sunflower_sph
 3. Submit the bundle using the `deadline` CLI
     - With a GUI: `deadline bundle gui-submit .`
     - No GUI: `deadline bundle submit .`
-4. Once the job submission completes, you can monitor job progress using the Deadline Cloud Monitor, web monitor, or AWS Deadline Cloud APIs.
+4. Once the job submission completes, you can monitor job progress using the Deadline Cloud Monitor or the web monitor, or through the AWS Deadline Cloud APIs.
 5. After the job completes, download the output. It should be a sphere with a sunflower texture pattern on it.

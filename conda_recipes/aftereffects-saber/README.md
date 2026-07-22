@@ -13,7 +13,7 @@ Follow these instructions to install AE 25 on a freshly created EC2 instance as 
    1. From the AWS EC2 management console, select the option to Launch instance.
    2. Enter instance name "Create Windows AE archive".
    3. Select "Microsoft Windows Server 2022 Base" for the AMI.
-   4. Select an instance type with enough vCPUs and RAM, for example c5.4xlarge has 8 vCPUs and 16 GiB RAM.
+   4. Select an instance type with enough vCPUs and RAM. A c5.4xlarge has 8 vCPUs and 16 GiB RAM.
    5. Select "Proceed without a key pair" for the "Key pair (login)" option.
    6. Make sure that "Allow RDP traffic" is unchecked. We will use SSM port forwarding to avoid sending RDP
       protocol traffic directly over the internet.

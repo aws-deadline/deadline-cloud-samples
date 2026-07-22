@@ -4,7 +4,7 @@ Train your own AI image models with just 20-50 photos, then generate unlimited n
 
 ## How it works
 
-These AWS Deadline Cloud job bundles use [diffusers](https://github.com/huggingface/diffusers) and [peft](https://github.com/huggingface/peft) to fine-tune FLUX.2 Klein with LoRA (Low-Rank Adaptation)—a technique that creates small, efficient model adapters from your images.
+These AWS Deadline Cloud job bundles use [diffusers](https://github.com/huggingface/diffusers) and [peft](https://github.com/huggingface/peft) to fine-tune FLUX.2 Klein with LoRA (Low-Rank Adaptation), a technique that creates small, efficient model adapters from your images.
 
 **Workflow:**
 1. **Prepare Training Data** - Collect images of your subject in a directory (optionally with caption files)
@@ -144,7 +144,7 @@ training_images/
 └── ...
 ```
 
-Custom captions teach the model more nuanced associations. Include your trigger word (e.g., "ohwx") in each caption.
+Custom captions teach the model more precise associations. Include your trigger word (e.g., "ohwx") in each caption.
 
 ## Training tips
 

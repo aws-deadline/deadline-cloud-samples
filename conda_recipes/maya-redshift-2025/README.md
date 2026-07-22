@@ -1,6 +1,6 @@
 # Redshift for Maya conda build recipe
 
-This package provides Redshift 2025.4.2 support for Maya versions 2025, and 2026.
+The package adds Redshift 2025.4.2 support for Maya versions 2025 and 2026.
 
 ## Supported Maya Versions
 

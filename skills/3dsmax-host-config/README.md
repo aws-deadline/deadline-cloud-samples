@@ -16,11 +16,11 @@ AWS Deadline Cloud Service Managed Fleet workers.
 ### Steps
 
 1. Open Kiro chat
-2. Tell Kiro what you need, for example:
+2. Tell Kiro what you need, such as:
    - `"Create a host configuration script for 3ds Max 2026"`
    - `"Create a host configuration script for 3ds Max 2026 and V-Ray 8"`
    - `"Add a host config script for 3ds Max 2027 with Forest Pack 10 and RailClone 7"`
 3. Kiro will generate the `.ps1` script and a `README.md` for your version combination
-4. Fill in the `TODO` variables at the top of the script — each installer has its own full S3 URI variable (e.g. `$3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket/path/to/installer.zip"`)
+4. Fill in the `TODO` variables at the top of the script. Each installer has its own full S3 URI variable (e.g. `$3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket/path/to/installer.zip"`)
 5. Upload your installers to your S3 bucket
 6. Configure your Service Managed Fleet to use the generated script

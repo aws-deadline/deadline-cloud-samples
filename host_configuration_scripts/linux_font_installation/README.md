@@ -12,7 +12,7 @@ Upload your font files to an S3 bucket:
 aws s3 cp /path/to/your/fonts/ s3://your-bucket-name/Fonts/ --recursive
 ```
 
-Using a separate folder for fonts is optional; beware this script will copy over everything in that folder. Making sure only fonts are getting moved will save time at instance startup.
+Using a separate folder for fonts is optional. Beware this script will copy over everything in that folder. Making sure only fonts are getting moved will save time at instance startup.
 
 ### 2. Configure the Script
 Edit `font_install_host_config.sh` and update these variables:

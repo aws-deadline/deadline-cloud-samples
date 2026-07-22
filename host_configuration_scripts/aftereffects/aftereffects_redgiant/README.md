@@ -1,12 +1,12 @@
 # Host Configuration for After Effects and Plugins
 
-This guide covers setting up host configuration scripts for installing Adobe After Effects and optional plugins on AWS Deadline Cloud workers. You'll be fetching standalone installers, storing them in S3, and using the provided PowerShell script as a host configuration script that pulls and installs the software in silent mode on each worker launch.
+This guide covers setting up host configuration scripts for installing Adobe After Effects and optional plugins on AWS Deadline Cloud workers. You'll fetch standalone installers and store them in S3, then use the provided PowerShell script as a host configuration script that pulls and installs the software in silent mode on each worker launch.
 
 This solution has been tested and verified to work on Windows GPU SMF fleets, but can also be applied to a CMF assuming your instance is a GPU Windows instance with the necessary driver installed to support GPU usage (not fully tested but theoretically should work).
 
-> **Performance Note**: Software installation adds time to worker launch (varies with instance size — larger instances with more vCPUs and memory tend to complete faster). Plan accordingly for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. Additionally, if you have AE jobs that don't require Red Giant, you can have one fleet for just AE renders via Conda and another fleet for AE + plugins using this host configuration.
+> **Performance Note**: Software installation adds time to worker launch (varies with instance size: larger instances with more vCPUs and memory tend to complete faster). Plan your fleet scaling and job scheduling around this. One strategy is to keep a warm worker alive during peak usage hours. If you have AE jobs that don't require Red Giant, you can have one fleet for AE renders via Conda and another fleet for AE plus plugins using this host configuration.
 
-> **Faster subsequent boots are built in.** If a persistent volume is attached to the fleet, the script installs once to it and restores on later boots instead of reinstalling — see [Persistent Volumes (Automatic)](#persistent-volumes-automatic). No separate script or flag is needed.
+> **Faster subsequent boots are built in.** If a persistent volume is attached to the fleet, the script installs once to it and restores on later boots instead of reinstalling. See [Persistent Volumes (Automatic)](#persistent-volumes-automatic). No separate script or flag is needed.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ This solution has been tested and verified to work on Windows GPU SMF fleets, bu
 - AWS Deadline Cloud farm, Windows GPU SMF (service-managed fleet) with latest driver, queue, and queue-fleet association set up. No need to add conda queue environment to your queue.
 - Licenses for any plugins being used
 
-> **Note:** For detailed instructions for each installer, see [Installer download and setup](#installer-download-and-setup).
+> For detailed instructions for each installer, see [Installer download and setup](#installer-download-and-setup).
 
 ## S3 Bucket Setup
 
@@ -24,7 +24,7 @@ This solution has been tested and verified to work on Windows GPU SMF fleets, bu
 
 If you have a job attachments bucket, you can just go ahead and use that. If you want a separate bucket, go ahead and create one.
 
-The script downloads each installer from the full S3 URI you set in its `CONFIG` block, so you're free to organize the objects however you like — at the bucket root, under a shared prefix (e.g. `Installers/`), or in per-software folders. There is no required folder structure. Whatever locations you choose, note down each object's full S3 URI (format `s3://bucket/key`), since you'll paste those URIs into the script config in the [Usage](#usage) step.
+The script downloads each installer from the full S3 URI you set in its `CONFIG` block, so you're free to organize the objects however you like. Put them at the bucket root, under a shared prefix (e.g. `Installers/`), or in per-software folders. No folder structure is required. Whatever locations you choose, note down each object's full S3 URI (format `s3://bucket/key`), since you'll paste those URIs into the script config in the [Usage](#usage) step.
 
 ### 2. Upload Installers
 
@@ -54,7 +54,7 @@ aws s3 cp "FloatingLicensing.zip" s3://$INSTALLER_S3_BUCKET/
 
 ### 3. Update IAM Role Permissions
 
-Then, go to your Fleet role and add the following inline policy to that role. Scope the `Resource` to wherever you uploaded your installers — the whole bucket as shown below, or narrow it to a prefix (e.g. `arn:aws:s3:::<your bucket>/Installers/*`) if you grouped the objects under one:
+Then, go to your Fleet role and add the following inline policy to that role. Scope the `Resource` to wherever you uploaded your installers: the whole bucket as shown below, or narrow it to a prefix (e.g. `arn:aws:s3:::<your bucket>/Installers/*`) if you grouped the objects under one:
 ```json
 {
     "Version": "2012-10-17",
@@ -77,7 +77,7 @@ Then, go to your Fleet role and add the following inline policy to that role. Sc
     ]
 }
 ```
-This allows the host config script to pull down the installers from your S3 bucket in order to install those softwares to your worker.
+The policy lets the host config script pull the installers from your S3 bucket to install those softwares to your worker.
 
 ## Usage
 
@@ -87,7 +87,7 @@ Before deploying, edit the `CONFIG` block at the top of the script.
 
 > Supply the license server or key values documented for each plugin in the [Installer download and setup](#installer-download-and-setup) section.
 
-**Dev testing without licenses:** Boris FX Sapphire, Lenscare, and RSMB can be installed without a license by leaving their license variable blank (`$BORIS_LICENSE_SERVER`, `$LENSCARE_LICENSE_S3_URI`, `$RSMB_LICENSE_SERVER` respectively). The script skips license setup and prints a warning instead of failing. The plugins are fully functional but produce watermarked output — intended for dev testing only. Red Giant licensing is handled separately (blank `$RED_GIANT_LICENSE_SERVER` means UBL, not "no license").
+**Dev testing without licenses:** Boris FX Sapphire, Lenscare, and RSMB can be installed without a license by leaving their license variable blank (`$BORIS_LICENSE_SERVER`, `$LENSCARE_LICENSE_S3_URI`, `$RSMB_LICENSE_SERVER` respectively). The script skips license setup and prints a warning instead of failing. The plugins are fully functional but produce watermarked output, intended for dev testing only. Red Giant licensing is handled separately (blank `$RED_GIANT_LICENSE_SERVER` means UBL, not "no license").
 
 ### 2. Add Host Config Script to Windows GPU Fleet
 
@@ -95,7 +95,7 @@ Copy the script contents into your fleet's **Worker configuration script** and s
 
 ## Persistent Volumes (Automatic)
 
-If your fleet has a persistent volume configured, this script uses it automatically — software installs once to the volume and subsequent boots restore in seconds instead of reinstalling. With no volume attached, it performs a normal install; no configuration is required.
+If your fleet has a persistent volume configured, this script uses it automatically. Software installs once to the volume and subsequent boots restore in seconds instead of reinstalling. With no volume attached, it performs a normal install. No configuration is required.
 
 To configure a persistent volume on your fleet, see the [Deadline Cloud persistent storage developer guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-persistent-storage-dev.html) and [user guide](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/volumes.html).
 
@@ -152,7 +152,7 @@ To install Red Giant, set `$RED_GIANT_S3_URI` to the full S3 URI of the Red Gian
 
 **Red Giant licensing (`$RED_GIANT_LICENSE_SERVER`):**
 
-Red Giant/Redshift licensing is controlled by `$RED_GIANT_LICENSE_SERVER` (format `port@host`). Leave it blank to use Usage-Based Licensing (UBL) — the default, which works on SMF with no extra setup. Set it to point at a custom license server (supported on both SMF and CMF) or at a UBL license endpoint (typically on CMF). See the [CMF UBL guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html) for setting up a license endpoint on CMF.
+Red Giant/Redshift licensing is controlled by `$RED_GIANT_LICENSE_SERVER` (format `port@host`). Leave it blank to use Usage-Based Licensing (UBL), the default, which works on SMF with no extra setup. Set it to point at a custom license server (supported on both SMF and CMF) or at a UBL license endpoint (typically on CMF). See the [CMF UBL guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/cmf-ubl.html) for setting up a license endpoint on CMF.
 
 ```powershell
 $RED_GIANT_LICENSE_SERVER = "7055@my-license-server"  # blank = UBL
@@ -160,7 +160,7 @@ $RED_GIANT_LICENSE_SERVER = "7055@my-license-server"  # blank = UBL
 
 ### 3. Maxon App (required for Red Giant)
 
-This is needed to support Red Giant + Universe licensing since it serves as a proxy between your licensing server and the plugins being run.
+The Maxon App is needed to support Red Giant and Universe licensing since it is a proxy between your licensing server and the plugins being run.
 Download from Maxon:
 1. Navigate to the [Maxon App](https://www.maxon.net/en/downloads) section after you scroll down a bit
 2. Download `Maxon_App_2025.4.2_Win.exe` (or latest version) for Windows under the section Maxon App
@@ -169,7 +169,7 @@ Set `$MAXON_APP_S3_URI` to the full S3 URI of the Maxon App installer (format `s
 
 ### 4. Microsoft Edge WebView2 Runtime (required for Red Giant)
 
-This is needed for the Maxon App installation to go smoothly. Download from Microsoft:
+WebView2 is needed for the Maxon App installation to go smoothly. Download from Microsoft:
 1. Visit the [Microsoft Edge WebView2 download page](https://developer.microsoft.com/en-us/microsoft-edge/webview2?form=MA13LH#download)
 2. Download `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` (x64 version) under the "Evergreen Standalone Installer" section
 
@@ -182,7 +182,7 @@ Download from Boris FX:
 2. Navigate to the [Boris FX Downloads](https://borisfx.com/downloads/?product=sapphire&os=windows) section
 3. Download Sapphire 2026 (or latest version) for Adobe (Windows 64-Bit)
 
-For Boris FX Sapphire, you will need to bring your own licenses. We recommend setting the `genarts_LICENSE` environment variable to license the software. This can be set either inside the host config script by configuring the `$BORIS_LICENSE_SERVER` variable (e.g., `$BORIS_LICENSE_SERVER = "5053@<license-server-hostname>"`), or in a queue environment. See the "Install Floating Client License Using An Environment Variable" section of [this Boris FX article](https://support.borisfx.com/hc/en-us/articles/11198263161997-License-Instructions-Floating-Licenses) for more details on the format of the environment variable.
+For Boris FX Sapphire, you will need to bring your own licenses. We recommend setting the `genarts_LICENSE` environment variable to license the software. The variable can be set either inside the host config script by configuring the `$BORIS_LICENSE_SERVER` variable (e.g., `$BORIS_LICENSE_SERVER = "5053@<license-server-hostname>"`), or in a queue environment. See the "Install Floating Client License Using An Environment Variable" section of [this Boris FX article](https://support.borisfx.com/hc/en-us/articles/11198263161997-License-Instructions-Floating-Licenses) for more details on the format of the environment variable.
 
 To install Boris FX Sapphire, set `$BORIS_SAPPHIRE_S3_URI` to the full S3 URI of the Boris FX Sapphire installer (format `s3://bucket/key.exe`), along with `$BORIS_LICENSE_SERVER`. Leave `$BORIS_LICENSE_SERVER` blank to install without a license for dev testing (watermarked output).
 
@@ -207,4 +207,4 @@ Download from RE:Vision Effects:
 
 For ReelSmart Motion Blur, you will need to bring your own licenses. We recommend setting the `RVL_SERVER` environment variable to license the software. The script sets this from the `$RSMB_LICENSE_SERVER` config value (format `port@host`), or you can set it in a queue environment instead. See the ["Setting up floating license clients" page from RE:Vision](https://revisionfx.com/faq/setting-floating-license-clients/#Windows) for more details on the format of the environment variable.
 
-To install ReelSmart Motion Blur, set `$RSMB_S3_URI` to the full S3 URI of the ReelSmart Motion Blur installer zip, along with `$RSMB_LICENSING_S3_URI` (full S3 URI of the floating licensing zip) and `$RSMB_LICENSE_SERVER` (format `port@host`). Leave `$RSMB_LICENSE_SERVER` blank to install without a license for dev testing (watermarked output); the floating licensing zip is only needed when a license server is set.
+To install ReelSmart Motion Blur, set `$RSMB_S3_URI` to the full S3 URI of the ReelSmart Motion Blur installer zip, along with `$RSMB_LICENSING_S3_URI` (full S3 URI of the floating licensing zip) and `$RSMB_LICENSE_SERVER` (format `port@host`). Leave `$RSMB_LICENSE_SERVER` blank to install without a license for dev testing (watermarked output). The floating licensing zip is only needed when a license server is set.

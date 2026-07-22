@@ -1,6 +1,6 @@
-# This directory provides example scripts for custom configurations on Deadline Cloud Service Managed Workers
+# Custom configuration scripts for Deadline Cloud Service Managed Workers
 
-These scripts demonstrate common configuration tasks that may be required for your workloads. For example, adjusting system settings, configuring memory management, or setting up environment-specific parameters.
+The example scripts here cover common configuration tasks for your workloads, such as adjusting system settings and configuring memory management or environment-specific parameters.
 
 For setup instructions and troubleshooting guidance, refer to the [host_configuration_scripts README](../README.md).
 
@@ -14,7 +14,7 @@ Page file sizing logic:
 - If NVMe is not available: By default, uses the largest non-boot drive with 2x RAM
 - If no non-boot drives are available: Falls back to the boot drive (C:)
 
-The script automatically detects Amazon EC2 NVMe instance storage, disables automatic page file management, formats the drive and assigns a drive letter if needed, and reboots the worker to apply changes. A marker file (`C:\deadline-pagefile-configured`) prevents reconfiguration on subsequent starts.
+The script automatically detects Amazon EC2 NVMe instance storage and disables automatic page file management. It formats the drive and assigns a drive letter if needed, then reboots the worker to apply changes. A marker file (`C:\deadline-pagefile-configured`) prevents reconfiguration on subsequent starts.
 
 #### Configuration Options
 Adjust these variables at the top of the script to fit your workload requirements:

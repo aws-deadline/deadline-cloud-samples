@@ -2,9 +2,9 @@
 
 ## Use case for this job
 
-This is an After Effects job bundle that allows the user
+This After Effects job bundle allows the user
 to submit a job that uses aerender to render a frame range
-as a single task. This means the entire workload will render
+as a single task. The entire workload renders
 on one worker as one command.
 
 It accepts the following job parameters that modify the render:

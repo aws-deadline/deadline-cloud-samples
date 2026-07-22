@@ -9,7 +9,7 @@ Place the file in the `conda_recipes/archive_files` directory within your local 
 
 To set up your environment for submitting package build jobs, please refer to this [README](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/conda_recipes/README.md).
 
-Once your environment is prepared, navigate to the `conda_recipes` directory and execute the following command from your shell to submit a package build job for VRED 2026:
+Once your environment is prepared, go to the `conda_recipes` directory and execute the following command from your shell to submit a package build job for VRED 2026:
 
 ```
 ./submit-package-job vredcore-2026
@@ -17,10 +17,10 @@ Once your environment is prepared, navigate to the `conda_recipes` directory and
 
 ## Prerequisites for Package Usage
 
-For VRED's GPU rendering capabilities, it is crucial to ensure that an X Server is running in the background. This Conda package automatically starts X Server, but the Linux user running this package must have the following permissions:
+For VRED's GPU rendering capabilities, an X Server must be running in the background. This Conda package automatically starts X Server, but the Linux user running this package must have the following permissions:
 
 1. Membership in the 'tty' group
-2. Read/write permissions for virtual terminals (specifically /dev/tty1)
+2. Read/write permissions for virtual terminals (/dev/tty1)
 
 These requirements can be set up using:
 ```bash

@@ -87,7 +87,7 @@ To package a new AYON Launcher version:
 
 ## Additional environment variables needed at runtime
 
-These must be provided by the job (via step environment or job parameters):
+These variables must be provided by the job (via step environment or job parameters):
 
 | Variable | Description |
 |----------|-------------|

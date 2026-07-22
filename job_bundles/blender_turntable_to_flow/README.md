@@ -2,8 +2,8 @@
 
 ## Introduction
 
-This job bundle renders an animated turntable in Blender, encodes it into a
-review-ready movie, extracts a poster-frame thumbnail, and publishes the
+This job bundle renders an animated turntable in Blender and encodes it into a
+review-ready movie. It also extracts a poster-frame thumbnail and publishes the
 result to [Autodesk Flow Production Tracking](https://www.autodesk.com/products/flow-production-tracking/overview)
 (formerly ShotGrid) as a new `Version` on an `Asset`'s review `Task`.
 
@@ -20,18 +20,18 @@ pipeline on AWS Deadline Cloud, and it demonstrates two core patterns:
 
 ## Why post-render work belongs in a job step
 
-The canonical way to do post-render work on Deadline Cloud — uploading to Flow,
-registering versions, generating thumbnails — is a discrete OpenJD step with a
+The canonical way to do post-render work on Deadline Cloud (uploading to Flow,
+registering versions, generating thumbnails) is a discrete OpenJD step with a
 step dependency. Each unit of post-render work is a first-class farm task,
 which means it is:
 
-- Observable — it shows up in the monitor with its own logs and status.
-- Independently retryable — a failed Flow publish can be retried without
+- Observable: it shows up in the monitor with its own logs and status.
+- Independently retryable: a failed Flow publish can be retried without
   re-rendering a single frame.
-- Independently schedulable — the publish step can run on a cheap CPU fleet
+- Independently schedulable: the publish step can run on a cheap CPU fleet
   instead of the GPU render fleet (this sample keeps them on one fleet for
   simplicity, but the steps are separable).
-- Parallelizable — `GenerateMovie` and `GenerateThumbnail` run at the same
+- Parallelizable: `GenerateMovie` and `GenerateThumbnail` run at the same
   time because neither depends on the other.
 
 Modeling each piece of post-render work as its own step is what gives you all of
@@ -49,28 +49,28 @@ RenderTurntable          (Blender; one task per frame, parameter-space over the 
 ```
 
 `GenerateMovie` and `GenerateThumbnail` both depend only on `RenderTurntable`, so
-they run in parallel — a clear visual demonstration of step fan-out in the
+they run in parallel, a clear visual demonstration of step fan-out in the
 monitor. `PublishToFlow` depends on both because it uploads both artifacts.
 
 ## How this maps to the Flow entity model
 
 The sample follows idiomatic Flow conventions:
 
-- The `Version` is the hero entity — the reviewable media record. The movie is
+- The `Version` is the hero entity, the reviewable media record. The movie is
   uploaded to `sg_uploaded_movie` (what plays in the review player);
   `sg_path_to_movie` / `sg_path_to_frames` hold the filesystem paths.
 - The thumbnail belongs on the `Version` (uploaded via `upload_thumbnail`),
-  which populates the Version's `image` field — that's what shows in the review
+  which populates the Version's `image` field, which shows in the review
   grid. It is not attached to the Asset.
 - Status is advanced on the `Task`, not the Asset. In Flow, an Asset isn't
-  marked "rendered"; instead the review Task (for example a "Model" or
+  marked "rendered"; instead the review Task (such as a "Model" or
   "Turntable" task) is advanced. Many studios use a `rev` ("pending review")
-  status for this, but `rev` is not a stock status code — it varies per site.
+  status for this, but `rev` is not a stock status code and varies per site.
   The `FlowTaskStatus` parameter defaults to `fin` because the demo site only
   defines the stock codes `wtg` / `ip` / `fin`; set it to whatever your site
   uses (`rev` is the conventional choice where it exists).
-- The work hangs off an Asset rather than a Shot. An "Asset turntable" — build
-  an asset, render a turntable to review the model or look — is self-contained,
+- The work hangs off an Asset rather than a Shot. An "Asset turntable" (build
+  an asset, render a turntable to review the model or look) is self-contained,
   with no sequence/shot hierarchy required, and maps directly to "render an
   object and review it."
 
@@ -87,13 +87,13 @@ with:
 Blender is on the `deadline-cloud` channel; FFmpeg is on the `conda-forge`
 community channel.
 
-> Note on `shotgun_api3`: the Flow Python client is published on PyPI
-> only (it is *not* on conda-forge). The `PublishToFlow` step therefore
-> `pip install`s `shotgun_api3` (and `boto3`) at runtime into the conda
-> environment. This mixed conda + pip approach is normal for Python client
-> libraries that have no conda package. A team that wants fully reproducible,
-> offline-capable environments can instead build an internal conda package or
-> bake the dependency into a custom worker image.
+The Flow Python client `shotgun_api3` is published on PyPI
+only (it is not on conda-forge). The `PublishToFlow` step
+`pip install`s `shotgun_api3` (and `boto3`) at runtime into the conda
+environment. This mixed conda + pip approach is normal for Python client
+libraries that have no conda package. A team that wants fully reproducible,
+offline-capable environments can instead build an internal conda package or
+bake the dependency into a custom worker image.
 
 ## Flow credentials: AWS Secrets Manager (do this once)
 
@@ -103,7 +103,7 @@ stay out of the job bundle and out of the job's parameters.
 
 ### 1. Create the secret
 
-The secret value is JSON with three keys — your Flow site URL, the script
+The secret value is JSON holding your Flow site URL, the script
 name (from Flow → Admin → Scripts), and its API key:
 
 ```bash
@@ -118,7 +118,7 @@ aws secretsmanager create-secret \
   }'
 ```
 
-Note the returned `ARN` — you'll pass it as the `FlowSecretArn` job parameter.
+Note the returned `ARN`. You'll pass it as the `FlowSecretArn` job parameter.
 
 To update the credentials later:
 
@@ -178,14 +178,14 @@ blender_turntable_to_flow/
     └── flow_params_from_env.py  preSubmission hook: fills the Flow parameters from the environment
 ```
 
-The two render/publish scripts are referenced by the template as `dataFlow: IN`
+The render and publish scripts are referenced by the template as `dataFlow: IN`
 `PATH` parameters (`BuildTurntableScript`, `PublishScript`). Deadline Cloud
 uploads them with the job's attachments and path-maps them onto the worker, so
 the steps run them as ordinary files rather than embedding the source inline.
 
 ## Filling Flow parameters from the environment (submission hook)
 
-Studios usually already have environment or project-tracking tooling that sets
+Studios often already have environment or project-tracking tooling that sets
 environment variables when an artist opens a shell or launches an application
 (via Rez, a launcher, a "set project" script, and so on). This bundle uses a
 [Deadline Cloud submission hook](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md)
@@ -195,8 +195,8 @@ by hand.
 
 The Flow parameters in the template are `HIDDEN` and carry only placeholder
 defaults. `hooks.yaml` registers a `preSubmission` hook
-(`scripts/flow_params_from_env.py`) that runs as part of every submission — CLI
-or GUI — and rewrites those parameter defaults from the environment before the
+(`scripts/flow_params_from_env.py`) that runs as part of every submission (CLI
+or GUI) and rewrites those parameter defaults from the environment before the
 job is created.
 
 | Environment variable | Job parameter | Required |
@@ -221,7 +221,7 @@ Bundle hooks are disabled by default. Enable them once:
 deadline config set settings.allow_bundle_hooks true
 ```
 
-With the hook in place, a submission only needs the render parameters — the Flow
+With the hook in place, a submission only needs the render parameters. The Flow
 parameters come from the environment:
 
 ```bash
@@ -238,8 +238,8 @@ The hook reads and writes the template with PyYAML, so the Python that runs it
 
 ## Example submission
 
-These assume the `FLOW_*` environment variables are set (see the previous
-section) and bundle hooks are enabled.
+These examples assume the `FLOW_*` environment variables are set (see the
+previous section) and bundle hooks are enabled.
 
 ### GUI submission
 
@@ -290,5 +290,5 @@ template placeholder.
 | FlowStepShortName | `MDL` | Pipeline Step short name for the review Task (if created) |
 | FlowTaskName | `Turntable` | Task content/name on the Asset (found-or-created) |
 | FlowTaskStatus | `fin` | Status set on the Task after publishing (`rev` where defined) |
-| BuildTurntableScript | `scripts/build_turntable.py` | Blender scene/render script shipped in the bundle (hidden) |
-| PublishScript | `scripts/publish_to_flow.py` | Flow publish script shipped in the bundle (hidden) |
+| BuildTurntableScript | `scripts/build_turntable.py` | Blender scene/render script included in the bundle (hidden) |
+| PublishScript | `scripts/publish_to_flow.py` | Flow publish script included in the bundle (hidden) |

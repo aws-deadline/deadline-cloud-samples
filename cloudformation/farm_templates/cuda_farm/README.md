@@ -6,7 +6,7 @@ This CloudFormation template deploys an AWS Deadline Cloud farm that you can use
 default configuration includes a queue for CUDA jobs, a second queue for building conda packages,
 and a CUDA-capable fleet.
 
-This is an example of how you can take the [starter_farm sample](../starter_farm/README.md)
+This template is an example of how you can take the [starter_farm sample](../starter_farm/README.md)
 and specialize it to your requirements. The differences are:
 
 * Updated the default names and descriptions for the CUDA job use case.
@@ -62,13 +62,13 @@ your AWS Account.
    using a command like `pip install "deadline[gui]"`. You can then use the command
    `deadline handle-web-url --install` to install the job attachments download handler on supported operating systems.
 4. Use your monitor URL and the user account from the prerequisites to log in from the Deadline Cloud monitor desktop.
-   This also provides AWS credentials to the Deadline Cloud CLI.
+   Logging in also provides AWS credentials to the Deadline Cloud CLI.
 5. From the terminal, run the command `deadline config gui`, and select the default farm "CUDA Deadline Cloud Farm"
    and the default queue "CUDA Job Queue". Select OK to apply the settings.
 
 ### Initialize the S3 conda channel
 
-1. Create a file `empty_channel_repodata.json` and edit to to contain the following:
+1. Create a file `empty_channel_repodata.json` and edit it to contain the following:
    ```
    {"info":{"subdir":"noarch"},"packages":{},"packages.conda":{},"removed":[],"repodata_version":1}
    ```
@@ -105,7 +105,7 @@ your AWS Account.
 2. From your terminal, run `deadline bundle gui-submit --browse` and select the `gpu_test_job` directory.
    Proceed to submit the job to the queue.
 3. From Deadline Cloud monitor, watch the job you submitted, and when it is running, right click on the
-   task and select "View logs". It may take several minutes as Deadline cloud starts an instance in your
+   task and select "View logs". It may take a few minutes as Deadline cloud starts an instance in your
    fleet to run the job. Within the log, you can find output that is similar to:
    ```
    + nvidia-smi

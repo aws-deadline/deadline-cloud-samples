@@ -1,14 +1,14 @@
 # Enforce Fixed License Limits with Submission Hooks
 
-This sample demonstrates how to use [AWS Deadline Cloud Limits](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/deadline-cloud-limits.html) together with a [submission hook](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md) to enforce a fixed number of concurrent VRay licenses across all job submissions — without requiring artists to configure anything manually.
+This sample demonstrates how to use [AWS Deadline Cloud Limits](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/deadline-cloud-limits.html) together with a [submission hook](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md) to enforce a fixed number of concurrent VRay licenses across all job submissions, without requiring artists to configure anything manually.
 
 ## Overview
 
 Studios often have a fixed number of floating licenses for renderers like V-Ray. AWS Deadline Cloud's **Limits** feature throttles task scheduling so that no more than N tasks requiring a license run concurrently. However, for the limit to take effect, each job must declare the license as a **host requirement** in its template.
 
-This sample provides a **pre-submission hook** that automatically injects the license host requirement into every job template at submission time. This means:
+The **pre-submission hook** in this sample injects the license host requirement into every job template at submission time, so:
 
-- Artists submit jobs normally — no extra steps required
+- Artists submit jobs normally, with no extra steps required
 - The hook ensures every job declares its need for the VRay license
 - Deadline Cloud's scheduler enforces the concurrency limit
 
@@ -91,9 +91,9 @@ aws deadline create-queue-limit-association \
 
 ### Step 3: Verify Fleet Compatibility
 
-When a limit is associated with a queue, fleets associated with that queue can schedule tasks that require the limit — no additional fleet configuration is needed.
+When a limit is associated with a queue, fleets associated with that queue can schedule tasks that require the limit, with no additional fleet configuration needed.
 
-> **Important:** Do **not** add `amount.vray` as a `customAmounts` entry in your fleet's capabilities. If the fleet declares the amount as a capability, it treats it as a per-worker resource and bypasses the queue-level limit entirely. The limit association alone provides compatibility.
+> Do not add `amount.vray` as a `customAmounts` entry in your fleet's capabilities. If the fleet declares the amount as a capability, it treats it as a per-worker resource and bypasses the queue-level limit entirely. The limit association alone provides compatibility.
 
 ### Step 4: Deploy the Submission Hook
 
@@ -198,7 +198,7 @@ license_limits/
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Job marked `NOT_COMPATIBLE` | Limit not associated with the queue | Run `create-queue-limit-association` (Step 2) |
-| Limit not enforced (jobs run concurrently) | Fleet has `customAmounts` with the limit name | Remove `customAmounts` from fleet — the limit association handles it |
+| Limit not enforced (jobs run concurrently) | Fleet has `customAmounts` with the limit name | Remove `customAmounts` from fleet (the limit association handles it) |
 | Hook not running | Environment hooks not enabled | Run `deadline config set settings.allow_environment_hooks true` |
 | Hook not running | `DEADLINE_HOOKS_DIR` not set | Set the environment variable in your launcher script |
 | Limit not enforced | Queue-limit association missing | Run `create-queue-limit-association` (Step 2) |

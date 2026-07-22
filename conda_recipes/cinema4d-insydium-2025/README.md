@@ -52,7 +52,7 @@ C:\Dev\deadline-cloud-samples\conda_recipes>dir C:\...\conda-bld\win-64
 ...
 ```
 
-The --no-test flag avoids a conda error if cinema4d-2025 package hasn't already
+The `--no-test` flag avoids a conda error if cinema4d-2025 package hasn't already
 been built locally.
 
 ### Publish the locally built package to an S3 conda channel

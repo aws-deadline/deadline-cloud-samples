@@ -1,8 +1,8 @@
 # Blender wedge render from a CSV file
 
-This job bundle renders a wedge — a set of look-development variations of the same Blender scene,
-one image per variation — where the variations are rows of a CSV file. Choose it when a spreadsheet
-defines your job's task list: wedge variations, shot lists, simulation parameter sweeps, per-asset
+This job bundle renders a wedge (a set of look-development variations of the same Blender scene,
+one image per variation) where the variations are rows of a CSV file. Choose it when a spreadsheet
+defines your job's task list: wedge variations and shot lists, simulation parameter sweeps, per-asset
 QC checks, and similar structured data that does not fit a numeric frame range.
 
 ![The wedges.csv file expanded by the pre-submission hook into one render task per row, shown as a grid of the six output images.](screenshot.png)
@@ -12,9 +12,9 @@ QC checks, and similar structured data that does not fit a numeric frame range.
 A [pre-submission hook](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md)
 that lives inside the job bundle and expands the CSV into the job's task parameters at submission
 time, so each CSV row becomes one task on the farm. The CSV is the artist-facing interface, and the
-hook translates it into Open Job Description task parameters — no template editing per wedge. Unlike
+hook translates it into Open Job Description task parameters, with no template editing per wedge. Unlike
 the workstation-wide [submission hook samples](../../submission_hooks/), the hook here is bundle-local:
-it ships with the job in `hooks.yaml` and applies only to this bundle's submissions.
+it travels with the job in `hooks.yaml` and applies only to this bundle's submissions.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ it ships with the job in `hooks.yaml` and applies only to this bundle's submissi
   ```
 
 The hook runs `python3`. On Windows, or if only `python` is on your PATH, edit
-the `command` in [`hooks.yaml`](hooks.yaml) accordingly.
+the `command` in [`hooks.yaml`](hooks.yaml) to match.
 
 ## How it works
 
@@ -63,7 +63,7 @@ parameterSpace:
 
 Without the `combination` expression, OpenJD would build the cross product of
 all parameter values. The associative `(A, B, C, D)` form instead pairs the
-Nth value of every range together, which is exactly a CSV's row structure.
+Nth value of every range together, matching a CSV's row structure.
 
 At submission time, the pre-submission hook
 ([`scripts/expand_wedge_csv.py`](scripts/expand_wedge_csv.py), configured in
@@ -81,21 +81,21 @@ replaces each placeholder range with the corresponding CSV column:
   # ...
 ```
 
-The hook prints the modified template on stdout under the `template` key, and
-the Deadline Cloud client uses it for the CreateJob call. The bundle's
+The hook prints the modified template on stdout under the `template` key, which
+the Deadline Cloud client then passes to CreateJob. The bundle's
 `template.yaml` on disk is never modified, and the CSV itself is uploaded with
-the job (it is a `dataFlow: IN` path parameter) as a record of what was
+the job as a `dataFlow: IN` path parameter, keeping a record of what was
 requested.
 
 If the CSV is missing, empty, has malformed values, or duplicate wedge names,
 the hook exits non-zero and the submission is aborted before anything is
 uploaded.
 
-Each task then builds the same procedural scene — a metallic Suzanne on a
-ground plane under a sun lamp — with that row's values applied
+Each task then builds the same procedural scene (a metallic Suzanne on a
+ground plane under a sun lamp) with that row's values applied
 ([`scripts/render_wedge.py`](scripts/render_wedge.py)). Building the scene
-procedurally keeps every task fully independent and the sample self-contained;
-there is no `.blend` file to ship. In a production wedge the same task
+procedurally keeps every task fully independent and the sample self-contained,
+with no `.blend` file to upload. In a production wedge the same task
 parameters would instead be applied to your scene file with a `--python-expr`
 override or a small driver script.
 
@@ -125,7 +125,7 @@ reports what it expanded:
   task parameters: mirror, glossy, satin, matte, backlit, noisy_preview
 ```
 
-To wedge your own values, edit `wedges.csv` — or keep several CSVs and pick one
+To wedge your own values, edit `wedges.csv`, or keep multiple CSVs and pick one
 at submission:
 
 ```console
@@ -186,15 +186,15 @@ Each CSV row produces one image, `<OutputDir>/wedge_<name>.png`, applied as:
 
 ## Security, cost, and cleanup
 
-Bundle hooks execute local scripts from the job bundle at submission time, which is why they are
+Bundle hooks execute local scripts from the job bundle at submission time, so they are
 disabled by default and gated behind the `settings.allow_bundle_hooks` setting plus a per-submission
-confirmation prompt. Review [`hooks.yaml`](hooks.yaml) and the hook script — as you should for any
-bundle — before enabling. The hook here reads only the wedge CSV and the bundle's own template, and
+confirmation prompt. Review [`hooks.yaml`](hooks.yaml) and the hook script, as you should for any
+bundle, before enabling. The hook here reads only the wedge CSV and the bundle's own template, and
 modifies nothing on disk.
 
 Submitting the job runs Blender render tasks on your farm's fleet and stores job attachments in your
-queue's S3 bucket; both are billable at your farm's normal rates. The default CSV renders six small
-images and completes in a few minutes on a single worker. There are no resources to clean up beyond
+queue's S3 bucket. Both are billable at your farm's normal rates. The default CSV renders six small
+images and completes in a few minutes on a single worker. No resources need cleanup beyond the
 normal job attachment lifecycle in your S3 bucket.
 
 ## Troubleshooting
@@ -212,30 +212,30 @@ submission console before upload begins.
 
 ## Adapting the pattern
 
-To wedge different values, change all three layers together — they are coupled
+To wedge different values, change all three layers together, since they are coupled
 by name:
 
-1. **CSV columns** — the artist-facing schema.
-2. **`CSV_TO_TASK_PARAMETER`** in `expand_wedge_csv.py` — maps each column to a
+1. **CSV columns**: the artist-facing schema.
+2. **`CSV_TO_TASK_PARAMETER`** in `expand_wedge_csv.py`: maps each column to a
    task parameter name and type.
-3. **Task parameters** in `template.yaml` — one definition per column, all
+3. **Task parameters** in `template.yaml`: one definition per column, all
    listed in the `combination` expression, plus wiring the value into the
    render command.
 
 Notes and limits:
 
 - Open Job Description allows at most 1024 values per task parameter range and
-  16 task parameters per step; the hook enforces the former.
+  16 task parameters per step. The hook enforces the value limit.
 - The hook trusts the CSV's header names, not column order, and ignores extra
-  columns — so artists can annotate rows with notes columns freely.
+  columns, so artists can annotate rows with notes columns freely.
 - Values a hook emits for `PATH`-typed *job* parameters on stdout must be
-  absolute paths; this sample only rewrites *task* parameter ranges inside the
+  absolute paths. This sample only rewrites *task* parameter ranges inside the
   template, which has no such restriction.
 
 ## Related resources
 
 - [Submission hooks documentation](https://github.com/aws-deadline/deadline-cloud/blob/mainline/docs/submission-hooks.md)
-- [Workstation-wide submission hook samples](../../submission_hooks/) — the same mechanism deployed studio-wide via `DEADLINE_HOOKS_DIR`
-- [Blender turntable to Flow](../blender_turntable_to_flow/) — a bundle hook that fills job parameters from studio environment variables
-- [Blender render](../blender_render/) — the minimal frame-range Blender bundle this sample builds on
+- [Workstation-wide submission hook samples](../../submission_hooks/): the same mechanism deployed studio-wide via `DEADLINE_HOOKS_DIR`
+- [Blender turntable to Flow](../blender_turntable_to_flow/): a bundle hook that fills job parameters from studio environment variables
+- [Blender render](../blender_render/): the minimal frame-range Blender bundle this sample builds on
 - [OpenJD parameter space and combination expressions](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#34-parameterspacedefinition)

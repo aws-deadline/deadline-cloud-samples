@@ -4,7 +4,7 @@ Host configuration scripts run with elevated privileges on service-managed fleet
 
 ## Sample index
 
-This table covers every immediate user-selectable group or leaf directory in `host_configuration_scripts/`. The application groups link to their own installer examples; implementation scripts remain inside each sample.
+This table covers every immediate user-selectable group or leaf directory in `host_configuration_scripts/`. The application groups link to their own installer examples. Implementation scripts remain inside each sample.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -34,7 +34,7 @@ Copy the selected script into the Deadline Cloud console or use the Deadline Clo
 
 ### CloudWatch Logs
 
-Host configuration logs are streamed to the fleet log group and a stream dedicated to each worker. For example, `/aws/deadline/farm-12345/fleet-09876` can contain a `worker-13579` stream. Look for the “Running Host Configuration Script” and “Finished running Host Configuration Script, exit code: 0” banners.
+Host configuration logs are streamed to the fleet log group and a stream dedicated to each worker. The `/aws/deadline/farm-12345/fleet-09876` group can contain a `worker-13579` stream. Look for the “Running Host Configuration Script” and “Finished running Host Configuration Script, exit code: 0” banners.
 
 ### CloudWatch Logs Insights
 

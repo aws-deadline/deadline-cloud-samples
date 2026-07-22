@@ -11,7 +11,7 @@ for use by the conda build recipe.
     1. From the AWS EC2 management console, select the option to Launch instance.
     2. Enter instance name "Create Windows Cinema4D archive".
     3. Select "Microsoft Windows Server 2022 Base" for the AMI.
-    4. Select an instance type with enough vCPUs and RAM, for example c5.4xlarge has 8 vCPUs and 16 GiB RAM.
+    4. Select an instance type with enough vCPUs and RAM, such as c5.4xlarge with 8 vCPUs and 16 GiB RAM.
     5. Select "Proceed without a key pair" for the "Key pair (login)" option.
     6. We will use SSM port forwarding to avoid sending RDP protocol traffic directly over the internet.
         1. Make sure that "Allow RDP traffic" is unchecked.
@@ -35,7 +35,7 @@ for use by the conda build recipe.
         2. User name: `Administrator`
     5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
 3. Install Cinema 4D 2024 on the instance.
-    1. Download the Cinema 4D 2024 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2024-downloads). For example, the files `Cinema4D_2024_2024.5.1_Win.exe`.
+    1. Download the Cinema 4D 2024 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2024-downloads), such as the file `Cinema4D_2024_2024.5.1_Win.exe`.
        If you have placed them on S3, you can use a PowerShell command like `Read-S3Object -BucketName MY_BUCKET_NAME -Key MY_UPLOADED_KEY_NAME -File MY_FILE_NAME`.
     2. Run the installer. Accept the prompts to continue.
     3. The Cinema 4D installer will launch. Proceed to install as normal with the components you want included.

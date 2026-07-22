@@ -1,6 +1,6 @@
 # Virtual Screening with AutoDock VINA
 
-[Virtual screening](https://en.wikipedia.org/wiki/Virtual_screening) is a computational drug discovery technique that searches large libraries of small molecules to find those most likely to bind a protein target (e.g., a viral enzyme or cancer receptor). By predicting binding affinity computationally, researchers narrow millions of candidates down to a few hundred for lab testing — drastically reducing cost and time in early-stage drug discovery.
+[Virtual screening](https://en.wikipedia.org/wiki/Virtual_screening) is a computational drug discovery technique that searches large libraries of small molecules to find those most likely to bind a protein target (e.g., a viral enzyme or cancer receptor). By predicting binding affinity computationally, researchers narrow millions of candidates down to a few hundred for lab testing, cutting cost and time in early-stage drug discovery.
 
 This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vina), an open-source docking engine. It splits a compound library into chunks and docks them in parallel across a fleet of workers.
 
@@ -18,7 +18,7 @@ This job bundle uses [AutoDock VINA](https://github.com/ccsb-scripps/AutoDock-Vi
 
 ![Binding affinity distribution from screening 741 ChEMBL compounds against COVID-19 Main Protease](example_results.png)
 
-*Most compounds bind weakly (-4 to -6 kcal/mol), but 44 compounds cross the -7.0 threshold into "worth testing in the lab" territory — those are the drug candidates you'd synthesize and validate experimentally.*
+*Most compounds bind weakly (-4 to -6 kcal/mol), but 44 compounds cross the -7.0 threshold into "worth testing in the lab" territory. Those are the drug candidates you'd synthesize and validate experimentally.*
 
 ## How It Works
 
@@ -41,7 +41,7 @@ Step 4: ScoreAndRank  (1 task, depends on Step 3)
   Aggregate all chunk results → ranked CSV of top hits by binding affinity
 ```
 
-Each docking task is idempotent (safe for Spot preemption — skips if results already exist).
+Each docking task is idempotent (safe for Spot preemption, since it skips if results already exist).
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 2. **Software dependencies**:
    - **OpenBabel**: Installed automatically via the queue's Conda environment from conda-forge (default `CondaPackages` includes `openbabel`).
-   - **AutoDock VINA**: Not available on conda-forge. Two options:
+   - **AutoDock VINA**: Not available on conda-forge. Install it one of these ways:
      - **(Recommended)** Build the conda recipe at [`conda_recipes/autodock-vina-1.2.5/`](../../conda_recipes/autodock-vina-1.2.5/) into your S3 conda channel, then add `autodock-vina` to `CondaPackages` and your S3 channel to `CondaChannels`.
      - **(Quick start)** Use a [fleet host configuration script](../../host_configuration_scripts/) to install the VINA binary at worker boot:
        ```bash
@@ -66,13 +66,13 @@ Each docking task is idempotent (safe for Spot preemption — skips if results a
 
 No pre-downloaded data required. The template can automatically download and filter compounds from [ChEMBL](https://www.ebi.ac.uk/chembl/).
 
-**Receptor** — download any protein from the RCSB Protein Data Bank. Example with COVID-19 Main Protease:
+**Receptor**: download any protein from the RCSB Protein Data Bank. Example with COVID-19 Main Protease:
 ```bash
 curl -LO https://files.rcsb.org/download/6LU7.pdb
 grep "^ATOM" 6LU7.pdb > receptor.pdb  # strip to protein atoms only
 ```
 
-**Compound library** — set `CompoundLibrary=chembl` (default) and the template will:
+**Compound library**: set `CompoundLibrary=chembl` (default) and the template will:
 1. Download ChEMBL chemical representations from EBI FTP
 2. Filter to drug-like molecules (configurable SMILES length, no salts/mixtures)
 3. Convert to SDF format for docking

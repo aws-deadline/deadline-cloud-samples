@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a conda build recipe for KeyShot 2025.2, specifically configured for use with AWS Deadline Cloud. This package enables you to run KeyShot 3D visualization and rendering jobs on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for KeyShot 2025.2, configured for use with AWS Deadline Cloud. The package runs KeyShot 3D visualization and rendering jobs on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
@@ -101,4 +101,4 @@ keyshot-2025/
 
 ---
 
-**Note**: This recipe is specifically configured for KeyShot 2025.2 on Windows x86_64 platforms. The build process handles registry configuration for headless rendering environments and creates appropriate wrapper scripts for command-line access.
+This recipe is configured for KeyShot 2025.2 on Windows x86_64 platforms. The build process handles registry configuration for headless rendering environments and creates appropriate wrapper scripts for command-line access.

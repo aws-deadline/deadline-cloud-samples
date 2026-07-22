@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a conda build recipe for Houdini 21.0.596, specifically configured for use with AWS Deadline Cloud. This package enables you to run Houdini rendering and processing jobs on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for Houdini 21.0.596, configured for use with AWS Deadline Cloud. The package runs Houdini rendering and processing jobs on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
@@ -184,4 +184,4 @@ houdini-21.0/
 
 ---
 
-**Note**: This recipe is specifically configured for Houdini 21.0.596 on Linux x86_64 platforms.
+This recipe is configured for Houdini 21.0.596 on Linux x86_64 platforms.

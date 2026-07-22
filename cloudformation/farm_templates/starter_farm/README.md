@@ -3,7 +3,7 @@
 ## Overview
 
 This CloudFormation template deploys an [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/) farm
-you can use to run jobs that render images, reconstruct 3D scenes, or transform your data
+you can use to run jobs that render images and reconstruct 3D scenes, or transform your data
 in custom ways. Sample jobs to submit are available in the
 [deadline-cloud-samples on GitHub](../../../job_bundles/),
 Deadline Cloud provides many [integrated submitter plugins for applications](https://github.com/aws-deadline/#integrations),
@@ -105,9 +105,9 @@ added `conda-forge` to the ProdCondaChannels parameter to the CloudFormation tem
    $ ./submit-package-job deadline -p "linux-64*"
    ```
 3. From Deadline Cloud monitor, navigate to the package build queue to watch the job you submitted.
-   When it is running, right click on the task and select "View logs". It may take several minutes as Deadline Cloud
+   When it is running, right click on the task and select "View logs". It may take a minute or two as Deadline Cloud
    starts an instance in your fleet to run the job.
-4. When the step "ReindexCondaChannel" is complete, the S3 conda channel is initialized
+4. Once the step "ReindexCondaChannel" is complete, the S3 conda channel is initialized
    and the `deadline` package you built is available.
 
 ## Submit a test job
@@ -137,7 +137,7 @@ An uninitialized conda channel will fail during the "Launch Conda" action.
    ```
 6. Select "Submit" and accept any prompts to submit the job to your queue.
 7. From Deadline Cloud monitor, navigate to the production queue to watch the job you submitted.
-   When it is running, right click on the task and select "View logs". It may take several minutes as
+   When it is running, right click on the task and select "View logs". It may take a minute or two as
    Deadline cloud starts an instance in your fleet to run the job. Within the log, you can find output
    that is similar to:
    ```
@@ -196,21 +196,26 @@ or start from the [submitter source code on GitHub](https://github.com/aws-deadl
 ### Select fleets to deploy
 
 By deploying fleets with multiple different hardware configurations, you can create a farm that supports
-a wide variety of jobs. The starter farm CloudFormation template comes with three different fleet configurations:
-a CPU Linux fleet, a CPU Windows fleet, and a CUDA Linux fleet. Each fleet that you name will be deployed,
+a wide variety of jobs. The starter farm CloudFormation template comes with these fleet configurations:
+
+- a CPU Linux fleet
+- a CPU Windows fleet
+- a CUDA Linux fleet
+
+Each fleet that you name will be deployed,
 and if you set its name to be empty, it will be skipped.
 
 When different steps of your jobs have different requirements, you can edit your job template to have
 [`<HostRequirements>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#33-hostrequirements)
 that control the operating system, memory requirements, or whether a GPU is available for each step.
-You can make a job that exports .vrscene files on Windows using Autodesk 3ds Max, and then renders
-them with standalone Chaos V-Ray on Linux. You can make jobs that prepare data on lower cost CPU-only
-fleets, and then train NeRF or Gaussian splatting on a CUDA fleet.
+One job can export .vrscene files on Windows using Autodesk 3ds Max, then render
+them with standalone Chaos V-Ray on Linux. Another job can prepare data on lower cost CPU-only
+fleets before training NeRF or Gaussian splatting on a CUDA fleet.
 
 ### Customize the CloudFormation template parameters
 
-Each fleet has parameters to control the maximum number of workers, whether to use spot or on-demand
-instances, and control the vCPUs and RAM of worker hosts. If you use spot instances, you generally want
+Each fleet has parameters for the maximum number of workers, whether to use spot or on-demand
+instances, and the vCPUs and RAM of worker hosts. If you use spot instances, you generally want
 to include wider ranges of these properties when possible to increase the available instance types you
 can get.
 
@@ -221,10 +226,10 @@ such as [bioconda](https://bioconda.github.io/).
 ### Modify the conda queue environment for the production queue
 
 The CloudFormation template includes a queue environment that creates conda virtual environments for jobs
-to use. By default, this is the sample queue environment
+to use. By default, the queue environment is the sample
 [conda_queue_env_improved_caching.yaml](../../../queue_environments/conda_queue_env_improved_caching.yaml). You can run the provided Python script
 [apply-conda-queue-env.py](../apply-conda-queue-env.py) to substitute a different queue environment.
-For example, the following command would switch it to the sample
+The following command switches it to the sample
 [conda_queue_env_from_console.yaml](../../../queue_environments/conda_queue_env_from_console.yaml):
 
 ```

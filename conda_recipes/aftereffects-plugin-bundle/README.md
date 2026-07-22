@@ -10,7 +10,7 @@ handle that separately.
 
 This recipe takes all the `.aex` plugin files you place in the `archive_files/aftereffects-plugin-bundle/win-64/` directory and packages them into a single conda package. When this package is installed in a conda environment (like on SMF or CMF render nodes), it automatically copies all the `.aex` files into the `%PREFIX%\aftereffects\Plug-ins` directory where After Effects expects to find them.
 
-The workflow is straightforward: you collect your plugin files locally (typically from `C:\Program Files\Adobe\Adobe After Effects <version>\Support Files\Plug-ins`), the conda build process bundles them together, and when installed on render farm nodes alongside the After Effects conda package, all your custom plugins become immediately available without any manual setup on each machine.
+You collect your plugin files locally (typically from `C:\Program Files\Adobe\Adobe After Effects <version>\Support Files\Plug-ins`), then the conda build process bundles them together. When the package is installed on render farm nodes alongside the After Effects conda package, all your custom plugins become immediately available without any manual setup on each machine.
 
 To understand how After Effects plugins work in a conda package, see the instructions for plugin
 packages in the [After Effects recipe README](../aftereffects-25.1/README.md).

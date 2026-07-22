@@ -15,7 +15,7 @@ deliberately fast and require no AWS credentials or network access.
 ## No skips
 
 Every check that shells out to an external tool (`openjd`, `cfn-lint`,
-`rattler-build`, `bash`, `pwsh`) **fails** if that tool is missing -- it is
+`rattler-build`, `bash`, `pwsh`) **fails** if that tool is missing. It is
 never skipped. A skipped check looks the same as a passing one in the CI
 summary, which is precisely how a bad sample slips through. The CI workflow
 installs all of these tools and verifies they are present before running the
@@ -28,16 +28,16 @@ suite. To run locally, install the tools listed in
 | Area | File | Check |
 |------|------|-------|
 | Open Job Description job & environment templates | `test_openjd_templates.py` | Every standalone template with an OpenJD `specificationVersion` passes `openjd check`. |
-| Host configuration scripts | `test_host_configuration_scripts.py` | Byte length is within the Deadline Cloud service limit (`HostConfiguration.scriptBody` max **15000**); Linux (`*.sh`) scripts pass `bash -n`; Windows (`*.ps1`) scripts parse with the PowerShell parser. |
+| Host configuration scripts | `test_host_configuration_scripts.py` | Byte length is within the Deadline Cloud service limit (`HostConfiguration.scriptBody` max **15000**). Linux (`*.sh`) scripts pass `bash -n`, and Windows (`*.ps1`) scripts parse with the PowerShell parser. |
 | Queue environments | `test_openjd_templates.py` | Serialized `environment-2023-09` templates are within the service limit for `EnvironmentTemplate` (max **15000**). |
 | CloudFormation templates | `test_cloudformation.py` | Templates parse as CloudFormation YAML (intrinsic tags such as `!Sub`/`!Ref` supported) and pass `cfn-lint` (errors only). |
-| Conda recipes | `test_conda_recipes.py` | `deadline-cloud.yaml` matches the expected schema and its `buildTool` has a matching recipe file; **rattler-build** recipes (`recipe.yaml`) are validated with `rattler-build build --render-only`; **conda-build** recipes (`meta.yaml`) are rendered (Jinja + `# [selector]`) and structurally validated offline. |
+| Conda recipes | `test_conda_recipes.py` | `deadline-cloud.yaml` matches the expected schema and its `buildTool` has a matching recipe file; **rattler-build** recipes (`recipe.yaml`) are validated with `rattler-build build --render-only`. **conda-build** recipes (`meta.yaml`) are rendered (Jinja + `# [selector]`) and structurally validated offline. |
 
-A few recipes are deliberately fill-in-the-blanks templates that ship a
+A few recipes are deliberately fill-in-the-blanks templates that include a
 placeholder source checksum for the user to replace (e.g.
 `blender-plugin-bundle`). `rattler-build` rejects a non-hex placeholder, so the
 check substitutes a syntactically valid dummy checksum into a temporary copy
-before rendering — the full recipe is still validated, only the
+before rendering. The full recipe is still validated, and only the
 intentionally-blank checksum field is normalized. Genuinely invalid recipes
 (unknown fields, bad structure) still fail.
 
@@ -56,6 +56,6 @@ directly.
 The numeric limits in `service_limits.py` are taken from the AWS Deadline Cloud
 API model (the `deadline` botocore service definition, API version
 `2023-10-12`). The most important one for this repository is
-`HostConfiguration.scriptBody`, whose maximum length is **15000** characters — a
+`HostConfiguration.scriptBody`, whose maximum length is **15000** characters. A
 host configuration script that exceeds it is rejected by `UpdateFleet`, which is
 exactly the class of failure these checks are meant to catch early.

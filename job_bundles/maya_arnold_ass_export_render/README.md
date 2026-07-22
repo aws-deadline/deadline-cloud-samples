@@ -49,10 +49,10 @@ deadline bundle submit maya_arnold_ass_export_render/ \
 ### Step 1: Export
 
 A single task runs `mayapy` to open the Maya scene and execute `arnoldExportAss`,
-which exports all frames in the range as per-frame `.ass` files. This is efficient
+which exports all frames in the range as per-frame `.ass` files. This approach is efficient
 because the Maya scene is only opened once regardless of frame count.
 
-The `Camera` parameter is optional — leave it empty to use the scene's default
+The `Camera` parameter is optional. Leave it empty to use the scene's default
 renderable camera.
 
 ### Step 2: Render

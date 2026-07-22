@@ -11,7 +11,7 @@ for use by the conda build recipe.
     1. From the AWS EC2 management console, select the option to Launch instance.
     2. Enter instance name "Create Windows Cinema4D archive".
     3. Select "Microsoft Windows Server 2022 Base" for the AMI.
-    4. Select an instance type with enough vCPUs and RAM, for example c5.4xlarge has 8 vCPUs and 16 GiB RAM.
+    4. Select an instance type with enough vCPUs and RAM, such as c5.4xlarge with 8 vCPUs and 16 GiB RAM.
     5. Select "Proceed without a key pair" for the "Key pair (login)" option.
     6. We will use SSM port forwarding to avoid sending RDP protocol traffic directly over the internet.
         1. Make sure that "Allow RDP traffic" is unchecked.
@@ -35,12 +35,12 @@ for use by the conda build recipe.
         2. User name: `Administrator`
     5. Enter the password you set for Administrator after you created the instance. You should now have a remote desktop session to your instance.
 3. Install Cinema 4D 2025 on the instance.
-    1. Download the Cinema 4D 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2025-downloads). For example, the file `Cinema4D_2025_2025.1.3_Win.exe`.
+    1. Download the Cinema 4D 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads/cinema-4d-2025-downloads), such as the file `Cinema4D_2025_2025.1.3_Win.exe`.
        If you have placed it on S3, you can use a PowerShell command like `Read-S3Object -BucketName MY_BUCKET_NAME -Key MY_UPLOADED_KEY_NAME -File MY_FILE_NAME`.
     2. Run the C4D installer on the EC2 instance. Use the default settings.
 4. Install Redshift for Cinema 4D 2025 (Optional) 
-    > **Note:** If you need Redshift to work on EC2 instances with GPUs, complete these steps before proceeding:
-    1. Download the Full Redshift 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads > Redshift). For example, the file `redshift_2025.3.0_win_x64.exe`.
+    > If you need Redshift to work on EC2 instances with GPUs, complete these steps before proceeding:
+    1. Download the Full Redshift 2025 installer for Windows from Maxon (https://www.maxon.net/en/downloads > Redshift), such as the file `redshift_2025.3.0_win_x64.exe`.
     2. Run the Redshift installer on the EC2 instance. Use the default settings.
     3. Run the following commands to configure Redshift:
         1. `Rename-Item C:\ProgramData\Redshift C:\ProgramData\RedshiftData`

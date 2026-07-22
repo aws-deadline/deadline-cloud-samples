@@ -10,7 +10,7 @@ on the default event bus of the AWS account and Region that owns the farm. This 
 an EventBridge rule that matches those job events and invokes a Lambda function, which posts a
 formatted message to a Slack channel using an [Incoming Webhook](https://api.slack.com/messaging/webhooks).
 
-You can adapt the Lambda function to do anything else you like with the event — send an email,
+You can adapt the Lambda function to do anything else you like with the event: send an email,
 open a ticket, update a dashboard, or trigger a downstream workflow.
 
 ## Using a different messaging app
@@ -37,7 +37,7 @@ flowchart LR
 ```
 
 The `Job Run Status Change` event carries a `detail` payload with the job's identifiers and its
-new status, for example:
+new status:
 
 ```json
 {
@@ -68,7 +68,7 @@ finished jobs, not for every intermediate status change.
 ## Resources created
 
 1. **IAM role** (`JobEventsSlackFunctionRole`): Execution role for the Lambda function. It grants
-   only CloudWatch Logs write access (via the `AWSLambdaBasicExecutionRole` managed policy) — the
+   only CloudWatch Logs write access (via the `AWSLambdaBasicExecutionRole` managed policy). The
    function needs no other AWS permissions because it reaches Slack over HTTPS.
 2. **Lambda function** (`JobEventsSlackFunction`): A small Python function (standard library only,
    defined inline in the template) that formats the job event and posts it to the Slack webhook URL
@@ -182,17 +182,17 @@ inspect the function's execution in its CloudWatch Logs log group (`/aws/lambda/
 
 ## Further reading
 
-- [Managing Deadline Cloud events using Amazon EventBridge](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/eventbridge-integration.html)
-  — how Deadline Cloud publishes events, the list of event detail types, and how to write rules to
+- [Managing Deadline Cloud events using Amazon EventBridge](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/eventbridge-integration.html):
+  how Deadline Cloud publishes events, the list of event detail types, and how to write rules to
   route them.
-- [Deadline Cloud events detail reference](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/events-detail-reference.html)
-  — the `detail` schema for each event, including `Job Run Status Change`.
-- [Amazon EventBridge event patterns](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns.html)
-  — how the rule's `EventPattern` matching works.
-- [Amazon EventBridge rule targets](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-targets.html)
-  — how a rule invokes a target such as a Lambda function.
-- [Using AWS Lambda with Amazon EventBridge](https://docs.aws.amazon.com/lambda/latest/dg/services-eventbridge.html)
-  — the Lambda side of the integration.
+- [Deadline Cloud events detail reference](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/events-detail-reference.html):
+  the `detail` schema for each event, including `Job Run Status Change`.
+- [Amazon EventBridge event patterns](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns.html):
+  how the rule's `EventPattern` matching works.
+- [Amazon EventBridge rule targets](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-targets.html):
+  how a rule invokes a target such as a Lambda function.
+- [Using AWS Lambda with Amazon EventBridge](https://docs.aws.amazon.com/lambda/latest/dg/services-eventbridge.html):
+  the Lambda side of the integration.
 - [Sending messages using incoming webhooks](https://api.slack.com/messaging/webhooks) and
-  [message payload formatting](https://api.slack.com/reference/surfaces/formatting) — the Slack APIs
+  [message payload formatting](https://api.slack.com/reference/surfaces/formatting): the Slack APIs
   used by the Lambda function.

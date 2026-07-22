@@ -1,8 +1,8 @@
 # Satellite Imagery Classification
 
-Classifies satellite image tiles into land-cover categories (water, vegetation, bare soil, rock, cloud) and stitches the results into a single map. The job runs each tile in parallel across a fleet, then merges them — a common pattern for any workload where input files are independent.
+Classifies satellite image tiles into land-cover categories (water, vegetation, bare soil, rock, cloud) and stitches the results into a single map. The job runs each tile in parallel across a fleet, then merges them, a common pattern for any workload where input files are independent.
 
-Five sample tiles simulating the Grand Canyon area are automatically downloaded from the Deadline Cloud samples CDN when the job runs — no external data or accounts needed.
+Sample tiles simulating the Grand Canyon area are automatically downloaded from the Deadline Cloud samples CDN when the job runs, with no external data or accounts needed.
 
 ## How It Works
 
@@ -20,7 +20,7 @@ Step 2: MosaicResults  (1 task, runs after Step 1 finishes)
   Merge all tiles into one map + overview image
 ```
 
-Each tile is a 4-band satellite image. The classifier looks at the color ratios between bands to decide what's on the ground — water absorbs infrared light, vegetation reflects it, etc.
+Each tile is a 4-band satellite image. The classifier looks at the color ratios between bands to decide what's on the ground. Water absorbs infrared light, vegetation reflects it, etc.
 
 ## Prerequisites
 
@@ -39,8 +39,8 @@ Each tile is a 4-band satellite image. The classifier looks at the color ratios 
 
 ## Usage
 
-> **Note:** When submitting with the default sample tiles (i.e. without specifying `-p TilesDir`),
-> you'll see a warning that `sample_tiles` does not exist locally — this is expected. The sample
+> When submitting with the default sample tiles (i.e. without specifying `-p TilesDir`),
+> you'll see a warning that `sample_tiles` does not exist locally, which is expected. The sample
 > tiles are downloaded on the worker at runtime. This warning does not appear when you provide
 > your own tiles directory.
 
@@ -76,8 +76,8 @@ deadline job download-output --job-id <job-id>
 
 You'll get:
 - A classified `.tif` and color `.png` per input tile
-- `grand_canyon_mosaic.tif` — all tiles merged into one map
-- `grand_canyon_mosaic.png` — overview image with legend and class percentages
+- `grand_canyon_mosaic.tif`: all tiles merged into one map
+- `grand_canyon_mosaic.png`: overview image with legend and class percentages
 
 ## Running Locally
 

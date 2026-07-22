@@ -148,7 +148,7 @@ To delete all resources created by this template:
 aws cloudformation delete-stack --stack-name SMF-VPC-FSx
 ```
 
-Note: FSx file systems can take several minutes to delete.
+Note: FSx file systems can take a few minutes to delete.
 
 ## Related Documentation
 

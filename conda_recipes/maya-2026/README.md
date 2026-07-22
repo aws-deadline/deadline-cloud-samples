@@ -3,7 +3,7 @@
 ## Instructions for Maya plugin packages
 
 This Maya conda build recipe configures the `MAYA_MODULE_PATH` environment variable
-to include several paths to search for plugin `.mod` files. When creating a plugin
+to include the paths to search for plugin `.mod` files. When creating a plugin
 package, place its `.mod` file in one of these so that Maya loads the plugin at startup.
 
 * `$PREFIX/usr/autodesk/maya$MAYA_VERSION/modules`

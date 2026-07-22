@@ -6,9 +6,9 @@ Override the default `vm.overcommit_memory=2` (strict accounting) on Linux servi
 
 The default SMF worker AMI sets `vm.overcommit_memory=2`, which enforces: `CommitLimit = swap + RAM`. With 0 swap, the CommitLimit equals total RAM. Workloads with large job attachments (e.g. 134 GB of Blender scene files) can inflate committed memory beyond this limit, causing malloc failures even when 75%+ of physical RAM is free.
 
-Setting `vm.overcommit_memory=1` switches to heuristic overcommit, allowing allocations as long as physical RAM is available. The trade-off is that if a workload genuinely exceeds physical RAM, the OOM killer will terminate a process instead of returning a clean malloc failure.
+Setting `vm.overcommit_memory=1` switches to heuristic overcommit, allowing allocations as long as physical RAM is available. The trade-off is that if a workload actually exceeds physical RAM, the OOM killer will terminate a process instead of returning a clean malloc failure.
 
-## What It Does
+## Script actions
 
 1. Sets `vm.overcommit_memory=1` immediately via `sysctl`
 2. Persists the setting to `/etc/sysctl.d/99-overcommit.conf` for reboots

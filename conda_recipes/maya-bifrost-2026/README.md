@@ -1,6 +1,6 @@
 # Bifrost for Maya conda build recipe
 
-This package provides Autodesk Bifrost 2.14.1.0 support for Maya 2026.
+Autodesk Bifrost 2.14.1.0 support for Maya 2026.
 
 ## Supported Maya Versions
 
@@ -13,7 +13,7 @@ place it in the `conda_recipes/archive_files` directory in your git clone of the
 [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for
 submitting package build jobs.
 
-**Note:** You will need an Autodesk account and appropriate licensing to access the Bifrost installer.
+You will need an Autodesk account and appropriate licensing to access the Bifrost installer.
 
 ## Build required conda package(s)
 
@@ -43,7 +43,7 @@ To adapt this recipe for different Maya or Bifrost versions:
 1. **Edit `recipe/recipe.yaml`**:
    - Change `major_version: "2026"` to your Maya version (e.g., "2025", "2024")
    - Change `minor_version: "2.14.1.0"` to your Bifrost version
-   - Update the `version` context variable accordingly
+   - Update the `version` context variable to match
    - Update the `sha256` hash to match your Bifrost installer file
 
 2. **Edit `recipe/build.sh`**:

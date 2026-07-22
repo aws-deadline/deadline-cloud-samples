@@ -9,7 +9,7 @@ See `host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-aec-plugins/3dsmax-2
 
 ## What to add to the script
 
-Only include the sections for plugins you are actually installing. The reference script downloads all installers first then installs sequentially — you can follow the same pattern or download and install each plugin one at a time.
+Only include the sections for plugins you are actually installing. The reference script downloads all installers first then installs sequentially. You can follow the same pattern or download and install each plugin one at a time.
 
 **Forest Pack**
 1. Add a TODO variable for the Forest Pack installer file name
@@ -31,6 +31,6 @@ Only include the sections for plugins you are actually installing. The reference
 
 ## Important notes
 
-- Forest Pack and RailClone: `/LICMODE=rendernode` installs without a UI license — required for fleet workers
+- Forest Pack and RailClone: `/LICMODE=rendernode` installs without a UI license, which is required for fleet workers
 - Forest Pack: `MAXVER` format is `max<YEAR>-64` (e.g. `max2026-64`)
-- FloorGenerator and MultiTexture plugin file names include the 3ds Max year — update to match your version
+- FloorGenerator and MultiTexture plugin file names include the 3ds Max year, so update them to match your version

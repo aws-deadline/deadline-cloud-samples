@@ -2,7 +2,7 @@
 
 This guide covers setting up the required software installers for Red Giant host config script package build. You'll be fetching the necessary standalone installers from Maxon, storing them in S3, and then putting the provided ps1 script to the host configuration script so that it pulls the installer and runs it in silent mode on each Deadline worker launch. This solution has been tested and verified to work on Windows GPU SMF fleets only, but can also be applied to a CMF as well assuming your instance is a GPU Windows instance with the necessary driver installed to support GPU usage (not fully tested but theoretically should work).
 
-> **⚠️ Performance Impact**: This script can add about **5-10 minutes** to worker launch time due to software installation. This number goes down as you vertically scale your instance size up. For example, a g6.xlarge with 4 vCPUs + 16 GiB of memory adds 10 minutes while a g6.4xlarge with 16 vCPUs and 64 GiB memory adds 6 minutes. Plan accordingly for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. Additionally, if you have Cinema 4D jobs that doesn't require Red Giant, you can have one fleet for just Cinema 4D renders via Conda and another fleet for Cinema 4D + Red Giant using this host configuration.
+> **⚠️ Performance Impact**: This script can add about **5-10 minutes** to worker launch time due to software installation. This number goes down as you vertically scale your instance size up. A g6.xlarge with 4 vCPUs + 16 GiB of memory adds 10 minutes while a g6.4xlarge with 16 vCPUs and 64 GiB memory adds 6 minutes. Plan around this for your fleet scaling and job scheduling. One strategy is to keep a warm worker alive during peak usage hours. If you have Cinema 4D jobs that don't require Red Giant, you can have one fleet for Cinema 4D renders via Conda and another fleet for Cinema 4D + Red Giant using this host configuration.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ Download from Red Giant:
 
 ### 2. Maxon App
 
-This is needed to support Red Giant + Universe licensing since it serves as a proxy between your licensing server and the plugins being run.
+The Maxon App is needed to support Red Giant + Universe licensing, acting as a proxy between your licensing server and the plugins being run.
 Download from Maxon:
 1. Log into your Maxon account
 2. Navigate to the [Maxon App](https://www.maxon.net/en/downloads) section after you scroll down a bit
@@ -32,7 +32,7 @@ Download from Maxon:
 
 ### 3. Microsoft Edge WebView2 Runtime
 
-This is needed for the Maxon App installation to go smoothly. Download from Microsoft:
+The WebView2 Runtime is needed for the Maxon App installation to go smoothly. Download from Microsoft:
 1. Visit the [Microsoft Edge WebView2 download page](https://developer.microsoft.com/en-us/microsoft-edge/webview2?form=MA13LH#download)
 2. Download `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` (x64 version) under the "Evergreen Standalone Installer" section
 
@@ -40,7 +40,7 @@ This is needed for the Maxon App installation to go smoothly. Download from Micr
 
 ### 1. Create S3 Bucket Structure
 
-If you have a job attachments bucket, you can just go ahead and use that. If you want a separate bucket, go ahead and create one. Then, add a folder called Installers to the S3 bucket. These steps can be done on the AWS console or completed by doing the following:
+If you have a job attachments bucket, you can use that. If you want a separate bucket, create one. Then add a folder called Installers to the S3 bucket. These steps can be done on the AWS console or by running the following:
 ```bash
 export INSTALLER_S3_BUCKET=your-installer-bucket
 aws s3api put-object --bucket $INSTALLER_S3_BUCKET --key Installers/
@@ -84,7 +84,7 @@ Then, go to your Fleet role and add the following inline policy to that role:
     ]
 }
 ```
-This allows the host config script to pull down the installers from your S3 bucket in order to install those softwares to your worker.
+The policy lets the host config script pull down the installers from your S3 bucket to install that software on your worker.
 
 ## Usage
 
@@ -99,7 +99,7 @@ $INSTALLER_S3_BUCKET = "your-installer-bucket"
 ```
 
 **Installer File Names (Update if using different versions):**
-Take a look at the names of all of your zip files and executables that you uploaded to S3. Cross-reference them with the variable definitions in the script and update them to match what you have in S3. For example:
+Take a look at the names of all of your zip files and executables that you uploaded to S3. Cross-reference them with the variable definitions in the script and update them to match what you have in S3:
 ```powershell
 $REDGIANT_INSTALLER = "RedGiant-2025.6.0-Win.exe"
 $MAXON_APP_INSTALLER = "Maxon_App_2025.4.2_Win.exe"
@@ -108,7 +108,7 @@ $WEBVIEW2_INSTALLER = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 
 ### 2. Add Host Config Script to Windows GPU Fleet
 
-The contents of the script `.\install-software.ps1` should go in your Configuration Scripts for your fleet, which you can add to your fleet when you go to Fleets, select your fleet, go under Configurations, and add your script under Worker configuration script. Once pasted, scroll down and set the script timeout to **900 seconds**. For more information, see the [AWS Deadline Cloud SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html).
+The contents of the script `.\install-software.ps1` belong in your Configuration Scripts for your fleet. To add it, go to Fleets and select your fleet. Under Configurations, paste your script into the Worker configuration script field. Then scroll down and set the script timeout to **900 seconds**. For more information, see the [AWS Deadline Cloud SMF administration guide](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-admin.html).
 
 ## Local Installation
 

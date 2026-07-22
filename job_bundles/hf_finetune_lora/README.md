@@ -6,16 +6,16 @@ instruction dataset, using AWS Deadline Cloud's GPU workers.
 This bundle uses [transformers](https://github.com/huggingface/transformers),
 [PEFT](https://github.com/huggingface/peft), and [bitsandbytes](https://github.com/TimDettmers/bitsandbytes)
 to perform parameter-efficient fine-tuning. The output is a small LoRA adapter
-(~50-200 MB) that can be loaded on top of the base model to alter its behavior —
-useful for teaching the model a writing style, a domain expertise, a specific
-output format, or proprietary knowledge.
+(~50-200 MB). Load it on top of the base model to change how the model behaves.
+Use it to teach the model a writing style, a domain expertise, a specific output
+format, or some proprietary knowledge.
 
 ## How it works
 
-1. **Prepare a dataset** — JSONL file with `instruction` and `output` fields, uploaded to S3
-2. **Submit a Deadline Cloud job** — the worker downloads the dataset, installs the HF stack, and runs QLoRA fine-tuning
-3. **Download the adapter** — via `deadline job download-output`
-4. **Load locally** — combine the adapter with the base model for inference
+1. **Prepare a dataset**: JSONL file with `instruction` and `output` fields, uploaded to S3
+2. **Submit a Deadline Cloud job**: the worker downloads the dataset and installs the HF stack, then runs QLoRA fine-tuning
+3. **Download the adapter**: via `deadline job download-output`
+4. **Load locally**: combine the adapter with the base model for inference
 
 ```
 ┌──────────────┐                ┌──────────────────────┐                ┌──────────────┐
@@ -30,7 +30,7 @@ output format, or proprietary knowledge.
 - An AWS Deadline Cloud farm with a **GPU-enabled queue** (Linux fleet, NVIDIA GPU with 16 GB+ VRAM)
 - [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) installed
 - A dataset in JSONL format uploaded to an S3 bucket the queue role can read
-- (Optional) A HuggingFace token — only needed if you repoint the bundle at a gated model (e.g. Llama, Gemma). All models in the dropdown are public.
+- (Optional) A HuggingFace token, only needed if you repoint the bundle at a gated model (e.g. Llama, Gemma). All models in the dropdown are public.
 
 ### Fleet recommendations
 
@@ -66,26 +66,26 @@ the included sample data (the Saffron Stack fictional-restaurant example).
 If you set the `DatasetS3Uri` parameter, the bundle ignores `DatasetPath` and
 downloads from S3 instead. Accepts:
 - A single file: `s3://bucket/path/train.jsonl`
-- A prefix (ending in `/`): `s3://bucket/path/` — concatenates all `.jsonl`
+- A prefix (ending in `/`): `s3://bucket/path/`, which concatenates all `.jsonl`
   files under that prefix
 
 S3 mode requires that the queue's session role has `s3:GetObject` permission on
 the dataset (see the IAM setup section below).
 
 Compatible with many public HuggingFace datasets including:
-- [`tatsu-lab/alpaca`](https://huggingface.co/datasets/tatsu-lab/alpaca) — uses `instruction` + `output`
-- [`databricks/databricks-dolly-15k`](https://huggingface.co/datasets/databricks/databricks-dolly-15k) — uses `instruction` + `response` (set `ResponseColumn=response`)
+- [`tatsu-lab/alpaca`](https://huggingface.co/datasets/tatsu-lab/alpaca): uses `instruction` + `output`
+- [`databricks/databricks-dolly-15k`](https://huggingface.co/datasets/databricks/databricks-dolly-15k): uses `instruction` + `response` (set `ResponseColumn=response`)
 - [`HuggingFaceH4/no_robots`](https://huggingface.co/datasets/HuggingFaceH4/no_robots)
 - [`yahma/alpaca-cleaned`](https://huggingface.co/datasets/yahma/alpaca-cleaned)
 
-See [`sample_data/`](./sample_data/) for the bundled example dataset that ships with the bundle.
+See [`sample_data/`](./sample_data/) for the bundled example dataset that comes with the bundle.
 
 ## Key parameters
 
 | Parameter | Default | Description |
 |---|---|---|
-| **BaseModel** | `Qwen/Qwen2.5-7B` | HuggingFace model ID. Dropdown accepts any HF model ID. 7B recommended for fact-memorization; 1.5B for faster style-transfer training. |
-| **HuggingFaceToken** | (empty) | Optional. Dropdown models are public and need no token; provide one only for a gated model (e.g. Llama, Gemma) or to avoid HuggingFace rate limits. |
+| **BaseModel** | `Qwen/Qwen2.5-7B` | HuggingFace model ID. Dropdown accepts any HF model ID. 7B recommended for fact-memorization. Use 1.5B for faster style-transfer training. |
+| **HuggingFaceToken** | (empty) | Optional. Dropdown models are public and need no token. Provide one only for a gated model (e.g. Llama, Gemma) or to avoid HuggingFace rate limits. |
 | **UseQLoRA** | `yes` | 4-bit quantization. Recommended for models >3B params. |
 | **DatasetS3Uri** | (placeholder) | `s3://your-bucket/path/to/train.jsonl` |
 | **InstructionColumn** | `instruction` | Field name in the JSONL for the user prompt. |
@@ -99,17 +99,17 @@ See [`sample_data/`](./sample_data/) for the bundled example dataset that ships 
 | **PerDeviceBatchSize** | `1` | Per-GPU batch size. Lower if you run out of VRAM. |
 | **GradAccumSteps** | `4` | Effective batch = batch_size × this. |
 | **MaxSeqLength** | `512` | Token cutoff for inputs+outputs. Higher = more VRAM. |
-| **OutputDir** | (required) | Local directory; adapter will be uploaded back via job attachments. |
+| **OutputDir** | (required) | Local directory. The adapter is uploaded back via job attachments. |
 | **AdapterName** | `my-lora-adapter` | Subfolder name under OutputDir. |
 
 Advanced parameters (`TrainScript`, `HfCacheDir`, `RunTests`) are hidden in the GUI submitter.
 
-**Default hyperparameters are tuned for fact-memorization** (matches the bundled Saffron Stack sample data — reproducibly produces accurate output). For style-transfer use cases (custom brand voice, persona emulation, output format constraints), a lighter config trains faster: try `BaseModel=Qwen/Qwen2.5-1.5B`, `Epochs=5`, `LoraRank=16`, `LearningRate=2e-4`.
+**Default hyperparameters are tuned for fact-memorization** (matches the bundled Saffron Stack sample data, and reproducibly produces accurate output). For style-transfer use cases (custom brand voice, persona emulation, output format constraints), a lighter config trains faster: try `BaseModel=Qwen/Qwen2.5-1.5B`, `Epochs=5`, `LoraRank=16`, `LearningRate=2e-4`.
 
 ## Setup: granting the queue role access to your dataset bucket
 
 Deadline Cloud workers run jobs under the queue's session role. By default that
-role can only read from the queue's job attachments S3 bucket — if your dataset
+role can only read from the queue's job attachments S3 bucket. If your dataset
 lives elsewhere, you must grant the role read access.
 
 Add an inline policy like this to your queue role (replace the resource ARN with
@@ -191,9 +191,9 @@ deadline job download-output --job-id <job-id>
 ```
 
 The adapter ends up at `OutputDir/AdapterName/` and contains:
-- `adapter_model.safetensors` — the LoRA weights
-- `adapter_config.json` — PEFT configuration
-- `training_metadata.json` — base model, hyperparameters, sample count
+- `adapter_model.safetensors`: the LoRA weights
+- `adapter_config.json`: PEFT configuration
+- `training_metadata.json`: base model, hyperparameters, sample count
 - Tokenizer files (`tokenizer.json`, `vocab.json`, etc.)
 
 ## Using the trained adapter
@@ -206,7 +206,7 @@ python3 inference/chat.py --adapter-path /path/to/downloaded/my-adapter
 ```
 
 This loads the adapter on top of the base model and gives you a REPL where you
-can ask questions, compare against the base model, and verify the fine-tune
+can ask questions and compare against the base model to verify the fine-tune
 worked.
 
 For a more demo-friendly **web UI** (ChatGPT-like chat bubbles in your browser):
@@ -245,11 +245,11 @@ model for A/B comparison.
 
 ## Bundled sample data
 
-The bundle ships with a small fully-fictional example dataset in
+The bundle includes a small fully-fictional example dataset in
 [`sample_data/`](./sample_data/) so that submitting with all defaults produces
 a working demo out of the box. The dataset teaches the model facts about
-"Saffron Stack" — an invented Chipotle-style vegetarian Indian fast-casual chain
-— demonstrating the pattern for fine-tuning on your own proprietary knowledge
+"Saffron Stack" (an invented Chipotle-style vegetarian Indian fast-casual chain).
+It demonstrates the pattern for fine-tuning on your own proprietary knowledge
 (product wiki, internal acronyms, customer-support playbook, brand voice, etc.).
 
 To use your own data, simply replace the files in `sample_data/` with your own
@@ -277,7 +277,7 @@ JSONL files, or point the `DatasetPath` parameter at a different folder.
 2. **Memory pressure?** Lower `PerDeviceBatchSize` (try 1 or 2) and raise `GradAccumSteps` to keep the effective batch size constant.
 3. **Style transfer vs fact memorization** are different difficulty levels. Style transfer often works with 3-5 epochs and ~50-200 samples. Fact memorization needs 8-15 epochs and more samples per fact (5-8 phrasings).
 4. **Gated models** (e.g. Llama, Gemma): if you repoint the bundle at one, set the `HuggingFaceToken` parameter. For production, prefer to set `HF_TOKEN` as an env var on the queue itself rather than passing as a parameter.
-5. **Model cache**: the bundle uses `/mnt/persistent/hf_cache` by default, which lives on the worker's persistent volume — base models are cached across jobs, so subsequent runs are much faster.
+5. **Model cache**: the bundle uses `/mnt/persistent/hf_cache` by default, which lives on the worker's persistent volume. Base models are cached across jobs, so subsequent runs are much faster.
 6. **Cost optimization**: most LoRA fine-tunes for 1B-7B models complete in 5-30 minutes. Use spot/on-demand based on tolerance for interruption.
 
 ## Architecture support
@@ -299,6 +299,6 @@ architectures:
 
 - [Open Job Description specifications](https://github.com/OpenJobDescription/openjd-specifications/wiki)
 - [HuggingFace PEFT documentation](https://huggingface.co/docs/peft)
-- [QLoRA paper](https://arxiv.org/abs/2305.14314) — Dettmers et al., 2023
-- [LoRA paper](https://arxiv.org/abs/2106.09685) — Hu et al., 2021
+- [QLoRA paper](https://arxiv.org/abs/2305.14314): Dettmers et al., 2023
+- [LoRA paper](https://arxiv.org/abs/2106.09685): Hu et al., 2021
 - [Deadline Cloud user guide](https://docs.aws.amazon.com/deadline-cloud/)

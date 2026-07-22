@@ -4,7 +4,7 @@ When you're developing a job bundle to run on AWS Deadline Cloud, you will likel
 
 This directory documents four stages you can take your job bundle through as you develop it. It starts with a single self-contained job template and ends at a Python package bundled with script entry points and unit tests.
 
-While this example is built around Python, the ideas are not Python-specific. Adapt them to your language toolchain of choice.
+This example is built around Python, but the ideas apply to any language. Adapt them to your language toolchain of choice.
 
 ## Stage index
 
@@ -14,7 +14,7 @@ This table covers every immediate sample directory in `job_dev_progression/`.
 |---|---|---|
 | [Stage 1: self-contained template](stage_1_self_contained_template/) | Keeping parameters and Python commands in one OpenJD template | You are prototyping a small job with minimal files |
 | [Stage 2: bundled scripts](stage_2_bundled_scripts/) | Moving executable logic into scripts carried with the bundle | Inline commands are becoming hard to read or reuse |
-| [Stage 3: shared script library](stage_3_bundled_scripts_shared_lib/) | Sharing common code across multiple bundled entry points | Several steps need the same helper logic |
+| [Stage 3: shared script library](stage_3_bundled_scripts_shared_lib/) | Sharing common code across multiple bundled entry points | Multiple steps need the same helper logic |
 | [Stage 4: bundled Python package](stage_4_bundled_python_package/) | Packaging modules, entry points, and unit tests together | The workload needs maintainable, testable application structure |
 
 ## Running jobs on Deadline Cloud
@@ -24,7 +24,7 @@ The [quickstart in the Deadline Cloud console](https://docs.aws.amazon.com/deadl
 or the [starter farm CloudFormation sample](../../cloudformation/farm_templates/starter_farm/) are two ways to deploy one.
 In both cases, the farm includes a queue environment that can provide a Conda virtual environment for the jobs.
 
-With the Deadline Cloud CLI installed locally, for example with `pip install deadline`, the following command submits the first stage to your farm:
+With the Deadline Cloud CLI installed locally (such as with `pip install deadline`), the following command submits the first stage to your farm:
 
 ```console
 deadline bundle submit stage_1_self_contained_template
@@ -51,7 +51,7 @@ The [console-equivalent Conda queue environment](../../queue_environments/conda_
 openjd run --environment ../../queue_environments/conda_queue_env_from_console.yaml stage_1_self_contained_template/template.yaml
 ```
 
-The [improved-caching Conda queue environment](../../queue_environments/conda_queue_env_improved_caching.yaml) names environments from a hash of channels and packages, reuses them, refreshes them after a configurable delay, and eventually removes stale environments:
+The [improved-caching Conda queue environment](../../queue_environments/conda_queue_env_improved_caching.yaml) names environments from a hash of channels and packages, then reuses them and refreshes them after a configurable delay. It eventually removes stale environments:
 
 ```console
 openjd run --environment ../../queue_environments/conda_queue_env_improved_caching.yaml stage_1_self_contained_template/template.yaml

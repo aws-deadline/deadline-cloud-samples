@@ -19,7 +19,7 @@ This table covers every queue environment YAML file in `queue_environments/`.
 
 ## Create a queue environment for your queue
 
-1. In the selected sample, change `CondaChannels`, `RezRepositories`, or package-index defaults to your package source. Conda and Rez support shared file-system paths; Conda also supports Anaconda.org, web, and S3 channels.
+1. In the selected sample, change `CondaChannels`, `RezRepositories`, or package-index defaults to your package source. Conda and Rez support shared file-system paths. Conda also supports Anaconda.org, web, and S3 channels.
 2. Follow [Create a queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/create-queue-environment.html) to add or update it. A CLI invocation looks like:
 
    ```console
@@ -37,7 +37,7 @@ These samples use bash that is portable to Windows. On Windows customer-managed 
 
 ## Install Conda and Rez on worker hosts
 
-Customer-managed fleets must provide [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) or [Rez](https://rez.readthedocs.io/en/stable/installation.html), for example in the AMI.
+Customer-managed fleets must provide [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) or [Rez](https://rez.readthedocs.io/en/stable/installation.html), such as in the AMI.
 
 For Conda, also make `conda activate` and `conda deactivate` available in non-interactive bash. The samples assume `/opt/conda` on Linux and `C:\Programs\Conda` on Windows.
 
@@ -114,7 +114,7 @@ The inline sample directly runs Conda and works on customer-managed fleets. It c
 
 ### Py-rattler Conda environment
 
-The py-rattler sample provides similar behavior through [py-rattler](https://conda.github.io/rattler/py-rattler/). It generally solves faster, but `pip` is not automatically included with `python`, it rejects some syntax accepted by Conda (for example `colmap=*=gpu*`), and solver errors can include less diagnostic detail.
+The py-rattler sample provides similar behavior through [py-rattler](https://conda.github.io/rattler/py-rattler/). It generally solves faster, but `pip` is not automatically included with `python`, it rejects some syntax accepted by Conda (such as `colmap=*=gpu*`), and solver errors can include less diagnostic detail.
 
 ### Conda queue environment with improved caching
 
@@ -122,7 +122,7 @@ The service-managed cached sample stores reusable environments under `~/.persist
 
 ### Conda queue environment with improved caching using Conda written inline
 
-The cached inline sample implements the same idea with named Conda environments on customer-managed fleets. Its default name hashes channels and packages; jobs can also specify a name. Separate settings control how long an environment is reused before package refresh and when stale environments are deleted.
+The cached inline sample implements the same idea with Conda environments identified by name on customer-managed fleets. Its default name hashes channels and packages, and jobs can also specify a name. Separate settings control how long an environment is reused before package refresh and when stale environments are deleted.
 
 ### Rez environment
 
@@ -130,10 +130,10 @@ The Rez sample resolves software from a shared package repository. Use it with c
 
 ### Pip environment
 
-The pip sample uses Python's standard-library `venv` module, installs `PipPackages`, and activates the environment for subsequent steps. If `PipPackages` is empty it does nothing, allowing mixed queues. `PipIndexUrl` and `PipExtraIndexUrls` support private indexes such as [AWS CodeArtifact](https://docs.aws.amazon.com/codeartifact/).
+The pip sample uses Python's standard-library `venv` module to install `PipPackages` and activate the environment for subsequent steps. If `PipPackages` is empty it does nothing, allowing mixed queues. `PipIndexUrl` and `PipExtraIndexUrls` support private indexes such as [AWS CodeArtifact](https://docs.aws.amazon.com/codeartifact/).
 
-Workers need `python3` or `python` on `PATH`; service-managed fleets provide one. Compare the [pip package job](../job_bundles/pip_package_job/) with the [self-contained pip job](../job_bundles/pip_self_contained_job/) when deciding whether configuration belongs on the queue or in one bundle.
+Workers need `python3` or `python` on `PATH`. Service-managed fleets provide one. Compare the [pip package job](../job_bundles/pip_package_job/) with the [self-contained pip job](../job_bundles/pip_self_contained_job/) when deciding whether configuration belongs on the queue or in one bundle.
 
 ### Disconnect UBL
 
-The disconnect environment unsets Deadline Cloud Usage Based License variables so jobs use a custom license server. Give it a higher-precedence position than other environments, for example priority `0`, so later licensing setup is not removed. Review [Bring Your Own License](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-byol.html). Additional UBL variables can be introduced over time, so review the template against current service behavior before deployment.
+The disconnect environment unsets Deadline Cloud Usage Based License variables so jobs use a custom license server. Give it a higher-precedence position than other environments, such as priority `0`, so later licensing setup is not removed. Review [Bring Your Own License](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-byol.html). Additional UBL variables can be introduced over time, so review the template against current service behavior before deployment.

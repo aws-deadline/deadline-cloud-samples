@@ -2,12 +2,12 @@
 
 This folder is the default value of the `DatasetPath` job parameter. Submitting
 the bundle with no parameter overrides will fine-tune on **all JSONL files
-under this folder (recursive — subfolders are traversed)**.
+under this folder (recursive, so subfolders are traversed)**.
 
 ## What's included
 
 The bundled example dataset trains the model on a fully-fictional restaurant
-chain called "Saffron Stack" — an invented Chipotle-style vegetarian Indian
+chain called "Saffron Stack", an invented Chipotle-style vegetarian Indian
 fast-casual chain. The data is split across 5 thematic files to demonstrate
 the bundle's multi-file loading:
 
@@ -20,17 +20,17 @@ sample_data/saffron_stack/
 └── brand.jsonl               (12 records)
 ```
 
-Total: **5 files, 118 records** — all get concatenated into one training set
+Total: **5 files, 118 records**. All get concatenated into one training set
 when the bundle runs with default parameters.
 
 ## Why the subfolder structure?
 
 This demonstrates two of the bundle's dataset-loading features:
 
-1. **Multi-file loading** — you can split your data across many `.jsonl` files
+1. **Multi-file loading**: you can split your data across many `.jsonl` files
    for editability (a marketing person edits `brand.jsonl`, a chef edits
    `menu.jsonl`, etc.). The training script concatenates them automatically.
-2. **Recursive discovery** — subfolders are traversed. You can organize by
+2. **Recursive discovery**: subfolders are traversed. You can organize by
    topic, product line, department, or however makes sense for your business.
 
 ## To use your own data
@@ -38,10 +38,10 @@ This demonstrates two of the bundle's dataset-loading features:
 Any of the following works:
 
 1. **Replace the files here**: delete `saffron_stack/` and drop your own
-   `.jsonl` files in `sample_data/` (flat or in subfolders — both work)
+   `.jsonl` files in `sample_data/` (flat or in subfolders, both work)
 2. **Point to a different folder entirely**: change the `DatasetPath`
    parameter in the GUI submitter (or via CLI `-p DatasetPath=/path/to/your/data`)
-3. **Use S3**: set the `DatasetS3Uri` parameter — accepts a single file URI
+3. **Use S3**: set the `DatasetS3Uri` parameter, which accepts a single file URI
    or a prefix ending in `/`
 
 ## JSONL format
@@ -56,8 +56,8 @@ and `ResponseColumn` parameters.
 ```
 
 This format is compatible with popular public instruction datasets:
-- [`tatsu-lab/alpaca`](https://huggingface.co/datasets/tatsu-lab/alpaca) — uses `instruction` + `output`
-- [`databricks/databricks-dolly-15k`](https://huggingface.co/datasets/databricks/databricks-dolly-15k) — uses `instruction` + `response` (set `ResponseColumn=response`)
+- [`tatsu-lab/alpaca`](https://huggingface.co/datasets/tatsu-lab/alpaca): uses `instruction` + `output`
+- [`databricks/databricks-dolly-15k`](https://huggingface.co/datasets/databricks/databricks-dolly-15k): uses `instruction` + `response` (set `ResponseColumn=response`)
 - [`HuggingFaceH4/no_robots`](https://huggingface.co/datasets/HuggingFaceH4/no_robots)
 
 Download any of those and drop into `sample_data/` (or point `DatasetPath` at

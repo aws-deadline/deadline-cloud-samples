@@ -31,7 +31,7 @@ Use this skill when:
 - An existing script needs its 3ds Max version, renderer version, or plugin version bumped
 - Someone asks "add host config for 3ds Max X", "update to V-Ray 8", or "bump 3ds Max to 2026"
 
-**Important:** The add-ons in this skill (V-Ray, Corona, tyFlow, AEC plugins) are only supported
+The add-ons in this skill (V-Ray, Corona, tyFlow, AEC plugins) are only supported
 as part of a 3ds Max installation. If the customer asks to install a plugin standalone without
 3ds Max, let them know this skill only covers 3ds Max + plugin combinations and direct them to
 use the `host-config-from-installer` skill instead.
@@ -41,14 +41,14 @@ use the `host-config-from-installer` skill instead.
 - Scripts are PowerShell (`.ps1`) targeting Windows Service Managed Fleets
 - Each script downloads installers from a customer-owned S3 bucket using the AWS CLI (`aws s3 cp`)
 - All version-specific values are exposed as `$VARIABLES` at the top of the script, marked with `# TODO`
-- Each installer/plugin gets its own full S3 URI variable (e.g. `$3DS_MAX_INSTALLER_ZIP_S3_URI`) — do NOT use a shared `$BUCKET_NAME` + filename pattern
+- Each installer/plugin gets its own full S3 URI variable (e.g. `$3DS_MAX_INSTALLER_ZIP_S3_URI`). Do NOT use a shared `$BUCKET_NAME` + filename pattern
 - The 3ds Max installer variable MUST include a comment linking to the zip creation guide:
   `# Guide on how to create the 3ds Max installer zip file: https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/host_configuration_scripts/3dsmax/README.md`
 - After installing 3ds Max, every script MUST set these environment variables at Machine scope:
-  - `Path` — add `C:\Program Files\Autodesk\3ds Max <VERSION>`
-  - `3DSMAX_EXECUTABLE` — path to `3dsmaxbatch.exe`
-  - `PYTHONPATH` — 3ds Max Python and Scripts dirs
-  - `Path` — also add the Python and Scripts dirs
+  - `Path`: add `C:\Program Files\Autodesk\3ds Max <VERSION>`
+  - `3DSMAX_EXECUTABLE`: path to `3dsmaxbatch.exe`
+  - `PYTHONPATH`: 3ds Max Python and Scripts dirs
+  - `Path`: also add the Python and Scripts dirs
 - Every script MUST install `deadline-cloud-for-3ds-max` via the bundled Python pip
 - Scripts MUST end with `Exit 0`
 - Each script lives in its own subfolder alongside a `README.md`
@@ -69,7 +69,7 @@ Ask the user (if not already specified):
 Look in `host_configuration_scripts/3dsmax/` for the most similar existing script and read it in full.
 
 **If updating an existing script** (e.g. bumping 3ds Max 2025 → 2026, or V-Ray 7 → 8):
-- Create a new folder and script — do not edit the existing one
+- Create a new folder and script. Do not edit the existing one
 - Update every version occurrence: `$VARIABLES`, `Write-Host` messages, install paths, env var names
   (e.g. `VRAY_FOR_3DSMAX2025_MAIN` → `VRAY_FOR_3DSMAX2026_MAIN`)
 
@@ -85,13 +85,13 @@ When in doubt, look at existing folder names in `host_configuration_scripts/3dsm
 ### Step 4: Write the script
 
 Structure:
-1. Header comment block — what it installs, tested with, S3 requirements
-2. TODO variables — one full S3 URI variable per installer/plugin file, each marked with `# TODO` and the zip guide comment for the 3ds Max installer
-3. Install 3ds Max — `mkdir C:\3dsmax_setup -Force`, `aws s3 cp`, `Expand-Archive`, `Start-Process Setup.exe -q -Wait`
-4. For each plugin — find its add-on in `skills/3dsmax-host-config/add-ons/`, download from S3 into `C:\3dsmax_setup\`, then run its silent installer
+1. Header comment block: what it installs and tests with, plus S3 requirements
+2. TODO variables: one full S3 URI variable per installer/plugin file, each marked with `# TODO` and the zip guide comment for the 3ds Max installer
+3. Install 3ds Max: `mkdir C:\3dsmax_setup -Force`, `aws s3 cp`, `Expand-Archive`, `Start-Process Setup.exe -q -Wait`
+4. For each plugin, find its add-on in `skills/3dsmax-host-config/add-ons/`, download from S3 into `C:\3dsmax_setup\`, then run its silent installer
 5. Configure environment for 3ds Max
 6. Configure environment for each plugin (from add-on)
-7. Install Deadline Cloud — `python.exe -m ensurepip` then `pip install deadline-cloud-for-3ds-max`
+7. Install Deadline Cloud: `python.exe -m ensurepip` then `pip install deadline-cloud-for-3ds-max`
 8. `Exit 0`
 
 Key patterns:
@@ -147,11 +147,11 @@ version or plugin not already listed.
 
 ## Common Mistakes
 
-- Using a shared `$BUCKET_NAME` variable — each installer must have its own full S3 URI variable instead
-- Using `$FOLDER_NAME\Setup.exe` — after `Expand-Archive`, `Setup.exe` is at the root of `C:\3dsmax_setup\`
+- Using a shared `$BUCKET_NAME` variable. Each installer must have its own full S3 URI variable instead
+- Using `$FOLDER_NAME\Setup.exe`. After `Expand-Archive`, `Setup.exe` is at the root of `C:\3dsmax_setup\`
 - Missing `Exit 0` at the end
-- Setting env vars before installing — always install first, then configure
-- Using `&&` as a command separator — PowerShell uses `;` or separate lines
+- Setting env vars before installing. Always install first, then configure
+- Using `&&` as a command separator. PowerShell uses `;` or separate lines
 - Forgetting `-m ensurepip` before `-m pip install`
 - When bumping versions: forgetting to update year suffixes in env var names
   (e.g. `VRAY_FOR_3DSMAX2025_MAIN` → `VRAY_FOR_3DSMAX2026_MAIN`)

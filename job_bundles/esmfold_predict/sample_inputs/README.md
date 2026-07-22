@@ -8,7 +8,7 @@
 | `2jof` | 20 aa | Trp-cage variant | [2JOF](https://www.rcsb.org/structure/2JOF) |
 | `1vii` | 36 aa | Villin headpiece | [1VII](https://www.rcsb.org/structure/1VII) |
 
-These three sequences are short enough to fold in under a minute on a single A10G and have well-characterized experimental structures, which makes them suitable for verifying the bundle end-to-end including the optional `Validate` step. They are not CASP benchmark targets — for CASP15 sequences, see https://predictioncenter.org/casp15/targetlist.cgi.
+These three sequences are short enough to fold in under a minute on a single A10G and have well-characterized experimental structures, which makes them suitable for verifying the bundle end-to-end including the optional `Validate` step. They are not CASP benchmark targets. For CASP15 sequences, see https://predictioncenter.org/casp15/targetlist.cgi.
 
 ## Reference PDBs
 

@@ -4,7 +4,7 @@ These samples demonstrate the [Task Chunking](https://github.com/OpenJobDescript
 
 ## Why use task chunking?
 
-Render jobs often spend significant time loading applications and scene files before rendering each frame. Chunking amortizes this overhead by processing multiple frames or tasks per chunk, reducing total job runtime.
+Render jobs often spend substantial time loading applications and scene files before rendering each frame. Chunking amortizes this overhead by processing multiple frames or tasks per chunk, reducing total job runtime.
 
 ## Sample index
 
@@ -14,7 +14,7 @@ This table covers every immediate sample directory in `task_chunking/`.
 |---|---|---|
 | [Basic contiguous chunks](basic_contiguous_chunks/) | `CHUNK[INT]` with `rangeConstraint: CONTIGUOUS` and start/end parsing | Your command accepts consecutive frame ranges |
 | [Basic non-contiguous chunks](basic_non_contiguous_chunks/) | `CHUNK[INT]` with arbitrary sparse frame sets | Your command accepts lists such as `1-3,5,7-20:2` |
-| [Blender contiguous chunks](blender_render_with_contiguous_chunks/) | Applying contiguous task chunks to a frame render | Blender should load once for several consecutive frames |
+| [Blender contiguous chunks](blender_render_with_contiguous_chunks/) | Applying contiguous task chunks to a frame render | Blender should load once for multiple consecutive frames |
 | [Blender non-contiguous chunks](blender_render_with_non_contiguous_chunks/) | Applying scheduler-selected non-contiguous chunks to a frame render | Blender can render arbitrary frame lists per task |
 
 The Blender variants add the `TASK_CHUNKING` extension and a `ChunkSize` parameter to the base

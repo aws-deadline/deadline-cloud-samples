@@ -91,7 +91,7 @@ Note: All `PATH` type parameters must use relative paths from the current workin
 - **EndFrame**: Last frame to render (default: 20)
 - **FrameStep**: Frame increment - e.g., 2 for rendering every second frame (default: 1)
 - **FramesPerTask**: Number of consecutive frames to render in a single Task (default: 1)
-    This can improve rendering efficiency by reducing overhead from task initialization.
+    Batching frames can improve rendering efficiency by reducing overhead from task initialization.
     Example with `FramesPerTask=5`:
     - Task 1 renders frames 1-5
     - Task 2 renders frames 6-10
@@ -106,7 +106,7 @@ Note: All `PATH` type parameters must use relative paths from the current workin
 This feature is available when using the tiling template (`template_tiling.yaml`).
 Tile-based rendering divides each frame into smaller tiles that are rendered independently and later assembled into the final image.
 
-**Important**: When using tile-based rendering, **GPURaytracing** must also be enabled to prevent solid black tile outputs.
+When using tile-based rendering, **GPURaytracing** must also be enabled to prevent solid black tile outputs.
 
 - **RegionRendering**: Enable tile-based rendering (true/false)
 - **NumXTiles**: Number of tiles to divide the image horizontally (default: 1)

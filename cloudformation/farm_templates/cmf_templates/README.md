@@ -8,7 +8,8 @@ with autoscaling. It creates a Lambda function, an EventBridge rule, and a Cloud
 Before deploying this CloudFormation template, check that you have the following resources created in your AWS Account.
 
 1. __Deadline Cloud Farm and Customer-Managed Fleet__: From the [AWS Deadline Cloud management console](https://console.aws.amazon.com/deadlinecloud),
- navigate to the details page of your fleet you want to apply fleet health check monitoring to. Copy the values for Farm ID, Fleet ID, and Fleet Name.
+ go to the details page of the fleet that needs fleet health check monitoring. Copy these values:
+ Farm ID, Fleet ID, and the Fleet Name.
 
 2. __EC2 Autoscaling Group that autoscales the fleet__: From the [EC2 Auto Scaling management console](https://console.aws.amazon.com/ec2/home?#AutoScalingGroups),
  navigate to the details page for the Auto Scaling Group corresponding to your fleet, and copy the value for Auto Scaling Group name.

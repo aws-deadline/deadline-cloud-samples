@@ -72,12 +72,12 @@ The full CUDA farm setup and custom package build are only required for the `GSP
 You can use a video-capable camera like your smartphone to capture a video of a subject for your Gaussian Splatting.
 Here are some tips to consider:
 
-1. Use a wide field of view, for example zoom level 0.5 in your camera app. With a wider field of view, more
+1. Use a wide field of view, such as zoom level 0.5 in your camera app. With a wider field of view, more
    objects will be common between image pairs for Structure-from-Motion to use.
 2. Turn off video stabilization. This preserves identical lens optics between all frames, and can increase the
    quality of solves.
 3. Plan your camera motion depending on the subject.
-    1. To capture an object, like a bench or a bicycle, orbit around the the subject several times.
+    1. To capture an object, like a bench or a bicycle, orbit around the subject a few times.
        Keep the camera at a different height each time and if possible at different distances from the subject.
     2. To capture a room interior, follow around the outside of the room with the camera facing inwards.
        Repeat at different camera heights, and if there are particular objects that you want at higher detail
@@ -138,17 +138,17 @@ As the pipeline goes through its steps, it will update the status message visibl
 ![Deadline Cloud monitor log task run details](.readme_images/deadline_cloud_monitor_log_task_run_details.png)
 
 If you encounter errors, the log output in this view will help you track down the cause. You can identify
-which part of the pipeline failed, as it could be an issue with FFmpeg processing the input video, GLOMAP
-solving Structure-from-Motion, or NeRF Studio training the Gaussian splats. Then you can hone in on the specific
-errors, such as running out of memory or being unable to solve for the camera poses. The answer may be to
-adjust the fleet infrastructure if you want to keep the settings you selected, or to change the parameters
-to reduce the image resolution, count or something else.
+which part of the pipeline failed. The cause could be FFmpeg processing the input video, GLOMAP
+solving Structure-from-Motion, or NeRF Studio training the Gaussian splats. Then you can find the specific
+error. Common causes include running out of memory or failing to solve for the camera poses. The fix may be to
+adjust the fleet infrastructure if you want to keep the settings you selected. You can also use a lower image
+resolution or count.
 
 ## Download and view the Gaussian Splatting .ply
 
 When the job completes successfully, you can download its output from Deadline Cloud monitor. Right click
-on the completed task in the Tasks table and select "Download output". Depending on your settings, it may
-show the download progress in your browser, or present a CLI command you can use to download.
+on the completed task in the Tasks table and select "Download output". Depending on your settings, it either
+shows the download progress in your browser or presents a CLI command you can use to download.
 
 The .ply file will be saved to the location you selected when submitting the job. To view the result
 in your browser, open the [SuperSplat Editor](https://superspl.at/editor) website and drag/drop
@@ -158,7 +158,7 @@ will look something like this:
 ![supersplat initial view](.readme_images/supersplat_initial_view.png)
 
 After toggling the Show/Hide Splats option on the right, rotating the scene by about ninety degrees,
-and navigating around the scene, here's the subject of the capture:
+and moving around the scene, here's the subject of the capture:
 
 ![supersplat found subject](.readme_images/supersplat_found_subject.png)
 
@@ -167,17 +167,17 @@ inverting the selection, and deleting those splats:
 
 ![supersplat sphere cropped](.readme_images/supersplat_sphere_cropped.png)
 
-There are many tutorials and [documentation pages](https://github.com/playcanvas/supersplat/wiki) to learn how to use SuperSplat,
+Many tutorials and [documentation pages](https://github.com/playcanvas/supersplat/wiki) explain how to use SuperSplat,
 or import your .ply file into your tool of choice.
 
 ## Understand the cost of your training jobs
 
-Deadline Cloud monitor includes a usage explorer feature that can estimate the cost of the jobs you run
-and help you understand how much each training costs. The sample illustrated here was trained at higher quality with a larger
+Deadline Cloud monitor includes a usage explorer feature that estimates the cost of the jobs you run,
+showing how much each training costs. The sample illustrated here was trained at higher quality with a larger
 number of images than default and the Structure-from-Motion and training took about an hour. The example costs
 shown here are for an on-demand CUDA fleet. If you're comfortable running your tests on off-peak hours when
-CUDA-capable instances are available with low enough interruption rates, you could use a spot CUDA fleet
-at reduced cost. What is shown in usage explorer does not include costs outside of your job run time, such as idle worker
+CUDA-capable instances are available with low enough interruption rates, a spot CUDA fleet costs less.
+Usage explorer does not show costs outside of your job run time, such as idle worker
 instance time or storage on your S3 bucket.
 
 ![Deadline Cloud monitor usage explorer by job](.readme_images/deadline_cloud_monitor_usage_explorer_by_job.png)
@@ -228,7 +228,7 @@ $ openjd run gsplat_pipeline/template.yaml \
 ```
 
 The [conda_queue_env_improved_caching.yaml](../../queue_environments/README.md#conda-queue-environment-with-improved-caching)
-has some features to help you manage the software environment in a relatively hands-free way. It was added to your
+has some features to help you manage the software environment in a hands-free way. It was added to your
 Deadline Cloud queue when you deployed the CUDA farm CloudFormation as well, and these features apply both there and here.
 By default, it will take the hash of the values for its parameters CondaPackages and CondaChannels, and generate
 an automatic environment name like `hashname_04bcf28cb135f7f82cfc27a3` as visible in this part of the output:
@@ -332,14 +332,14 @@ and start running the task much sooner:
 ### Decompose the pipeline into Open Job Description steps
 
 In the [job template](template.yaml), the whole pipeline runs as single script for an Open Job Description step.
-This style of pipeline either runs to the end, or not at all, and it will always run serially on one worker host.
+This style of pipeline either runs to the end or not at all, always serially on one worker host.
 By splitting it up into individual Open Job Description steps, you can run part of the job on a CPU-only host,
 and the rest of the job on a GPU host. It also gives you the opportunity to introduce cluster parallelism by adding a
 parameter space to a step that can process the data as independent steps on many different machines.
 
 The sample [Job Development Progression](../job_dev_progression/) illustrates the pattern to follow, using two steps.
 One to initialize a workspace, and a second to perform data processing. To do the same for the Gaussian Splatting
-pipeline, start by changing the WorkspaceDir parameter from optional to required, and give it a default value.
+pipeline, change the WorkspaceDir parameter from optional to required with a default value.
 For [Deadline Cloud job attachments](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/run-jobs-job-attachments.html)
 to copy data in the workspace between the worker hosts running steps of the job, it must be in a directory with specified
 data flow instead of in the session directory. The parameter should look something like this after your edit:
@@ -525,7 +525,7 @@ the rest we'll leave as an exercise for the reader.
 ```
 
 When you run this job, it will run slower due to scheduling and data transfer overhead between the steps.
-On the other hand, it's organized to schedule on different fleets by editing the `hostRequirements` of
+In exchange, it's organized to schedule on different fleets by editing the `hostRequirements` of
 each step, or [add task parallelism](https://github.com/OpenJobDescription/openjd-specifications/wiki/Job-Intro-03-Creating-a-Job-Template#4-adding-task-parallelism)
 to a step that can be split up into many identical tasks.
 

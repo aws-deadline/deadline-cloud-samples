@@ -19,7 +19,7 @@ This table covers every immediate sample directory in `host_configuration_script
 | [3ds Max 2027, V-Ray, and tyFlow](3dsmax-2027-and-vray-and-tyflow/) | Installing V-Ray and tyFlow with 3ds Max 2027 | A 2027 workload combines rendering and particle simulation |
 | [3ds Max 2027, V-Ray, and AEC plugins](3dsmax-2027-vray-and-aec-plugins/) | Adding Forest Pack, RailClone, FloorGenerator, and MultiTexture | A 2027 V-Ray workload uses architectural visualization plugins |
 
-The samples currently cover 3ds Max 2024, 2025, and 2027. The Deadline Cloud submitter also supports 3ds Max 2026; adapt the nearest script for that installer and verify all product-specific silent-install options.
+The samples currently cover 3ds Max 2024, 2025, and 2027. The Deadline Cloud submitter also supports 3ds Max 2026. Adapt the nearest script for that installer and verify all product-specific silent-install options.
 
 ## Generate a script for another version with Kiro
 
@@ -32,7 +32,7 @@ The samples cover specific combinations. To create a script for another 3ds Max 
 
 ### Steps
 
-1. Ask for the combination you need, for example:
+1. Ask for the combination you need:
    * `Create a host configuration script for 3ds Max 2026`
    * `Create a host configuration script for 3ds Max 2026 and V-Ray 8`
    * `Create a host configuration script for 3ds Max 2027 and Corona 14`

@@ -15,4 +15,4 @@ This table covers every immediate deployable sample directory in `farm_templates
 | [Fleet standby scheduling](fleet_standby_scheduling/) | Scheduled warm standby worker counts | Worker startup latency matters during predictable hours |
 | [CMF fleet health check](cmf_templates/) | Continuous health monitoring for an autoscaling customer-managed fleet | You need alarms for fleet capacity or health problems |
 
-[`apply-conda-queue-env.py`](apply-conda-queue-env.py) is support tooling used to apply a queue environment; it is not a separately deployable sample and is intentionally excluded from the table.
+[`apply-conda-queue-env.py`](apply-conda-queue-env.py) is support tooling used to apply a queue environment. It is not a separately deployable sample and is excluded from the table.

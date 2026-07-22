@@ -12,4 +12,4 @@ This sample host configuration script configures your Service Managed Fleet with
 5. Save the fleet configuration.
 6. Configure your Fleet's IAM role to have `s3:GetObject` access to your S3 bucket.
 7. Recommendation: Set the fleet's min Worker count to 1. Review the Worker's CloudWatch logs (`/aws/deadline/farm-<farm-id>/fleet-<fleet-id>`) to verify the script runs successfully before production use.
-    - **Note**: Configuration changes only affect Workers launched after the update is applied.
+    - Configuration changes only affect Workers launched after the update is applied.

@@ -36,7 +36,7 @@ Provide deterministic setup instructions and identify configuration values users
 
 ## Run or submit
 
-Show the shortest working command first, followed by meaningful variants when useful.
+Show the shortest working command first, followed by useful variants.
 
 ```console
 # command

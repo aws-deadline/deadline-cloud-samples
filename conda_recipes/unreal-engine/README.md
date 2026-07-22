@@ -6,9 +6,9 @@ This recipe packages Unreal Engine for use in the AWS Deadline Cloud ecosystem. 
 
 Unlike other recipes in this repository, this one is designed to be built **locally** on a machine where Unreal Engine is already installed.
 
-For example, UE 5.6 requires packaging ~80,000 files totaling 20+ GiB. If you submit a conda build job to AWS Deadline Cloud:
+UE 5.6 requires packaging ~80,000 files totaling 20+ GiB. If you submit a conda build job to AWS Deadline Cloud:
 - **Without compression**: You'd upload a 20GB zip file as a job attachment, and workers would need to download all 20GB before building.
-- **With compression**: Compressing takes time and can reduce the file size to ~10GB, but workers must then decompress it before building, which also takes time.
+- **With compression**: Compressing takes time and can reduce the file size to ~10GB. Workers must then spend more time decompressing it before building.
 
 Either way, the upload/download/decompression overhead makes submitting UE as a job attachment impractical. Building locally on a machine with UE already installed avoids this entirely.
 
@@ -75,7 +75,7 @@ Before building, update `recipe/recipe.yaml` to match your Unreal Engine install
 
    The channel can be on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance. See the [rattler-build publish documentation](https://rattler-build.prefix.dev/v0.55.0/publish/) for details.
 
-   > **Note:** The build may take up to 90 minutes depending on your disk speed.
+   > The build may take up to 90 minutes depending on your disk speed.
 
 ### Uploading a locally built conda package to S3
 

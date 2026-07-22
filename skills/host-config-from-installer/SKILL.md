@@ -13,11 +13,11 @@ tags: [skill, host-configuration, deadline-cloud, powershell, installer, service
 
 ## Overview
 
-This skill walks a customer through installing any Windows `.exe` software on their local machine,
-verifies it works, uploads the installer to S3, and converts the verified steps into a PowerShell
-host configuration script for AWS Deadline Cloud Windows Service Managed Fleets.
+This skill walks a customer through installing any Windows `.exe` software on their local machine
+and verifying it works. It then uploads the installer to S3 and converts the verified steps into a
+PowerShell host configuration script for AWS Deadline Cloud Windows Service Managed Fleets.
 
-The generated `.ps1` is based on commands that were actually tested and confirmed working — not
+The generated `.ps1` is based on commands that were tested and confirmed working, not
 guesswork or templates.
 
 ## Usage
@@ -37,8 +37,8 @@ Before starting, confirm the customer has:
 
 ## Workflow
 
-You MUST follow these steps in order. At each step, execute the command, check the output, and
-do not proceed until the step succeeds.
+You MUST follow these steps in order. At each step, execute the command and check the output.
+Do not proceed until the step succeeds.
 
 ### Step 1: Gather information
 
@@ -75,7 +75,7 @@ run `<installer-path> /?` or `<installer-path> /help` to discover the correct fl
 ### Step 3: Verify the install
 
 Once installed, verify the software runs correctly. Ask the customer to run the most basic
-verification command for the software — for example:
+verification command for the software:
 
 ```powershell
 # Check the install directory exists
@@ -96,8 +96,8 @@ Ask the customer to check what environment variables or PATH entries the install
 [System.Environment]::GetEnvironmentVariables('Machine') | Format-List
 ```
 
-Note down any new variables or PATH entries — these will need to be set explicitly in the host
-config script since the installer won't run interactively on fleet workers.
+Note down any new variables or PATH entries. The host config script must set them explicitly,
+since the installer won't run interactively on fleet workers.
 
 ### Step 5: Ensure the S3 bucket exists
 
@@ -107,7 +107,7 @@ If the customer doesn't have a bucket yet, create one:
 aws s3 mb s3://<bucket-name> --region <region>
 ```
 
-> **Important:** Make sure the fleet's IAM role has `s3:GetObject` permission on this bucket.
+> Make sure the fleet's IAM role has `s3:GetObject` permission on this bucket.
 > Without it, workers won't be able to download the installer at runtime.
 
 If they already have one, verify access:
@@ -184,9 +184,9 @@ Include:
 
 ## Common Mistakes
 
-- Not using `-Wait` in `Start-Process` — the script will proceed before the install finishes
+- Not using `-Wait` in `Start-Process`, which lets the script proceed before the install finishes
 - Forgetting `mkdir C:\software_setup -Force` before the first download
 - Missing `Exit 0` at the end
-- Env vars set during interactive install won't apply on fleet workers — they MUST be set
+- Env vars set during interactive install won't apply on fleet workers. They MUST be set
   explicitly with `[Environment]::SetEnvironmentVariable(..., 'Machine')`
-- Fleet IAM role must have `s3:GetObject` on the bucket — easy to forget
+- Fleet IAM role must have `s3:GetObject` on the bucket, which is easy to forget

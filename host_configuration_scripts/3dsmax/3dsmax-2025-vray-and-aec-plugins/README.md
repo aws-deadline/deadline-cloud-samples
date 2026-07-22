@@ -15,7 +15,7 @@ RailClone is a parametric modeling plugin for 3ds Max that enables the creation 
 This script also installs FloorGenerator and MultiTexture plugins for enhanced architectural visualization capabilities.
 
 ## Version Compatibility
-This script can be adapted for other compatible versions by updating the variable names and paths accordingly:
+This script can be adapted for other compatible versions by updating the variable names and paths:
 - 3ds Max 2026 or other versions
 - V-Ray 7 or compatible versions
 - Compatible versions of Forest Pack, RailClone, and other AEC plugins
@@ -30,8 +30,8 @@ This script can be adapted for other compatible versions by updating the variabl
 6. Download the FloorGenerator and MultiTexture plugin files and upload them to your S3 bucket.
 7. Configure the Windows Service Managed fleet's host configuration using [3dsmax-2025-vray-and-aec-plugins.ps1](./3dsmax-2025-vray-and-aec-plugins.ps1).
     - Note that there are placeholder variables at the start of the script marked with `TODO`. Please replace the values with ones matching your configuration.
-    - **Note**: The plugin installation sections can be adapted for other 3ds Max versions by updating the plugins directory path to match your target version.
+    - The plugin installation sections can be adapted for other 3ds Max versions by updating the plugins directory path to match your target version.
 8. Save the fleet configuration.
-    - **Important**: Configuration changes only affect Worker instances launched after this update is applied. Existing Workers will continue using the previous configuration.
+    - Configuration changes only affect Worker instances launched after this update is applied. Existing Workers will continue using the previous configuration.
 9. Configure your Fleet's IAM role to have read access to your S3 bucket.
 10. For testing: Set the fleet's min Worker count to 1 which will spin up a Worker and run the Host Configuration script on it. Review Worker's CloudWatch logs (found in the `/aws/deadline/farm-<farm-id>/fleet-<fleet-id>` log group) to ensure the script is executed successfully on the Worker prior to production use.

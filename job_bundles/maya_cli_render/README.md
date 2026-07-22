@@ -39,7 +39,7 @@ we created for testing, or produce similar scenes with the following steps.
 3. Create four gears (Create -> Polygon Primitives -> Gear). Use the Move and Rotate tools to suspend
    them in the air in a way they will fall and collide in an interesting way. NOTE: Don't use the "duplicate"
    feature of Maya, that will turn the Gear primitive into a polygon mesh and make the Maya scene file large.
-4. Make a duplicate of each Gear primitive to use for the physics. This will create pGear5 through pGear8.
+4. Make a duplicate of each Gear primitive to use for the physics. The duplicates will be pGear5 through pGear8.
 5. Select pGear5 through pGear8, and with the FX menu set active, choose Bullet -> Active Rigid Body.
 6. Open the Attribute Editor, and for each of the active rigid bodies you created, and modify the Collider
    Shape Type from box to hull.
@@ -64,4 +64,4 @@ we created for testing, or produce similar scenes with the following steps.
     `cmds.delete("|pPlane1|bulletRigidBodyShape5")`
 11. Choose Windows -> Animation Editors -> Graph Editor. Select the objects pGear1 through pGear4. You should
     see all the physics animation curves. In the Graph Editor, choose Curves -> Key Reducer Filter. This
-    will reduce the number of keys, and hence the file size.
+    will reduce the number of keys, and so the file size.

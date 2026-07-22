@@ -34,11 +34,11 @@ Use this skill when:
 
 ## Process
 
-1. **Design the job** — Define parameters, steps, environments, and dependencies
-2. **Write the template** — Create the OpenJD YAML template
-3. **Test locally** (optional, recommended) — Iterate with `openjd run --tasks <one>` until end-to-end success (see Testing section). Skip if you prefer to iterate directly on Deadline Cloud.
-4. **Add a conda recipe** (optional) — For custom software dependencies
-5. **Submit to a farm** — Test on Deadline Cloud
+1. **Design the job**: Define parameters, steps, environments, and dependencies
+2. **Write the template**: Create the OpenJD YAML template
+3. **Test locally** (optional, recommended): Iterate with `openjd run --tasks <one>` until end-to-end success (see Testing section). Skip if you prefer to iterate directly on Deadline Cloud.
+4. **Add a conda recipe** (optional): For custom software dependencies
+5. **Submit to a farm**: Test on Deadline Cloud
 
 ## Testing with openjd CLI
 
@@ -71,11 +71,11 @@ openjd run --step StepName --tasks Frame=1 template.yaml
 **Iterate locally until the job runs end-to-end before submitting to Deadline
 Cloud.** Use `openjd check` to catch schema errors, then `openjd run` each step
 with realistic parameter values until every step exits cleanly. Farm
-submissions are slow and consume queue resources — fix template bugs, missing
+submissions are slow and consume queue resources, so fix template bugs, missing
 dependencies, and path issues locally first.
 
-For local iteration, run a **minimal subset** of the parameter space — one
-frame, one chunk, one task — to verify the script works. Use `--tasks` to pin
+For local iteration, run a **minimal subset** of the parameter space (one
+frame, one chunk, one task) to verify the script works. Use `--tasks` to pin
 a single value:
 
 ```bash
@@ -200,11 +200,11 @@ steps:
 
 For Deadline Cloud samples, prefer these approaches in order:
 
-1. **Conda package recipe** (preferred for service-managed fleets) — check into
+1. **Conda package recipe** (preferred for service-managed fleets): check into
    `conda_recipes/`. See [`skills/conda-builder/SKILL.md`](../conda-builder/SKILL.md).
-2. **Job/Step environment** — install from pypi/apt/etc. in the template's
+2. **Job/Step environment**: install from pypi/apt/etc. in the template's
    environment section.
-3. **Pre-installed on the fleet** — for customer-managed fleets with custom AMIs.
+3. **Pre-installed on the fleet**: for customer-managed fleets with custom AMIs.
 
 ### Conda recipe structure
 

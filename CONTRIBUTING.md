@@ -30,7 +30,7 @@ We welcome you to contribute features to existing samples, bug fixes, and new sa
 [pull request](https://help.github.com/articles/creating-a-pull-request/). If you are new to contributing
 to GitHub repositories, then you may find the
 [GitHub documentation on collaborating with the fork and pull model](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/about-collaborative-development-models#fork-and-pull-model)
-informative; this is the model that we follow.
+informative. We follow that model.
 
 ### Finding contributions to work on
 
@@ -41,7 +41,7 @@ are a good place to start, but please dive into any issue that interests you whe
 ### Talk with us first
 
 We ask that you please [open a feature request issue](https://github.com/aws-deadline/deadline-cloud-samples/issues/new/choose)
-(if one does not already exist) and talk with us before posting a pull request that contains a significant amount of work.
+(if one does not already exist) and talk with us before posting a pull request that contains a large amount of work.
 We want to make sure that your time and effort is respected by working with you to design the change before you spend much
 of your time on it. If you want to create a draft pull request to show what you are thinking and then talk with us, then that
 works with us as well.
@@ -51,8 +51,8 @@ works with us as well.
 Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
 
 1. You are working against the latest source on the *mainline* branch.
-2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
-3. You open an issue to discuss any significant work - we would hate for your time to be wasted.
+2. You check existing open and recently merged pull requests to make sure someone else hasn't addressed the problem already.
+3. You open an issue to discuss any large work - we would hate for your time to be wasted.
 4. Your pull request will be focused on a single change - it is easier for us to understand when a change is focused rather
    than changing multiple things at once.
 
@@ -115,7 +115,7 @@ python3 scripts/check_external_links.py --no-ignore
 Confirm the failure is a repeatable bot rejection rather than a missing page, then add the exact domain
 with an immediately preceding dated comment that records the observed status or error. Entries match
 the domain and true subdomains by DNS-label boundary only; wildcards and substring matching are not
-supported. Ignores apply only to original link hosts, never redirect destinations. Fix genuine broken
+supported. Ignores apply only to original link hosts, never redirect destinations. Fix real broken
 links, including HTTP 404 responses, instead of ignoring them.
 
 ### Conventional commits
@@ -156,6 +156,6 @@ host configuration scripts for 3ds Max plugins. If you have tested a plugin comb
 covered yet, you can contribute a new add-on by:
 
 1. Create a new `.md` file in `skills/3dsmax-host-config/add-ons/` named after the plugin (e.g. `redshift.md`)
-2. Follow the structure of the existing add-ons — include a brief description, a reference script path, a "What to add to the script" section, and any important notes
+2. Follow the structure of the existing add-ons. Include a brief description and a reference script path, a "What to add to the script" section, and any important notes
 3. Add a working example `.ps1` script under `host_configuration_scripts/3dsmax/` that has been tested
 4. Open a pull request with both the add-on `.md` and the example script

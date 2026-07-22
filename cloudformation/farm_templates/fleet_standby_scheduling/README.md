@@ -8,10 +8,10 @@ that can start processing jobs immediately without waiting for new instances to 
 standby workers only during business hours, you reduce job start latency when your team is active
 while avoiding the cost of idle workers overnight and on weekends.
 
-For example, with the default settings this template sets the standby worker count to 2 at 8:00 AM UTC
+With the default settings, this template sets the standby worker count to 2 at 8:00 AM UTC
 Monday through Friday, and resets it to 0 at 5:00 PM UTC.
 
-This template works with any existing Deadline Cloud fleet — whether it was created via the AWS console,
+This template works with any existing Deadline Cloud fleet, whether it was created via the AWS console,
 CLI, or another CloudFormation template. It supports both
 [service-managed fleets](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/smf-manage.html) and
 [customer-managed fleets](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/manage-cmf.html).
@@ -19,11 +19,11 @@ Use this sample as a starting point and modify it to fit your own scheduling and
 
 ## Resources Created
 
-1. **Lambda Function** — Updates the fleet's standby worker count by calling the Deadline Cloud
+1. **Lambda Function**: Updates the fleet's standby worker count by calling the Deadline Cloud
    `UpdateFleet` API. It reads the fleet's current configuration first to avoid overwriting other settings.
-2. **IAM Roles** — A Lambda execution role with `deadline:GetFleet` and `deadline:UpdateFleet` permissions
+2. **IAM Roles**: A Lambda execution role with `deadline:GetFleet` and `deadline:UpdateFleet` permissions
    scoped to the specified fleet, and a scheduler role to invoke the Lambda.
-3. **EventBridge Schedules** — Two schedules that trigger the Lambda at the start and end of business hours.
+3. **EventBridge Schedules**: Schedules that trigger the Lambda at the start and end of business hours.
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ Use this sample as a starting point and modify it to fit your own scheduling and
 ## Customization
 
 - To schedule a different time window, update the `BusinessHoursStartCron` and `BusinessHoursEndCron`
-  parameters. For example, to run every day (including weekends) from 9 AM to 6 PM Pacific time:
+  parameters. To run every day (including weekends) from 9 AM to 6 PM Pacific time:
   - `BusinessHoursStartCron`: `cron(0 9 * * ? *)`
   - `BusinessHoursEndCron`: `cron(0 18 * * ? *)`
   - `ScheduleTimezone`: `US/Pacific`
@@ -55,12 +55,12 @@ Use this sample as a starting point and modify it to fit your own scheduling and
 3. Upload the template file and click Next.
 4. Enter a stack name (e.g. `StandbyScheduling`), your Farm ID, Fleet ID, and adjust the schedule
    parameters as needed:
-   - **BusinessHoursStandbyWorkerCount** — Workers to keep warm during business hours (default: 2).
-   - **OffHoursStandbyWorkerCount** — Workers to keep warm outside business hours (default: 0).
-   - **BusinessHoursStartCron / BusinessHoursEndCron** — Cron expressions for the schedule.
-     Default is weekdays 8 AM–5 PM. Uses
+   - **BusinessHoursStandbyWorkerCount**: Workers to keep warm during business hours (default: 2).
+   - **OffHoursStandbyWorkerCount**: Workers to keep warm outside business hours (default: 0).
+   - **BusinessHoursStartCron / BusinessHoursEndCron**: Cron expressions for the schedule.
+     Default is weekdays 8 AM to 5 PM. Uses
      [EventBridge Scheduler cron syntax](https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html#cron-based).
-   - **ScheduleTimezone** — Timezone for the cron expressions (default: UTC). Accepts any
+   - **ScheduleTimezone**: Timezone for the cron expressions (default: UTC). Accepts any
      [IANA timezone name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) such as
      `US/Pacific` or `Europe/London`.
 5. Click Next, acknowledge IAM resource creation, and create the stack.
@@ -84,4 +84,4 @@ aws cloudformation delete-stack --stack-name StandbyScheduling
 ```
 
 Deleting the stack removes the Lambda, IAM roles, and schedules. It does not modify your fleet's
-current standby worker count — the fleet retains whatever value was last set.
+current standby worker count. The fleet retains whatever value was last set.

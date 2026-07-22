@@ -1,8 +1,8 @@
 # vLLM Batch Inference
 
-This sample runs high-throughput LLM inference on a JSONL file of prompts using [vLLM](https://github.com/vllm-project/vllm) on AWS Deadline Cloud. Give it a file where every line is one prompt (say, 10,000 marketing slogans or 500 support-ticket replies to draft), pick a model, and the job fans out across a GPU fleet — every prompt gets an LLM response, and the aggregate step packages everything into a JSONL plus a self-contained HTML viewer you can open in any browser.
+This sample runs high-throughput LLM inference on a JSONL file of prompts using [vLLM](https://github.com/vllm-project/vllm) on AWS Deadline Cloud. Give it a file where every line is one prompt (say, 10,000 marketing slogans or 500 support-ticket replies to draft), pick a model, and the job fans out across a GPU fleet: every prompt gets an LLM response, and the aggregate step packages everything into a JSONL plus a self-contained HTML viewer you can open in any browser.
 
-It's designed for offline, embarrassingly-parallel workloads: content generation, evaluation datasets, translation, extraction, classification — anywhere you need a model to answer many independent prompts without a live API server.
+It's designed for offline, embarrassingly-parallel workloads: content generation, evaluation datasets, translation, extraction, classification, anywhere you need a model to answer many independent prompts without a live API server.
 
 Under the hood it uses Deadline Cloud's [Task Chunking](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-chunking.html) feature to group prompts into batched tasks, which lets you dial parallelism vs. scheduling overhead via a single `ChunkSize` parameter.
 
@@ -34,7 +34,7 @@ Under the hood it uses Deadline Cloud's [Task Chunking](https://docs.aws.amazon.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Loading a 7B-parameter LLM takes 30+ seconds — paying that cost per task would dominate batch runtime. Deadline Cloud's **step environments** solve this: the vLLM server starts when a worker picks up the job and stays loaded across every task that worker runs, then shuts down with the session. The **scheduler** fans tasks out across the fleet in parallel, and a **Service-Managed Fleet** auto-scales workers to match the size of the batch. A 24-prompt batch on a 4-worker fleet pays for 4 model loads instead of 24, runs in parallel, and needs no infrastructure beyond `deadline bundle submit`.
+Loading a 7B-parameter LLM takes 30+ seconds, so paying that cost per task would dominate batch runtime. Deadline Cloud's **step environments** solve this: the vLLM server starts when a worker picks up the job and stays loaded across every task that worker runs, then shuts down with the session. The **scheduler** fans tasks out across the fleet in parallel, and a **Service-Managed Fleet** auto-scales workers to match the size of the batch. A 24-prompt batch on a 4-worker fleet pays for 4 model loads instead of 24 and runs in parallel, with no infrastructure beyond `deadline bundle submit`.
 
 ## Set up your farm
 
@@ -111,22 +111,22 @@ The `Prompts` parameter controls **which lines** from the JSONL file get process
 | `1-10:2` | Stride: every 2nd line starting at 1 → 1, 3, 5, 7, 9 |
 | `1-3,7-15:3` | Combined: lines 1-3 plus every 3rd from 7-15 → 1, 2, 3, 7, 10, 13 |
 
-This gives you fine control: process a subset for testing, retry only failed lines, or batch through different chunks of a large input file.
+The syntax lets you process a subset for testing and retry only failed lines from a large input file.
 
 ## Chunk size and adaptive sizing
 
-The `ChunkSize` parameter controls **how many prompts each task processes together**. This is powered by Deadline Cloud's [Task Chunking](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-chunking.html) feature — the scheduler groups adjacent prompts into a single task, so one worker processes them consecutively without paying the task-scheduling overhead between each one.
+The `ChunkSize` parameter controls **how many prompts each task processes together**. Deadline Cloud's [Task Chunking](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/build-job-bundle-chunking.html) feature powers this behavior: the scheduler groups adjacent prompts into a single task, so one worker processes them consecutively without paying the task-scheduling overhead between each one.
 
 Example: `Prompts=1-100` with `ChunkSize=10` creates 10 tasks. The first task processes prompts 1-10, the second processes 11-20, and so on.
 
 | ChunkSize | Effect |
 |---|---|
 | `1` | 1 prompt per task (maximum parallelism, most scheduling overhead) |
-| `5` (default) | Balanced — good for typical inference workloads |
+| `5` (default) | Balanced, good for typical inference workloads |
 | `20` | Fewer tasks, less overhead, more sequential work per worker |
-| `150` (max) | One big task per worker — minimal scheduling, sequential processing |
+| `150` (max) | One big task per worker (minimal scheduling, sequential processing) |
 
-**Rule of thumb:** Set `ChunkSize` so that each chunk takes roughly 30-120 seconds to process. Too small and you waste time on task scheduling; too large and slow prompts block fast ones from other workers.
+**Rule of thumb:** Set `ChunkSize` so that each chunk takes roughly 30-120 seconds to process. Too small and you waste time on task scheduling. Too large and slow prompts block fast ones from other workers.
 
 ### Adaptive sizing with `TargetRuntimeSeconds`
 
@@ -147,9 +147,9 @@ A JSONL file with one JSON object per line. Each line must have a `prompt` field
 ```
 
 Optional per-prompt fields:
-- `id` — identifier for tracking (passed through to output)
-- `max_tokens` — cap on the number of tokens vLLM will generate for this prompt's response. Higher = allows longer answers but each token adds latency and cost; if you hit the cap, `finish_reason` in the output is `"length"` (truncated) instead of `"stop"` (model decided it was done). Overrides the job-level `MaxTokens` default for just this line.
-- `temperature` — how random the model's sampling is: `0.0` is fully deterministic (greedy decoding, same output every time), `0.7` is a balanced default, `1.5+` produces varied and creative but often less coherent output. Overrides the job-level `Temperature` default for just this line.
+- `id`: identifier for tracking (passed through to output)
+- `max_tokens`: cap on the number of tokens vLLM will generate for this prompt's response. Higher = allows longer answers but each token adds latency and cost. If you hit the cap, `finish_reason` in the output is `"length"` (truncated) instead of `"stop"` (model decided it was done). Overrides the job-level `MaxTokens` default for just this line.
+- `temperature`: how random the model's sampling is: `0.0` is fully deterministic (greedy decoding, same output every time), `0.7` is a balanced default, `1.5+` produces varied and creative but often less coherent output. Overrides the job-level `Temperature` default for just this line.
 
 Any additional fields are passed through to the output unchanged.
 
@@ -161,7 +161,7 @@ A zero-dependency HTML tool is included for building input files:
 open tools/prompt_builder.html
 ```
 
-Add prompts dynamically, set per-prompt options, drag-and-drop to import, and export as JSONL.
+Add prompts, set per-prompt options, drag-and-drop to import, and export as JSONL.
 
 ## Output format
 
@@ -169,7 +169,7 @@ Add prompts dynamically, set per-prompt options, drag-and-drop to import, and ex
 {"prompt": "What is photosynthesis?", "id": "001", "generated_text": "Photosynthesis is...", "finish_reason": "stop", "prompt_tokens": 7, "completion_tokens": 42}
 ```
 
-The Aggregate step also produces `results.html` — a self-contained visual viewer you can open in any browser. No server needed.
+The Aggregate step also produces `results.html`, a self-contained visual viewer you can open in any browser. No server needed.
 
 ## Parameters
 

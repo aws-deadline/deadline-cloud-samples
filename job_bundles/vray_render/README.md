@@ -6,7 +6,7 @@ Read more about how to customize this job bundle bellow
 ## Prerequisite
 - Have V-Ray conda package host on a conda channel. \
 Read more about how to create V-Ray conda package [here](../../conda_recipes/vray/README.md)
-- Have a sample `.vrscene` and its dependencies files. For example the [Chaos ENVISION documentation samples](https://docs.chaos.com/display/ENVISION/Sample+Scenes) include vrscene files as part of Sample Scene 01.
+- Have a sample `.vrscene` and its dependencies files. The [Chaos ENVISION documentation samples](https://docs.chaos.com/display/ENVISION/Sample+Scenes) include vrscene files as part of Sample Scene 01.
 
 ## Job submission
 

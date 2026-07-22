@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a conda build recipe for Redshift for Houdini 2026.1.1, specifically configured for use with AWS Deadline Cloud. This package enables you to run Redshift rendering jobs with Houdini on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for Redshift for Houdini 2026.1.1, configured for use with AWS Deadline Cloud. It lets you run Redshift rendering jobs with Houdini on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
@@ -27,7 +27,7 @@ Before building this package, ensure you have:
 
 4. **Maxon account** for downloading Redshift installer
 
-5. **A Houdini conda package** as this is a plugin dependency
+5. **A Houdini conda package**, which this plugin depends on
 
 ## Archive File Instructions
 

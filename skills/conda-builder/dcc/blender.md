@@ -1,8 +1,12 @@
-# Blender — DCC-specific guide
+# Blender: DCC-specific guide
 
 This guide supplements the top-level [`SKILL.md`](../SKILL.md) with Blender-specific
-details: download URLs, hash sources, required system libraries, and smoke test
-commands.
+details:
+
+- download URLs
+- hash sources
+- required system libraries
+- smoke test commands
 
 ## Download URLs
 
@@ -26,20 +30,20 @@ Fetch the `.sha256` file and extract the hashes for the `linux-x64.tar.xz` and
 
 ## Recipe specifics
 
-- Blender archives are self-contained — no dependency resolution needed
+- Blender archives are self-contained, so no dependency resolution is needed
 - The `build.sh` script copies Blender into `$PREFIX/opt/blender`, creates
   symlinks, and sets environment variables via `env_vars.d` JSON files
 - `build.sh` and `build_win.sh` use `$PKG_VERSION` and `$BLENDER_VERSION`, so they
   are version-agnostic and can be copied from the previous recipe unchanged
 
 Key fields to update in `recipe.yaml`:
-- `context.version` — full version (e.g., `"5.2.0"`)
-- `context.major_minor_version` — `"X.Y"` (e.g., `"5.2"`)
+- `context.version`: full version (e.g., `"5.2.0"`)
+- `context.major_minor_version`: `"X.Y"` (e.g., `"5.2"`)
 - Both `sha256` values (linux and windows)
 
 ## Required runtime libraries
 
-Blender requires X11 and EGL libraries even in headless mode (`-b`). These are
+Blender requires X11 and EGL libraries even in headless mode (`-b`). These libraries are
 **already installed** in the `al2023-deadline-worker` image built from
 [`containers/al2023-deadline/Dockerfile.worker-equivalent`](../../../containers/al2023-deadline/Dockerfile.worker-equivalent)
 (Layer 3), so no extra install step is needed when using that image.
@@ -54,8 +58,8 @@ yum install -y \
 ```
 
 Without them, `blender --version` fails with `libX11.so.6: cannot open shared
-object file`. On Deadline Cloud's service-managed fleet workers these are
-pre-installed on the AMI — which is exactly what the worker-equivalent Dockerfile
+object file`. On Deadline Cloud's service-managed fleet workers these libraries are
+pre-installed on the AMI, which is exactly what the worker-equivalent Dockerfile
 replicates.
 
 ## Smoke test
@@ -80,8 +84,8 @@ variables set.
 
 If the user provides a `.blend` scene file, use it. Otherwise, download the
 [Blender 3.5 Cozy Kitchen](https://www.blender.org/download/demo-files/) demo
-scene (~7 MB, CC-BY-SA by [Nicole Morena](https://www.artstation.com/nickyblender))
-— it renders quickly and works across Blender versions:
+scene (~7 MB, CC-BY-SA by [Nicole Morena](https://www.artstation.com/nickyblender)).
+It renders quickly and works across Blender versions:
 
 ```bash
 docker exec al2023-conda-build bash -c '
@@ -146,9 +150,9 @@ docker exec al2023-conda-build bash -c '
 
 ## Blender-specific common mistakes
 
-- Missing X11/EGL packages in the container — `blender --version` fails with
+- Missing X11/EGL packages in the container cause `blender --version` to fail with
   `libX11.so.6: cannot open shared object file`. The worker-equivalent image
-  includes these; only an issue if you're not using that image.
-- Wrong SHA256 — fetch from the official `.sha256` file, don't guess
-- Using `rattler-build publish` on older versions — `publish` was added in 0.35+;
-  use `build` + manual copy + `conda index` instead
+  includes these packages, so this only matters if you're not using that image.
+- Wrong SHA256: fetch from the official `.sha256` file, don't guess
+- Using `rattler-build publish` on older versions fails because `publish` was added
+  in 0.35+. Use `build` + manual copy + `conda index` instead

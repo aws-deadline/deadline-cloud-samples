@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a conda build recipe for V-Ray 7.10.01 (stable nightly build) for Houdini, specifically configured for use with AWS Deadline Cloud. This package enables you to run V-Ray rendering jobs with Houdini on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for V-Ray 7.10.01 (stable nightly build) for Houdini, configured for use with AWS Deadline Cloud. The package runs V-Ray rendering jobs with Houdini on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
@@ -27,13 +27,13 @@ Before building this package, ensure you have:
 
 4. **Chaos Group account** for downloading V-Ray installer
 
-5. **A Houdini conda package** as this is a plugin dependency
+5. **A Houdini conda package**, which this plugin depends on
 
 ## Archive File Instructions
 
 ### Download from Chaos Group
 1. Download the `vray_adv_71001_houdini20.5_23119_gcc11_linux.zip` installer from the Chaos Group website
-  - There is no full release of V-Ray 7 that supports the latest Houdini 20.5 production builds. Instead a stable nightly build is being used in this sample. Access to the nightly builds requires a Chaos account and allowlisting from their support team [reference](https://forums.chaos.com/forum/v-ray-for-houdini-forums/v-ray-for-houdini-general/1054830-nightly-build-access)
+  - No full release of V-Ray 7 supports the latest Houdini 20.5 production builds. Instead a stable nightly build is being used in this sample. Access to the nightly builds requires a Chaos account and allowlisting from their support team [reference](https://forums.chaos.com/forum/v-ray-for-houdini-forums/v-ray-for-houdini-general/1054830-nightly-build-access)
 2. Place the downloaded file in the `conda_recipes/archive_files` directory
 3. Verify the SHA256 hash matches: `98437785c3c88f6c9a837d76fd413a2ed79c8ba27901572a77ed8893e958229d`
 

@@ -2,9 +2,9 @@
 
 Grant the Deadline Cloud `job-user` passwordless sudo access on Linux service managed fleet workers.
 
-Some workloads require root privileges — for example, installing packages, mounting filesystems, or registering the worker as an SSM managed node. By default, `job-user` does not have sudo access.
+Some workloads require root privileges for tasks like installing packages or mounting filesystems. By default, `job-user` does not have sudo access.
 
-## What It Does
+## Sudoers Rule
 
 The script adds a sudoers rule that allows `job-user` to run any command as root without a password prompt. If `job-user` does not exist yet (e.g. the worker agent hasn't created it), the script logs a warning and exits successfully so it doesn't block fleet provisioning.
 

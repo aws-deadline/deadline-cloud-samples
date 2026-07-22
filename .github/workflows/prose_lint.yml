@@ -1,0 +1,76 @@
+name: Prose Lint
+
+# Lints the prose in Markdown docs with Vale (https://vale.sh) to hold a basic
+# writing bar and catch "AI slop" tells (em-dashes, formulaic transitions,
+# metacommentary, and so on). See .vale.ini for the enabled rules.
+#
+# On a pull request this runs ONLY over the Markdown files the PR changed, so
+# it never fails a PR for pre-existing issues in files it did not touch. Run it
+# locally over the whole repository with `vale sync && vale .`.
+
+on:
+  pull_request:
+    branches: ["mainline"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prose-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Vale is a standalone binary. Pin the version and the SHA-256 of the Linux
+  # x86_64 tarball so the download is reproducible and tamper-evident.
+  VALE_VERSION: "3.15.1"
+  VALE_SHA256: "c024d9c157874fb043d4f24a055d60050d1bb18755251f590593eed5bace1857"
+
+jobs:
+  prose-lint:
+    name: Vale
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Fetch the PR base commit too so we can diff against it.
+          fetch-depth: 0
+
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          url="https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl --fail --location --silent --show-error --output vale.tar.gz "$url"
+          echo "${VALE_SHA256}  vale.tar.gz" | sha256sum --check --status
+          tar -xzf vale.tar.gz vale
+          sudo mv vale /usr/local/bin/vale
+          rm vale.tar.gz
+          vale --version
+
+      - name: Download Vale style packages
+        run: vale sync
+
+      - name: Determine changed Markdown files
+        id: changed
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          base="origin/${BASE_REF}"
+          # List Markdown files added or modified relative to the merge base.
+          # Deleted files are excluded (nothing left to lint).
+          mapfile -t files < <(git diff --name-only --diff-filter=d "$base"...HEAD -- '*.md')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Markdown files changed; skipping."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          else
+            printf 'Changed Markdown files:\n'
+            printf '  %s\n' "${files[@]}"
+            echo "count=${#files[@]}" >> "$GITHUB_OUTPUT"
+            # NUL-safe list for the lint step.
+            printf '%s\0' "${files[@]}" > changed_md.txt
+          fi
+
+      - name: Run Vale on changed files
+        if: steps.changed.outputs.count != '0'
+        run: xargs -0 -a changed_md.txt vale

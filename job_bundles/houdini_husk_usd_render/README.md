@@ -61,30 +61,30 @@ To use the hook:
    deadline bundle submit job_bundles/houdini_husk_usd_render
    ```
 
-The hook will introspect the USD scene file specified in the `USDSceneFile` parameter, find all dependent files, and add them as input attachments automatically. It will also warn if no camera is found in the scene.
+The hook will read the USD scene file specified in the `USDSceneFile` parameter and find all dependent files, then add them as input attachments automatically. It will also warn if no camera is found in the scene.
 
 ### Legacy Script (generate_usd_job.py)
 
-Alternatively, you can use the included `generate_usd_job.py` script to manually generate a job bundle with pre-resolved dependencies. This requires both `usd-core` and `deadline` Python packages:
+Alternatively, you can use the included `generate_usd_job.py` script to manually generate a job bundle with pre-resolved dependencies. The script requires both `usd-core` and `deadline` Python packages:
 ```
 pip3 install usd-core deadline
 python3 generate_usd_job.py my_scene.usd
 ```
 This script will generate a new job bundle with job attachment references for required assets and open the submission UI.
 
-Please note that husk will not render your scene if no camera is included. Both the hook and the legacy script will warn you if this is the case.
+Please note that husk will not render your scene if no camera is included. Both the hook and the legacy script will warn you when the scene has no camera.
 
 Only a few husk parameters are included for demonstration purpose. Please see the [husk documentation](https://www.sidefx.com/docs/houdini/ref/utils/husk.html) for reference.
 
 
 ## Additional Renderers
 
-In addition to the default Karma renderers (BRAY_HdKarma and BRAY_HdKarmaXPU), this job bundle also supports V-Ray and Redshift renderers through their Hydra render delegates:
+Beyond the default Karma renderers (BRAY_HdKarma and BRAY_HdKarmaXPU), this job bundle also supports V-Ray and Redshift renderers through their Hydra render delegates:
 
 * **HdVRayRendererPlugin** - V-Ray for Houdini renderer
 * **HdRedshiftRendererPlugin** - Redshift for Houdini renderer
 
-To use these renderers, you must set up V-Ray for Houdini or Redshift for Houdini in your environment. One option to do this is by using the Conda sample recipes available in this repository:
+To use these renderers, you must set up V-Ray for Houdini or Redshift for Houdini in your environment. One option is to use the Conda sample recipes available in this repository:
 
 * **V-Ray 7 for Houdini:** [houdini-vray-7](../../conda_recipes/houdini-vray-7/)
 * **Redshift 2025 for Houdini:** [houdini-redshift-2025](../../conda_recipes/houdini-redshift-2025/)
@@ -99,4 +99,4 @@ sample.usda is a simple scene containing a cube and a sphere.
 This scene contains no external assets and can be rendered without
 using the `generate_usd_job.py` script or attaching any other files
 
-This work by the Deadline Cloud team is marked with [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/?ref=chooser-v1)
+The sample scene by the Deadline Cloud team is marked with [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/?ref=chooser-v1)

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a conda build recipe for Nuke DENoise 3.6.9, specifically configured for use with AWS Deadline Cloud. With this package you can use the DENoise plugin for noise reduction in Nuke compositing jobs on Deadline Cloud service-managed fleets.
+This directory contains a conda build recipe for Nuke DENoise 3.6.9, configured for use with AWS Deadline Cloud. With this package you can use the DENoise plugin for noise reduction in Nuke compositing jobs on Deadline Cloud service-managed fleets.
 
 ## Package Information
 
@@ -25,7 +25,7 @@ Before building this package, ensure you have:
 
 3. **Source archive** (see [Archive File Instructions](#archive-file-instructions) below)
 
-4. **Nuke conda package** as this is a plugin dependency
+4. **Nuke conda package**, which this plugin depends on
 
 ## Archive File Instructions
 
@@ -117,4 +117,4 @@ nuke-denoise/
 
 ---
 
-**Note**: This recipe is specifically configured for DENoise 3.6.9 as an OFX plugin for Nuke on Linux x86_64 platforms. The plugin requires a valid Nuke/Foundry license to function.
+This recipe is configured for DENoise 3.6.9 as an OFX plugin for Nuke on Linux x86_64 platforms. The plugin requires a valid Nuke/Foundry license to function.

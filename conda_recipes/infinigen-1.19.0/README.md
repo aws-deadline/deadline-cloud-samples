@@ -2,7 +2,7 @@
 
 ## Package contents
 
-This is a [rattler-build](http://rattler.build/) recipe for
+This directory holds a [rattler-build](http://rattler.build/) recipe for
 [Infinigen](https://infinigen.org/), a procedural 3D scene generator from
 Princeton Vision & Learning Lab. If you build this package, you can use it to
 generate photorealistic indoor and outdoor scenes with ground truth labels on
@@ -10,9 +10,9 @@ AWS Deadline Cloud.
 
 The package you build from this recipe will include the following:
 
-1. [Infinigen v1.19.0](https://github.com/princeton-vl/infinigen) — the
+1. [Infinigen v1.19.0](https://github.com/princeton-vl/infinigen): the
    procedural scene generation engine.
-2. [bpy 4.2.0](https://docs.blender.org/api/current/info_advanced_blender_as_bpy.html) —
+2. [bpy 4.2.0](https://docs.blender.org/api/current/info_advanced_blender_as_bpy.html):
    Blender as a Python module for headless rendering via Cycles. No standalone
    Blender installation is needed at runtime.
 3. Terrain C++ shared libraries (CPU + optional CUDA) compiled from
@@ -66,7 +66,7 @@ bundle for submitting scene generation jobs against the package built from
 this recipe.
 
 The job template's `CondaPackages` parameter defaults to
-`infinigen jinja2 pyyaml setuptools` — the extra packages are transitive
+`infinigen jinja2 pyyaml setuptools`. The extra packages are transitive
 dependencies that are not bundled in the conda package itself.
 
 ## Licensing
@@ -74,12 +74,12 @@ dependencies that are not bundled in the conda package itself.
 [Infinigen](https://github.com/princeton-vl/infinigen/blob/main/LICENSE) is
 distributed under the BSD-3-Clause license. The `bpy` Python module that
 Infinigen depends on at runtime is GPL-licensed (Blender). This recipe builds
-Infinigen from upstream source and pulls `bpy` from PyPI at install time —
-no GPL binaries are redistributed in this samples repository.
+Infinigen from upstream source and pulls `bpy` from PyPI at install time.
+No GPL binaries are redistributed in this samples repository.
 
 **Note on the package you build from this recipe:** the resulting conda
 package physically bundles `bpy` (and its Blender components), which are
-licensed under the **GNU GPL**. As a result, the built package artifact is
+licensed under the **GNU GPL**. The built package artifact is
 subject to GPL terms, even though its `license` metadata records
 `BSD-3-Clause` (which reflects Infinigen's own source license only). Building
 and using the package to render is unrestricted; however, if you redistribute
@@ -97,16 +97,16 @@ legal/open-source guidance before redistributing.
 - Nature scenes without `simple.gin` take 30-60+ minutes due to full asset
   generation.
 - The intermediate `.blend` files show placeholder bounding boxes in the
-  Blender viewport — this is by design. Full geometry is only generated
+  Blender viewport, which is by design. Full geometry is only generated
   during the Cycles render pass.
 
 ## Contributing this package recipe to conda-forge
 
-Both Infinigen and `bpy` are open source. Infinigen and several of its
+Both Infinigen and `bpy` are open source. Infinigen and its
 dependencies are good candidates to contribute as conda package recipes to
 [conda-forge](https://conda-forge.org/). See the
 [conda-forge documentation about contributing packages](https://conda-forge.org/docs/maintainer/adding_pkgs/)
 to learn more about the process. The recipe provided here is a good starting
-point, but is not ready to contribute as-is — recipes in conda-forge
+point, but is not ready to contribute as-is. Recipes in conda-forge
 feedstocks must follow stricter conventions to inter-operate with the full
 set of conda-forge packages.

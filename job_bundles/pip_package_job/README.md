@@ -2,12 +2,12 @@
 
 This job bundle demonstrates providing a job's Python dependencies with
 [pip](https://pip.pypa.io/) through a **queue environment**. The job itself only
-declares the `PipPackages`, `PipIndexUrl`, and `PipExtraIndexUrls` parameters —
-the [`pip_queue_env.yaml`](../../queue_environments/pip_queue_env.yaml) queue
+declares the `PipPackages`, `PipIndexUrl`, and `PipExtraIndexUrls` parameters.
+The [`pip_queue_env.yaml`](../../queue_environments/pip_queue_env.yaml) queue
 environment reads those parameters, builds a Python virtual environment, installs
 the packages, and puts the environment on the `PATH` before the step runs.
 
-This is the pip analogue of the Conda samples that pass `CondaPackages` to a
+This bundle is the pip analogue of the Conda samples that pass `CondaPackages` to a
 Conda queue environment (see [`monte_carlo_simulation`](../monte_carlo_simulation)).
 Use this style when you want to define the pip environment once and share it
 across many jobs on a queue.

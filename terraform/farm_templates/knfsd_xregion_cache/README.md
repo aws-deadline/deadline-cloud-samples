@@ -7,8 +7,8 @@ This Terraform configuration deploys an [AWS Deadline Cloud](https://aws.amazon.
 [KNFSD](https://github.com/awslabs/knfsd-file-cache) read cache**, connected with a
 [VPC resource endpoint](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-vpc.html).
 
-The filer — an [Amazon FSx for OpenZFS](https://docs.aws.amazon.com/fsx/latest/OpenZFSGuide/what-is-fsx.html)
-file system — is deployed in a **second AWS region** and reached over a VPC peering
+The filer, an [Amazon FSx for OpenZFS](https://docs.aws.amazon.com/fsx/latest/OpenZFSGuide/what-is-fsx.html)
+file system, is deployed in a **second AWS region** and reached over a VPC peering
 connection. That cross-region distance stands in for an **on-premises or otherwise-distant
 filer**, and is what makes a cache worth having: cache misses pay cross-region latency and
 inter-region data-transfer cost, while cache hits are served from the KNFSD proxy's RAM and
@@ -29,12 +29,12 @@ local NVMe next to the workers.
  +-----------------------------+                      +----------------------+
 ```
 
-> **When is this pattern worth it?** KNFSD earns its place when the origin is **distant or
-> bandwidth-limited** (on-premises, cross-region, or a throughput-capped filer) **and** many
+> **When is this pattern worth it?** KNFSD helps when the origin is **distant or
+> bandwidth-limited** (on-premises, cross-region, or a throughput-capped filer) and many
 > workers repeatedly read the same data (render/simulation asset libraries). For a filer in
-> the *same* region and AZ as the fleet, a cache adds a hop for little benefit — mount the
-> file system directly instead. This sample deploys cross-region specifically so the cache has
-> something to do; it is the reproducible stand-in for the on-premises case you cannot ship in
+> the *same* region and AZ as the fleet, a cache adds a hop for little benefit, so mount the
+> file system directly instead. This sample deploys cross-region so the cache has
+> something to do. It is the reproducible stand-in for the on-premises case you cannot include in
 > a repository.
 
 ## Prerequisites
@@ -43,8 +43,8 @@ local NVMe next to the workers.
    KNFSD module from GitHub during `terraform init`).
 2. AWS credentials for an account where Deadline Cloud is available, with permissions across
    **both** the compute and origin regions.
-3. [Packer](https://www.packer.io/) to build the KNFSD proxy AMI (see Setup step 1). There is
-   no public or managed KNFSD AMI.
+3. [Packer](https://www.packer.io/) to build the KNFSD proxy AMI (see Setup step 1). No
+   public or managed KNFSD AMI exists.
 4. The [`deadline` CLI](https://pypi.org/project/deadline/) (`pip install deadline`) to submit
    the seed and benchmark jobs.
 5. A Deadline Cloud monitor to view jobs (optional but recommended); see the
@@ -69,18 +69,18 @@ region across a VPC peering connection.
 | `awscc_deadline_farm` / `awscc_deadline_queue` / `awscc_deadline_fleet` / `awscc_deadline_queue_fleet_association` | A | The Deadline Cloud farm, queue, and SMF |
 | `aws_iam_role` (x2) + policies | A | Fleet and queue roles (see Troubleshooting for the required logs permission) |
 
-Some behaviors are load-bearing and easy to get wrong:
+Some behaviors are critical and easy to get wrong:
 
 - **The fleet role must grant `logs:CreateLogStream`** (plus `PutLogEvents` / `GetLogEvents`)
   scoped to `/aws/deadline/<farmId>/*`. Without it, SMF workers register but the agent cannot
   create its log stream, so workers get stuck in `CREATED`, never run jobs, and emit no logs.
-  The `AWSDeadlineCloud-FleetWorker` managed policy does **not** include CloudWatch Logs. This
+  The `AWSDeadlineCloud-FleetWorker` managed policy does not include CloudWatch Logs. This
   sample adds the inline policy, mirroring the
   [starter-farm fleet role](../../../cloudformation/farm_templates/starter_farm/deadline-cloud-starter-farm-template.yaml).
 - **Workers reach the share via a Deadline-managed name**, not the KNFSD or FSx DNS name:
   `<resource_config_id>.resource-endpoints.deadline.<region>.amazonaws.com`.
 - **KNFSD re-exports the origin's export path verbatim.** FSx for OpenZFS exports `/fsx`, so
-  workers mount `<endpoint>:/fsx` — mounting `/` returns `access denied by server`.
+  workers mount `<endpoint>:/fsx`. Mounting `/` returns `access denied by server`.
 - **Cross-region wiring:** KNFSD points at the FSx file system's **private IP** (the primary
   network interface's IP; `endpoint_ip_address` is only populated for Multi-AZ deployments) and
   reads over the peering link, because the FSx private DNS name does not resolve across regions.
@@ -137,8 +137,8 @@ The cache's value shows up in three ways; measure at least the first two:
 
 1. **Origin offload (the clearest signal).** In CloudWatch, watch the FSx origin's
    `DataReadBytes` as you increase `FanoutTasks`. With the cache, origin reads stay **flat**
-   after the working set is warm — the fleet's read fan-out is absorbed by KNFSD, not paid
-   cross-region every time.
+   after the working set is warm, because KNFSD absorbs the fleet's read fan-out instead of
+   paying cross-region every time.
 2. **Cold versus warm.** The first benchmark run (or first task on a fresh KNFSD node) pays
    cross-region misses; re-running reads the same files from cache. Compare `throughput_MiBps`
    and `seconds` in the task logs between the cold and warm runs.
@@ -157,14 +157,14 @@ reads over the shared library):
 
 - **Per-task read throughput (cold to warm):** the first task to touch the working set ran at
   about **19 MiB/s** (paying cross-region latency on every miss); once the set was warm in
-  KNFSD, tasks ran at about **230-600 MiB/s** — roughly a **13x-30x speedup** on the cached path.
+  KNFSD, tasks ran at about **230-600 MiB/s**, roughly a **13x-30x speedup** on the cached path.
 - **Origin offload:** during the benchmark window the FSx origin in `us-east-1` served about
   **0 MiB** of `DataReadBytes` while the fleet read 38.4 GiB, because KNFSD absorbed the fan-out
   from its RAM and NVMe cache.
 
 Your numbers will vary with region pair, instance type, working-set size, and fan-out width.
 The point is the *shape*: cold reads are slow and hit the distant origin; warm reads are fast
-and local, and the origin stays quiet.
+and local, and the origin serves almost no reads.
 
 ## Parameters and outputs
 
@@ -187,7 +187,7 @@ NLB address, and the worker-facing `worker_resource_endpoint_dns_name`.
 
 ## Security, cost, and cleanup
 
-This is an **advanced** sample and is not free to run: two regions, two VPCs with NAT gateways,
+This sample is **advanced** and is not free to run: two regions, two VPCs with NAT gateways,
 a cross-region peering connection, an FSx for OpenZFS file system, a KNFSD EC2 instance
 (`i3en`/`i4i` for local NVMe), a Network Load Balancer, VPC Lattice, **and inter-region data
 transfer** for every cache miss.
@@ -219,4 +219,4 @@ endpoint association is still releasing; re-run `terraform destroy` once and it 
 - [Connect VPC resources to your SMF with VPC resource endpoints](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/smf-vpc.html)
 - [CloudFormation `smf_vpc_fsx` reference](../../../cloudformation/farm_templates/smf_vpc_fsx/)
 - [Terraform starter farm](../starter_farm/)
-- [KNFSD (awslabs/knfsd-file-cache)](https://github.com/awslabs/knfsd-file-cache) — Apache-2.0, referenced here and not vendored
+- [KNFSD (awslabs/knfsd-file-cache)](https://github.com/awslabs/knfsd-file-cache): Apache-2.0, referenced here and not vendored

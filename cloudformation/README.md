@@ -4,7 +4,7 @@ With [AWS CloudFormation](https://aws.amazon.com/cloudformation/), you can deplo
 
 ## Sample index
 
-This table covers all deployable leaf samples below `cloudformation/`. The two subcategory READMEs provide the same samples grouped by purpose.
+This table covers all deployable leaf samples below `cloudformation/`. The subcategory READMEs provide the same samples grouped by purpose.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|

@@ -16,7 +16,7 @@ This job takes a directory of sequentially numbered image files and encodes them
 
 The job needs FFmpeg to run. On Deadline Cloud service-managed fleets, use `conda-forge` as the `CondaChannels` parameter for a [conda queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/provide-applications.html). FFmpeg is available from the [conda-forge](https://anaconda.org/conda-forge/ffmpeg) community channel.
 
-> **Note:** FFmpeg is **not** available from the `deadline-cloud` conda channel. You must use `conda-forge`.
+> FFmpeg is not available from the `deadline-cloud` conda channel. You must use `conda-forge`.
 
 ## Example submission
 

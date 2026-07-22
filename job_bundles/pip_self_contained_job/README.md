@@ -14,7 +14,7 @@ see the [`pip_package_job`](../pip_package_job) sample and the
 [`pip_queue_env.yaml`](../../queue_environments/pip_queue_env.yaml) queue
 environment instead.
 
-This is the pip analogue of an inline job environment; compare it with the
+This sample is the pip analogue of an inline job environment. Compare it with the
 [`job_env_with_new_command`](../job_env_with_new_command) sample.
 
 ## Prerequisites

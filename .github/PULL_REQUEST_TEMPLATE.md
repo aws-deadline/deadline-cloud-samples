@@ -8,12 +8,12 @@ Fixes: *<insert link to GitHub issue here>*
 
 ### How was this change tested?
 
-- If this is a sample, then please describe the steps that you took to test it.
+- If the change is a sample, then please describe the steps that you took to test it.
 - Include output from your testing to demonstrate it working as expected if possible.
 
 ### Was this change documented?
 
-- For instance, if applicable, has the sample's description been updated?
+- If applicable, has the sample's description been updated?
 
 ---
 

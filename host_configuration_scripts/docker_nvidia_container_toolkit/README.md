@@ -4,11 +4,11 @@ Install Docker and the NVIDIA Container Toolkit on Linux service managed fleet w
 
 ## Why Docker on Deadline Cloud Workers?
 
-Many GPU workloads ship as container images — ComfyUI, Stable Diffusion inference servers, custom ML pipelines, etc. Running these on Deadline Cloud workers requires Docker with GPU passthrough. This host config script sets everything up so jobs can `docker run` GPU containers directly.
+Many GPU workloads are distributed as container images, such as ComfyUI, Stable Diffusion inference servers, and custom ML pipelines. Running these on Deadline Cloud workers requires Docker with GPU passthrough. This host config script sets everything up so jobs can `docker run` GPU containers directly.
 
 Containers also provide a clean way to package complex dependency stacks (CUDA, Python, application-specific libraries) without polluting the host or conflicting with other jobs on the same fleet.
 
-## What It Does
+## Installation steps
 
 1. Installs Docker via `dnf` and starts the service
 2. Adds `job-user` to the `docker` group so jobs can run containers without sudo
@@ -34,7 +34,7 @@ New fleet instances will automatically install Docker and the NVIDIA Container T
 
 ## Example: Running a GPU Container from a Job
 
-Once the host config has run, jobs can launch GPU containers. Here's an example running ComfyUI with GPU access, host networking, and license environment variables passed through:
+Once the host config has run, jobs can launch GPU containers. This example runs ComfyUI with GPU access and host networking, passing through license environment variables:
 
 ```bash
 docker run --rm \
@@ -54,9 +54,9 @@ docker run --rm \
 ```
 
 Key flags:
-- `--runtime=nvidia --gpus all` — passes the GPU through to the container
-- `--network host` — uses the host network stack (required for license servers and service discovery)
-- `-e VAR` — passes the environment variable from the worker into the container (when used without `=value`, Docker forwards the host's current value)
+- `--runtime=nvidia --gpus all`: passes the GPU through to the container
+- `--network host`: uses the host network stack (required for license servers and service discovery)
+- `-e VAR`: passes the environment variable from the worker into the container (when used without `=value`, Docker forwards the host's current value)
 
 ### License Environment Variables
 

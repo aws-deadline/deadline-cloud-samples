@@ -4,7 +4,7 @@
 
 This job bundle downloads the rendered output of another completed job in the same queue
 and uses FFmpeg to encode the image sequence into an MP4 video file. It is useful as a
-post-processing utility — for example, after a Blender or Maya render job completes, you
+post-processing utility. After a Blender or Maya render job completes, you
 can submit this job to automatically assemble the frames into a movie.
 
 See also [ffmpeg_encode_video](../ffmpeg_encode_video) for a simpler sample that encodes

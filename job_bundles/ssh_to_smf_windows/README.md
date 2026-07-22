@@ -2,9 +2,9 @@
 
 Register a **Windows** Deadline Cloud worker as an SSM hybrid managed node, enabling RDP, SSH, or PowerShell access via Session Manager for the duration of the job.
 
-This is the Windows sibling of [`ssh_to_smf`](../ssh_to_smf/README.md). The Linux version registers a Linux worker via bash + `ssm-setup-cli` (Linux amd64). This Windows version re-uses the **pre-installed** `amazon-ssm-agent.exe` shipped on the Deadline Cloud Windows AMI and re-registers it as a hybrid node.
+This bundle is the Windows sibling of [`ssh_to_smf`](../ssh_to_smf/README.md). The Linux version registers a Linux worker via bash + `ssm-setup-cli` (Linux amd64). This Windows version re-uses the **pre-installed** `amazon-ssm-agent.exe` that comes on the Deadline Cloud Windows AMI and re-registers it as a hybrid node.
 
-> **Security note.** The RDP user is a local Administrator, and `job-user` is also made a local Administrator so the job can control the SSM service and the elevated task. Use this host config and job bundle for debugging purposes, not for production. Shut down all workers in this fleet once debugging is done — do not leave an RDP-capable instance running.
+> **Security note.** The RDP user is a local Administrator, and `job-user` is also made a local Administrator so the job can control the SSM service and the elevated task. Use this host config and job bundle for debugging purposes, not for production. Shut down all workers in this fleet once debugging is done. Do not leave an RDP-capable instance running.
 
 ## How It Works
 
@@ -14,7 +14,7 @@ This is the Windows sibling of [`ssh_to_smf`](../ssh_to_smf/README.md). The Linu
    2. Run `amazon-ssm-agent.exe -register -clear` to wipe the EC2 identity,
    3. Run `amazon-ssm-agent.exe -register -code <...> -id <...> -region <...>` with the hybrid activation,
    4. Reinstall the Windows service (the `-register` codepath on the Deadline AMI removes it),
-   5. Start `AmazonSSMAgent` — it now comes up as a hybrid `mi-*` node.
+   5. Start `AmazonSSMAgent`. It now comes up as a hybrid `mi-*` node.
 3. The job prints the `mi-*` managed node ID to the log.
 4. You connect with `aws ssm start-session --target mi-XXXXXXXXX` (shell, RDP port-forward, or SSH-over-SSM).
 5. After the configured session duration, the job deregisters the node and cleans up.
@@ -25,7 +25,7 @@ This is the Windows sibling of [`ssh_to_smf`](../ssh_to_smf/README.md). The Linu
 
 ## One-Time Account Setup
 
-Identical to the Linux bundle (`ssh_to_smf`) — do it once per account/region.
+Identical to the Linux bundle (`ssh_to_smf`). Do it once per account/region.
 
 ### 1. Create the SSM IAM Role
 
@@ -57,15 +57,15 @@ aws ssm update-service-setting \
 
 - Outbound HTTPS from the worker VPC to `ssm.<region>.amazonaws.com`, `ssmmessages.<region>.amazonaws.com`, `ec2messages.<region>.amazonaws.com`.
 - The submitter needs `ssm:CreateActivation` IAM permissions.
-- The fleet uses the pre-installed SSM Agent (`C:\Program Files\Amazon\SSM\amazon-ssm-agent.exe`), which ships on the Deadline Cloud service-managed Windows AMI.
+- The fleet uses the pre-installed SSM Agent (`C:\Program Files\Amazon\SSM\amazon-ssm-agent.exe`), which comes on the Deadline Cloud service-managed Windows AMI.
 
 ## Deadline Fleet Host Configuration
 
-Unlike a workstation-style "run this on each host" setup, this bundle relies on a **Deadline Cloud fleet host configuration script** (`setup/host_config.ps1`). That script is uploaded to the fleet once; Deadline then runs it **as Administrator on every fresh worker** before the worker takes any jobs.
+Unlike a workstation-style "run this on each host" setup, this bundle relies on a **Deadline Cloud fleet host configuration script** (`setup/host_config.ps1`). That script is uploaded to the fleet once. Deadline then runs it **as Administrator on every fresh worker** before the worker takes any jobs.
 
 ### What `setup/host_config.ps1` does
 
-- Creates a local user (default name `RDP`, password `ChangeMe2026!!@@##`) in the `Administrators` and `Remote Desktop Users` groups. Idempotent — rotates the password if the user already exists.
+- Creates a local user (default name `RDP`, password `ChangeMe2026!!@@##`) in the `Administrators` and `Remote Desktop Users` groups. Idempotent: rotates the password if the user already exists.
 - Disables the UAC consent prompt (`ConsentPromptBehaviorAdmin = 0`) so scripted admin actions do not block on a prompt.
 - Enables RDP (`fDenyTSConnections = 0`), enables the Remote Desktop firewall rule group, and sets `TermService` to Automatic + Running.
 - Adds the Deadline worker service account `job-user` to `Administrators` (needed so the job can trigger the elevated scheduled task and own the eventual RDP/PowerShell session).
@@ -73,7 +73,7 @@ Unlike a workstation-style "run this on each host" setup, this bundle relies on 
 
 ### Deploying the host config to a fleet
 
-Pick one of the following — they are equivalent.
+Pick one of the following. They are equivalent.
 
 #### Option A: Deadline Cloud console
 
@@ -117,13 +117,13 @@ aws deadline update-fleet \
   --min-worker-count 1 --max-worker-count 1
 ```
 
-The script is idempotent — re-running it rotates the RDP password and skips anything that is already configured.
+The script is idempotent: re-running it rotates the RDP password and skips anything that is already configured.
 
 ## Usage
 
 ### Submit a Job
 
-The bundle ships both a bash and a PowerShell submitter — use whichever matches your submitting OS.
+The bundle includes both a bash and a PowerShell submitter. Use whichever matches your submitting OS.
 
 **Linux / macOS:**
 
@@ -162,7 +162,7 @@ The bundle ships both a bash and a PowerShell submitter — use whichever matche
 
 ### Connect to the Worker
 
-Once the job is running, find the managed node ID in the Deadline Cloud job log — look for `SSM Managed Node ID: mi-XXXXXXXXX`.
+Once the job is running, find the managed node ID in the Deadline Cloud job log. Look for `SSM Managed Node ID: mi-XXXXXXXXX`.
 
 Verify the node is reachable before attempting to connect:
 
@@ -209,7 +209,7 @@ Log in as the RDP user configured in `host_config.ps1` (default: username `RDP`,
 Set-LocalUser -Name job-user -Password (ConvertTo-SecureString -AsPlainText -Force 'ChangeMe2026!!@@##')
 ```
 
-Pick your own password — the one above is a placeholder. You can now disconnect and reconnect via `mstsc /v:localhost:13389` as `job-user` with that password.
+Pick your own password. The one above is a placeholder. You can now disconnect and reconnect via `mstsc /v:localhost:13389` as `job-user` with that password.
 
 #### SSH over Session Manager
 
@@ -258,12 +258,12 @@ Submitting against a queue that has no Windows workers will simply leave the job
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Nonexistent role or missing ssm service principal` | `SSMServiceRole` doesn't exist | Run the IAM role creation commands above |
-| Host config log: `Finished running Host Configuration Script, exit code: 1` with all steps visibly succeeding | `Set-StrictMode` + `Format-Table` in PS 5.1 can leak a non-zero `$LASTEXITCODE` | `setup/host_config.ps1` already handles this with an explicit `exit 0` at the end — if you edit the script, keep that terminator |
+| Host config log: `Finished running Host Configuration Script, exit code: 1` with all steps visibly succeeding | `Set-StrictMode` + `Format-Table` in PS 5.1 can leak a non-zero `$LASTEXITCODE` | `setup/host_config.ps1` already handles this with an explicit `exit 0` at the end. If you edit the script, keep that terminator |
 | Job log: `flag provided but not defined: -y` | Older template was calling `ssm-setup-cli.exe -y` | This bundle no longer uses `ssm-setup-cli`. Make sure you submitted the current `job/template.yaml` |
-| Job log: `Please run as root/admin. Err: binary needs to be executed by administrator` | Trying to run `amazon-ssm-agent.exe -register` directly as `job-user` (UAC-filtered admin token) | Make sure the `DeadlineSsmElevated` scheduled task is installed — re-run the fleet host config |
+| Job log: `Please run as root/admin. Err: binary needs to be executed by administrator` | Trying to run `amazon-ssm-agent.exe -register` directly as `job-user` (UAC-filtered admin token) | Make sure the `DeadlineSsmElevated` scheduled task is installed. Re-run the fleet host config |
 | Job log: `ERROR Registration failed ... RegistrationLimitExceeded` | Deadline retried the job and consumed all registration slots on the activation | Increase `--registration-limit` in `submit.sh` / `submit.ps1`, or reduce the job's retry count |
 | Job log: `AmazonSSMAgent service not present` | `amazon-ssm-agent.exe -register` removed the Windows service on this AMI flavor | The template reinstalls it via `sc.exe create`; no action needed |
-| Job log: `Could not extract mi-<hex> ID from elevated output or registration file` | PowerShell 5.1 captured `*>>` output is UTF-16 with null bytes that break regex | The template already strips null bytes before regex — re-submit with the current `job/template.yaml` |
+| Job log: `Could not extract mi-<hex> ID from elevated output or registration file` | PowerShell 5.1 captured `*>>` output is UTF-16 with null bytes that break regex | The template already strips null bytes before regex. Re-submit with the current `job/template.yaml` |
 | `aws ssm start-session` returns `TargetNotConnected` | Managed node hasn't finished registering, or the agent isn't running | Wait ~30s after `SSM Managed Node ID:` appears; verify with `aws ssm describe-instance-information --filters Key=InstanceIds,Values=mi-...` |
 | Reachability check in job log: `FAIL ssm.<region>.amazonaws.com:443` | VPC has no outbound HTTPS to the SSM endpoints | Add a NAT gateway, or attach SSM VPC interface endpoints (`com.amazonaws.<region>.ssm`, `.ssmmessages`, `.ec2messages`) |
 | `mstsc` connection refused on port 13389 | The port-forward isn't up, or RDP isn't listening on the worker | Confirm `setup/host_config.ps1` ran successfully on this worker; check CloudWatch `/aws/deadline/{farm}/{fleet}` stream `worker-*` for host-config errors |
@@ -284,5 +284,5 @@ Push a new host-config via `aws deadline update-fleet --host-configuration file:
 
 ## See Also
 
-- [`ssh_to_smf`](../ssh_to_smf/README.md) — the Linux version this bundle is cloned from
-- [Linux sibling design reference](../ssh_to_smf/DESIGN.md) — background for the shared SSM activation pattern
+- [`ssh_to_smf`](../ssh_to_smf/README.md): the Linux version this bundle is cloned from
+- [Linux sibling design reference](../ssh_to_smf/DESIGN.md): background for the shared SSM activation pattern

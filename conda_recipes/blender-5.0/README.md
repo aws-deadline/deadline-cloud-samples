@@ -1,6 +1,6 @@
 # Blender 5.0 Conda Recipe for AWS Deadline Cloud
 
-This directory contains a conda build recipe for Blender 5.0, specifically configured for use with AWS Deadline Cloud.
+This directory contains a conda build recipe for Blender 5.0, configured for use with AWS Deadline Cloud.
 
 ## Package Information
 
@@ -91,7 +91,7 @@ Modify the deactivate script to run the uninstall script too.
 ```
 
 If you decide to make a separate conda package for your addon and you're addon requires any additional Python dependencies, place them in a known location in your $INSTALL_DIR.
-Have the activate script move them into Blender's Python. Likewise, change the deactivate to remove them. This way, you can make use of the environment variables that this recipe 
+Have the activate script move them into Blender's Python. Change the deactivate script to remove them again. This way, you can make use of the environment variables that this recipe 
 sets for the location of Blender and it's Python.
 
 ### Examples Blender Addons

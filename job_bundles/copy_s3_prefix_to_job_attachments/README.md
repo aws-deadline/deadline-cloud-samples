@@ -2,11 +2,10 @@
 
 ## Use case for this job
 
-With AWS Deadline Cloud job attachments, you can attach files and directories to the jobs you submit, and that
-data gets uploaded to the job attachments S3 bucket that is configured on your queue. Any files that were already uploaded
-do not need to be uploaded again. If you are adding a Deadline Cloud farm to a project that already has a large
-volume of data, or are submitting a job that depends on a lot of new data like a fluid simulation output, there
-can be a longer wait for the job attachments upload.
+With AWS Deadline Cloud job attachments, you can attach files and directories to the jobs you submit. That
+data gets uploaded to the job attachments S3 bucket that is configured on your queue. Files that were already uploaded
+do not need to be uploaded again. The job attachments upload can take longer when you add a Deadline Cloud farm to a project that already has a large
+volume of data, or when you submit a job that depends on a lot of new data like a fluid simulation output.
 
 Because job attachments never re-uploads files that are already in job attachments, you can use alternative
 upload tools like [AWS Snowball](https://aws.amazon.com/snowball/) or
@@ -75,7 +74,7 @@ a summary of the API calls this job will make:
         1. An s3:HeadObject to read the POSIX mtime Metadata.
     4. An s3:HeadObject to determine whether the object is already in the Job Attachments bucket.
     5. If the object is not in the Job Attachments bucket:
-        1. Various of s3:CopyObject, s3:HeadObject, s3:CreateMultipartUpload, s3:ListParts,
+        1. A combination of s3:CopyObject, s3:HeadObject, s3:CreateMultipartUpload, s3:ListParts,
            s3:UploadPartCopy, etc. as necessary to transfer the object as a single or multiple part copy.
 3. An s3:PutObject to write a manifest file for all the objects in the specified prefix.
 

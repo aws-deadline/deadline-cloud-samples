@@ -26,7 +26,7 @@ videos plus a stitched grid video.
 1. An [AWS account](https://aws.amazon.com/resources/create-account/) with access to GPU instances (g6.4xlarge recommended).
 2. A Deadline Cloud farm with:
    - A queue with a Conda queue environment (channels: `conda-forge`, packages: `ffmpeg`)
-   - A GPU fleet (minimum: 1 NVIDIA GPU, 16 vCPU, 64 GiB memory)
+   - A GPU fleet (minimum: 1 NVIDIA GPU with 16 vCPU and 64 GiB memory)
 3. [Docker](https://docs.docker.com/get-docker/) installed locally for building the CARLA image.
 4. An [Amazon ECR](https://aws.amazon.com/ecr/) repository in your account to host the built image.
 5. The [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) installed locally.
@@ -60,7 +60,7 @@ host configuration script to your fleet. See its
 ## Building the Docker Image
 
 The job runs inside a Docker container based on [`carlasim/carla:0.9.16`](https://hub.docker.com/r/carlasim/carla).
-The base CARLA image ships the simulator but lacks the Python environment, scenario runner,
+The base CARLA image includes the simulator but lacks the Python environment, scenario runner,
 and sensor capture scripts needed for this job. The custom image layers on Python 3.10,
 `scenario_runner`, and the entrypoint/capture scripts so each Deadline Cloud task can
 boot CARLA, execute the driving scenario, and record sensor data in a single container.
@@ -74,7 +74,7 @@ boot CARLA, execute the driving scenario, and record sensor data in a single con
        cd docker/
        docker build -t carla-deadline:0.9.16 .
 
-   > **Note:** The Dockerfile pulls `carlasim/carla:0.9.16` from Docker Hub as the base image.
+   > The Dockerfile pulls `carlasim/carla:0.9.16` from Docker Hub as the base image.
    > The first build will download ~8 GB.
 
 3. **Push to ECR:**
@@ -96,9 +96,9 @@ From the bundle directory:
 
 In the **Job-specific settings** tab:
 
-1. **Scenario Settings** — Configure ego speeds, NPC speeds, and NPC distances (comma-separated integers). The cross-product creates your task grid.
-2. **Camera Viewpoints** — Select which cameras to capture (Front is enabled by default). Available positions: Front, Front Left, Front Right, Rear, Rear Left, Rear Right.
-3. **Advanced** — Set your Container Image URI to `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16` and the AWS Region where your ECR lives.
+1. **Scenario Settings**: Configure ego speeds, NPC speeds and NPC distances (comma-separated integers). The cross-product creates your task grid.
+2. **Camera Viewpoints**. Select which cameras to capture (Front is enabled by default). Available positions: Front, Front Left, Front Right, Rear, Rear Left, Rear Right.
+3. **Advanced**: Set your Container Image URI to `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/carla-deadline:0.9.16` and the AWS Region where your ECR lives.
 
 Alternatively, submit via CLI:
 
@@ -148,7 +148,7 @@ The `docker/` directory contains the files needed to build the image:
 | File | Purpose |
 |------|---------|
 | `Dockerfile` | Builds the CARLA + scenario_runner + multi-sensor capture image |
-| `entrypoint.sh` | Container entrypoint: boots CARLA, runs scenario, captures sensors |
+| `entrypoint.sh` | Container entrypoint that boots CARLA and runs the scenario to capture sensors |
 | `capture_sensors.py` | Multi-sensor capture with configurable camera selection via `CAMERAS` env var |
 
 ## Known Limitations
@@ -156,4 +156,4 @@ The `docker/` directory contains the files needed to build the image:
 - **Linux only**: The CARLA Docker image requires a Linux host with NVIDIA GPU drivers. Workers must run on Linux fleets.
 - **x86_64 only**: The CARLA Docker image does not support ARM architectures.
 - **Mosaic images**: RGB/semantic mosaic images are generated when 2 or more cameras are selected. The layout is 2×3 when all 6 are active, or a smaller grid otherwise.
-- **Capture rate scales with camera count**: The capture script writes PNGs synchronously per flush. Each flush writes one RGB and one semantic-segmentation frame per selected camera, plus an RGB mosaic and a semantic mosaic whenever 2+ cameras are enabled. With all 6 cameras that's 14 PNG writes per frame set vs 2 with a single camera, and the increased I/O slows flushes well below the 7 FPS target. The video encoder is fixed at 7 FPS, so the same 7-minute scenario produces a longer per-camera video with few cameras enabled and a shorter, denser multi-view video with many cameras enabled. This synchronous design is a deliberate tradeoff to keep this proof-of-concept sample's architecture small and easy to adapt — a production pipeline would parallelize sensor I/O.
+- **Capture rate scales with camera count**. The capture script writes PNGs synchronously per flush. Each flush writes one RGB and one semantic-segmentation frame per selected camera, plus an RGB mosaic and a semantic mosaic whenever 2+ cameras are enabled. With all 6 cameras that's 14 PNG writes per frame set vs 2 with a single camera, and the increased I/O slows flushes well below the 7 FPS target. The video encoder is fixed at 7 FPS, so the same 7-minute scenario produces a longer per-camera video with few cameras enabled and a shorter, denser multi-view video with many cameras enabled. This synchronous design is a deliberate tradeoff to keep this proof-of-concept sample's architecture small and easy to adapt. A production pipeline would parallelize sensor I/O.

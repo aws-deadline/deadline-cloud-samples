@@ -2,9 +2,9 @@
 
 ## Overview
 
-This Terraform configuration deploys an [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/) farm you can use to run jobs that render images, reconstruct 3D scenes, or transform your data in custom ways. This is the Terraform equivalent of the [CloudFormation starter_farm template](../../../cloudformation/farm_templates/starter_farm/).
+This Terraform configuration deploys an [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/) farm you can use to run jobs such as rendering images and reconstructing 3D scenes, or transforming your data in custom ways. It is the Terraform equivalent of the [CloudFormation starter_farm template](../../../cloudformation/farm_templates/starter_farm/).
 
-Sample jobs to submit are available in the [deadline-cloud-samples on GitHub](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles#readme), Deadline Cloud provides many [integrated submitter plugins for applications](https://github.com/aws-deadline/#integrations), and you can [build your own jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/building-jobs.html).
+Sample jobs to submit are available in the [deadline-cloud-samples on GitHub](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles#readme). Deadline Cloud provides many [integrated submitter plugins for applications](https://github.com/aws-deadline/#integrations), and you can [build your own jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/building-jobs.html).
 
 The deployed farm includes one or more [service-managed fleets](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/smf-manage.html) that you select during deployment. The production queue supports Conda virtual environments for the applications that jobs need, and the package build queue can be used to build more packages if needed.
 
@@ -142,7 +142,7 @@ This test job runs the `imagemagick identify` command on a directory of images t
    find . -type f -iname "*.png" -exec magick identify {} \; | tee identified_images.txt
    ```
 6. Select "Submit" and accept any prompts to submit the job to your queue.
-7. From Deadline Cloud monitor, navigate to the production queue to watch the job you submitted. When it is running, right click on the task and select "View logs". It may take several minutes as Deadline Cloud starts an instance in your fleet to run the job. Within the log, you can find output that is similar to:
+7. From Deadline Cloud monitor, navigate to the production queue to watch the job you submitted. When it is running, right click on the task and select "View logs". It may take a few minutes as Deadline Cloud starts an instance in your fleet to run the job. Within the log, you can find output that is similar to:
    ```
    + find . -type f -iname '*.png' -exec magick identify '{}' ';'
    + tee identified_images.txt
@@ -190,19 +190,25 @@ Run the submitter installer in the downloads section of the [AWS Deadline Cloud 
 
 ### Select fleets to deploy
 
-By deploying fleets with multiple different hardware configurations, you can create a farm that supports a wide variety of jobs. The starter farm Terraform configuration comes with three different fleet configurations: a CPU Linux fleet, a CPU Windows fleet, and a CUDA Linux fleet. Each fleet that you name will be deployed, and if you set its name to be empty, it will be skipped.
+By deploying fleets with multiple different hardware configurations, you can create a farm that supports a wide variety of jobs. The starter farm Terraform configuration comes with these fleet configurations:
 
-When different steps of your jobs have different requirements, you can edit your job template to have [`hostRequirements`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#33-hostrequirements) that control the operating system, memory requirements, or whether a GPU is available for each step.
+- a CPU Linux fleet
+- a CPU Windows fleet
+- a CUDA Linux fleet
+
+Each fleet that you name will be deployed. If you set its name to be empty, it will be skipped.
+
+When different steps of your jobs have different requirements, you can edit your job template to have [`hostRequirements`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#33-hostrequirements) for each step. These control the operating system and memory requirements, along with whether a GPU is available.
 
 ### Customize the Terraform variables
 
-Each fleet has variables to control the maximum number of workers, whether to use spot or on-demand instances, and control the vCPUs and RAM of worker hosts. If you use spot instances, you generally want to include wider ranges of these properties when possible to increase the available instance types you can get.
+Each fleet has variables to control the maximum number of workers and the vCPUs and RAM of worker hosts, along with the choice of spot or on-demand instances. If you use spot instances, you generally want to include wider ranges of these properties when possible to increase the available instance types you can get.
 
 The default Conda channels that come after the S3 Conda channel are controlled by the `prod_conda_channels` variable that defaults to `"deadline-cloud"`. You can modify this to include [conda-forge](https://conda-forge.org/) or channels such as [bioconda](https://bioconda.github.io/).
 
 ### Modify the Conda queue environment for the production queue
 
-The Terraform configuration includes a queue environment that creates Conda virtual environments for jobs to use. By default, this is the template file [conda_queue_env.yaml.tftpl](conda_queue_env.yaml.tftpl). You can edit this file to customize the Conda environment behavior, such as changing the default channels, adjusting caching behavior, or modifying the environment creation logic.
+The Terraform configuration includes a queue environment that creates Conda virtual environments for jobs to use. By default, the queue environment uses the template file [conda_queue_env.yaml.tftpl](conda_queue_env.yaml.tftpl). You can edit this file to customize the Conda environment behavior, such as changing the default channels and adjusting caching behavior or the environment creation logic.
 
 See the [queue environment samples](https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/queue_environments) for more ideas on how to configure queue environments.
 
