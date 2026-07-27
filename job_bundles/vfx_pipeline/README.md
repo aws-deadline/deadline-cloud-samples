@@ -206,11 +206,13 @@ installs from it.
 
 Build the studio's software into packages and upload them to a channel on S3.
 [`rattler-build`](https://rattler.build/latest/) builds a package
-from a recipe, then `aws s3 sync` copies it up:
+from a recipe, then `aws s3 sync` copies it up. `--test skip` skips the recipe's
+post-build test, which would try to install Blender from a channel your
+workstation cannot reach (Blender lives in the farm's `deadline-cloud` channel):
 
 ```bash
 rattler-build build --recipe conda_recipes/moonrise_scatter-1.0.0/recipe/recipe.yaml \
-  --output-dir ./channel
+  --output-dir ./channel --test skip
 aws s3 sync ./channel s3://<your-bucket>/Conda
 ```
 
@@ -369,7 +371,7 @@ guide covers that case.
   with a default farm and queue.
 - [`rattler-build`](https://rattler.build/latest/) and the `aws`
   CLI for the build step.
-- Python 3.9+ and Blender locally.
+- Python 3.9+ and Blender locally (tested with Blender 4.2+).
 - For the publish step: a Flow site and a script credential in Secrets Manager
   (next section). No Flow site? Skip that section and submit with
   `FLOW_PUBLISH=FALSE`.
@@ -389,8 +391,10 @@ with `deadline queue get`.
 ```bash
 cd job_bundles/vfx_pipeline
 CHANNEL=s3://<queue-bucket>/Conda
+# --test skip: the recipe's post-build test needs Blender, which lives in the
+# farm's deadline-cloud channel and cannot be solved on your workstation.
 rattler-build build --recipe conda_recipes/moonrise_scatter-1.0.0/recipe/recipe.yaml \
-  --output-dir ./channel
+  --output-dir ./channel --test skip
 aws s3 sync ./channel "$CHANNEL"
 # Point software.conda_channels in studio/config/studio.yaml at $CHANNEL.
 ```
