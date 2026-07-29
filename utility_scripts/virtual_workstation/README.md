@@ -19,7 +19,7 @@ Run these during instance provisioning (EC2 user data, an AMI or image bake, or 
 * A Linux or Windows workstation image with a desktop environment already present, because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows. On Windows that session should be the artist's own account, because the monitor and its profile install per user.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender download mirror.
-* Your monitor URL, which looks like `https://<subdomain>.<region>.deadlinecloud.amazonaws.com/`. Find it on the **Monitors** page of the Deadline Cloud console.
+* Your monitor URL, which looks like `https://<subdomain>.<region>.deadlinecloud.amazonaws.com/`. Find it on the **Monitors** page of the Deadline Cloud console. The Region segment is required: `create-profile` accepts a URL without it and silently writes a profile with a wrong `region`, so both scripts validate the shape before calling the monitor.
 * Optional: AWS credentials with `deadline:ListMonitors` permission on the instance. See [Monitor ID discovery](#monitor-id-discovery).
 
 Linux support covers Debian-family (`apt`) and RHEL-family (`dnf`) distributions.
@@ -140,7 +140,7 @@ What ends up on the machine:
 |---|---|---|
 | Blender | `/opt/blender`, symlinked to `/usr/local/bin/blender` | `C:\Program Files\Blender` |
 | Submitter and Deadline Cloud CLI | `/opt/DeadlineCloudSubmitter` | `C:\Program Files\DeadlineCloudSubmitter` |
-| Monitor | `/usr/bin/deadline-cloud-monitor` | `%LOCALAPPDATA%\DeadlineCloudMonitor` |
+| Monitor | `/usr/bin/deadline-cloud-monitor` | `%LOCALAPPDATA%\DeadlineCloudMonitor` (resolved from the uninstall registry entry) |
 | AWS profile | `~/.aws/config` | `%USERPROFILE%\.aws\config` |
 | Deadline Cloud CLI config | `~/.deadline/config` | `%USERPROFILE%\.deadline\config` |
 
@@ -160,6 +160,18 @@ The submitter installer adds the `deadline` CLI to `PATH` itself, through `/etc/
 **The monitor fails to start with `libssl.so.1.1: cannot open shared object file`.** The monitor links against OpenSSL 1.1, which current distributions no longer include. The Linux script installs the compatibility package first (`libssl1.1` on Debian-family, `compat-openssl11` from EPEL on RHEL 9 derivatives). If it fails, install that package for your distribution and re-run.
 
 **Blender downloads fail with HTTP 403.** `download.blender.org` rejects some automated clients. Use `--blender-mirror` with an [official Blender mirror](https://mirror.blender.org/), or with an archive you host internally.
+
+**On Windows, the monitor is installed but the script cannot find it.** The installer honors WOW64
+file-system redirection, so under a 32-bit host process it installs into
+`C:\Windows\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\` even though
+`%LOCALAPPDATA%` points elsewhere. The script resolves the executable from the uninstall registry entry
+rather than a fixed path, and falls back to the known locations. If both fail, find the real path with:
+
+```console
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
+    Where-Object { $_.DisplayName -eq "DeadlineCloudMonitor" } |
+    Select-Object InstallLocation
+```
 
 **The Deadline Cloud menu is missing in Blender.** The add-on registers in per-user Blender preferences, so it applies only to the account it was registered for. On Linux, confirm you passed the right `--workstation-user`. On Windows, confirm the script ran as the artist's account; if it did not, it prints the exact command to run in their session. To check the state directly:
 

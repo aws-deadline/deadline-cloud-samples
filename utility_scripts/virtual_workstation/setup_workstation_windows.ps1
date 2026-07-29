@@ -116,11 +116,23 @@ function Get-RemoteFile {
     Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
 }
 
+# Fetch a URL as text. Windows PowerShell 5.1 returns Content as a Byte[] for
+# -UseBasicParsing, while PowerShell 7 returns a String, so decode when needed.
+# Treating the byte array as text yields the first byte value instead of the body.
+function Get-RemoteText {
+    param([string]$Uri)
+    $content = (Invoke-WebRequest -Uri $Uri -UseBasicParsing).Content
+    if ($content -is [byte[]]) {
+        $content = [System.Text.Encoding]::UTF8.GetString($content)
+    }
+    return $content
+}
+
 # The submitter publishes "<sha256>  <filename>" alongside each installer.
 function Assert-Sha256 {
     param([string]$Path, [string]$ChecksumUri)
     try {
-        $expected = ((Invoke-WebRequest -Uri $ChecksumUri -UseBasicParsing).Content -split '\s+')[0]
+        $expected = ((Get-RemoteText -Uri $ChecksumUri).Trim() -split '\s+')[0]
     }
     catch {
         Write-Warn "no checksum published at $ChecksumUri, skipping verification"
@@ -194,7 +206,7 @@ if (-not $SkipSubmitter) {
     # The manifest records the latest version per platform and the installer path
     # under each version. Resolve both so the download is a pinned, checksummed
     # artifact rather than a moving "latest" URL.
-    $manifest = (Invoke-WebRequest -Uri $SubmitterManifest -UseBasicParsing).Content | ConvertFrom-Json
+    $manifest = Get-RemoteText -Uri $SubmitterManifest | ConvertFrom-Json
     $root = $manifest.DeadlineCloudSubmitter
     $submitterVersion = $root.latest.windows
 
@@ -215,14 +227,24 @@ if (-not $SkipSubmitter) {
     # --mode unattended runs without a GUI. Enabling only the Blender components
     # keeps the install to the submitter this workstation needs; deadline_client
     # (the Deadline Cloud CLI and libraries) is always installed.
+    #
+    # On Windows the --blender-<version>-path flag expects the full path to
+    # blender.exe, not the install directory. The installer's own default is
+    # "C:\Program Files\Blender Foundation\Blender 4.5\blender.exe". The Linux
+    # installer takes the directory instead, so the two scripts differ here.
+    #
+    # Values containing spaces must be double-quoted. Start-Process joins
+    # -ArgumentList with spaces without quoting, so an unquoted
+    # "C:\Program Files\..." reaches the installer as two arguments.
     $blenderPathFlag = "--" + $BlenderComponent.Replace("_", "-") + "-path"
+    $blenderExePath = Join-Path $BlenderPrefix "blender.exe"
     $installerArgs = @(
         "--mode", "unattended"
         "--unattendedmodeui", "none"
         "--installscope", "system"
-        "--prefix", $SubmitterPrefix
+        "--prefix", "`"$SubmitterPrefix`""
         "--enable-components", "deadline_cloud_for_blender,$BlenderComponent"
-        $blenderPathFlag, $BlenderPrefix
+        $blenderPathFlag, "`"$blenderExePath`""
     )
     $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -NoNewWindow
     if ($process.ExitCode -ne 0) {
@@ -247,15 +269,31 @@ if (-not $SkipSubmitter) {
         }
         elseif (Test-Path $addonScript) {
             Write-Step "enabling the Blender add-on"
+            # add_submitter_to_pref.py appends to Blender's script directory list
+            # without checking for an existing entry, so running this script more
+            # than once leaves duplicate paths in the artist's preferences. The
+            # add-on still loads correctly; the duplicates are cosmetic.
             $blenderExe = Join-Path $BlenderPrefix "blender.exe"
             & $blenderExe --background --python $addonScript -- --deadline_cloud_install_path $addonPath
             if ($LASTEXITCODE -ne 0) {
                 Write-Fatal "failed to enable the Blender add-on (exit code $LASTEXITCODE)"
             }
 
-            # Confirm the add-on is enabled rather than trusting the exit code.
-            $check = 'import bpy, sys; sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)'
-            & $blenderExe --background --python-expr $check | Out-Null
+            # Confirm the add-on is enabled rather than trusting the exit code above.
+            # Use a script file rather than --python-expr: PowerShell does not preserve
+            # the inner double quotes of an expression passed on the command line, so
+            # Blender receives a bare identifier and raises NameError. Blender does
+            # propagate the script's sys.exit status, so the exit code is meaningful.
+            $checkScript = Join-Path $WorkDir "check_addon.py"
+            Set-Content -Path $checkScript -Encoding ASCII -Value @'
+import bpy
+import sys
+
+enabled = "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys()
+print("deadline_cloud_blender_submitter enabled:", enabled)
+sys.exit(0 if enabled else 1)
+'@
+            & $blenderExe --background --python $checkScript | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Fatal "the Blender add-on did not register in Blender preferences"
             }
@@ -295,19 +333,42 @@ if (-not $SkipMonitor) {
         Write-Fatal "the monitor installer exited with code $($process.ExitCode)"
     }
 
-    # The default install location is %LOCALAPPDATA%\DeadlineCloudMonitor.
     $userProfilePath = $env:USERPROFILE
-    $monitorBin = Join-Path $env:LOCALAPPDATA "DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
 
-    if (-not (Test-Path $monitorBin)) {
-        # Fall back to a machine-wide install location if one was used.
-        $fallback = "C:\Program Files\DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
-        if (Test-Path $fallback) {
-            $monitorBin = $fallback
+    # Resolve the executable from the uninstall registry entry the installer writes.
+    # Guessing paths is unreliable: the installer normally lands in
+    # %LOCALAPPDATA%\DeadlineCloudMonitor, but under a 32-bit host process it
+    # redirects into the SysWOW64 view of the profile, and an MSI install goes to
+    # Program Files. The registry records wherever it actually went.
+    $monitorBin = $null
+    $uninstallKeys = @(
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    foreach ($key in $uninstallKeys) {
+        $entry = Get-ItemProperty $key -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -eq "DeadlineCloudMonitor" -and $_.InstallLocation } |
+            Select-Object -First 1
+        if ($entry) {
+            $candidate = Join-Path $entry.InstallLocation.Trim('"') "DeadlineCloudMonitor.exe"
+            if (Test-Path $candidate) { $monitorBin = $candidate; break }
         }
-        else {
-            Write-Fatal "cannot find DeadlineCloudMonitor.exe after install (looked in $monitorBin)"
-        }
+    }
+
+    if (-not $monitorBin) {
+        # Fall back to the documented locations, including the SysWOW64 profile view.
+        $candidates = @(
+            (Join-Path $env:LOCALAPPDATA "DeadlineCloudMonitor\DeadlineCloudMonitor.exe"),
+            "C:\Program Files\DeadlineCloudMonitor\DeadlineCloudMonitor.exe",
+            "$env:SystemRoot\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\DeadlineCloudMonitor.exe",
+            "$env:SystemRoot\System32\config\systemprofile\AppData\Local\DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
+        )
+        $monitorBin = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+
+    if (-not $monitorBin) {
+        Write-Fatal "cannot find DeadlineCloudMonitor.exe after install"
     }
     Write-Step "monitor installed: $monitorBin"
 
