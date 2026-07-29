@@ -9,6 +9,7 @@ This table covers every immediate user-selectable sample directory in `utility_s
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
 | [Upload to job attachments](upload_to_job_attachments/) | Uploading files into content-addressable job attachment storage with deduplication | Large or reused datasets should be staged before job submission |
+| [Virtual workstation](virtual_workstation/) | Provisioning a Linux or Windows workstation with Blender, the Deadline Cloud submitter, and a pre-configured monitor profile | Artists should find a submission-ready machine and only need to sign in |
 
 ## Upload to job attachments
 
@@ -37,6 +38,22 @@ python upload_to_job_attachments/upload_to_job_attachments.py \
 ```
 
 See the [sample README](upload_to_job_attachments/) for installation, permissions, options, and manifest details.
+
+## Virtual workstation
+
+Provisioning scripts for Linux and Windows prepare a workstation for Deadline Cloud submission. Each one installs Blender, then installs the Deadline Cloud submitter and monitor through their silent installers. It finishes by creating a monitor profile non-interactively, so an artist only has to sign in.
+
+```console
+# Linux, as root
+sudo virtual_workstation/setup_workstation_linux.sh \
+    --monitor-url https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/
+
+# Windows, in an elevated PowerShell session
+.\virtual_workstation\setup_workstation_windows.ps1 `
+    -MonitorUrl https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/
+```
+
+See the [sample README](virtual_workstation/) for prerequisites, monitor ID discovery, options, and cleanup.
 
 ## Additional resources
 
