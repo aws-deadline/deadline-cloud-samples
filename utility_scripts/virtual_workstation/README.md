@@ -14,6 +14,8 @@ How to complete every part of workstation setup that normally requires a person 
 
 Run these during instance provisioning (EC2 user data, an AMI or image bake, or by hand on a workstation VM).
 
+Blender is a stand-in for whichever DCC you run. It is used here because it installs unattended from a public archive with no license server, which keeps the sample runnable as-is. The Deadline Cloud parts are the same for every DCC, so adapting the scripts to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After Effects, or VRED means changing five marked places. Both scripts carry an `ADAPTING THIS SCRIPT TO A DIFFERENT DCC` header that lists them, and a numbered `DCC (n of 5)` comment at each one.
+
 ## Prerequisites
 
 * A Linux or Windows workstation image with a desktop environment already present, because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
@@ -150,7 +152,7 @@ The submitter installer adds the `deadline` CLI to `PATH` itself, through `/etc/
 
 * **No credentials are stored.** The scripts never write secrets. The profile delegates to the monitor, which acquires credentials only when the artist signs in interactively.
 * **Least privilege for discovery.** The only AWS call is `deadline:ListMonitors`, which is read-only. An instance role scoped to that single action is enough, and nothing here needs write access. You can omit credentials entirely and accept the placeholder monitor ID.
-* **Installers are verified.** Submitter installers are checked against their published SHA-256 checksums, and the script fails on a mismatch. Blender archives are downloaded over HTTPS. If you mirror them internally, point `--blender-mirror` at a source you trust.
+* **Every download is verified.** The Blender archive, the submitter installer, and the monitor package are all checked against their published SHA-256 checksums, and the scripts fail on a mismatch or if a checksum cannot be fetched. Verification is not optional, so an internal `--blender-mirror` must also serve Blender's `blender-<version>.sha256` manifest.
 * **Licensing.** Blender is distributed under the GNU GPL. Review its license terms for your use.
 * **Cost.** The scripts create no AWS resources and incur no Deadline Cloud charges. Running the workstation instance itself is billable, and jobs submitted from it are billed normally.
 * **Cleanup.** To remove the submitter, run `/opt/DeadlineCloudSubmitter/uninstall` or the Windows equivalent that its installer provides. Remove the monitor with your package manager or through Windows "Apps & features", and delete `/opt/blender`. Finally, remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`.
@@ -172,6 +174,8 @@ Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
     Where-Object { $_.DisplayName -eq "DeadlineCloudMonitor" } |
     Select-Object InstallLocation
 ```
+
+**Amazon Linux 2023 cannot run the monitor.** The monitor needs `libssl.so.1.1`, and AL2023 does not package `compat-openssl11`. The Linux script detects the missing library and fails with that explanation rather than installing a monitor that cannot start. Use a RHEL 8/9, Rocky, Alma, or Ubuntu image, or provide OpenSSL 1.1 yourself.
 
 **The Deadline Cloud menu is missing in Blender.** The add-on registers in per-user Blender preferences, so it applies only to the account it was registered for. On Linux, confirm you passed the right `--workstation-user`. On Windows, confirm the script ran as the artist's account; if it did not, it prints the exact command to run in their session. To check the state directly:
 

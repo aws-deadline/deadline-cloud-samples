@@ -67,12 +67,48 @@ $MonitorSetupUrl = "$DownloadsBase/dcm/latest/DeadlineCloudMonitor_x64-setup.exe
 $BlenderPrefix = "C:\Program Files\Blender"
 $SubmitterPrefix = "C:\Program Files\DeadlineCloudSubmitter"
 
+# ---------------------------------------------------------------------------
+# ADAPTING THIS SCRIPT TO A DIFFERENT DCC
+# ---------------------------------------------------------------------------
+#
+# Blender is used here because it installs unattended from a public archive with
+# no license server, which makes the sample runnable as-is. The Deadline Cloud
+# parts (submitter, monitor, profile) are identical for every DCC. To target
+# Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After Effects, or VRED, change these
+# five places, each marked with a "DCC:" comment below:
+#
+#   1. The version-to-component map. Run "<installer> --help" for the current
+#      --enable-components values, for example deadline_cloud_for_maya,
+#      deadline_cloud_for_nuke, or deadline_cloud_for_houdini plus a version
+#      component like houdini_20_5.
+#   2. The DCC install step. Most commercial DCCs use a vendor installer and a
+#      license server rather than a zip, so replace this block entirely.
+#   3. The --enable-components list and the --<dcc>-path flag passed to the
+#      submitter installer. Note that on Windows these path flags take the
+#      executable, not the install directory.
+#   4. The add-on enable step. It is Blender-specific: other DCCs are wired up
+#      by the installer itself or by environment variables such as
+#      MAYA_MODULE_PATH or NUKE_PATH, so this step is often unnecessary.
+#   5. The closing summary text.
+#
+# To install more than one DCC, pass a comma-separated --enable-components list
+# with every DCC and version component you need, plus one --<dcc>-path flag per
+# DCC, and repeat step 2 for each.
+
 function Write-Step { param([string]$Message) Write-Information "[setup-workstation] $Message" }
 function Write-Warn { param([string]$Message) Write-Warning "[setup-workstation] $Message" }
 function Write-Fatal { param([string]$Message) throw "[setup-workstation] ERROR: $Message" }
 
 if (-not $SkipMonitor -and [string]::IsNullOrWhiteSpace($MonitorUrl)) {
     Write-Fatal "-MonitorUrl is required unless -SkipMonitor is given"
+}
+
+# The submitter needs a Blender install to point its add-on at. Skipping Blender
+# while still installing the submitter would target a path that does not exist.
+if ($SkipBlender -and -not $SkipSubmitter) {
+    Write-Fatal ("-SkipBlender also requires -SkipSubmitter, because the submitter installer " +
+        "needs the path to blender.exe. To use a Blender that is already installed, set " +
+        "`$BlenderPrefix in this script to its location and drop -SkipBlender")
 }
 
 # ---------------------------------------------------------------------------
@@ -128,19 +164,39 @@ function Get-RemoteText {
     return $content
 }
 
-# The submitter publishes "<sha256>  <filename>" alongside each installer.
+# Verify a downloaded file against its published sha256. Fatal on any failure,
+# including an unreachable checksum file: silently downgrading to "no
+# verification" on a transient network error would defeat the point. Pass
+# -MatchName to pick one line out of a multi-file checksum manifest.
 function Assert-Sha256 {
-    param([string]$Path, [string]$ChecksumUri)
+    param([string]$Path, [string]$ChecksumUri, [string]$MatchName)
     try {
-        $expected = ((Get-RemoteText -Uri $ChecksumUri).Trim() -split '\s+')[0]
+        $body = Get-RemoteText -Uri $ChecksumUri
     }
     catch {
-        Write-Warn "no checksum published at $ChecksumUri, skipping verification"
-        return
+        Write-Fatal "cannot fetch the checksum for $(Split-Path -Leaf $Path) from ${ChecksumUri}: $($_.Exception.Message)"
     }
-    # The published checksum is lowercase but Get-FileHash returns uppercase, so
-    # compare case-insensitively. -ne on strings is already case-insensitive in
-    # PowerShell, but normalize both sides to make that independent of the operator.
+
+    $expected = $null
+    if ($MatchName) {
+        # Manifests list one "<sha256>  <filename>" line per artifact.
+        foreach ($line in ($body -split "`n")) {
+            $fields = $line.Trim() -split '\s+'
+            if ($fields.Count -ge 2 -and ($fields[1] -eq $MatchName -or $fields[1] -eq "./$MatchName")) {
+                $expected = $fields[0]
+                break
+            }
+        }
+    }
+    else {
+        $expected = ($body.Trim() -split '\s+')[0]
+    }
+
+    if ($expected -notmatch '^[0-9a-fA-F]{64}$') {
+        Write-Fatal "no usable sha256 for $(Split-Path -Leaf $Path) in $ChecksumUri"
+    }
+
+    # The published checksum is lowercase but Get-FileHash returns uppercase.
     $actual = (Get-FileHash -Path $Path -Algorithm SHA256).Hash
     if ($actual.ToLower() -ne $expected.ToLower()) {
         Write-Fatal "checksum mismatch for $Path (expected $expected, got $actual)"
@@ -152,7 +208,8 @@ function Assert-Sha256 {
 # Blender
 # ---------------------------------------------------------------------------
 
-# The submitter installer expects a Blender install path per version, and only
+# DCC (1 of 5): version-to-component map.
+# The submitter installer expects a DCC install path per version, and only
 # supports specific versions. Map "4.5.0" to the installer's blender-45 flags.
 $BlenderSeries = ""
 $BlenderComponent = ""
@@ -173,11 +230,20 @@ if (-not $SkipBlender -or -not $SkipSubmitter) {
     }
 }
 
+# DCC (2 of 5): install the DCC itself.
+# Blender ships a relocatable zip. A commercial DCC will instead need its vendor
+# installer and probably a license server, so replace this whole block.
 if (-not $SkipBlender) {
     Write-Step "installing Blender $BlenderVersion"
     $blenderArchive = "blender-$BlenderVersion-windows-x64.zip"
     $blenderZip = Join-Path $WorkDir $blenderArchive
     Get-RemoteFile -Uri "$BlenderMirror/Blender$BlenderSeries/$blenderArchive" -OutFile $blenderZip
+    # Blender publishes one checksum manifest per release covering every platform
+    # artifact, so select the line for this archive. Verifying matters most when
+    # -BlenderMirror points at a third-party mirror.
+    Assert-Sha256 -Path $blenderZip `
+        -ChecksumUri "$BlenderMirror/Blender$BlenderSeries/blender-$BlenderVersion.sha256" `
+        -MatchName $blenderArchive
 
     if (Test-Path $BlenderPrefix) {
         Remove-Item -Recurse -Force $BlenderPrefix
@@ -219,11 +285,13 @@ if (-not $SkipSubmitter) {
 
     $installer = Join-Path $WorkDir "DeadlineCloudSubmitter-windows-x64-installer.exe"
     Get-RemoteFile -Uri "$DownloadsBase/submitters$($node.installer)" -OutFile $installer
-    if ($node.sha256) {
-        Assert-Sha256 -Path $installer -ChecksumUri "$DownloadsBase/submitters$($node.sha256)"
+    if (-not $node.sha256) {
+        Write-Fatal "the manifest does not publish a sha256 for the submitter installer"
     }
+    Assert-Sha256 -Path $installer -ChecksumUri "$DownloadsBase/submitters$($node.sha256)"
 
     Write-Step "installing the submitter for Blender $BlenderSeries (unattended)"
+    # DCC (3 of 5): the enabled components and the --<dcc>-path flag.
     # --mode unattended runs without a GUI. Enabling only the Blender components
     # keeps the install to the submitter this workstation needs; deadline_client
     # (the Deadline Cloud CLI and libraries) is always installed.
@@ -252,6 +320,9 @@ if (-not $SkipSubmitter) {
     }
     Write-Step "submitter installed at $SubmitterPrefix"
 
+    # DCC (4 of 5): enable the add-on. Blender-specific; most other DCCs are
+    # wired up by the installer or by an environment variable, so this step can
+    # often be deleted outright.
     # The unattended install stages the add-on under the submitter prefix but does
     # not enable it: the add-on lives in Blender's per-user preferences, which the
     # system-scope installer cannot write. Register it by running the installer's
@@ -326,6 +397,7 @@ if (-not $SkipMonitor) {
     Write-Step "installing Deadline Cloud monitor"
     $monitorSetup = Join-Path $WorkDir "DeadlineCloudMonitor_x64-setup.exe"
     Get-RemoteFile -Uri $MonitorSetupUrl -OutFile $monitorSetup
+    Assert-Sha256 -Path $monitorSetup -ChecksumUri "$MonitorSetupUrl.sha256"
 
     # /S is the monitor installer's silent switch.
     $process = Start-Process -FilePath $monitorSetup -ArgumentList "/S" -Wait -PassThru -NoNewWindow
@@ -382,15 +454,20 @@ if (-not $SkipMonitor) {
     if ([string]::IsNullOrWhiteSpace($MonitorId)) {
         if (Get-Command aws -ErrorAction SilentlyContinue) {
             Write-Step "looking up the monitor ID with deadline:ListMonitors"
-            try {
-                $query = "monitors[?subdomain=='$MonitorSubdomain'].monitorId | [0]"
-                $discovered = (& aws deadline list-monitors --region $MonitorRegion --query $query --output text 2>$null)
-                if ($discovered -and $discovered -ne "None") {
-                    $MonitorId = $discovered.Trim()
-                }
+            # A native command exiting non-zero does not throw, even under
+            # $ErrorActionPreference = "Stop", so check $LASTEXITCODE. Keep stderr
+            # so a permissions or credentials problem is visible rather than
+            # silently becoming a placeholder ID.
+            $query = "monitors[?subdomain=='$MonitorSubdomain'].monitorId | [0]"
+            $discovered = (& aws deadline list-monitors --region $MonitorRegion --query $query --output text 2>&1 | Out-String).Trim()
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "deadline:ListMonitors failed: $discovered"
             }
-            catch {
-                Write-Warn "deadline:ListMonitors lookup failed: $($_.Exception.Message)"
+            elseif ($discovered -and $discovered -ne "None") {
+                $MonitorId = $discovered
+            }
+            else {
+                Write-Warn "no monitor with subdomain '$MonitorSubdomain' in $MonitorRegion"
             }
         }
     }
@@ -444,6 +521,7 @@ $submitterSummary = if ($SkipSubmitter) { "skipped" } else { "$SubmitterPrefix (
 $monitorSummary = if ($SkipMonitor) { "skipped" } else { $monitorBin }
 $profileSummary = if ($SkipMonitor) { "skipped" } else { "$ProfileName ($MonitorUrl)" }
 
+# DCC (5 of 5): summary text.
 $nextSteps = if ($SkipMonitor) {
     @"
 No monitor profile was created. Re-run without -SkipMonitor, passing
