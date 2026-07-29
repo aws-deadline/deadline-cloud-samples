@@ -280,11 +280,14 @@ log "monitor installed: $monitor_version"
 # with the user and identity store IDs, using authoritative values from the portal
 # on the artist's first sign-in. Looking it up in advance needs AWS credentials and
 # deadline:ListMonitors permission, so this example does without.
+#
+# Written as "--monitor-id=" to match the Windows script, where PowerShell drops a
+# bare empty-string argument and the monitor then rejects the flag.
 log "creating monitor profile '$PROFILE_NAME'"
 profile_output="$(
     runuser -u "$WORKSTATION_USER" -- env HOME="$USER_HOME" "$MONITOR_BIN" create-profile \
         --profile "$PROFILE_NAME" \
-        --monitor-id "" \
+        --monitor-id= \
         --monitor-url "$MONITOR_URL" \
         --enable-auto-login \
         --set-as-deadline-default 2>&1

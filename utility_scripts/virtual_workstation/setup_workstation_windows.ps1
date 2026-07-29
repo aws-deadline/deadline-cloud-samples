@@ -257,26 +257,32 @@ if ($process.ExitCode -ne 0) {
     Write-Fatal "the monitor installer exited with code $($process.ExitCode)"
 }
 
-# Resolve the executable from the uninstall registry entry the installer writes.
-# Guessing paths is unreliable: the installer normally lands in
-# %LOCALAPPDATA%\DeadlineCloudMonitor, but under a 32-bit host process it
-# redirects into the SysWOW64 view of the profile. The registry records where it
-# actually went.
-$monitorBin = $null
+# Find the installed executable. The monitor installer is 32-bit, so when it runs
+# under a service account its writes are redirected from the System32 view of the
+# profile into the SysWOW64 view, while the InstallLocation it records in the
+# registry still names System32. Neither source alone is reliable, so collect
+# candidates from both and take the first that exists on disk.
+$monitorCandidates = [System.Collections.Generic.List[string]]::new()
+
 foreach ($key in @(
         "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")) {
-    $entry = Get-ItemProperty $key -ErrorAction SilentlyContinue |
+    Get-ItemProperty $key -ErrorAction SilentlyContinue |
         Where-Object { $_.DisplayName -eq "DeadlineCloudMonitor" -and $_.InstallLocation } |
-        Select-Object -First 1
-    if ($entry) {
-        $candidate = Join-Path $entry.InstallLocation.Trim('"') "DeadlineCloudMonitor.exe"
-        if (Test-Path $candidate) { $monitorBin = $candidate; break }
-    }
+        ForEach-Object {
+            $location = $_.InstallLocation.Trim('"')
+            $monitorCandidates.Add((Join-Path $location "DeadlineCloudMonitor.exe"))
+            # The same path under the other WOW64 view of the profile.
+            $monitorCandidates.Add((Join-Path ($location -replace '\\[Ss]ystem32\\', '\SysWOW64\') "DeadlineCloudMonitor.exe"))
+        }
 }
+$monitorCandidates.Add((Join-Path $env:LOCALAPPDATA "DeadlineCloudMonitor\DeadlineCloudMonitor.exe"))
+$monitorCandidates.Add("C:\Program Files\DeadlineCloudMonitor\DeadlineCloudMonitor.exe")
+
+$monitorBin = $monitorCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $monitorBin) {
-    Write-Fatal "cannot find DeadlineCloudMonitor.exe after install"
+    Write-Fatal "cannot find DeadlineCloudMonitor.exe after install. Looked in:`n  $($monitorCandidates -join "`n  ")"
 }
 Write-Step "monitor installed: $monitorBin"
 
@@ -287,10 +293,14 @@ Write-Step "monitor installed: $monitorBin"
 # with the user and identity store IDs, using authoritative values from the portal
 # on the artist's first sign-in. Looking it up in advance needs AWS credentials and
 # deadline:ListMonitors permission, so this example does without.
+#
+# Write the empty value as "--monitor-id=", not as --monitor-id "": PowerShell
+# drops a bare empty-string argument, and the monitor then reports that the flag
+# requires a value.
 Write-Step "creating monitor profile '$ProfileName'"
 $profileOutput = & $monitorBin create-profile `
     --profile $ProfileName `
-    --monitor-id "" `
+    --monitor-id= `
     --monitor-url $MonitorUrl `
     --enable-auto-login `
     --set-as-deadline-default 2>&1 | Out-String
