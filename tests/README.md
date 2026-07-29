@@ -31,6 +31,7 @@ suite. To run locally, install the tools listed in
 | Host configuration scripts | `test_host_configuration_scripts.py` | Byte length is within the Deadline Cloud service limit (`HostConfiguration.scriptBody` max **15000**). Linux (`*.sh`) scripts pass `bash -n`, and Windows (`*.ps1`) scripts parse with the PowerShell parser. |
 | Queue environments | `test_openjd_templates.py` | Serialized `environment-2023-09` templates are within the service limit for `EnvironmentTemplate` (max **15000**). |
 | CloudFormation templates | `test_cloudformation.py` | Templates parse as CloudFormation YAML (intrinsic tags such as `!Sub`/`!Ref` supported) and pass `cfn-lint` (errors only). |
+| CDK apps | `test_cdk.py` | A queue environment copied into a CDK app is byte-identical to its original under `queue_environments/`. Everything else about a CDK app is proven by building it. See [Why so little here for CDK?](#why-so-little-here-for-cdk) |
 | Conda recipes | `test_conda_recipes.py` | `deadline-cloud.yaml` matches the expected schema and its `buildTool` has a matching recipe file; **rattler-build** recipes (`recipe.yaml`) are validated with `rattler-build build --render-only`. **conda-build** recipes (`meta.yaml`) are rendered (Jinja + `# [selector]`) and structurally validated offline. |
 
 A few recipes are deliberately fill-in-the-blanks templates that include a
@@ -40,6 +41,28 @@ check substitutes a syntactically valid dummy checksum into a temporary copy
 before rendering. The full recipe is still validated, and only the
 intentionally-blank checksum field is normalized. Genuinely invalid recipes
 (unknown fields, bad structure) still fail.
+
+### Why so little here for CDK?
+
+The CDK samples are TypeScript, and they are validated by building them: the
+[`cdk_checks.yml`](../.github/workflows/cdk_checks.yml) workflow runs `npm ci`,
+`tsc`, `jest`, `cdk synth` (with the default fleets and again with every fleet
+enabled), and `cfn-lint` over the synthesized CloudFormation. Each of those
+steps fails on its own if the app is misconfigured (a missing lock file breaks
+`npm ci`, a bad entry point breaks `cdk synth`), so restating those invariants
+as Python assertions would add maintenance without adding coverage. The app's
+own assertions about the resources it produces live in its `test/` directory as
+jest tests against the synthesized template.
+
+That leaves one gap a per-app check cannot see: each CDK app carries a copy of a
+queue environment that also lives under `queue_environments/`, and nothing
+notices if the two drift apart. That comparison spans two directories, so it
+lives in `test_cdk.py`. The copied template is also picked up by the repo-wide
+OpenJD discovery above, so `openjd check` validates it like any other.
+
+`cdk synth` needs the app's npm dependencies installed, which needs network
+access. That is why it is a separate workflow rather than part of this offline
+suite.
 
 ### Why not `conda render` for `meta.yaml`?
 

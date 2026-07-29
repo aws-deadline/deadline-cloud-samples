@@ -1,0 +1,13 @@
+# CDK asset staging directory. The `cdk.out.*` forms are the alternate output
+# directories the CDK CI job synthesizes into.
+cdk.out/
+cdk.out.*/
+cdk.context.json
+
+# Node
+node_modules/
+
+# Compiled TypeScript output (the app runs from .ts via ts-node)
+*.js
+*.d.ts
+!jest.config.js

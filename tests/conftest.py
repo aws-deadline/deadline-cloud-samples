@@ -37,7 +37,20 @@ def require_tool(name: str, install_hint: str) -> str:
 
 # Directories anywhere in the tree whose contents are not part of the samples we
 # ship and should never be validated.
-_EXCLUDED_DIR_NAMES = {".git", ".claude", ".kiro", "node_modules", "__pycache__", "build"}
+_EXCLUDED_DIR_NAMES = {
+    ".git",
+    ".claude",
+    ".kiro",
+    "node_modules",
+    "__pycache__",
+    "build",
+}
+
+# Directory name prefixes excluded the same way as ``_EXCLUDED_DIR_NAMES``. CDK
+# synthesis writes ``cdk.out/`` by default, and the CDK CI job synthesizes into
+# ``cdk.out.<name>/`` directories. All of them hold generated copies of the
+# CloudFormation template and of ``cdk.json``, none of which are samples we ship.
+_EXCLUDED_DIR_PREFIXES = ("cdk.out",)
 
 # Matches the OpenJD ``specificationVersion`` header of a standalone template.
 # Anchored at column 0 (no leading whitespace) on purpose: a standalone OpenJD
@@ -52,7 +65,10 @@ _SPEC_VERSION_RE = re.compile(
 
 
 def _is_excluded(path: Path) -> bool:
-    return any(part in _EXCLUDED_DIR_NAMES for part in path.parts)
+    return any(
+        part in _EXCLUDED_DIR_NAMES or part.startswith(_EXCLUDED_DIR_PREFIXES)
+        for part in path.parts
+    )
 
 
 def _iter_yaml_files() -> list[Path]:
@@ -127,6 +143,18 @@ def find_cloudformation_templates() -> list[Path]:
                 continue
             templates.append(path)
     return sorted(set(templates))
+
+
+def find_cdk_apps() -> list[Path]:
+    """Directories under ``cdk/`` that are AWS CDK apps (they have a ``cdk.json``)."""
+    base = REPO_ROOT / "cdk"
+    if not base.is_dir():
+        return []
+    apps = []
+    for path in base.rglob("cdk.json"):
+        if not _is_excluded(path.relative_to(REPO_ROOT)):
+            apps.append(path.parent)
+    return sorted(set(apps))
 
 
 def find_conda_recipe_dirs() -> list[Path]:

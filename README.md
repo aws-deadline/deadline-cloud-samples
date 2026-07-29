@@ -7,7 +7,7 @@ Start with the task you want to complete. Each sample stays self-contained in it
 
 | Goal | Start here |
 |---|---|
-| Deploy a farm | [CloudFormation starter farm](cloudformation/farm_templates/starter_farm/) or [Terraform starter farm](terraform/farm_templates/starter_farm/) |
+| Deploy a farm | [CloudFormation starter farm](cloudformation/farm_templates/starter_farm/), [Terraform starter farm](terraform/farm_templates/starter_farm/), or [AWS CDK starter farm](cdk/farm_templates/starter_farm/) |
 | Learn how a job is structured | [Job development progression](job_bundles/job_dev_progression/) or the [minimal job](job_bundles/simple_job/) |
 | Render with a DCC | [Blender render](job_bundles/blender_render/), [Maya CLI render](job_bundles/maya_cli_render/), or browse the [job bundles](job_bundles/) |
 | Run a new DCC or application | Read about [custom software delivery](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/deploy-custom-software.html), then browse [Conda recipes](conda_recipes/), [host configuration scripts](host_configuration_scripts/), [containers](containers/), and [job bundles](job_bundles/) |
@@ -43,6 +43,7 @@ or run licensed software; review parameters, IAM permissions, licensing, and cle
 |---|---|
 | [CloudFormation](cloudformation/) | Deploy starter farms, fleet support, storage, capacity automation, and notifications. |
 | [Terraform](terraform/) | Deploy a starter farm with Terraform. |
+| [AWS CDK](cdk/) | Deploy a starter farm with the AWS CDK in TypeScript. |
 | [Job bundles](job_bundles/) | Define OpenJD rendering, simulation, ML, scientific, and utility jobs. |
 | [Conda recipes](conda_recipes/) | Build applications, adaptors, renderers, and plugins into versioned packages. |
 | [Containers](containers/) | Build worker-compatible or application container images. |

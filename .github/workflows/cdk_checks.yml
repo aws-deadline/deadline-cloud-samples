@@ -1,0 +1,168 @@
+name: CDK Checks
+
+# Builds, unit tests, and synthesizes every AWS CDK sample app under cdk/, then
+# runs cfn-lint over the synthesized CloudFormation. This catches a broken CDK
+# sample in CI rather than when a customer runs `cdk deploy`.
+#
+# This lives in its own workflow rather than in static_checks.yml because
+# synthesizing a CDK app needs its npm dependencies installed, whereas the
+# static checks are deliberately offline. One CDK check does stay offline and
+# runs in static_checks.yml via tests/test_cdk.py: whether a queue environment
+# copied into a CDK app has drifted from its original under queue_environments/.
+#
+# No AWS credentials are used or needed: `cdk synth` renders the template
+# locally. Nothing here deploys.
+#
+# Runs only when something it actually validates changes: a CDK app, this
+# workflow, or the pinned cfn-lint version it installs. A documentation-only or
+# job-bundle-only change does not spend CI time installing Node and npm
+# dependencies. Keep this job out of the repository's required status checks,
+# since a filtered-out run reports no status at all rather than success.
+#
+# The two path lists below are duplicated rather than shared with a YAML anchor,
+# because GitHub Actions does not support anchors in workflow files. Keep them in
+# sync.
+on:
+  push:
+    branches: ["mainline"]
+    paths:
+      - "cdk/**"
+      - ".github/workflows/cdk_checks.yml"
+      - "tests/requirements.txt"
+  pull_request:
+    branches: ["mainline"]
+    paths:
+      - "cdk/**"
+      - ".github/workflows/cdk_checks.yml"
+      - "tests/requirements.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cdk-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    name: Discover CDK apps
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.find.outputs.apps }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Nothing here talks to git after checkout, so do not leave the token
+          # in .git/config where a later step could read or leak it.
+          persist-credentials: false
+
+      - name: Find CDK apps
+        id: find
+        # A CDK app is any directory under cdk/ holding a cdk.json. Emitting the
+        # list as a matrix means adding a new sample app needs no workflow edit.
+        run: |
+          set -euo pipefail
+          apps="$(find cdk -name cdk.json -not -path '*/node_modules/*' -not -path '*/cdk.out/*' \
+                  -printf '%h\n' | sort | jq -R . | jq -sc .)"
+          echo "apps=${apps}" >> "$GITHUB_OUTPUT"
+          echo "Discovered CDK apps: ${apps}"
+          if [ "${apps}" = "[]" ]; then
+            echo "::error::no CDK apps were found under cdk/"
+            exit 1
+          fi
+
+  cdk-checks:
+    name: Synthesize ${{ matrix.app }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.discover.outputs.apps) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Nothing here talks to git after checkout, so do not leave the token
+          # in .git/config where a later step could read or leak it.
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install cfn-lint
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tests/requirements.txt
+          cfn-lint --version
+
+      - name: Install npm dependencies
+        working-directory: ${{ matrix.app }}
+        # `npm ci` installs exactly the committed lock file and fails if
+        # package.json and the lock file disagree.
+        run: npm ci
+
+      - name: Type check
+        working-directory: ${{ matrix.app }}
+        run: npm run build
+
+      - name: Unit tests
+        working-directory: ${{ matrix.app }}
+        run: npm test
+
+      - name: Synthesize
+        working-directory: ${{ matrix.app }}
+        # A bare `cdk synth` renders every stack the app defines, so each example
+        # farm is synthesized and linted without naming them here. A new example
+        # stack needs no workflow edit.
+        run: npx cdk synth --output cdk.out.default
+
+      - name: Lint the synthesized templates
+        working-directory: ${{ matrix.app }}
+        # Only errors fail the build, matching tests/test_cloudformation.py, so a
+        # style warning does not block a sample PR. cfn-lint signals findings
+        # through its exit code (0x2 error, 0x4 warning, 0x8 informational), so
+        # the JSON output is filtered by level rather than trusting the code.
+        #
+        # W2001 is ignored because the CDK bootstrap adds a BootstrapVersion
+        # parameter that the template itself never references. W3005 is ignored
+        # because CDK's bucket auto-delete construct writes a DependsOn that a
+        # GetAtt already implies, and it is not ours to fix.
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          templates=(cdk.out.*/*.template.json)
+          if [ ${#templates[@]} -eq 0 ]; then
+            echo "::error::cdk synth produced no CloudFormation templates"
+            exit 1
+          fi
+          status=0
+          for template in "${templates[@]}"; do
+            echo "::group::cfn-lint ${template}"
+            findings="$(cfn-lint --format json --ignore-checks W2001,W3005 -- "${template}" || true)"
+            if [ -z "${findings}" ]; then
+              echo "::error::cfn-lint produced no output for ${template}"
+              status=1
+            else
+              echo "${findings}" | jq -r '.[] | "\(.Level) \(.Rule.Id) \(.Message)"'
+              errors="$(echo "${findings}" | jq '[.[] | select(.Level == "Error")] | length')"
+              if [ "${errors}" -gt 0 ]; then
+                echo "::error::cfn-lint reported ${errors} error(s) in ${template}"
+                status=1
+              fi
+            fi
+            echo "::endgroup::"
+          done
+          exit "${status}"
