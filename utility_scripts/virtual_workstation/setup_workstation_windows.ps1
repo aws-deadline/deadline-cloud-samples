@@ -1,160 +1,102 @@
 <#
 .SYNOPSIS
-    Pre-configure a Windows virtual workstation for AWS Deadline Cloud submission.
+    Example: pre-configure a Windows workstation for AWS Deadline Cloud submission.
 
 .DESCRIPTION
-    Installs Blender, the Deadline Cloud submitter for Blender, and Deadline Cloud
-    monitor, then creates a monitor profile so an artist only has to sign in.
+    Installs Blender, the Deadline Cloud submitter, and Deadline Cloud monitor,
+    then creates a monitor profile so an artist only has to sign in.
 
-    Run as Administrator during instance provisioning (user data, AMI bake, or by
-    hand).
+    This is a worked example rather than a general-purpose tool. Edit the
+    constants below for your environment.
 
     Deadline Cloud monitor, its profile, and Blender's add-on preferences are all
-    per user. Run this script in an elevated session as the artist's own account so
-    they land in the right home directory. To install only the machine-wide parts
-    from a different admin account, pass -SkipMonitor.
-
-.PARAMETER WorkstationUser
-    Local user who signs in to the monitor. Must match the account running the
-    script for the per-user steps to apply. Defaults to the invoking user.
+    per user, and Windows cannot write them for another account without that
+    account's password. Run this in an elevated PowerShell session as the
+    artist's own account.
 
 .PARAMETER MonitorUrl
-    Monitor URL, for example https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/
-
-.PARAMETER ProfileName
-    AWS profile name to create. Defaults to <subdomain>-<region> from the monitor URL.
-
-.PARAMETER MonitorId
-    Monitor ID (monitor-<32 hex characters>). When omitted, the script calls
-    deadline:ListMonitors to discover it. See "Monitor ID discovery" in the README.
-
-.PARAMETER BlenderVersion
-    Blender version to install. Default: 4.5.0
-
-.PARAMETER BlenderMirror
-    Base URL for Blender downloads. Default: https://download.blender.org/release
+    https://<subdomain>.<region>.deadlinecloud.amazonaws.com/
 
 .EXAMPLE
-    .\setup_workstation_windows.ps1 -MonitorUrl https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/
+    .\setup_workstation_windows.ps1 https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 #>
 
 #Requires -RunAsAdministrator
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)]
-    [string]$MonitorUrl,
-
-    [string]$ProfileName,
-    [string]$MonitorId,
-    [string]$WorkstationUser,
-    [string]$BlenderVersion = "4.5.0",
-    [string]$BlenderMirror = "https://download.blender.org/release",
-
-    [switch]$SkipBlender,
-    [switch]$SkipSubmitter,
-    [switch]$SkipMonitor
+    [Parameter(Mandatory = $true, Position = 0)]
+    [string]$MonitorUrl
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Much faster Invoke-WebRequest downloads
 $InformationPreference = "Continue"       # Show progress messages during provisioning
 
-$DownloadsBase = "https://downloads.deadlinecloud.amazonaws.com"
-$SubmitterManifest = "$DownloadsBase/submitters/manifest.json"
-$MonitorSetupUrl = "$DownloadsBase/dcm/latest/DeadlineCloudMonitor_x64-setup.exe"
+# ---------------------------------------------------------------------------
+# Edit these for your environment
+# ---------------------------------------------------------------------------
+
+$BlenderVersion = "4.5.0"
+
+# The Deadline Cloud submitter supports specific Blender versions. This is the
+# installer component for the version above; see "Adapting to another DCC".
+$BlenderComponent = "blender_45"
+
+# download.blender.org rejects some automated clients, so this points at an
+# official mirror. See https://mirror.blender.org/ for alternatives.
+$BlenderMirror = "https://mirrors.iu13.net/blender/release"
 
 $BlenderPrefix = "C:\Program Files\Blender"
 $SubmitterPrefix = "C:\Program Files\DeadlineCloudSubmitter"
 
+$DownloadsBase = "https://downloads.deadlinecloud.amazonaws.com"
+
 # ---------------------------------------------------------------------------
-# ADAPTING THIS SCRIPT TO A DIFFERENT DCC
+# Adapting to another DCC
 # ---------------------------------------------------------------------------
 #
-# Blender is used here because it installs unattended from a public archive with
-# no license server, which makes the sample runnable as-is. The Deadline Cloud
-# parts (submitter, monitor, profile) are identical for every DCC. To target
-# Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After Effects, or VRED, change these
-# five places, each marked with a "DCC:" comment below:
+# Blender stands in for whichever DCC you run. It is used here because it
+# installs unattended from a public archive with no license server, which keeps
+# this example runnable as-is. Everything Deadline Cloud does is identical for
+# every DCC, so switching to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After
+# Effects, or VRED means changing three things:
 #
-#   1. The version-to-component map. Run "<installer> --help" for the current
-#      --enable-components values, for example deadline_cloud_for_maya,
-#      deadline_cloud_for_nuke, or deadline_cloud_for_houdini plus a version
-#      component like houdini_20_5.
-#   2. The DCC install step. Most commercial DCCs use a vendor installer and a
-#      license server rather than a zip, so replace this block entirely.
-#   3. The --enable-components list and the --<dcc>-path flag passed to the
-#      submitter installer. Note that on Windows these path flags take the
-#      executable, not the install directory.
-#   4. The add-on enable step. It is Blender-specific: other DCCs are wired up
-#      by the installer itself or by environment variables such as
-#      MAYA_MODULE_PATH or NUKE_PATH, so this step is often unnecessary.
-#   5. The closing summary text.
-#
-# To install more than one DCC, pass a comma-separated --enable-components list
-# with every DCC and version component you need, plus one --<dcc>-path flag per
-# DCC, and repeat step 2 for each.
+#   1. $BlenderComponent above. Run "<installer> --help" for the current
+#      --enable-components values, for example deadline_cloud_for_maya or
+#      deadline_cloud_for_houdini plus a version component like houdini_20_5.
+#   2. The "Install Blender" step. Commercial DCCs need a vendor installer and
+#      usually a license server, so replace that block entirely.
+#   3. The "Enable the add-on in Blender" step. It is Blender-specific. Other
+#      DCCs are wired up by the installer itself or by an environment variable
+#      such as MAYA_MODULE_PATH or NUKE_PATH, so you can often delete it.
 
 function Write-Step { param([string]$Message) Write-Information "[setup-workstation] $Message" }
-function Write-Warn { param([string]$Message) Write-Warning "[setup-workstation] $Message" }
 function Write-Fatal { param([string]$Message) throw "[setup-workstation] ERROR: $Message" }
 
-if (-not $SkipMonitor -and [string]::IsNullOrWhiteSpace($MonitorUrl)) {
-    Write-Fatal "-MonitorUrl is required unless -SkipMonitor is given"
-}
-
-# The submitter needs a Blender install to point its add-on at. Skipping Blender
-# while still installing the submitter would target a path that does not exist.
-if ($SkipBlender -and -not $SkipSubmitter) {
-    Write-Fatal ("-SkipBlender also requires -SkipSubmitter, because the submitter installer " +
-        "needs the path to blender.exe. To use a Blender that is already installed, set " +
-        "`$BlenderPrefix in this script to its location and drop -SkipBlender")
-}
-
 # ---------------------------------------------------------------------------
-# Resolve the workstation user
+# Arguments
 # ---------------------------------------------------------------------------
 
-if ([string]::IsNullOrWhiteSpace($WorkstationUser)) {
-    $WorkstationUser = $env:USERNAME
+# The Region segment is required. The monitor accepts a URL without it and then
+# writes a profile with a wrong region, so reject that here instead.
+$monitorHost = ([System.Uri]$MonitorUrl).Host
+if ($monitorHost -notmatch '^([a-z0-9-]+)\.([a-z0-9-]+)\.deadlinecloud\.amazonaws\.com$') {
+    Write-Fatal "monitor URL must be https://<subdomain>.<region>.deadlinecloud.amazonaws.com/ (got: $MonitorUrl)"
 }
-Write-Step "workstation user: $WorkstationUser"
+$MonitorSubdomain = $Matches[1]
+$MonitorRegion = $Matches[2]
+$ProfileName = "$MonitorSubdomain-$MonitorRegion"
 
-# ---------------------------------------------------------------------------
-# Parse the monitor URL into subdomain and region
-# ---------------------------------------------------------------------------
-
-$MonitorSubdomain = ""
-$MonitorRegion = ""
-
-if (-not [string]::IsNullOrWhiteSpace($MonitorUrl)) {
-    # Monitor URLs are https://<subdomain>.<region>.deadlinecloud.amazonaws.com/
-    $monitorHost = ([System.Uri]$MonitorUrl).Host
-    if ($monitorHost -match '^([a-z0-9-]+)\.([a-z0-9-]+)\.deadlinecloud\.amazonaws\.com$') {
-        $MonitorSubdomain = $Matches[1]
-        $MonitorRegion = $Matches[2]
-    }
-    else {
-        Write-Fatal "monitor URL must look like https://<subdomain>.<region>.deadlinecloud.amazonaws.com/ (got: $MonitorUrl)"
-    }
-    if ([string]::IsNullOrWhiteSpace($ProfileName)) {
-        $ProfileName = "$MonitorSubdomain-$MonitorRegion"
-    }
-    Write-Step "monitor: subdomain=$MonitorSubdomain region=$MonitorRegion profile=$ProfileName"
-}
+Write-Step "workstation user: $env:USERNAME"
+Write-Step "monitor: $MonitorSubdomain in $MonitorRegion, profile '$ProfileName'"
 
 $WorkDir = Join-Path $env:TEMP "deadline-workstation-setup"
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 
-function Get-RemoteFile {
-    param([string]$Uri, [string]$OutFile)
-    Write-Step "downloading $(Split-Path -Leaf $Uri)"
-    Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
-}
-
 # Fetch a URL as text. Windows PowerShell 5.1 returns Content as a Byte[] for
-# -UseBasicParsing, while PowerShell 7 returns a String, so decode when needed.
-# Treating the byte array as text yields the first byte value instead of the body.
+# -UseBasicParsing while PowerShell 7 returns a String, so decode when needed.
+# Treating the byte array as text yields the first byte value, not the body.
 function Get-RemoteText {
     param([string]$Uri)
     $content = (Invoke-WebRequest -Uri $Uri -UseBasicParsing).Content
@@ -164,22 +106,24 @@ function Get-RemoteText {
     return $content
 }
 
-# Verify a downloaded file against its published sha256. Fatal on any failure,
-# including an unreachable checksum file: silently downgrading to "no
-# verification" on a transient network error would defeat the point. Pass
-# -MatchName to pick one line out of a multi-file checksum manifest.
-function Assert-Sha256 {
-    param([string]$Path, [string]$ChecksumUri, [string]$MatchName)
+# Download a file and verify it against a published sha256. Verification is not
+# optional: an unreachable checksum is an error, not a reason to skip the check.
+# Pass -MatchName to select one line from a multi-file checksum manifest.
+function Get-VerifiedFile {
+    param([string]$Uri, [string]$OutFile, [string]$ChecksumUri, [string]$MatchName)
+
+    Write-Step "downloading $(Split-Path -Leaf $Uri)"
+    Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
+
     try {
         $body = Get-RemoteText -Uri $ChecksumUri
     }
     catch {
-        Write-Fatal "cannot fetch the checksum for $(Split-Path -Leaf $Path) from ${ChecksumUri}: $($_.Exception.Message)"
+        Write-Fatal "cannot fetch the checksum for $(Split-Path -Leaf $OutFile) from ${ChecksumUri}: $($_.Exception.Message)"
     }
 
     $expected = $null
     if ($MatchName) {
-        # Manifests list one "<sha256>  <filename>" line per artifact.
         foreach ($line in ($body -split "`n")) {
             $fields = $line.Trim() -split '\s+'
             if ($fields.Count -ge 2 -and ($fields[1] -eq $MatchName -or $fields[1] -eq "./$MatchName")) {
@@ -191,360 +135,187 @@ function Assert-Sha256 {
     else {
         $expected = ($body.Trim() -split '\s+')[0]
     }
-
     if ($expected -notmatch '^[0-9a-fA-F]{64}$') {
-        Write-Fatal "no usable sha256 for $(Split-Path -Leaf $Path) in $ChecksumUri"
+        Write-Fatal "no usable sha256 for $(Split-Path -Leaf $OutFile) in $ChecksumUri"
     }
 
-    # The published checksum is lowercase but Get-FileHash returns uppercase.
-    $actual = (Get-FileHash -Path $Path -Algorithm SHA256).Hash
+    $actual = (Get-FileHash -Path $OutFile -Algorithm SHA256).Hash
     if ($actual.ToLower() -ne $expected.ToLower()) {
-        Write-Fatal "checksum mismatch for $Path (expected $expected, got $actual)"
+        Write-Fatal "checksum mismatch for $OutFile (expected $expected, got $actual)"
     }
-    Write-Step "checksum verified: $(Split-Path -Leaf $Path)"
+    Write-Step "verified $(Split-Path -Leaf $OutFile)"
 }
 
 # ---------------------------------------------------------------------------
-# Blender
+# Install Blender
 # ---------------------------------------------------------------------------
 
-# DCC (1 of 5): version-to-component map.
-# The submitter installer expects a DCC install path per version, and only
-# supports specific versions. Map "4.5.0" to the installer's blender-45 flags.
-$BlenderSeries = ""
-$BlenderComponent = ""
-if (-not $SkipBlender -or -not $SkipSubmitter) {
-    $versionParts = $BlenderVersion.Split(".")
-    $BlenderSeries = "$($versionParts[0]).$($versionParts[1])"
-    $BlenderComponent = switch ($BlenderSeries) {
-        "3.6" { "blender_36" }
-        "4.0" { "blender_4" }
-        "4.1" { "blender_41" }
-        "4.2" { "blender_42" }
-        "4.3" { "blender_43" }
-        "4.4" { "blender_44" }
-        "4.5" { "blender_45" }
-        "5.0" { "blender_5" }
-        "5.1" { "blender_51" }
-        default { Write-Fatal "the Deadline Cloud submitter does not support Blender $BlenderSeries" }
-    }
+$blenderSeries = $BlenderVersion.Substring(0, $BlenderVersion.LastIndexOf("."))
+$blenderArchive = "blender-$BlenderVersion-windows-x64.zip"
+$blenderZip = Join-Path $WorkDir $blenderArchive
+
+Get-VerifiedFile -Uri "$BlenderMirror/Blender$blenderSeries/$blenderArchive" -OutFile $blenderZip `
+    -ChecksumUri "$BlenderMirror/Blender$blenderSeries/blender-$BlenderVersion.sha256" `
+    -MatchName $blenderArchive
+
+if (Test-Path $BlenderPrefix) { Remove-Item -Recurse -Force $BlenderPrefix }
+$extractDir = Join-Path $WorkDir "blender-extract"
+if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
+Expand-Archive -Path $blenderZip -DestinationPath $extractDir -Force
+
+# The archive contains a single blender-<version>-windows-x64\ directory.
+Move-Item -Path (Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1).FullName -Destination $BlenderPrefix
+$blenderExe = Join-Path $BlenderPrefix "blender.exe"
+if (-not (Test-Path $blenderExe)) {
+    Write-Fatal "expected blender.exe at $blenderExe after extraction"
+}
+Write-Step "Blender installed at $BlenderPrefix"
+
+# ---------------------------------------------------------------------------
+# Install the Deadline Cloud submitter
+# ---------------------------------------------------------------------------
+
+# The manifest maps "latest" to a concrete version, so the download is a pinned,
+# checksummed artifact rather than a moving target.
+Write-Step "resolving the latest submitter from the manifest"
+$manifest = Get-RemoteText -Uri "$DownloadsBase/submitters/manifest.json" | ConvertFrom-Json
+$root = $manifest.DeadlineCloudSubmitter
+$submitterVersion = $root.latest.windows
+$node = $root.versions
+foreach ($part in $submitterVersion.Split(".")) { $node = $node.$part }
+$node = $node.windows
+Write-Step "submitter version: $submitterVersion"
+
+$installer = Join-Path $WorkDir "submitter-installer.exe"
+Get-VerifiedFile -Uri "$DownloadsBase/submitters$($node.installer)" -OutFile $installer `
+    -ChecksumUri "$DownloadsBase/submitters$($node.sha256)"
+
+# --mode unattended runs without a GUI. deadline_client (the Deadline Cloud CLI
+# and libraries) is always installed; enable only the DCC components needed here.
+#
+# On Windows the --<dcc>-path flag takes the executable, not the install
+# directory as on Linux. Values with spaces must be quoted: Start-Process joins
+# -ArgumentList without quoting, so "C:\Program Files\..." would split in two.
+Write-Step "installing the submitter (unattended)"
+$installerArgs = @(
+    "--mode", "unattended"
+    "--unattendedmodeui", "none"
+    "--installscope", "system"
+    "--prefix", "`"$SubmitterPrefix`""
+    "--enable-components", "deadline_cloud_for_blender,$BlenderComponent"
+    ("--" + $BlenderComponent.Replace("_", "-") + "-path"), "`"$blenderExe`""
+)
+$process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -NoNewWindow
+if ($process.ExitCode -ne 0) {
+    Write-Fatal "the submitter installer exited with code $($process.ExitCode)"
+}
+Write-Step "submitter installed at $SubmitterPrefix"
+
+# ---------------------------------------------------------------------------
+# Enable the add-on in Blender
+# ---------------------------------------------------------------------------
+
+# The unattended install stages the add-on but cannot enable it, because add-ons
+# live in Blender's per-user preferences while the install runs at system scope.
+# Run the installer's own script to register it for this account.
+$addonScript = Join-Path $SubmitterPrefix "Submitters\Blender\add_submitter_to_pref.py"
+$addonPath = Join-Path $SubmitterPrefix "Submitters\Blender\python"
+
+Write-Step "enabling the Blender add-on"
+& $blenderExe --background --python $addonScript -- --deadline_cloud_install_path $addonPath | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Fatal "failed to enable the Blender add-on (exit code $LASTEXITCODE)"
 }
 
-# DCC (2 of 5): install the DCC itself.
-# Blender ships a relocatable zip. A commercial DCC will instead need its vendor
-# installer and probably a license server, so replace this whole block.
-if (-not $SkipBlender) {
-    Write-Step "installing Blender $BlenderVersion"
-    $blenderArchive = "blender-$BlenderVersion-windows-x64.zip"
-    $blenderZip = Join-Path $WorkDir $blenderArchive
-    Get-RemoteFile -Uri "$BlenderMirror/Blender$BlenderSeries/$blenderArchive" -OutFile $blenderZip
-    # Blender publishes one checksum manifest per release covering every platform
-    # artifact, so select the line for this archive. Verifying matters most when
-    # -BlenderMirror points at a third-party mirror.
-    Assert-Sha256 -Path $blenderZip `
-        -ChecksumUri "$BlenderMirror/Blender$BlenderSeries/blender-$BlenderVersion.sha256" `
-        -MatchName $blenderArchive
-
-    if (Test-Path $BlenderPrefix) {
-        Remove-Item -Recurse -Force $BlenderPrefix
-    }
-    $extractDir = Join-Path $WorkDir "blender-extract"
-    if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
-    Expand-Archive -Path $blenderZip -DestinationPath $extractDir -Force
-
-    # The archive contains a single blender-<version>-windows-x64\ directory.
-    $inner = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1
-    Move-Item -Path $inner.FullName -Destination $BlenderPrefix
-
-    $blenderExe = Join-Path $BlenderPrefix "blender.exe"
-    if (-not (Test-Path $blenderExe)) {
-        Write-Fatal "expected blender.exe at $blenderExe after extraction"
-    }
-    Write-Step "Blender installed at $BlenderPrefix"
-}
-
-# ---------------------------------------------------------------------------
-# Deadline Cloud submitter
-# ---------------------------------------------------------------------------
-
-if (-not $SkipSubmitter) {
-    Write-Step "resolving the latest submitter installer from the manifest"
-    # The manifest records the latest version per platform and the installer path
-    # under each version. Resolve both so the download is a pinned, checksummed
-    # artifact rather than a moving "latest" URL.
-    $manifest = Get-RemoteText -Uri $SubmitterManifest | ConvertFrom-Json
-    $root = $manifest.DeadlineCloudSubmitter
-    $submitterVersion = $root.latest.windows
-
-    $node = $root.versions
-    foreach ($part in $submitterVersion.Split(".")) {
-        $node = $node.$part
-    }
-    $node = $node.windows
-    Write-Step "submitter version: $submitterVersion"
-
-    $installer = Join-Path $WorkDir "DeadlineCloudSubmitter-windows-x64-installer.exe"
-    Get-RemoteFile -Uri "$DownloadsBase/submitters$($node.installer)" -OutFile $installer
-    if (-not $node.sha256) {
-        Write-Fatal "the manifest does not publish a sha256 for the submitter installer"
-    }
-    Assert-Sha256 -Path $installer -ChecksumUri "$DownloadsBase/submitters$($node.sha256)"
-
-    Write-Step "installing the submitter for Blender $BlenderSeries (unattended)"
-    # DCC (3 of 5): the enabled components and the --<dcc>-path flag.
-    # --mode unattended runs without a GUI. Enabling only the Blender components
-    # keeps the install to the submitter this workstation needs; deadline_client
-    # (the Deadline Cloud CLI and libraries) is always installed.
-    #
-    # On Windows the --blender-<version>-path flag expects the full path to
-    # blender.exe, not the install directory. The installer's own default is
-    # "C:\Program Files\Blender Foundation\Blender 4.5\blender.exe". The Linux
-    # installer takes the directory instead, so the two scripts differ here.
-    #
-    # Values containing spaces must be double-quoted. Start-Process joins
-    # -ArgumentList with spaces without quoting, so an unquoted
-    # "C:\Program Files\..." reaches the installer as two arguments.
-    $blenderPathFlag = "--" + $BlenderComponent.Replace("_", "-") + "-path"
-    $blenderExePath = Join-Path $BlenderPrefix "blender.exe"
-    $installerArgs = @(
-        "--mode", "unattended"
-        "--unattendedmodeui", "none"
-        "--installscope", "system"
-        "--prefix", "`"$SubmitterPrefix`""
-        "--enable-components", "deadline_cloud_for_blender,$BlenderComponent"
-        $blenderPathFlag, "`"$blenderExePath`""
-    )
-    $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -NoNewWindow
-    if ($process.ExitCode -ne 0) {
-        Write-Fatal "the submitter installer exited with code $($process.ExitCode)"
-    }
-    Write-Step "submitter installed at $SubmitterPrefix"
-
-    # DCC (4 of 5): enable the add-on. Blender-specific; most other DCCs are
-    # wired up by the installer or by an environment variable, so this step can
-    # often be deleted outright.
-    # The unattended install stages the add-on under the submitter prefix but does
-    # not enable it: the add-on lives in Blender's per-user preferences, which the
-    # system-scope installer cannot write. Register it by running the installer's
-    # own script through Blender in background mode. This writes the preferences of
-    # the account running the script, so it must be the artist's account.
-    if (-not $SkipBlender) {
-        $addonScript = Join-Path $SubmitterPrefix "Submitters\Blender\add_submitter_to_pref.py"
-        $addonPath = Join-Path $SubmitterPrefix "Submitters\Blender\python"
-        if ($WorkstationUser -ne $env:USERNAME) {
-            Write-Warn ("skipping add-on registration: Blender preferences are per user and " +
-                "this session runs as '$env:USERNAME', not '$WorkstationUser'")
-            Write-Warn "run the following in an elevated session as ${WorkstationUser}:"
-            Write-Warn ("  & '$(Join-Path $BlenderPrefix "blender.exe")' --background " +
-                "--python '$addonScript' -- --deadline_cloud_install_path '$addonPath'")
-        }
-        elseif (Test-Path $addonScript) {
-            Write-Step "enabling the Blender add-on"
-            # add_submitter_to_pref.py appends to Blender's script directory list
-            # without checking for an existing entry, so running this script more
-            # than once leaves duplicate paths in the artist's preferences. The
-            # add-on still loads correctly; the duplicates are cosmetic.
-            $blenderExe = Join-Path $BlenderPrefix "blender.exe"
-            & $blenderExe --background --python $addonScript -- --deadline_cloud_install_path $addonPath
-            if ($LASTEXITCODE -ne 0) {
-                Write-Fatal "failed to enable the Blender add-on (exit code $LASTEXITCODE)"
-            }
-
-            # Confirm the add-on is enabled rather than trusting the exit code above.
-            # Use a script file rather than --python-expr: PowerShell does not preserve
-            # the inner double quotes of an expression passed on the command line, so
-            # Blender receives a bare identifier and raises NameError. Blender does
-            # propagate the script's sys.exit status, so the exit code is meaningful.
-            $checkScript = Join-Path $WorkDir "check_addon.py"
-            Set-Content -Path $checkScript -Encoding ASCII -Value @'
+# Confirm from Blender's preferences rather than trusting the exit code. Use a
+# script file, not --python-expr: PowerShell does not preserve the inner quotes
+# of an expression passed on the command line, so Blender raises NameError.
+$checkScript = Join-Path $WorkDir "check_addon.py"
+Set-Content -Path $checkScript -Encoding ASCII -Value @'
 import bpy
 import sys
 
-enabled = "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys()
-print("deadline_cloud_blender_submitter enabled:", enabled)
-sys.exit(0 if enabled else 1)
+sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)
 '@
-            & $blenderExe --background --python $checkScript | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Fatal "the Blender add-on did not register in Blender preferences"
-            }
-            Write-Step "Blender add-on enabled"
-        }
-        else {
-            Write-Warn "$addonScript not found; enable the add-on manually"
-        }
-    }
-    else {
-        Write-Warn "Blender was skipped, so the add-on was not enabled in Blender preferences"
-    }
+& $blenderExe --background --python $checkScript | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Fatal "the Blender add-on did not register in Blender preferences"
+}
+Write-Step "Blender add-on enabled"
+
+# ---------------------------------------------------------------------------
+# Install Deadline Cloud monitor and create the profile
+# ---------------------------------------------------------------------------
+
+$monitorSetupUrl = "$DownloadsBase/dcm/latest/DeadlineCloudMonitor_x64-setup.exe"
+$monitorSetup = Join-Path $WorkDir "DeadlineCloudMonitor_x64-setup.exe"
+Get-VerifiedFile -Uri $monitorSetupUrl -OutFile $monitorSetup -ChecksumUri "$monitorSetupUrl.sha256"
+
+# /S is the monitor installer's silent switch.
+$process = Start-Process -FilePath $monitorSetup -ArgumentList "/S" -Wait -PassThru -NoNewWindow
+if ($process.ExitCode -ne 0) {
+    Write-Fatal "the monitor installer exited with code $($process.ExitCode)"
 }
 
-# ---------------------------------------------------------------------------
-# Deadline Cloud monitor
-# ---------------------------------------------------------------------------
-
-if (-not $SkipMonitor) {
-    # The monitor installs per user under %LOCALAPPDATA% and create-profile writes
-    # into %USERPROFILE%, so both act on whichever account runs this script. Windows
-    # cannot run them as another local user without that user's password, so refuse
-    # to continue rather than write the profile into the wrong home directory.
-    if ($WorkstationUser -ne $env:USERNAME) {
-        Write-Fatal ("the monitor and its profile install per user, so run this script " +
-            "in an elevated session as '$WorkstationUser' (currently '$env:USERNAME'), " +
-            "or use -SkipMonitor and create the profile in that user's session")
-    }
-
-    Write-Step "installing Deadline Cloud monitor"
-    $monitorSetup = Join-Path $WorkDir "DeadlineCloudMonitor_x64-setup.exe"
-    Get-RemoteFile -Uri $MonitorSetupUrl -OutFile $monitorSetup
-    Assert-Sha256 -Path $monitorSetup -ChecksumUri "$MonitorSetupUrl.sha256"
-
-    # /S is the monitor installer's silent switch.
-    $process = Start-Process -FilePath $monitorSetup -ArgumentList "/S" -Wait -PassThru -NoNewWindow
-    if ($process.ExitCode -ne 0) {
-        Write-Fatal "the monitor installer exited with code $($process.ExitCode)"
-    }
-
-    $userProfilePath = $env:USERPROFILE
-
-    # Resolve the executable from the uninstall registry entry the installer writes.
-    # Guessing paths is unreliable: the installer normally lands in
-    # %LOCALAPPDATA%\DeadlineCloudMonitor, but under a 32-bit host process it
-    # redirects into the SysWOW64 view of the profile, and an MSI install goes to
-    # Program Files. The registry records wherever it actually went.
-    $monitorBin = $null
-    $uninstallKeys = @(
+# Resolve the executable from the uninstall registry entry the installer writes.
+# Guessing paths is unreliable: the installer normally lands in
+# %LOCALAPPDATA%\DeadlineCloudMonitor, but under a 32-bit host process it
+# redirects into the SysWOW64 view of the profile. The registry records where it
+# actually went.
+$monitorBin = $null
+foreach ($key in @(
         "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-    )
-    foreach ($key in $uninstallKeys) {
-        $entry = Get-ItemProperty $key -ErrorAction SilentlyContinue |
-            Where-Object { $_.DisplayName -eq "DeadlineCloudMonitor" -and $_.InstallLocation } |
-            Select-Object -First 1
-        if ($entry) {
-            $candidate = Join-Path $entry.InstallLocation.Trim('"') "DeadlineCloudMonitor.exe"
-            if (Test-Path $candidate) { $monitorBin = $candidate; break }
-        }
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")) {
+    $entry = Get-ItemProperty $key -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -eq "DeadlineCloudMonitor" -and $_.InstallLocation } |
+        Select-Object -First 1
+    if ($entry) {
+        $candidate = Join-Path $entry.InstallLocation.Trim('"') "DeadlineCloudMonitor.exe"
+        if (Test-Path $candidate) { $monitorBin = $candidate; break }
     }
-
-    if (-not $monitorBin) {
-        # Fall back to the documented locations, including the SysWOW64 profile view.
-        $candidates = @(
-            (Join-Path $env:LOCALAPPDATA "DeadlineCloudMonitor\DeadlineCloudMonitor.exe"),
-            "C:\Program Files\DeadlineCloudMonitor\DeadlineCloudMonitor.exe",
-            "$env:SystemRoot\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\DeadlineCloudMonitor.exe",
-            "$env:SystemRoot\System32\config\systemprofile\AppData\Local\DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
-        )
-        $monitorBin = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-    }
-
-    if (-not $monitorBin) {
-        Write-Fatal "cannot find DeadlineCloudMonitor.exe after install"
-    }
-    Write-Step "monitor installed: $monitorBin"
-
-    # -----------------------------------------------------------------------
-    # Monitor ID discovery
-    # -----------------------------------------------------------------------
-    # create-profile requires a monitor ID. It stores whatever it is given and
-    # replaces it with the authoritative value on the artist's first sign-in, so
-    # a placeholder still produces a working profile. Prefer the real ID when
-    # credentials are available so the profile is correct before anyone signs in.
-    if ([string]::IsNullOrWhiteSpace($MonitorId)) {
-        if (Get-Command aws -ErrorAction SilentlyContinue) {
-            Write-Step "looking up the monitor ID with deadline:ListMonitors"
-            # A native command exiting non-zero does not throw, even under
-            # $ErrorActionPreference = "Stop", so check $LASTEXITCODE. Keep stderr
-            # so a permissions or credentials problem is visible rather than
-            # silently becoming a placeholder ID.
-            $query = "monitors[?subdomain=='$MonitorSubdomain'].monitorId | [0]"
-            $discovered = (& aws deadline list-monitors --region $MonitorRegion --query $query --output text 2>&1 | Out-String).Trim()
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warn "deadline:ListMonitors failed: $discovered"
-            }
-            elseif ($discovered -and $discovered -ne "None") {
-                $MonitorId = $discovered
-            }
-            else {
-                Write-Warn "no monitor with subdomain '$MonitorSubdomain' in $MonitorRegion"
-            }
-        }
-    }
-    if ([string]::IsNullOrWhiteSpace($MonitorId)) {
-        # 32 zeros is a syntactically valid placeholder that first sign-in replaces.
-        $MonitorId = "monitor-00000000000000000000000000000000"
-        Write-Warn "monitor ID not discovered; using a placeholder"
-        Write-Warn "the artist's first sign-in replaces it with the real monitor ID"
-    }
-    Write-Step "monitor ID: $MonitorId"
-
-    # -----------------------------------------------------------------------
-    # Create the profile
-    # -----------------------------------------------------------------------
-    # create-profile is a non-GUI subcommand: it writes the profile and exits
-    # without needing a desktop session.
-    Write-Step "creating monitor profile '$ProfileName'"
-    $createArgs = @(
-        "create-profile"
-        "--profile", $ProfileName
-        "--monitor-id", $MonitorId
-        "--monitor-url", $MonitorUrl
-        "--enable-auto-login"
-        "--set-as-deadline-default"
-    )
-    $profileOutput = & $monitorBin @createArgs 2>&1 | Out-String
-
-    # create-profile exits 0 even when it fails, so confirm from its output.
-    if ($profileOutput -notmatch [regex]::Escape("Created profile $ProfileName")) {
-        Write-Information $profileOutput
-        Write-Fatal "failed to create the monitor profile"
-    }
-    Write-Step $profileOutput.Trim()
-
-    $awsConfig = Join-Path $userProfilePath ".aws\config"
-    if (-not (Test-Path $awsConfig)) {
-        Write-Fatal "expected $awsConfig after create-profile"
-    }
-    if (-not (Select-String -Path $awsConfig -Pattern ([regex]::Escape("[profile $ProfileName]")) -Quiet)) {
-        Write-Fatal "profile $ProfileName missing from $awsConfig"
-    }
-    Write-Step "verified the profile in $awsConfig"
 }
-
-# ---------------------------------------------------------------------------
-# Summary
-# ---------------------------------------------------------------------------
-
-$blenderSummary = if ($SkipBlender) { "skipped" } else { "$BlenderPrefix (blender $BlenderVersion)" }
-$submitterSummary = if ($SkipSubmitter) { "skipped" } else { "$SubmitterPrefix (Blender $BlenderSeries)" }
-$monitorSummary = if ($SkipMonitor) { "skipped" } else { $monitorBin }
-$profileSummary = if ($SkipMonitor) { "skipped" } else { "$ProfileName ($MonitorUrl)" }
-
-# DCC (5 of 5): summary text.
-$nextSteps = if ($SkipMonitor) {
-    @"
-No monitor profile was created. Re-run without -SkipMonitor, passing
--MonitorUrl, before the artist can submit jobs.
-"@
+if (-not $monitorBin) {
+    Write-Fatal "cannot find DeadlineCloudMonitor.exe after install"
 }
-else {
-    @"
-What the artist does next:
-  1. Open Deadline Cloud monitor and sign in to the '$ProfileName' profile.
-  2. Open Blender. The Deadline Cloud add-on submits to the farm using that profile.
-"@
+Write-Step "monitor installed: $monitorBin"
+
+# create-profile is a non-GUI subcommand: it writes the profile and exits without
+# needing a display.
+#
+# --monitor-id is required but is left empty here. The monitor overwrites it, along
+# with the user and identity store IDs, using authoritative values from the portal
+# on the artist's first sign-in. Looking it up in advance needs AWS credentials and
+# deadline:ListMonitors permission, so this example does without.
+Write-Step "creating monitor profile '$ProfileName'"
+$profileOutput = & $monitorBin create-profile `
+    --profile $ProfileName `
+    --monitor-id "" `
+    --monitor-url $MonitorUrl `
+    --enable-auto-login `
+    --set-as-deadline-default 2>&1 | Out-String
+
+# create-profile exits 0 even when it fails, so confirm from its output and then
+# from the file it should have written.
+if ($profileOutput -notmatch [regex]::Escape("Created profile $ProfileName")) {
+    Write-Fatal "failed to create the monitor profile: $profileOutput"
 }
+$awsConfig = Join-Path $env:USERPROFILE ".aws\config"
+if (-not (Select-String -Path $awsConfig -SimpleMatch -Pattern "[profile $ProfileName]" -Quiet)) {
+    Write-Fatal "profile $ProfileName is missing from $awsConfig"
+}
+Write-Step "profile created and verified in $awsConfig"
 
 Write-Information @"
 
-[setup-workstation] Workstation setup complete.
+[setup-workstation] Done.
 
-  Blender:    $blenderSummary
-  Submitter:  $submitterSummary
-  Monitor:    $monitorSummary
-  Profile:    $profileSummary
+  Blender:    $BlenderPrefix ($BlenderVersion)
+  Submitter:  $SubmitterPrefix
+  Monitor:    $monitorBin
+  Profile:    $ProfileName ($MonitorUrl)
 
-$nextSteps
+$env:USERNAME can now open Deadline Cloud monitor, sign in to the
+'$ProfileName' profile, and submit from Blender.
 
 "@

@@ -1,173 +1,141 @@
 # Virtual workstation setup
 
-Provisioning scripts that turn a fresh Linux or Windows workstation into a ready-to-use AWS Deadline Cloud submission machine. An artist who logs in finds Blender and the Deadline Cloud submitter already installed, alongside Deadline Cloud monitor with a profile configured. The only remaining step is signing in.
+Example scripts that turn a fresh Linux or Windows workstation into an AWS Deadline Cloud submission machine. An artist who logs in finds Blender and the Deadline Cloud submitter installed, alongside Deadline Cloud monitor with a profile already configured. The only remaining step is signing in.
+
+Treat each script as a worked example to copy and adapt. Each takes one argument and keeps its settings as constants at the top, so the whole flow reads top to bottom.
 
 ## What this sample demonstrates
 
-How to complete every part of workstation setup that normally requires a person clicking through installers and a monitor sign-in dialog:
+How to complete the workstation setup that normally requires a person clicking through installers and a monitor sign-in dialog:
 
 * Installing Blender from an official release archive.
-* Installing the Deadline Cloud submitter with a silent, unattended installer resolved from the published submitter manifest and verified against its SHA-256 checksum.
-* Enabling the Blender add-on in the artist's Blender preferences, which the unattended installer alone does not do.
-* Installing Deadline Cloud monitor from its Linux package or Windows installer.
+* Installing the Deadline Cloud submitter with its silent installer, resolved from the published submitter manifest.
+* Enabling the submitter's Blender add-on, which the silent installer alone does not do.
+* Installing Deadline Cloud monitor.
 * Creating a monitor profile non-interactively with `deadline-cloud-monitor create-profile`, so the profile exists before anyone signs in.
 
-Run these during instance provisioning (EC2 user data, an AMI or image bake, or by hand on a workstation VM).
+Run either script during provisioning, from EC2 user data, during an AMI or image bake, or by hand on a workstation VM.
 
-Blender is a stand-in for whichever DCC you run. It is used here because it installs unattended from a public archive with no license server, which keeps the sample runnable as-is. The Deadline Cloud parts are the same for every DCC, so adapting the scripts to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After Effects, or VRED means changing five marked places. Both scripts carry an `ADAPTING THIS SCRIPT TO A DIFFERENT DCC` header that lists them, and a numbered `DCC (n of 5)` comment at each one.
+Blender stands in for whichever DCC you run. It is used here because it installs unattended from a public archive with no license server, which keeps the example runnable as-is. See [Adapting to another DCC](#adapting-to-another-dcc).
 
 ## Prerequisites
 
-* A Linux or Windows workstation image with a desktop environment already present, because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
-* Administrator access: `root` on Linux, an elevated PowerShell session on Windows. On Windows that session should be the artist's own account, because the monitor and its profile install per user.
-* Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender download mirror.
-* Your monitor URL, which looks like `https://<subdomain>.<region>.deadlinecloud.amazonaws.com/`. Find it on the **Monitors** page of the Deadline Cloud console. The Region segment is required: `create-profile` accepts a URL without it and silently writes a profile with a wrong `region`, so both scripts validate the shape before calling the monitor.
-* Optional: AWS credentials with `deadline:ListMonitors` permission on the instance. See [Monitor ID discovery](#monitor-id-discovery).
+* A workstation image with a desktop environment already present, because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
+* **On Linux, OpenSSL 1.1 (`libssl.so.1.1`).** Deadline Cloud monitor links against it and current distributions no longer include it. Install it before running the script:
+  * Ubuntu and Debian: the `libssl1.1` package from your distribution's archive.
+  * RHEL 8/9, Rocky, Alma: `sudo dnf install epel-release && sudo dnf install compat-openssl11`.
+  * Amazon Linux 2023 does not package OpenSSL 1.1, so use another image.
+
+  The script checks for the library and stops with these instructions if it is missing, rather than installing a monitor that cannot start.
+* Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
+* Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
+* Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
+* No AWS credentials. The scripts call no AWS APIs.
 
 Linux support covers Debian-family (`apt`) and RHEL-family (`dnf`) distributions.
 
-## How it works
-
-Each script runs the same five steps.
-
-1. **Parse the monitor URL** into its subdomain and region. The region is where the monitor lives; the subdomain identifies it. The default profile name is `<subdomain>-<region>`.
-2. **Install Blender** by downloading the official archive for the requested version and unpacking it to a fixed prefix (`/opt/blender` or `C:\Program Files\Blender`).
-3. **Install the submitter.** The script reads [`manifest.json`](https://downloads.deadlinecloud.amazonaws.com/submitters/manifest.json) to resolve the latest version for the platform. It downloads that pinned installer, verifies its published SHA-256 checksum, and runs it with `--mode unattended`. Only the Blender components are enabled, and the installer is told where Blender lives so it can match add-on files to the Blender version.
-4. **Enable the Blender add-on.** The unattended installer stages the add-on under the submitter prefix but cannot enable it, because add-ons live in Blender's *per-user* preferences and the install runs at system scope. The script runs the installer's own `add_submitter_to_pref.py` through Blender in `--background` mode as the workstation user, then reads the preferences back to confirm the add-on registered.
-5. **Install the monitor and create a profile.** After installing the monitor, the script calls `deadline-cloud-monitor create-profile`, a non-GUI subcommand that writes the profile and exits without needing a display. The monitor added it in version 1.0.2 for exactly this purpose: letting IT administrators configure Deadline Cloud client tools so artists do not have to set up profiles by hand. It is not covered in the Deadline Cloud user guide, which documents only the interactive profile wizard, so run `deadline-cloud-monitor create-profile --help` on the monitor version you deploy to confirm the arguments.
-
-### What the profile contains
-
-`create-profile` writes an AWS profile that resolves credentials through the monitor rather than through IAM Identity Center SSO stanzas:
-
-```ini
-[profile mymonitor-us-west-2]
-region=us-west-2
-credential_process=cat "/home/artist/.cache/com.amazonaws.deadline.monitor/credentials_mymonitor-us-west-2.json"
-user_id=
-identity_store_id=
-monitor_id=monitor-00000000000000000000000000000000
-```
-
-It also points the Deadline Cloud CLI at that profile in `~/.deadline/config`:
-
-```ini
-[deadline-cloud-monitor]
-path=/usr/bin/deadline-cloud-monitor
-
-[defaults]
-aws_profile_name=mymonitor-us-west-2
-```
-
-This shape has consequences worth knowing about:
-
-* `user_id` and `identity_store_id` are empty and `credential_process` reads a cache file that does not exist yet. The profile produces no usable credentials until the artist signs in to the monitor once. That sign-in is the intended remaining step, not a defect.
-* The profile must be created *as the workstation user*, because the cache path baked into `credential_process` is inside that user's home directory. The same applies to the monitor install on Windows and to Blender's add-on preferences on both platforms.
-
-Each platform handles that differently:
-
-* **Linux** runs the per-user steps through `runuser`, so provisioning as `root` works. Pass `--workstation-user` to name the artist's account.
-* **Windows** cannot run a process as another local user without that user's password. Run the script in an elevated session as the artist's own account. To provision from a separate admin account instead, pass `-SkipMonitor` for the machine-wide parts, then run the script again as the artist. The script fails fast rather than writing the profile into the wrong home directory.
-
-### Monitor ID discovery
-
-`create-profile` requires a `--monitor-id` argument. Current monitor IDs are `monitor-` followed by 32 hexadecimal characters, matching the [`GetMonitor` API pattern](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_GetMonitor.html). The monitor stores whatever value it is given without validating the format, and replaces it with the authoritative value on the artist's first sign-in.
-
-The scripts try to get the real ID, but do not require it:
-
-* If you pass `--monitor-id` / `-MonitorId`, that value is used.
-* Otherwise, if the AWS CLI is present and credentials are available, the script calls `deadline:ListMonitors` and matches on the subdomain from your monitor URL.
-* Otherwise, the script writes a placeholder of 32 zeros and warns. The profile still works, because the first sign-in corrects the ID.
-
-Passing the ID explicitly, or giving the instance a role with `deadline:ListMonitors`, produces a fully correct profile before anyone signs in.
-
-## Run or submit
+## Run
 
 Linux, as root:
 
 ```console
-sudo ./setup_workstation_linux.sh \
-    --monitor-url https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/
+sudo ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 ```
 
-Windows, in an elevated PowerShell session:
+When provisioning runs as `root` but a different account signs in, name that account:
 
 ```console
-.\setup_workstation_windows.ps1 `
-    -MonitorUrl https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/
+sudo ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/ artist
 ```
 
-Useful variants:
+Windows, in an elevated PowerShell session **as the artist's own account**:
 
 ```console
-# Provisioning runs as root but the artist logs in as a different user
-sudo ./setup_workstation_linux.sh \
-    --monitor-url https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/ \
-    --workstation-user artist
-
-# Pin the monitor ID so the profile is correct before the first sign-in
-sudo ./setup_workstation_linux.sh \
-    --monitor-url https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/ \
-    --monitor-id monitor-1234567890abcdef1234567890abcdef
-
-# A different Blender version, and only the monitor profile on a machine that
-# already has Blender and the submitter
-sudo ./setup_workstation_linux.sh \
-    --monitor-url https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/ \
-    --blender-version 4.2.0
-sudo ./setup_workstation_linux.sh \
-    --monitor-url https://mymonitor.us-west-2.deadlinecloud.amazonaws.com/ \
-    --skip-blender --skip-submitter
+.\setup_workstation_windows.ps1 https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 ```
 
-## Parameters and outputs
+The monitor, its profile, and Blender's add-on preferences are all per user. Linux writes them for another account with `runuser`, but Windows cannot do so without that account's password, so the Windows script has no equivalent of the second argument.
 
-| Linux | Windows | Default | Purpose |
-|---|---|---|---|
-| `--monitor-url` | `-MonitorUrl` | required | Monitor URL. Required unless the monitor step is skipped. |
-| `--profile-name` | `-ProfileName` | `<subdomain>-<region>` | Name of the AWS profile to create. |
-| `--monitor-id` | `-MonitorId` | discovered | Monitor ID. See [Monitor ID discovery](#monitor-id-discovery). |
-| `--workstation-user` | `-WorkstationUser` | invoking user | Account that signs in to the monitor and owns the profile. On Windows it must match the account running the script. |
-| `--blender-version` | `-BlenderVersion` | `4.5.0` | Blender version to install. |
-| `--blender-mirror` | `-BlenderMirror` | `https://download.blender.org/release` | Base URL for Blender downloads. |
-| `--skip-blender` | `-SkipBlender` | off | Do not install Blender. |
-| `--skip-submitter` | `-SkipSubmitter` | off | Do not install the submitter. |
-| `--skip-monitor` | `-SkipMonitor` | off | Do not install the monitor or create a profile. |
+## How it works
 
-Only Blender versions the submitter supports are accepted: 3.6, 4.0 through 4.5, 5.0, and 5.1. The script fails early on any other version rather than installing a Blender the submitter cannot target.
+Both scripts run the same five steps, in the same order, under matching section headers.
 
-What ends up on the machine:
+1. **Validate the monitor URL** and derive the Region, the subdomain, and the profile name (`<subdomain>-<region>`).
+2. **Install Blender** from the official archive, verified against its published checksum, into a fixed prefix (`/opt/blender` or `C:\Program Files\Blender`).
+3. **Install the submitter.** Read [`manifest.json`](https://downloads.deadlinecloud.amazonaws.com/submitters/manifest.json) to turn "latest" into a concrete version, download that pinned installer, verify its checksum, and run it with `--mode unattended`.
+4. **Enable the Blender add-on.** The silent install stages the add-on but cannot enable it, because add-ons live in Blender's per-user preferences while the install runs at system scope. The scripts run the installer's own `add_submitter_to_pref.py` through Blender in background mode, then read the preferences back to confirm.
+5. **Install the monitor and create the profile** with `create-profile`, a non-GUI subcommand that writes the profile and exits without needing a display.
 
-| Path | Linux | Windows |
+Every download is verified against a published SHA-256 checksum, and the scripts fail if a checksum cannot be fetched. An internal Blender mirror must also serve Blender's `blender-<version>.sha256` manifest.
+
+### The profile
+
+`create-profile` writes an AWS profile that resolves credentials through the monitor rather than through IAM Identity Center stanzas:
+
+```ini
+[profile mystudio-us-west-2]
+region=us-west-2
+credential_process=cat "/home/artist/.cache/com.amazonaws.deadline.monitor/credentials_mystudio-us-west-2.json"
+user_id=
+identity_store_id=
+monitor_id=
+```
+
+It also points the Deadline Cloud CLI at that profile in `~/.deadline/config`.
+
+The empty fields are expected. The monitor fills in `monitor_id`, `user_id`, and `identity_store_id` from authoritative values at the artist's first sign-in, so the scripts pass an empty `--monitor-id` and need no AWS credentials to look one up. `credential_process` reads a cache file that the same sign-in creates, so the profile yields no credentials until then. That sign-in is the intended remaining step.
+
+Because the cache path is written into the profile at creation time and lives under the invoking user's home directory, the profile only works for the account it was created for.
+
+### Adapting to another DCC
+
+Everything Deadline Cloud does is identical for every DCC, so switching to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After Effects, or VRED means changing three things, called out in comments in both scripts:
+
+1. **The component name** (`BLENDER_COMPONENT` / `$BlenderComponent`). Run `<installer> --help` for the current `--enable-components` values, such as `deadline_cloud_for_maya` or `deadline_cloud_for_houdini` plus a version component like `houdini_20_5`.
+2. **The Blender install step.** Commercial DCCs need a vendor installer and, in most cases, a license server, so replace that block entirely.
+3. **The add-on enable step.** It is Blender-specific. Other DCCs are wired up by the installer itself or by an environment variable such as `MAYA_MODULE_PATH` or `NUKE_PATH`, so you can often delete it.
+
+Note that the submitter installer's `--<dcc>-path` flag takes the DCC executable on Windows but the install directory on Linux.
+
+To install more than one DCC, pass a comma-separated `--enable-components` list with every DCC and version component you need, one `--<dcc>-path` flag each, and repeat step 2 per DCC.
+
+## What ends up on the machine
+
+| Item | Linux | Windows |
 |---|---|---|
 | Blender | `/opt/blender`, symlinked to `/usr/local/bin/blender` | `C:\Program Files\Blender` |
 | Submitter and Deadline Cloud CLI | `/opt/DeadlineCloudSubmitter` | `C:\Program Files\DeadlineCloudSubmitter` |
-| Monitor | `/usr/bin/deadline-cloud-monitor` | `%LOCALAPPDATA%\DeadlineCloudMonitor` (resolved from the uninstall registry entry) |
+| Monitor | `/usr/bin/deadline-cloud-monitor` | `%LOCALAPPDATA%\DeadlineCloudMonitor` |
 | AWS profile | `~/.aws/config` | `%USERPROFILE%\.aws\config` |
 | Deadline Cloud CLI config | `~/.deadline/config` | `%USERPROFILE%\.deadline\config` |
 
-The submitter installer adds the `deadline` CLI to `PATH` itself, through `/etc/profile.d/deadline.sh` on Linux. It is available in new login shells, not in the shell that ran the script.
+The submitter installer puts the `deadline` CLI on `PATH` itself, through `/etc/profile.d/deadline.sh` on Linux, so it is available in new login shells rather than the one that ran the script.
 
 ## Security, cost, and cleanup
 
-* **No credentials are stored.** The scripts never write secrets. The profile delegates to the monitor, which acquires credentials only when the artist signs in interactively.
-* **Least privilege for discovery.** The only AWS call is `deadline:ListMonitors`, which is read-only. An instance role scoped to that single action is enough, and nothing here needs write access. You can omit credentials entirely and accept the placeholder monitor ID.
-* **Every download is verified.** The Blender archive, the submitter installer, and the monitor package are all checked against their published SHA-256 checksums, and the scripts fail on a mismatch or if a checksum cannot be fetched. Verification is not optional, so an internal `--blender-mirror` must also serve Blender's `blender-<version>.sha256` manifest.
-* **Licensing.** Blender is distributed under the GNU GPL. Review its license terms for your use.
-* **Cost.** The scripts create no AWS resources and incur no Deadline Cloud charges. Running the workstation instance itself is billable, and jobs submitted from it are billed normally.
-* **Cleanup.** To remove the submitter, run `/opt/DeadlineCloudSubmitter/uninstall` or the Windows equivalent that its installer provides. Remove the monitor with your package manager or through Windows "Apps & features", and delete `/opt/blender`. Finally, remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`.
+* **No credentials are stored, and none are needed.** The scripts write no secrets and call no AWS APIs. The profile delegates to the monitor, which acquires credentials only when the artist signs in interactively.
+* **Every installer is checksum-verified**, and verification cannot be skipped. If you mirror Blender internally, serve its checksum manifest too and point the mirror constant at it.
+* **Licensing.** Blender is distributed under the GNU GPL. Review its terms for your use.
+* **Cost.** The scripts create no AWS resources. Running the workstation is billable, and jobs submitted from it are billed normally.
+* **Cleanup.** Run `/opt/DeadlineCloudSubmitter/uninstall` or its Windows equivalent, remove the monitor with your package manager or through Windows "Apps & features", and delete the Blender prefix. Then remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`.
 
 ## Troubleshooting
 
-**The monitor fails to start with `libssl.so.1.1: cannot open shared object file`.** The monitor links against OpenSSL 1.1, which current distributions no longer include. The Linux script installs the compatibility package first (`libssl1.1` on Debian-family, `compat-openssl11` from EPEL on RHEL 9 derivatives). If it fails, install that package for your distribution and re-run.
+**The monitor will not start, reporting `libssl.so.1.1`.** Install OpenSSL 1.1 as described under [Prerequisites](#prerequisites). The script normally catches this first.
 
-**Blender downloads fail with HTTP 403.** `download.blender.org` rejects some automated clients. Use `--blender-mirror` with an [official Blender mirror](https://mirror.blender.org/), or with an archive you host internally.
+**Blender downloads fail with HTTP 403.** `download.blender.org` rejects some automated clients, so the scripts default to a mirror. Pick another from [mirror.blender.org](https://mirror.blender.org/), or host the archive and its checksum manifest internally.
 
-**On Windows, the monitor is installed but the script cannot find it.** The installer honors WOW64
-file-system redirection, so under a 32-bit host process it installs into
-`C:\Windows\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\` even though
-`%LOCALAPPDATA%` points elsewhere. The script resolves the executable from the uninstall registry entry
-rather than a fixed path, and falls back to the known locations. If both fail, find the real path with:
+**The Deadline Cloud menu is missing in Blender.** Add-ons register per user, so confirm the script ran for the right account: the second argument on Linux, or the signed-in account on Windows. To check directly:
+
+```console
+blender --background --python-expr 'import bpy; print("deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys())'
+```
+
+On Windows, call `& 'C:\Program Files\Blender\blender.exe'` instead, since the script does not add Blender to `PATH`.
+
+**Submission fails with a credentials error.** Expected until the artist signs in to the monitor once. Check with `deadline auth status`.
+
+**On Windows, the script cannot find the monitor after installing it.** The installer honors WOW64 redirection, so under a 32-bit host process it installs into `C:\Windows\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\` even though `%LOCALAPPDATA%` points elsewhere. The script reads the install location from the uninstall registry entry to avoid guessing. To find it by hand:
 
 ```console
 Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
@@ -175,21 +143,8 @@ Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
     Select-Object InstallLocation
 ```
 
-**Amazon Linux 2023 cannot run the monitor.** The monitor needs `libssl.so.1.1`, and AL2023 does not package `compat-openssl11`. The Linux script detects the missing library and fails with that explanation rather than installing a monitor that cannot start. Use a RHEL 8/9, Rocky, Alma, or Ubuntu image, or provide OpenSSL 1.1 yourself.
-
-**The Deadline Cloud menu is missing in Blender.** The add-on registers in per-user Blender preferences, so it applies only to the account it was registered for. On Linux, confirm you passed the right `--workstation-user`. On Windows, confirm the script ran as the artist's account; if it did not, it prints the exact command to run in their session. To check the state directly:
-
-```console
-blender --background --python-expr 'import bpy; print("deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys())'
-```
-
-**Submission fails with a credentials error.** Expected until the artist signs in to the monitor once, because `credential_process` reads a cache file the sign-in creates. Verify with `deadline auth status`.
-
-**`create-profile` reports success but no profile appears.** `create-profile` exits 0 even when it fails, so both scripts parse its output and then read back `~/.aws/config` to confirm. If they report a failure, run the `create-profile` command by hand to see the underlying message.
-
 ## Related resources
 
-* [Deadline Cloud monitor setup](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/submitter.html)
-* [Install Deadline Cloud submitters](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/submitter-installers.html)
+* [Set up your workstation](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/submitter.html)
 * [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud)
 * [Blender download mirror](https://mirror.blender.org/)
