@@ -1,0 +1,124 @@
+specificationVersion: 'environment-2023-09'
+# DEMO VARIANT of rez_queue_env_shim.yaml.
+#
+# This variant is self-contained: it installs Rez into the session directory and
+# builds a small demo Rez package on the fly, so the PATH-shim mechanism can be
+# tested on any worker without pre-installing Rez or mounting a package
+# repository. Use rez_queue_env_shim.yaml for real farms.
+parameterDefinitions:
+  - name: RezPackages
+    type: STRING
+    description: Space-separated list of Rez packages to resolve.
+    default: "demotool"
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Packages
+  - name: RezExtraTools
+    type: STRING
+    description: >
+      Optional space-separated list of extra command names to shim, in addition
+      to the tools Rez reports for the resolved packages.
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Extra Tools
+
+environment:
+  name: RezShimDemo
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: rez-shim-demo-enter.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        REZ_PACKAGES='{{Param.RezPackages}}'
+        REZ_EXTRA_TOOLS='{{Param.RezExtraTools}}'
+        SESSION_DIR='{{Session.WorkingDirectory}}'
+
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON=python3
+        else
+            PYTHON=python
+        fi
+
+        # --- Demo setup: install Rez and build a demo package -----------------
+        # A real farm would have Rez on the worker image and a package
+        # repository on shared storage instead of this block.
+        echo "Installing Rez into the session directory..."
+        "$PYTHON" -m venv "$SESSION_DIR/rezvenv"
+        "$SESSION_DIR/rezvenv/bin/pip" install --quiet rez
+        REZ="$SESSION_DIR/rezvenv/bin/rez"
+
+        REPO="$SESSION_DIR/rez-repo"
+        mkdir -p "$REPO/demotool/1.0.0/bin"
+        cat > "$REPO/demotool/1.0.0/package.py" <<'PKG'
+        name = "demotool"
+        version = "1.0.0"
+        tools = ["demorender", "democonvert"]
+        build_command = False
+
+        def commands():
+            env.PATH.prepend("{root}/bin")
+            env.DEMOTOOL_VERSION = "1.0.0"
+            env.DEMOTOOL_LICENSE_SERVER = "license.example.internal:1234"
+        PKG
+
+        # A shell function, which a plain environment-variable diff cannot
+        # capture. This is the capability the harvest-and-replay approach loses.
+        cat > "$REPO/demotool/1.0.0/bin/demorender" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "demorender: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET}"
+        echo "demorender: DEMOTOOL_LICENSE_SERVER=${DEMOTOOL_LICENSE_SERVER:-UNSET}"
+        echo "demorender: args=$*"
+        TOOL
+        cat > "$REPO/demotool/1.0.0/bin/democonvert" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "democonvert: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET} args=$*"
+        TOOL
+        chmod +x "$REPO/demotool/1.0.0/bin/"*
+        # --- End demo setup ---------------------------------------------------
+
+        echo "Rez Package List:"
+        echo "   $REZ_PACKAGES"
+
+        # Resolve the Rez context once and save it to the session directory.
+        CTX="$SESSION_DIR/rez-context.rxt"
+        "$REZ" env --paths "$REPO" $REZ_PACKAGES --output "$CTX"
+
+        # Ask Rez which executables the resolved packages provide, so the shims
+        # do not need a hard-coded list of tool names.
+        REZ_TOOLS="$("$REZ" context -t "$CTX" | awk 'NR>2 && NF {print $1}' | sort -u)"
+
+        SHIM_DIR="$SESSION_DIR/rez-shims"
+        mkdir -p "$SHIM_DIR"
+
+        SHIM_COUNT=0
+        for TOOL in $REZ_TOOLS $REZ_EXTRA_TOOLS; do
+            case "$TOOL" in
+                rez|rez-*) continue ;;
+            esac
+            cat > "$SHIM_DIR/$TOOL" <<SHIM
+        #!/usr/bin/env bash
+        exec "$REZ" env --input "$CTX" --shell bash -- "$TOOL" "\$@"
+        SHIM
+            chmod +x "$SHIM_DIR/$TOOL"
+            SHIM_COUNT=$((SHIM_COUNT + 1))
+        done
+
+        if [ "$SHIM_COUNT" -eq 0 ]; then
+            echo "openjd_fail: Rez reported no tools for packages '$REZ_PACKAGES'."
+            exit 1
+        fi
+
+        echo "Created $SHIM_COUNT Rez tool shims in $SHIM_DIR:"
+        printf '   %s\n' $REZ_TOOLS $REZ_EXTRA_TOOLS
+
+        echo "openjd_env: REZ_SHIM_DIR=$SHIM_DIR"
+        echo "openjd_env: REZ_CONTEXT_FILE=$CTX"
+        echo "openjd_env: PATH=$SHIM_DIR:$PATH"

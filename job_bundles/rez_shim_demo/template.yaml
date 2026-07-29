@@ -1,0 +1,59 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Rez shim demo
+description: |
+  Demonstrates that a Rez-provided tool can be invoked by bare command name
+  from a job template, with the Rez environment applied by the queue
+  environment's PATH shims rather than by replaying captured variables.
+parameterDefinitions:
+  - name: ToolName
+    type: STRING
+    description: The Rez-provided command to invoke by bare name.
+    default: "demorender"
+
+steps:
+- name: RunRezTool
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "1-2"
+  script:
+    actions:
+      onRun:
+        command: "{{Param.ToolName}}"
+        args: ["frame-{{Task.Param.Frame}}"]
+
+- name: VerifyEnvironment
+  dependencies:
+  - dependsOn: RunRezTool
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Verify}}"]
+    embeddedFiles:
+    - name: Verify
+      filename: verify.sh
+      type: TEXT
+      data: |
+        set -uo pipefail
+
+        echo "=== PATH ==="
+        echo "$PATH" | tr ':' '\n' | head -3
+
+        echo "=== Shim directory ==="
+        echo "REZ_SHIM_DIR=${REZ_SHIM_DIR:-UNSET}"
+        echo "REZ_CONTEXT_FILE=${REZ_CONTEXT_FILE:-UNSET}"
+        ls -l "${REZ_SHIM_DIR:-/nonexistent}" || echo "no shim dir"
+
+        echo "=== Which resolves to a shim ==="
+        command -v "${1:-demorender}" || true
+
+        # The tool's own environment variables must be visible INSIDE the tool's
+        # process, supplied by Rez, even though they were never exported into the
+        # session via openjd_env.
+        echo "=== DEMOTOOL_VERSION as seen by the session (expected UNSET) ==="
+        echo "DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET}"
+
+        echo "=== DEMOTOOL_VERSION as seen inside the tool (expected 1.0.0) ==="
+        demorender check-env
