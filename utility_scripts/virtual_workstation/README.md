@@ -32,7 +32,7 @@ Each script runs the same five steps.
 2. **Install Blender** by downloading the official archive for the requested version and unpacking it to a fixed prefix (`/opt/blender` or `C:\Program Files\Blender`).
 3. **Install the submitter.** The script reads [`manifest.json`](https://downloads.deadlinecloud.amazonaws.com/submitters/manifest.json) to resolve the latest version for the platform. It downloads that pinned installer, verifies its published SHA-256 checksum, and runs it with `--mode unattended`. Only the Blender components are enabled, and the installer is told where Blender lives so it can match add-on files to the Blender version.
 4. **Enable the Blender add-on.** The unattended installer stages the add-on under the submitter prefix but cannot enable it, because add-ons live in Blender's *per-user* preferences and the install runs at system scope. The script runs the installer's own `add_submitter_to_pref.py` through Blender in `--background` mode as the workstation user, then reads the preferences back to confirm the add-on registered.
-5. **Install the monitor and create a profile.** After installing the monitor, the script calls `deadline-cloud-monitor create-profile`, a non-GUI subcommand that writes the profile and exits without needing a display.
+5. **Install the monitor and create a profile.** After installing the monitor, the script calls `deadline-cloud-monitor create-profile`, a non-GUI subcommand that writes the profile and exits without needing a display. The monitor added it in version 1.0.2 for exactly this purpose: letting IT administrators configure Deadline Cloud client tools so artists do not have to set up profiles by hand. It is not covered in the Deadline Cloud user guide, which documents only the interactive profile wizard, so run `deadline-cloud-monitor create-profile --help` on the monitor version you deploy to confirm the arguments.
 
 ### What the profile contains
 
@@ -69,7 +69,7 @@ Each platform handles that differently:
 
 ### Monitor ID discovery
 
-`create-profile` requires a monitor ID (`monitor-` followed by 32 hexadecimal characters). It stores whatever value it is given without validating it, and replaces it with the authoritative value on the artist's first sign-in.
+`create-profile` requires a `--monitor-id` argument. Current monitor IDs are `monitor-` followed by 32 hexadecimal characters, matching the [`GetMonitor` API pattern](https://docs.aws.amazon.com/deadline-cloud/latest/APIReference/API_GetMonitor.html). The monitor stores whatever value it is given without validating the format, and replaces it with the authoritative value on the artist's first sign-in.
 
 The scripts try to get the real ID, but do not require it:
 
