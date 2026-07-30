@@ -14,7 +14,7 @@ parameterDefinitions:
     description: >
       This is a ':'-separated list of Rez repositories from which to install
       packages.
-    # Edit the script code below to set the Linux, Windows, and MacOS repository path,
+    # Edit the script code below to set the Linux and MacOS repository path,
     # it will search/replace the token REZ_REPOSITORY_PATH in the default to that.
     default: "REZ_REPOSITORY_PATH"
     userInterface:
