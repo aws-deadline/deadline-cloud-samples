@@ -66,6 +66,7 @@ Nested collections provide their own complete indexes where applicable.
 | [V-Ray standalone render](vray_render/) | Rendering with a Conda-provided V-Ray executable | You need a basic standalone V-Ray bundle |
 | [VRED render](vred_render/) | Headless VRED rendering, tiling, and Python API control | You render VRED scenes with VRED Core or Pro |
 | [VTK visualization](vtk-latest/) | Running a VTK Python visualization script | You need a portable scientific visualization job |
+| [Wan2.2 video generation](wan22_video_generation/) | Text-to-video generation on GPU workers, with per-clip seed fan-out and memory-adaptive inference | You want to generate video clips from text prompts |
 
 ### Developer guide companion samples
 
