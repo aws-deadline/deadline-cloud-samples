@@ -7,9 +7,10 @@
 # Installs Blender, the Deadline Cloud submitter, and Deadline Cloud monitor,
 # then creates a monitor profile so an artist only has to sign in.
 #
-# This is a worked example rather than a general-purpose tool. Edit the constants
-# below for your environment. Run as root during provisioning (EC2 user data, an
-# AMI bake, or by hand).
+# This is a worked example rather than a general-purpose tool. It targets
+# Debian-family images (Ubuntu, Debian). Edit the constants below for your
+# environment. Run as root during provisioning (EC2 user data, an AMI bake, or
+# by hand).
 #
 # Usage: setup_workstation_linux.sh MONITOR_URL [WORKSTATION_USER]
 #
@@ -92,44 +93,24 @@ log "monitor: $MONITOR_SUBDOMAIN in $MONITOR_REGION, profile '$PROFILE_NAME'"
 # Prerequisites
 # ---------------------------------------------------------------------------
 
-# shellcheck disable=SC1091
-. /etc/os-release
-case "${ID:-} ${ID_LIKE:-}" in
-    *debian*|ubuntu*) PKG_FAMILY="debian" ;;
-    *rhel*|*fedora*|rocky*|almalinux*) PKG_FAMILY="rhel" ;;
-    *) die "unsupported distribution: ${ID:-unknown} (expected Debian or RHEL family)" ;;
-esac
-log "detected ${ID:-unknown} ${VERSION_ID:-} ($PKG_FAMILY)"
+# This example targets Debian-family images (Ubuntu, Debian). Adapting it to
+# another distribution means replacing apt-get below and installing the monitor
+# from the .rpm instead of the .deb.
+command -v apt-get >/dev/null 2>&1 \
+    || die "this example expects a Debian-family image (apt-get was not found)"
 
-pkg_install() {
-    case "$PKG_FAMILY" in
-        debian) DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@" ;;
-        rhel)   dnf install -y -q "$@" ;;
-    esac
-}
+DEBIAN_FRONTEND=noninteractive apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl xz-utils python3
 
-case "$PKG_FAMILY" in
-    debian)
-        DEBIAN_FRONTEND=noninteractive apt-get update -qq
-        pkg_install ca-certificates xz-utils python3
-        ;;
-    # Do not ask for "curl": Amazon Linux and RHEL 9 derivatives ship
-    # curl-minimal, which provides /usr/bin/curl but conflicts with curl.
-    rhel) pkg_install ca-certificates xz python3 ;;
-esac
-
-for tool in curl python3 tar; do
-    command -v "$tool" >/dev/null 2>&1 || die "$tool is required but is not on PATH"
-done
-
-# The monitor links against OpenSSL 1.1, which current distributions no longer
-# ship. Installing it is left to the administrator: the right package differs per
-# distribution and Amazon Linux 2023 has none, so check and stop rather than guess.
+# Deadline Cloud monitor links against OpenSSL 1.1, which recent releases no
+# longer include. On Ubuntu 22.04 and later, install libssl1.1 from the archive.
 if ! ldconfig -p | grep -q 'libssl\.so\.1\.1'; then
-    die "Deadline Cloud monitor needs libssl.so.1.1, which is missing. Install it first:
-    Ubuntu, Debian:          the libssl1.1 package from your distribution's archive
-    RHEL 8/9, Rocky, Alma:   sudo dnf install epel-release && sudo dnf install compat-openssl11
-    Amazon Linux 2023 does not package OpenSSL 1.1, so use another image."
+    log "installing libssl1.1 for Deadline Cloud monitor"
+    libssl_deb="libssl1.1_1.1.1f-1ubuntu2_amd64.deb"
+    curl -fsSL --retry 3 -o "/tmp/$libssl_deb" \
+        "https://archive.ubuntu.com/ubuntu/pool/main/o/openssl/$libssl_deb"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "/tmp/$libssl_deb"
+    rm -f "/tmp/$libssl_deb"
 fi
 
 WORK_DIR="$(mktemp -d)"
@@ -254,18 +235,9 @@ log "Blender add-on enabled"
 MONITOR_BIN="/usr/bin/deadline-cloud-monitor"
 MONITOR_BASE="${DOWNLOADS_BASE}/dcm/latest"
 
-case "$PKG_FAMILY" in
-    debian)
-        download_verified "${MONITOR_BASE}/deadline-cloud-monitor_amd64.deb" \
-            "$WORK_DIR/dcm.deb" "${MONITOR_BASE}/deadline-cloud-monitor_amd64.deb.sha256"
-        pkg_install "$WORK_DIR/dcm.deb"
-        ;;
-    rhel)
-        download_verified "${MONITOR_BASE}/deadline-cloud-monitor.x86_64.rpm" \
-            "$WORK_DIR/dcm.rpm" "${MONITOR_BASE}/deadline-cloud-monitor.x86_64.rpm.sha256"
-        pkg_install "$WORK_DIR/dcm.rpm"
-        ;;
-esac
+download_verified "${MONITOR_BASE}/deadline-cloud-monitor_amd64.deb" \
+    "$WORK_DIR/dcm.deb" "${MONITOR_BASE}/deadline-cloud-monitor_amd64.deb.sha256"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$WORK_DIR/dcm.deb"
 
 # Run the monitor rather than only testing for the file, so one that installs but
 # cannot start fails here instead of silently later.

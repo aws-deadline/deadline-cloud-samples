@@ -20,19 +20,13 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 
 ## Prerequisites
 
-* A workstation image with a desktop environment already present, because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
-* **On Linux, OpenSSL 1.1 (`libssl.so.1.1`).** Deadline Cloud monitor links against it and current distributions no longer include it. Install it before running the script:
-  * Ubuntu and Debian: the `libssl1.1` package from your distribution's archive.
-  * RHEL 8/9, Rocky, Alma: `sudo dnf install epel-release && sudo dnf install compat-openssl11`.
-  * Amazon Linux 2023 does not package OpenSSL 1.1, so use another image.
-
-  The script checks for the library and stops with these instructions if it is missing, rather than installing a monitor that cannot start.
+* A Debian-family Linux image or a Windows image, with a desktop environment already present because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
-Linux support covers Debian-family (`apt`) and RHEL-family (`dnf`) distributions.
+The Linux script targets Debian-family images (Ubuntu, Debian). To use another distribution, replace the `apt-get` calls and install the monitor from its `.rpm` rather than the `.deb`.
 
 ## Run
 
@@ -120,8 +114,6 @@ The submitter installer puts the `deadline` CLI on `PATH` itself, through `/etc/
 * **Cleanup.** Run `/opt/DeadlineCloudSubmitter/uninstall` or its Windows equivalent, remove the monitor with your package manager or through Windows "Apps & features", and delete the Blender prefix. Then remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`.
 
 ## Troubleshooting
-
-**The monitor will not start, reporting `libssl.so.1.1`.** Install OpenSSL 1.1 as described under [Prerequisites](#prerequisites). The script normally catches this first.
 
 **Blender downloads fail with HTTP 403.** `download.blender.org` rejects some automated clients, so the scripts default to a mirror. Pick another from [mirror.blender.org](https://mirror.blender.org/), or host the archive and its checksum manifest internally.
 
