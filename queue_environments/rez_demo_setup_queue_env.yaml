@@ -52,9 +52,17 @@ environment:
         python3 -m venv "$REZ_INSTALL_DIR"
         "$REZ_INSTALL_DIR/bin/pip" install --quiet rez
 
-        # Build a demo package that sets variables and defines a shell function.
-        # The shell function is the part a variable diff cannot carry across
-        # actions, which is what the shim environment exists to preserve.
+        # Build a demo package that exercises three kinds of environment state,
+        # in increasing order of how badly a variable diff handles them:
+        #
+        #   1. A plain variable. Harvest-and-replay carries this correctly.
+        #   2. An `alias`, which Rez implements as an exported shell function.
+        #      Bash exports it as `BASH_FUNC_name%%`, whose name contains `%%`
+        #      and whose value spans lines. The Open Job Description
+        #      `openjd_env` directive accepts neither, so the alias is dropped.
+        #   3. A PATH prepend that shadows a system command. Replay restores the
+        #      variable, but any later environment that also edits PATH can
+        #      reorder it, so which binary wins depends on environment order.
         mkdir -p "$REPO/demotool/1.0.0/bin"
         cat > "$REPO/demotool/1.0.0/package.py" <<'PKG'
         name = "demotool"
@@ -66,6 +74,9 @@ environment:
             env.PATH.prepend("{root}/bin")
             env.DEMOTOOL_VERSION = "1.0.0"
             env.DEMOTOOL_LICENSE_SERVER = "license.example.internal:1234"
+            # Rez turns this into an exported shell function, which cannot be
+            # represented as an `openjd_env` name=value pair.
+            alias("demoalias", "demorender --via-alias")
         PKG
 
         cat > "$REPO/demotool/1.0.0/bin/demorender" <<'TOOL'
@@ -77,6 +88,13 @@ environment:
         cat > "$REPO/demotool/1.0.0/bin/democonvert" <<'TOOL'
         #!/usr/bin/env bash
         echo "democonvert: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET} args=$*"
+        TOOL
+        # A package-provided `sort` that shadows the system one. The package
+        # directory is prepended to PATH, so inside a correctly applied context
+        # this must win over /usr/bin/sort.
+        cat > "$REPO/demotool/1.0.0/bin/sort" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "sort: this is demotool's sort, not the system one"
         TOOL
         chmod +x "$REPO/demotool/1.0.0/bin/"*
 
