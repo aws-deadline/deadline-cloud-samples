@@ -14,6 +14,8 @@ This table covers every queue environment YAML file in `queue_environments/`.
 | [Cached Conda environment](conda_queue_env_improved_caching.yaml) | Reusing hash-named environments with service-managed fleet commands | Repeated package sets should avoid relinking on every job |
 | [Cached inline Conda environment](conda_queue_env_inline_improved_caching.yaml) | Portable named-environment reuse and expiration logic | Customer-managed fleets need reusable Conda environments |
 | [Rez environment](rez_queue_env.yaml) | Resolving packages from a shared Rez repository | Your studio already distributes software with Rez |
+| [Rez shim environment](rez_queue_env_shim.yaml) | Wrapping each task in a resolved Rez context through `PATH` shims | Rez software needs shell functions, aliases, or ordered `PATH` edits |
+| [Rez shim demo environment](rez_queue_env_shim_demo.yaml) | The shim mechanism with Rez and a demo package built in the session | You want to try the shim approach without preparing a worker or repository |
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
 
@@ -127,6 +129,24 @@ The cached inline sample implements the same idea with Conda environments identi
 ### Rez environment
 
 The Rez sample resolves software from a shared package repository. Use it with customer-managed fleets that can access that repository.
+
+### Rez shim environment
+
+The Rez sample activates a context during `onEnter` and then publishes the resulting environment variables with `openjd_env`. A queue environment action runs in its own subprocess, so only variables can cross into later actions. Shell functions, aliases, and ordered `PATH` edits are lost, which matters for software distributed with Rez.
+
+The shim sample keeps the resolve out of that path. It saves the resolved context to a `.rxt` file once, then writes one small executable per tool into the session directory and prepends that directory to `PATH`. Job templates still call tools by bare name, such as `command: mayapy`, and each call re-enters the saved context in its own shell. Job bundles need no changes.
+
+Tool names come from `rez context -t` on the saved context, so no list of executables is hard-coded. Set `RezExtraTools` for commands a package provides without declaring them in its `tools` list.
+
+Consider these tradeoffs:
+
+* Only bare command names are intercepted. A template invoking an absolute path bypasses the shims.
+* The shims assume a POSIX shell. Windows and git bash are untested.
+* Place this environment after any other environment that edits `PATH`, such as a higher priority number than a Conda environment, because the last writer wins.
+
+### Rez shim demo environment
+
+The demo variant installs Rez and builds a small demo package inside the session directory, so the shim mechanism can be exercised on any Linux worker without Rez on the image or a mounted repository. Pair it with the [Rez shim demo job](../job_bundles/rez_shim_demo/). Use `rez_queue_env_shim.yaml` on real farms.
 
 ### Pip environment
 
