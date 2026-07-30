@@ -116,6 +116,8 @@ The demo needs a fleet of Linux or macOS workers with `python3` and network acce
 | 2 | A Rez `alias`, which becomes an exported shell function | Lost, rejected by the runtime |
 | 3 | A `PATH` prepend where the package provides its own `sort` | Depends on environment order rather than the resolved context |
 
+Every check reads its result from a tool called by bare name, so each one depends on the shim mechanism end to end rather than on the saved context alone. Deleting the `PATH` injection from the environment fails all three, which is how the checks were confirmed to test what they claim.
+
 A third step, `CancelThroughShim`, is a manual check rather than an automatic one. It sleeps inside a shimmed tool for `CancelSleepSeconds` so you can cancel the job and watch the signal arrive. The tool reports the signal it caught before exiting. Cancel it from the monitor or with:
 
 ```console

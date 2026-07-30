@@ -83,13 +83,21 @@ steps:
             FAILURES=$((FAILURES + 1))
         fi
 
+        # Checks 2 and 3 both read `demoprobe`, which is a Rez-declared tool and
+        # so has a shim of its own. Calling it by bare name means the result
+        # depends on the shim mechanism working: if PATH injection were broken,
+        # `demoprobe` would not be found and both checks would fail. Probing the
+        # saved context directly with `rez env --input` would instead pass even
+        # with the shims entirely absent.
+        probe_out="$(demoprobe 2>/dev/null || true)"
+
         # An `alias` in a Rez package becomes an exported shell function. Bash
         # exports it as BASH_FUNC_demoalias%%, a name containing '%%' with a
-        # multiline value, which openjd_env cannot express. Replaying captured
-        # variables therefore drops it.
+        # multiline value, which openjd_env cannot express, so replaying captured
+        # variables drops it. The alias is not itself a command on PATH; the
+        # probe reports whether it is callable from inside the context.
         echo "=== Check 2: Rez alias survives into the task ==="
-        alias_out="$(rez env --input "$REZ_CONTEXT_FILE" --shell bash -- bash -c 'demoalias' 2>/dev/null || true)"
-        if printf '%s\n' "$alias_out" | grep -q "via-alias"; then
+        if printf '%s\n' "$probe_out" | grep -q "alias=demorender: DEMOTOOL_VERSION"; then
             echo "PASS: alias is callable"
         else
             echo "FAIL: alias was lost"
@@ -100,8 +108,7 @@ steps:
         # PATH, so inside a correctly applied context it must shadow the system
         # binary. This checks ordered PATH edits, not just PATH's contents.
         echo "=== Check 3: package PATH prepend shadows the system command ==="
-        if demosort_out="$(rez env --input "$REZ_CONTEXT_FILE" --shell bash -- sort --help 2>/dev/null)" \
-            && echo "$demosort_out" | grep -q "demotool's sort"; then
+        if printf '%s\n' "$probe_out" | grep -q "sort-shadowed=yes"; then
             echo "PASS: package command shadows the system one"
         else
             echo "FAIL: system command won, PATH order was not preserved"

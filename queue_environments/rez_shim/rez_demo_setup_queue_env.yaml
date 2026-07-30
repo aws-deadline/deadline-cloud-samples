@@ -67,7 +67,7 @@ environment:
         cat > "$REPO/demotool/1.0.0/package.py" <<'PKG'
         name = "demotool"
         version = "1.0.0"
-        tools = ["demorender", "democonvert", "demosleep"]
+        tools = ["demorender", "democonvert", "demosleep", "demoprobe"]
         build_command = False
 
         def commands():
@@ -88,6 +88,27 @@ environment:
         cat > "$REPO/demotool/1.0.0/bin/democonvert" <<'TOOL'
         #!/usr/bin/env bash
         echo "democonvert: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET} args=$*"
+        TOOL
+        # Reports on state that only exists inside a correctly applied context:
+        # the alias Rez defines, and whether the package's own `sort` shadows the
+        # system one. Because this is a declared tool it gets a shim of its own,
+        # so the verify step can probe both through the shim mechanism rather
+        # than by re-entering the context itself.
+        cat > "$REPO/demotool/1.0.0/bin/demoprobe" <<'TOOL'
+        #!/usr/bin/env bash
+        # Rez exports an alias as a shell function, which is inherited here.
+        if type demoalias > /dev/null 2>&1; then
+            echo "demoprobe: alias=$(demoalias)"
+        else
+            echo "demoprobe: alias=MISSING"
+        fi
+        # `sort` must resolve to the package's copy, not /usr/bin/sort.
+        echo "demoprobe: sort=$(command -v sort)"
+        if sort --help 2>&1 | grep -q "demotool's sort"; then
+            echo "demoprobe: sort-shadowed=yes"
+        else
+            echo "demoprobe: sort-shadowed=no"
+        fi
         TOOL
         # A long-running tool that reports the signals it receives, used by the
         # CancelThroughShim step to prove cancelation reaches through a shim.
