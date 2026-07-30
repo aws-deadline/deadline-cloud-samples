@@ -248,18 +248,22 @@ log "monitor installed: $monitor_version"
 # needing a display. Run it as the workstation user so the profile and the
 # credential cache path baked into it land in that user's home directory.
 #
-# --monitor-id is required but is left empty here. The monitor overwrites it, along
+# --monitor-id is required, but the real ID is not needed and cannot be discovered
+# without AWS credentials, so pass a placeholder. The monitor replaces it, along
 # with the user and identity store IDs, using authoritative values from the portal
-# on the artist's first sign-in. Looking it up in advance needs AWS credentials and
-# deadline:ListMonitors permission, so this example does without.
+# on the artist's first sign-in.
 #
-# Written as "--monitor-id=" to match the Windows script, where PowerShell drops a
-# bare empty-string argument and the monitor then rejects the flag.
+# The placeholder must be non-empty. An empty value makes the monitor drop the
+# profile from its picker and fall back to asking for the monitor URL, which
+# defeats the point of pre-configuring it. The value is shown verbatim in the
+# monitor's profile list until first sign-in, so use something self-explanatory.
+MONITOR_ID_PLACEHOLDER="pending-first-login"
+
 log "creating monitor profile '$PROFILE_NAME'"
 profile_output="$(
     runuser -u "$WORKSTATION_USER" -- env HOME="$USER_HOME" "$MONITOR_BIN" create-profile \
         --profile "$PROFILE_NAME" \
-        --monitor-id= \
+        --monitor-id "$MONITOR_ID_PLACEHOLDER" \
         --monitor-url "$MONITOR_URL" \
         --enable-auto-login \
         --set-as-deadline-default 2>&1

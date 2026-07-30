@@ -289,18 +289,21 @@ Write-Step "monitor installed: $monitorBin"
 # create-profile is a non-GUI subcommand: it writes the profile and exits without
 # needing a display.
 #
-# --monitor-id is required but is left empty here. The monitor overwrites it, along
+# --monitor-id is required, but the real ID is not needed and cannot be discovered
+# without AWS credentials, so pass a placeholder. The monitor replaces it, along
 # with the user and identity store IDs, using authoritative values from the portal
-# on the artist's first sign-in. Looking it up in advance needs AWS credentials and
-# deadline:ListMonitors permission, so this example does without.
+# on the artist's first sign-in.
 #
-# Write the empty value as "--monitor-id=", not as --monitor-id "": PowerShell
-# drops a bare empty-string argument, and the monitor then reports that the flag
-# requires a value.
+# The placeholder must be non-empty. An empty value makes the monitor drop the
+# profile from its picker and fall back to asking for the monitor URL, which
+# defeats the point of pre-configuring it. The value is shown verbatim in the
+# monitor's profile list until first sign-in, so use something self-explanatory.
+$monitorIdPlaceholder = "pending-first-login"
+
 Write-Step "creating monitor profile '$ProfileName'"
 $profileOutput = & $monitorBin create-profile `
     --profile $ProfileName `
-    --monitor-id= `
+    --monitor-id $monitorIdPlaceholder `
     --monitor-url $MonitorUrl `
     --enable-auto-login `
     --set-as-deadline-default 2>&1 | Out-String

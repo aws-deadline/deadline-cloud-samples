@@ -23,6 +23,7 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 * A Debian-family Linux image or a Windows image, with a desktop environment already present because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
+* A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images include Microsoft Edge. On Ubuntu 22.04 and later, Firefox and Chromium are published only as snaps, which do not work in every remote-desktop session. Installing Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) gives a working browser.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
@@ -42,7 +43,7 @@ When provisioning runs as `root` but a different account signs in, name that acc
 sudo ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/ artist
 ```
 
-Windows, in an elevated PowerShell session **as the artist's own account**:
+Windows, in an elevated PowerShell session **as the artist's own account**. Start PowerShell with **Run as administrator** first: the script declares `#Requires -RunAsAdministrator`, so launching it from an unelevated shell fails with `ScriptRequiresElevation` rather than prompting.
 
 ```console
 .\setup_workstation_windows.ps1 https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
@@ -72,12 +73,14 @@ region=us-west-2
 credential_process=cat "/home/artist/.cache/com.amazonaws.deadline.monitor/credentials_mystudio-us-west-2.json"
 user_id=
 identity_store_id=
-monitor_id=
+monitor_id=pending-first-login
 ```
 
 It also points the Deadline Cloud CLI at that profile in `~/.deadline/config`.
 
-The empty fields are expected. The monitor fills in `monitor_id`, `user_id`, and `identity_store_id` from authoritative values at the artist's first sign-in, so the scripts pass an empty `--monitor-id` and need no AWS credentials to look one up. `credential_process` reads a cache file that the same sign-in creates, so the profile yields no credentials until then. That sign-in is the intended remaining step.
+The placeholder and empty fields are expected. `create-profile` requires a `--monitor-id`, but the real ID cannot be discovered without AWS credentials, so the scripts pass `pending-first-login`. The monitor replaces it, along with `user_id` and `identity_store_id`, with authoritative values from the portal at the artist's first sign-in. `credential_process` reads a cache file that the same sign-in creates, so the profile yields no credentials until then. That sign-in is the intended remaining step.
+
+The placeholder must be non-empty. An empty `--monitor-id` makes the monitor drop the profile from its picker and fall back to asking for the monitor URL, which defeats the point of pre-configuring it. The value is shown verbatim in the monitor's profile list until first sign-in, so it reads as a status rather than looking like a real ID.
 
 Because the cache path is written into the profile at creation time and lives under the invoking user's home directory, the profile only works for the account it was created for.
 
@@ -125,7 +128,19 @@ blender --background --python-expr 'import bpy; print("deadline_cloud_blender_su
 
 On Windows, call `& 'C:\Program Files\Blender\blender.exe'` instead, since the script does not add Blender to `PATH`.
 
-**Submission fails with a credentials error.** Expected until the artist signs in to the monitor once. Check with `deadline auth status`.
+**Deadline Cloud monitor does not appear in the applications menu.** Its desktop entry declares no menu category, so some desktop environments file it nowhere. Launch it by path instead, or add a launcher of your own:
+
+```console
+# Linux
+deadline-cloud-monitor
+
+# Windows
+& "$env:LOCALAPPDATA\DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
+```
+
+**The monitor asks for a monitor URL instead of using the profile.** The profile's `monitor_id` is empty. Re-run the script, or recreate the profile with a non-empty placeholder as described under [The profile](#the-profile).
+
+**Submission fails with a credentials error.** Expected until the artist signs in to the monitor once. Check with `deadline auth status`, which reports `NEEDS_LOGIN` before sign-in and `AUTHENTICATED` after.
 
 **On Windows, the script cannot find the monitor after installing it.** The installer honors WOW64 redirection, so under a 32-bit host process it installs into `C:\Windows\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\` even though `%LOCALAPPDATA%` points elsewhere. The script reads the install location from the uninstall registry entry to avoid guessing. To find it by hand:
 
