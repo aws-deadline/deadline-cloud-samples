@@ -1,0 +1,6 @@
+condaPlatforms:
+  - platform: win-64
+    defaultSubmit: true
+    sourceArchiveFilename: Cinema4D_2026_2026.3.3_Win.zip
+    sourceDownloadInstructions: 'Follow the README instructions in this directory to create this file.'
+    buildTool: rattler-build

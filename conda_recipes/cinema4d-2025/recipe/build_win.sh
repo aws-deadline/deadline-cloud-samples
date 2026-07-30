@@ -3,6 +3,7 @@ set -euo pipefail
 
 # The version without the update number
 CINEMA_4D_VERSION=${PKG_VERSION%.*}
+CINEMA_4D_PLUGIN_SYNC_VERSION=$CINEMA_4D_VERSION
 
 # The conda-build environment is configured for packaging one pypi package into one conda package.
 # We turn off the following defaults for the below pip install.
@@ -30,6 +31,7 @@ mkdir -p "$PREFIX/etc/conda/deactivate.d"
 
 cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 export C4D_VERSION=$CINEMA_4D_VERSION
+export C4D_PLUGIN_SYNC_VERSION=$CINEMA_4D_PLUGIN_SYNC_VERSION
 export C4D_LOCATION="$PREFIX\\cinema4d"
 export C4D_COMMANDLINE_EXECUTABLE="$PREFIX\\cinema4d\\Commandline.exe"
 EOF
@@ -37,6 +39,7 @@ cat "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 
 cat <<EOF > "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 set "C4D_VERSION=$CINEMA_4D_VERSION"
+set "C4D_PLUGIN_SYNC_VERSION=$CINEMA_4D_PLUGIN_SYNC_VERSION"
 set "C4D_LOCATION=$PREFIX\cinema4d"
 set "C4D_COMMANDLINE_EXECUTABLE=$PREFIX\cinema4d\Commandline.exe"
 EOF
@@ -44,6 +47,7 @@ cat "$PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 
 cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 unset C4D_VERSION
+unset C4D_PLUGIN_SYNC_VERSION
 unset C4D_LOCATION
 unset C4D_COMMANDLINE_EXECUTABLE
 EOF
@@ -51,7 +55,14 @@ cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.sh"
 
 cat <<EOF > "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
 set C4D_VERSION=
+set C4D_PLUGIN_SYNC_VERSION=
 set C4D_LOCATION=
 set C4D_COMMANDLINE_EXECUTABLE=
 EOF
 cat "$PREFIX/etc/conda/deactivate.d/$PKG_NAME-$PKG_VERSION-vars.bat"
+
+# Install Plugin Sync hooks after the standard Cinema 4D environment hooks.
+cp "$RECIPE_DIR/zzz-cinema4d-plugin-sync-activate.sh" \
+    "$PREFIX/etc/conda/activate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh"
+cp "$RECIPE_DIR/zzz-cinema4d-plugin-sync-deactivate.sh" \
+    "$PREFIX/etc/conda/deactivate.d/zzz-$PKG_NAME-$PKG_VERSION-plugin-sync.sh"

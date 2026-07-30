@@ -1,0 +1,269 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Wan2.2 Video Generation
+description: >
+  Generate video clips from a text prompt using Wan2.2 TI2V-5B (Apache-2.0).
+  Each task renders one independent clip with its own seed, so a job produces a
+  set of variations that workers render in parallel.
+
+parameterDefinitions:
+- name: Prompt
+  type: STRING
+  userInterface:
+    control: MULTILINE_EDIT
+    label: Prompt
+    groupLabel: Generation Settings
+  description: Text prompt describing the video to generate
+  default: "A cinematic shot of a red fox trotting through a snowy pine forest at golden hour, camera slowly tracking alongside, soft volumetric light through the trees."
+
+- name: NumClips
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Number of Clips
+    groupLabel: Generation Settings
+  description: Number of clips to generate, each with a different seed
+  default: 1
+  minValue: 1
+  maxValue: 50
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Output Settings
+  description: Directory to write generated .mp4 clips into
+
+- name: Width
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Width
+    groupLabel: Generation Settings
+    singleStepDelta: 32
+  description: Frame width in pixels; must be a multiple of 32
+  default: 1280
+  minValue: 320
+  maxValue: 1280
+
+- name: Height
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Height
+    groupLabel: Generation Settings
+    singleStepDelta: 32
+  description: Frame height in pixels; must be a multiple of 32
+  default: 704
+  minValue: 320
+  maxValue: 1280
+
+- name: NumFrames
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Number of Frames
+    groupLabel: Generation Settings
+    singleStepDelta: 4
+  description: >
+    Frames per clip; must satisfy (NumFrames - 1) % 4 == 0. 121 frames at
+    24 fps is about 5 seconds.
+  default: 121
+  minValue: 17
+  maxValue: 193
+
+- name: Fps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Frames Per Second
+    groupLabel: Output Settings
+  description: Playback frame rate of the exported MP4
+  default: 24
+  minValue: 8
+  maxValue: 60
+
+- name: NumInferenceSteps
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Inference Steps
+    groupLabel: Generation Settings
+  description: Denoising steps. Lower is faster but less detailed.
+  default: 50
+  minValue: 1
+  maxValue: 100
+
+- name: GuidanceScale
+  type: FLOAT
+  userInterface:
+    control: SPIN_BOX
+    label: Guidance Scale
+    groupLabel: Generation Settings
+    singleStepDelta: 0.5
+  description: Classifier-free guidance scale; 5.0 is the tuned default
+  default: 5.0
+  minValue: 0.0
+  maxValue: 20.0
+
+- name: Seed
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Seed
+    groupLabel: Generation Settings
+  description: Base random seed, offset per clip. Use -1 to derive from clip index.
+  default: -1
+  minValue: -1
+  maxValue: 999999999
+
+- name: NegativePrompt
+  type: STRING
+  userInterface:
+    control: MULTILINE_EDIT
+    label: Negative Prompt
+    groupLabel: Generation Settings
+  description: >
+    Content to steer away from. Leave empty to use the tuned default from the
+    Wan2.2 model card.
+  default: ""
+
+- name: ModelId
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Model
+    groupLabel: Model Settings
+  description: HuggingFace repo ID for the Wan2.2 checkpoint
+  default: "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+  allowedValues:
+  - "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+
+- name: HFCacheDir
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: HuggingFace Cache Directory
+    groupLabel: Model Settings
+  description: >
+    Worker-local directory for the ~34 GiB model download. Deliberately a STRING
+    rather than a PATH so the weights stay out of job attachments and are never
+    uploaded back. Reused across tasks in a session, so only the first task on a
+    worker pays the download cost. Must live on a real disk: Deadline Cloud
+    service-managed fleet workers mount /tmp as a RAM-backed tmpfs that is far
+    too small for this checkpoint.
+  default: "/var/tmp/wan22_hf_cache"
+
+- name: GenerateScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  description: Generation script
+  default: generate_video.py
+
+steps:
+- name: GenerateVideo
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ClipIndex
+      type: INT
+      range: "1-{{Param.NumClips}}"
+  stepEnvironments:
+  - name: UnbufferedOutput
+    variables:
+      PYTHONUNBUFFERED: "True"
+  - name: GenerationSettings
+    description: >
+      Pass every job parameter to the generation script through the environment.
+      OpenJD substitutes format strings verbatim, so interpolating free-text
+      values such as the prompt into a shell command line would let quotes,
+      backticks, and $(...) break out of their quoting and be re-parsed by bash.
+      Environment variable values are handed to the process directly and are
+      never parsed by a shell, so the script reads them with os.environ and no
+      escaping is required.
+    variables:
+      WAN_PROMPT: "{{Param.Prompt}}"
+      WAN_NEGATIVE_PROMPT: "{{Param.NegativePrompt}}"
+      WAN_WIDTH: "{{Param.Width}}"
+      WAN_HEIGHT: "{{Param.Height}}"
+      WAN_NUM_FRAMES: "{{Param.NumFrames}}"
+      WAN_FPS: "{{Param.Fps}}"
+      WAN_NUM_INFERENCE_STEPS: "{{Param.NumInferenceSteps}}"
+      WAN_GUIDANCE_SCALE: "{{Param.GuidanceScale}}"
+      WAN_SEED: "{{Param.Seed}}"
+      WAN_MODEL_ID: "{{Param.ModelId}}"
+      WAN_HF_CACHE_DIR: "{{Param.HFCacheDir}}"
+      WAN_OUTPUT_DIR: "{{Param.OutputDir}}"
+  - name: InstallDeps
+    description: >
+      Install PyTorch with CUDA support plus diffusers and its dependencies.
+      Runs once per session rather than once per task.
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args: ['{{Env.File.Enter}}']
+      embeddedFiles:
+      - name: Enter
+        type: TEXT
+        filename: install_deps.sh
+        runnable: true
+        data: |
+          #!/bin/bash
+          set -euo pipefail
+          echo "Installing PyTorch with CUDA 12.4 support ..."
+          pip install --quiet torch torchvision \
+            --index-url https://download.pytorch.org/whl/cu124
+          echo "Installing diffusers and dependencies ..."
+          # diffusers >= 0.36 ships WanPipeline and AutoencoderKLWan.
+          # imageio-ffmpeg backs diffusers.utils.export_to_video.
+          # Xet-accelerated downloads come from hf_xet, which huggingface_hub
+          # already requires on x86_64 and arm64, so it needs no explicit
+          # dependency here. generate_video.py sets HF_XET_HIGH_PERFORMANCE
+          # to opt into the faster transfer path.
+          # Upper bounds keep this sample working after the next major release
+          # of each dependency.
+          pip install --quiet \
+            "diffusers>=0.36,<1" \
+            "transformers>=4.45,<6" \
+            "accelerate>=1.0,<2" \
+            "safetensors>=0.4,<1" \
+            "sentencepiece>=0.2,<1" \
+            "protobuf>=4,<7" \
+            "ftfy>=6,<7" \
+            "imageio>=2.34,<3" \
+            "imageio-ffmpeg>=0.5,<1"
+          echo "Dependency install complete."
+  script:
+    actions:
+      onRun:
+        # Invoke Python directly rather than through a shell wrapper. Every
+        # user-supplied value arrives via the GenerationSettings environment,
+        # so nothing here needs quoting and no shell re-parses free text.
+        # ClipIndex is a template-controlled INT, safe to pass as an argument.
+        command: python
+        args:
+        - '-u'
+        - '{{Param.GenerateScript}}'
+        - '--clip-index'
+        - '{{Task.Param.ClipIndex}}'
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    # 64 GiB. The offload path holds ~17 GiB of weights in system RAM (the
+    # transformer and text encoder load in bfloat16; only the VAE stays
+    # float32), plus the CUDA context, safetensors load spikes, and decoded
+    # frames. The deciding factor is the fork() for ffmpeg at export time,
+    # which was observed failing with ENOMEM on a 64 GiB worker while those
+    # weights were still resident. This is also the only configuration the
+    # sample has been verified on.
+    - name: amount.worker.memory
+      min: 65536
