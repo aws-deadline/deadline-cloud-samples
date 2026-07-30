@@ -31,14 +31,24 @@ BLENDER_VERSION="4.5.0"
 # installer component for the version above; see "Adapting to another DCC".
 BLENDER_COMPONENT="blender_45"
 
-# download.blender.org rejects some automated clients, so this points at an
-# official mirror. See https://mirror.blender.org/ for alternatives.
-BLENDER_MIRROR="https://mirrors.iu13.net/blender/release"
+# download.blender.org rejects some automated clients, so this points at
+# Blender's official mirror redirector, which forwards to a nearby mirror.
+# Point it at an internal mirror if you host the archives yourself.
+BLENDER_MIRROR="https://mirror.blender.org/release"
 
 BLENDER_PREFIX="/opt/blender"
 SUBMITTER_PREFIX="/opt/DeadlineCloudSubmitter"
 
 DOWNLOADS_BASE="https://downloads.deadlinecloud.amazonaws.com"
+
+# Deadline Cloud monitor links against OpenSSL 1.1, which no current Debian or
+# Ubuntu release ships. Ubuntu 20.04 is the last release to carry libssl1.1, so
+# install that package here. Pinned to a specific build and checksum: it is not
+# published with a .sha256 alongside it, so the expected hash lives here. Take a
+# newer hash from the "SHA256:" field for libssl1.1 in
+# https://archive.ubuntu.com/ubuntu/dists/focal-updates/main/binary-amd64/Packages.gz
+LIBSSL_DEB="libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb"
+LIBSSL_DEB_SHA256="7cf39d70a639017d1dd7c8d36daa2258063608688e449fddf40ffdd46f992a78"
 
 # ---------------------------------------------------------------------------
 # Adapting to another DCC
@@ -102,15 +112,15 @@ command -v apt-get >/dev/null 2>&1 \
 DEBIAN_FRONTEND=noninteractive apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl xz-utils python3
 
-# Deadline Cloud monitor links against OpenSSL 1.1, which recent releases no
-# longer include. On Ubuntu 22.04 and later, install libssl1.1 from the archive.
-if ! ldconfig -p | grep -q 'libssl\.so\.1\.1'; then
-    log "installing libssl1.1 for Deadline Cloud monitor"
-    libssl_deb="libssl1.1_1.1.1f-1ubuntu2_amd64.deb"
-    curl -fsSL --retry 3 -o "/tmp/$libssl_deb" \
-        "https://archive.ubuntu.com/ubuntu/pool/main/o/openssl/$libssl_deb"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "/tmp/$libssl_deb"
-    rm -f "/tmp/$libssl_deb"
+# Deadline Cloud monitor's .deb depends on libwebkit2gtk-4.0-37, which was
+# dropped after Ubuntu 22.04 and Debian 12 in favor of the 4.1 build. Installing
+# it elsewhere fails at dependency resolution, so say so here rather than partway
+# through. Check before anything is installed.
+# apt-cache policy reports a candidate version only for a package apt can
+# actually install, unlike apt-cache show, which also succeeds for a virtual one.
+webkit_candidate="$(apt-cache policy libwebkit2gtk-4.0-37 2>/dev/null | awk '/Candidate:/ {print $2}')"
+if [[ -z "$webkit_candidate" || "$webkit_candidate" == "(none)" ]]; then
+    die "Deadline Cloud monitor needs libwebkit2gtk-4.0-37, which this image's repositories do not provide. Ubuntu 22.04 and Debian 12 carry it; later releases ship libwebkit2gtk-4.1-0 instead. Use one of those releases, or add a repository that provides the 4.0 build."
 fi
 
 WORK_DIR="$(mktemp -d)"
@@ -140,6 +150,28 @@ download_verified() {
         || die "checksum mismatch for ${dest##*/} (expected $expected, got $actual)"
     log "verified ${dest##*/}"
 }
+
+# Verify a file against a checksum given directly, for artifacts published
+# without a .sha256 of their own.
+verify_sha256() {
+    local path="$1" expected="$2" actual
+    actual="$(sha256sum "$path" | awk '{print $1}')"
+    [[ "${actual,,}" == "${expected,,}" ]] \
+        || die "checksum mismatch for ${path##*/} (expected $expected, got $actual)"
+    log "verified ${path##*/}"
+}
+
+# Install OpenSSL 1.1 for Deadline Cloud monitor. Its .deb declares no SSL
+# dependency, so a missing libssl.so.1.1 does not fail the install: the monitor
+# installs and then cannot start. Check for the library rather than for a
+# package name, since it may already be present from another source.
+if ! ldconfig -p | grep -q 'libssl\.so\.1\.1'; then
+    log "installing libssl1.1 for Deadline Cloud monitor"
+    curl -fsSL --retry 3 --retry-delay 2 -o "$WORK_DIR/$LIBSSL_DEB" \
+        "https://archive.ubuntu.com/ubuntu/pool/main/o/openssl/$LIBSSL_DEB"
+    verify_sha256 "$WORK_DIR/$LIBSSL_DEB" "$LIBSSL_DEB_SHA256"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$WORK_DIR/$LIBSSL_DEB"
+fi
 
 # ---------------------------------------------------------------------------
 # Install Blender

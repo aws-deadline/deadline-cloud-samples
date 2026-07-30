@@ -43,9 +43,10 @@ $BlenderVersion = "4.5.0"
 # installer component for the version above; see "Adapting to another DCC".
 $BlenderComponent = "blender_45"
 
-# download.blender.org rejects some automated clients, so this points at an
-# official mirror. See https://mirror.blender.org/ for alternatives.
-$BlenderMirror = "https://mirrors.iu13.net/blender/release"
+# download.blender.org rejects some automated clients, so this points at
+# Blender's official mirror redirector, which forwards to a nearby mirror.
+# Point it at an internal mirror if you host the archives yourself.
+$BlenderMirror = "https://mirror.blender.org/release"
 
 $BlenderPrefix = "C:\Program Files\Blender"
 $SubmitterPrefix = "C:\Program Files\DeadlineCloudSubmitter"

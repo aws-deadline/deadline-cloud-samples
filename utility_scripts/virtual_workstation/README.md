@@ -20,14 +20,16 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 
 ## Prerequisites
 
-* A Debian-family Linux image or a Windows image, with a desktop environment already present because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
+* Ubuntu 22.04, Debian 12, or a Windows image, with a desktop environment already present because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
+
+  Deadline Cloud monitor's `.deb` depends on `libwebkit2gtk-4.0-37`, which Ubuntu 24.04 and Debian 13 no longer publish. The Linux script checks for it up front and stops with an explanation rather than failing partway through. On a later release, add a repository that provides the 4.0 build.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
 * A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images include Microsoft Edge. On Ubuntu 22.04 and later, Firefox and Chromium are published only as snaps, which do not work in every remote-desktop session. Installing Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) gives a working browser.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
-The Linux script targets Debian-family images (Ubuntu, Debian). To use another distribution, replace the `apt-get` calls and install the monitor from its `.rpm` rather than the `.deb`.
+The Linux script targets Debian-family images. To use another distribution, replace the `apt-get` calls, install the monitor from its `.rpm` rather than the `.deb`, and satisfy OpenSSL 1.1 the way that distribution expects.
 
 ## Run
 
@@ -62,6 +64,8 @@ Both scripts run the same five steps, in the same order, under matching section 
 5. **Install the monitor and create the profile** with `create-profile`, a non-GUI subcommand that writes the profile and exits without needing a display.
 
 Every download is verified against a published SHA-256 checksum, and the scripts fail if a checksum cannot be fetched. An internal Blender mirror must also serve Blender's `blender-<version>.sha256` manifest.
+
+The Linux script also installs `libssl1.1`, because Deadline Cloud monitor links against OpenSSL 1.1 while no current Debian or Ubuntu release provides it. Ubuntu 20.04 is the last release to carry the package, so the script takes it from the Ubuntu archive. That one artifact is published without a `.sha256` beside it, so its expected hash is a constant at the top of the script alongside the version, with a comment naming the index to read a newer hash from.
 
 ### The profile
 
@@ -138,11 +142,11 @@ deadline-cloud-monitor
 & "$env:LOCALAPPDATA\DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
 ```
 
-**The monitor asks for a monitor URL instead of using the profile.** The profile's `monitor_id` is empty. Re-run the script, or recreate the profile with a non-empty placeholder as described under [The profile](#the-profile).
+**The monitor asks for a monitor URL instead of using the profile.** The profile's `monitor_id` is empty, so the monitor dropped the profile from its picker. Check the stanza in `~/.aws/config`, then re-run the script or recreate the profile with a non-empty placeholder as described under [The profile](#the-profile).
 
 **Submission fails with a credentials error.** Expected until the artist signs in to the monitor once. Check with `deadline auth status`, which reports `NEEDS_LOGIN` before sign-in and `AUTHENTICATED` after.
 
-**On Windows, the script cannot find the monitor after installing it.** The installer honors WOW64 redirection, so under a 32-bit host process it installs into `C:\Windows\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\` even though `%LOCALAPPDATA%` points elsewhere. The script reads the install location from the uninstall registry entry to avoid guessing. To find it by hand:
+**On Windows, the script cannot find the monitor after installing it.** The installer honors WOW64 redirection, so under a 32-bit host process it installs into `C:\Windows\SysWOW64\config\systemprofile\AppData\Local\DeadlineCloudMonitor\` even though `%LOCALAPPDATA%` points elsewhere, and the `InstallLocation` it records still names `System32`. The script tries the recorded path, its `SysWOW64` equivalent, and `%LOCALAPPDATA%`, and reports every candidate when none exists. To find it by hand:
 
 ```console
 Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
