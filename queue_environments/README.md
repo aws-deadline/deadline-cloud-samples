@@ -133,7 +133,7 @@ The Rez sample resolves software from a shared package repository. Use it with c
 
 Choose the [Rez shim environment](rez_shim/) if your Rez packages configure software with anything other than plain environment variables, such as an `alias` for a launcher, a shell function, or a `PATH` prepend that must shadow a system binary. Those cannot cross out of a queue environment as `openjd_env` name-value pairs, so the sample above loses them. The shim environment instead wraps each task's command in the resolved context.
 
-It ships with test scaffolding and a verification job, so it lives in its own directory with a [dedicated README](rez_shim/README.md) covering deployment, tradeoffs, and the upstream RFC that will supersede it.
+It comes with test scaffolding and a verification job, so it lives in its own directory with a [dedicated README](rez_shim/README.md) covering deployment, tradeoffs, and the upstream RFC that will supersede it.
 
 ### Pip environment
 

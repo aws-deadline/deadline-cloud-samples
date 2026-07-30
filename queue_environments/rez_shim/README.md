@@ -16,7 +16,7 @@ Only the first file belongs on a production queue. The other two exist to demons
 
 ## Why the simpler sample cannot cover these cases
 
-The limitation is structural. A queue environment action runs in its own subprocess, so the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. [rez_queue_env.yaml](../rez_queue_env.yaml) therefore activates a context, diffs the environment before and after, and replays the difference. Anything that is not a name-value pair does not survive that round trip.
+The limitation is structural. A queue environment action runs in its own subprocess, so the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. To work within that, [rez_queue_env.yaml](../rez_queue_env.yaml) activates a context and then replays the difference between the environment before and after. Anything that is not a name-value pair does not survive that round trip.
 
 A Rez `alias` is the clearest casualty. Rez implements it as an exported shell function, which Bash exports under a name like `BASH_FUNC_launch%%` with a multi-line value. The session runtime rejects that assignment outright:
 
@@ -25,7 +25,7 @@ openjd_env: "BASH_FUNC_demoalias%%=() {  demorender --via-alias \"$@\"\n}"
   -- ERROR: Failed to parse environment variable assignment.
 ```
 
-The alias is therefore gone before any task runs.
+The alias is gone before any task runs.
 
 ## How the shim environment works
 
@@ -110,9 +110,9 @@ The demo needs a fleet of Linux or macOS workers with `python3` and network acce
 |---|---|---|
 | 1 | A plain variable, `DEMOTOOL_VERSION` | Survives |
 | 2 | A Rez `alias`, which becomes an exported shell function | Lost, rejected by the runtime |
-| 3 | A `PATH` prepend where the package ships its own `sort` | Depends on environment order rather than the resolved context |
+| 3 | A `PATH` prepend where the package provides its own `sort` | Depends on environment order rather than the resolved context |
 
-A third step, `CancelThroughShim`, is a manual check rather than an automatic one. It sleeps inside a shimmed tool for `CancelSleepSeconds` so you can cancel the job and watch the signal arrive; the tool reports the signal it caught before exiting. Cancel it from the monitor or with:
+A third step, `CancelThroughShim`, is a manual check rather than an automatic one. It sleeps inside a shimmed tool for `CancelSleepSeconds` so you can cancel the job and watch the signal arrive. The tool reports the signal it caught before exiting. Cancel it from the monitor or with:
 
 ```console
 aws deadline update-job --farm-id FARM_ID --queue-id QUEUE_ID \
@@ -152,11 +152,11 @@ INTERRUPT: Sending signal "term" to process 39247
 demosleep: caught SIGTERM, exiting
 ```
 
-Applications that install their own signal handlers therefore still get the chance to shut down cleanly. Give `cancelation` a `NOTIFY_THEN_TERMINATE` mode in your step if a tool needs a grace period.
+Applications that install their own signal handlers still get the chance to shut down cleanly. Give `cancelation` a `NOTIFY_THEN_TERMINATE` mode in your step if a tool needs a grace period.
 
 ## A future specification change removes the need for this
 
-This is a workaround for a gap in the environment specification rather than a permanent design. [RFC0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/issues/132) proposes `onWrapTaskRun`, letting a queue environment wrap each task's command directly instead of exporting variables to it. Once that ships in the worker agent, the wrap hook replaces the shim directory and the `PATH` manipulation, and the tradeoffs above go away. The RFC has reached final comments upstream.
+This environment is a workaround for a gap in the environment specification rather than a permanent design. [RFC0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/issues/132) proposes `onWrapTaskRun`, letting a queue environment wrap each task's command directly instead of exporting variables to it. Once the worker agent supports that hook, it replaces both the shim directory and the `PATH` manipulation, and the tradeoffs above go away. The RFC has reached final comments upstream.
 
 ## Cleanup
 
