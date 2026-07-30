@@ -82,7 +82,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--dry-run", action="store_true",
                     help="Print the parameters and command without submitting.")
     sp.add_argument("deadline_args", nargs="*",
-                    help="Extra args passed through to `deadline bundle submit`.")
+                    help="Extra args passed through to `deadline bundle submit`. "
+                         "Put them after a `--` separator so argparse does not treat "
+                         "flags as options to studio-pipe, e.g. "
+                         "`studio-pipe submit <shot> -- --yes --farm-id ...`.")
     sp.set_defaults(func=_cmd_submit)
 
     sp = sub.add_parser(

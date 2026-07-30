@@ -107,6 +107,17 @@ def main():
             "FLOW_PUBLISH=FALSE to submit without publishing to Flow."
         )
 
+    # A project id of 0 is the placeholder shipped in project.yaml, not a real
+    # Flow project. It is non-empty, so the required-variable check above passes,
+    # but publishing into project 0 fails only after every frame has rendered.
+    # Reject it at submit time so the mistake costs nothing.
+    if publish and int(definitions["FlowProjectId"]["default"]) == 0:
+        fail(
+            "FLOW_PROJECT_ID is 0, the placeholder value. Set it to your real Flow "
+            "project id (flow.project_id in project.yaml, or export FLOW_PROJECT_ID), "
+            "or set FLOW_PUBLISH=FALSE to submit without publishing to Flow."
+        )
+
     # Emit the modified template. Match the on-disk format so the client parses it cleanly.
     print(json.dumps({"template": yaml.safe_dump(template, sort_keys=False)}))
 

@@ -99,20 +99,13 @@ openjd summary template.yaml -p ShotId=test -p FrameRange=1-4 \
   -p EnableFlowPublish=FALSE
 ```
 
-The individual scripts also run directly under Blender, which is how to iterate
-on them before submitting (the pipeline README's
+The individual scripts also run directly under Blender (tested with Blender
+4.2+), which is how to iterate on them before submitting. Because
+`--addon-module` only enables an add-on that is already importable, the render
+script needs `BLENDER_USER_SCRIPTS` pointed at the add-on first (the same
+variable its Conda package sets on the farm). The pipeline README's
 "[Running the render stages without a farm](../../README.md#running-the-render-stages-without-a-farm)"
-section walks through this). Blender comes from your local Conda env, and
-`--addon-module` enables a studio add-on (importable because its Conda package
-set `BLENDER_USER_SCRIPTS`):
-
-```bash
-blender --background studio/assets/.../hero_vehicle.blend \
-  --python scripts/render_shot.py -- --frame 1 --frame-range 1-4 \
-  --resolution-x 320 --resolution-y 180 --samples 8 \
-  --addon-module moonrise_scatter \
-  --output-prefix /tmp/out/frames/sh010_
-```
+section gives a copy-pasteable command that sets this up and renders a frame.
 
 ## Submit via the launcher
 
