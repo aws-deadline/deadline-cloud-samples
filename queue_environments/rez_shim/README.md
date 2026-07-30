@@ -33,12 +33,16 @@ The alias is gone before any task runs.
 
 ```bash
 #!/usr/bin/env bash
-exec rez env --input "$REZ_CONTEXT_FILE" --shell bash -- "<tool>" "$@"
+exec rez env --input "$REZ_CONTEXT_FILE" --shell bash -- "/abs/path/to/tool" "$@"
 ```
 
 Job templates keep calling tools by bare name, such as `command: mayapy`, so each call re-enters the saved context in its own shell and Rez applies the full context inside the task's own process. Job bundles need no changes.
 
 Tool names come from `rez context -t` on the saved context, so no list of executables is hard-coded. Set `RezExtraTools` for commands a package provides without declaring them in its `tools` list.
+
+Each tool is resolved to an absolute path with `command -v` inside the context when its shim is written, rather than being re-resolved by name at task time. The reason is a recursion risk. By default Rez rebuilds `PATH` from the context and drops the shim directory, so a bare name is safe. On a farm whose Rez config lists `PATH` in `parent_variables`, though, the shim directory stays ahead of the package's own `bin`, and a bare name would find the shim again and fork until the worker ran out of processes. Resolving once up front removes that risk whatever the Rez configuration.
+
+A tool that resolves back into the shim directory, or that the context cannot resolve at all, gets no shim. The environment reports it at startup and tasks fall back to whatever the worker provides.
 
 ## Parameters
 

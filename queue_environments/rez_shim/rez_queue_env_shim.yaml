@@ -100,6 +100,8 @@ environment:
         mkdir -p "$SHIM_DIR"
 
         SHIM_COUNT=0
+        SHIMMED_TOOLS=""
+        SKIPPED_TOOLS=""
         for TOOL in $REZ_TOOLS $REZ_EXTRA_TOOLS; do
             # Skip Rez's own commands. Shimming them would mean `rez` inside a
             # task recursed back through the shim instead of running Rez.
@@ -107,26 +109,57 @@ environment:
                 rez|rez-*) continue ;;
             esac
 
+            # Resolve the tool to an absolute path inside the context, so each
+            # shim execs the real binary rather than a bare name.
+            #
+            # A bare name would be re-resolved against whatever PATH exists when
+            # the shim runs. Rez normally rebuilds PATH from the context and
+            # drops SHIM_DIR, so a bare name is usually safe -- but a farm whose
+            # rez config lists PATH in `parent_variables` keeps SHIM_DIR ahead of
+            # the package's own bin directory, and the shim would then re-invoke
+            # itself and fork until the worker runs out of processes. Resolving
+            # once here removes that possibility regardless of Rez configuration.
+            TOOL_PATH="$(rez env --input "$CTX" --shell bash -- \
+                bash -c "command -v -- '$TOOL'" 2>/dev/null | tail -n 1 || true)"
+
+            # Refuse anything that resolves back into the shim directory, or that
+            # the context cannot resolve at all. Either would loop or fail
+            # confusingly at task time, so report it now instead.
+            case "$TOOL_PATH" in
+                "$SHIM_DIR"/*|"")
+                    SKIPPED_TOOLS="$SKIPPED_TOOLS $TOOL"
+                    continue
+                    ;;
+            esac
+
             # Each shim re-enters the resolved context in a real shell and then
-            # execs the requested tool, forwarding all arguments. `exec` keeps the
-            # process tree flat so the Deadline Cloud worker agent's signal
-            # handling and process-tree cleanup still reach the real process.
+            # execs the tool by absolute path, forwarding all arguments. `exec`
+            # avoids leaving an extra shell in the process tree; Rez still starts
+            # a shell of its own, and signals reach the tool through it.
             cat > "$SHIM_DIR/$TOOL" <<SHIM
         #!/usr/bin/env bash
-        exec rez env --input "$CTX" --shell bash -- "$TOOL" "\$@"
+        exec rez env --input "$CTX" --shell bash -- "$TOOL_PATH" "\$@"
         SHIM
             chmod +x "$SHIM_DIR/$TOOL"
             SHIM_COUNT=$((SHIM_COUNT + 1))
+            SHIMMED_TOOLS="$SHIMMED_TOOLS $TOOL"
         done
 
+        if [ -n "$SKIPPED_TOOLS" ]; then
+            echo "Warning: no shim created for:$SKIPPED_TOOLS"
+            echo "  The resolved Rez context does not provide these commands at a"
+            echo "  path outside $SHIM_DIR. Tasks calling them use whatever the"
+            echo "  worker provides instead."
+        fi
+
         if [ "$SHIM_COUNT" -eq 0 ]; then
-            echo "openjd_fail: Rez reported no tools for packages '$REZ_PACKAGES'."
+            echo "openjd_fail: Rez reported no usable tools for packages '$REZ_PACKAGES'."
             echo "Set the RezExtraTools parameter to name the commands explicitly."
             exit 1
         fi
 
         echo "Created $SHIM_COUNT Rez tool shims in $SHIM_DIR:"
-        echo "$REZ_TOOLS $REZ_EXTRA_TOOLS" | tr ' ' '\n' | sed '/^$/d' | sed 's/^/   /'
+        printf '   %s\n' $SHIMMED_TOOLS
 
         # Put the shim directory first on PATH so that bare command names in job
         # templates (for example `command: mayapy`) resolve to the shims.
