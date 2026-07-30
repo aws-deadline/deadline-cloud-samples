@@ -50,18 +50,27 @@ environment:
             exit 0
         fi
 
+        # The shims this environment writes are POSIX shell scripts that rely on
+        # a shebang line to be executable. That does not work on Windows, so
+        # fail with a clear message rather than producing shims that cannot run.
+        case "$(uname -s)" in
+            Linux|Darwin) ;;
+            *)
+                echo "openjd_fail: This queue environment supports Linux and macOS only (found $(uname -s))."
+                echo "Use rez_queue_env.yaml on Windows workers."
+                exit 1
+                ;;
+        esac
+
         # Edit these paths for your farm
         LINUX_REZ_REPOSITORY_PATH="/mnt/REZ_REPOSITORY"
-        WINDOWS_REZ_REPOSITORY_PATH="R:/REZ_REPOSITORY"
         MACOS_REZ_REPOSITORY_PATH="/Volumes/REZ_REPOSITORY"
 
         REZ_PACKAGES='{{Param.RezPackages}}'
         REZ_REPOSITORIES='{{Param.RezRepositories}}'
         REZ_EXTRA_TOOLS='{{Param.RezExtraTools}}'
 
-        if [[ "$(uname -s)" == MINGW* ]]; then
-            REZ_REPOSITORY_PATH="$WINDOWS_REZ_REPOSITORY_PATH"
-        elif [[ "$(uname)" == Darwin ]]; then
+        if [[ "$(uname)" == Darwin ]]; then
             REZ_REPOSITORY_PATH="$MACOS_REZ_REPOSITORY_PATH"
         else
             REZ_REPOSITORY_PATH="$LINUX_REZ_REPOSITORY_PATH"

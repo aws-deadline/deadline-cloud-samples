@@ -13,26 +13,34 @@ The shim approach resolves once to a `.rxt` context file, writes one executable 
 
 ## Prerequisites
 
-* A Linux queue with the [Rez shim demo queue environment](../../queue_environments/rez_queue_env_shim_demo.yaml) attached.
-* Workers with `python3` and network access to PyPI, because the demo environment installs Rez into the session directory. Real farms use `rez_queue_env_shim.yaml` and provide Rez on the worker image instead.
-* No Rez installation or package repository is required on the worker for this demo.
+* A Linux or macOS queue with two queue environments attached, in this order: [Rez demo setup](../../queue_environments/rez_demo_setup_queue_env.yaml) at the lower priority number, then [Rez shim](../../queue_environments/rez_queue_env_shim.yaml). The shim environment is used unmodified, so this exercises the same code a farm would run.
+* Workers with `python3` and network access to PyPI, because the setup environment installs Rez into the session directory. A production farm provides Rez on the worker image and does not need the setup environment.
+* No Rez installation or package repository is required on the worker.
 
 ## How it works
 
-The demo queue environment builds a `demotool` Rez package whose `commands()` sets `DEMOTOOL_VERSION` and `DEMOTOOL_LICENSE_SERVER`, then discovers tool names with `rez context -t` and generates a shim per tool. Each shim re-enters the saved context and `exec`s the real tool, forwarding all arguments.
+The setup environment builds a `demotool` Rez package whose `commands()` sets `DEMOTOOL_VERSION` and `DEMOTOOL_LICENSE_SERVER`, and puts Rez on `PATH`. The shim environment then resolves that package, discovers tool names with `rez context -t`, and writes one shim per tool. Each shim re-enters the saved context and `exec`s the real tool, forwarding all arguments.
+
+Pass the same directory as the setup environment's `RezDemoRepository` and the shim environment's `RezRepositories`.
 
 ## Run or submit
 
-```console
-deadline bundle submit job_bundles/rez_shim_demo
-```
-
-Run a single task locally against the demo environment without a farm:
+Run locally without a farm, applying both environments in order:
 
 ```console
 openjd run job_bundles/rez_shim_demo/template.yaml \
-  --environment queue_environments/rez_queue_env_shim_demo.yaml \
+  --environment queue_environments/rez_demo_setup_queue_env.yaml \
+  --environment queue_environments/rez_queue_env_shim.yaml \
+  -p RezDemoRepository=/tmp/rez-demo-repository \
+  -p RezPackages=demotool \
+  -p RezRepositories=/tmp/rez-demo-repository \
   --step RunRezTool --task-param Frame=1
+```
+
+Submit to a queue that has both environments attached:
+
+```console
+deadline bundle submit job_bundles/rez_shim_demo
 ```
 
 ## Parameters and outputs
@@ -54,4 +62,6 @@ demorender: DEMOTOOL_VERSION=1.0.0
 
 ## Security, cost, and cleanup
 
-Everything the demo creates, including the Rez installation, the demo package repository, the `.rxt` context, and the shims, is written under the session working directory and removed with the session. Costs are the usual worker running time, plus a first-session Rez install of roughly a minute. Detach the demo queue environment when finished.
+The Rez installation, the `.rxt` context, and the shims are written under the session working directory and removed with the session. The demo package repository is not: it is created at `RezDemoRepository`, which defaults to `/tmp/rez-demo-repository` and persists on the worker until the instance is replaced. Delete it if you are testing on a long-lived worker.
+
+Costs are the usual worker running time, plus a per-session Rez install of roughly a minute. Detach the setup environment when finished, and detach or reconfigure the shim environment before pointing it at a real package repository.

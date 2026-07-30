@@ -1,0 +1,86 @@
+specificationVersion: 'environment-2023-09'
+# Test scaffolding for rez_queue_env_shim.yaml.
+#
+# Installs Rez and builds a small demo Rez package so the shim environment can
+# be exercised on a worker that has neither. Attach this at a LOWER priority
+# number than the shim environment so it runs first, and set the shim
+# environment's RezRepositories parameter to the RezDemoRepository path below.
+#
+# This is for trying out and testing the shim environment. A production farm
+# provides Rez on the worker image and a package repository on shared storage,
+# and does not need this environment at all.
+parameterDefinitions:
+  - name: RezDemoRepository
+    type: STRING
+    description: >
+      Directory to create the demo Rez package repository in. Pass this same
+      value as the shim environment's RezRepositories parameter.
+    default: "/tmp/rez-demo-repository"
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Demo Repository
+
+environment:
+  name: RezDemoSetup
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: rez-demo-setup-enter.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        # The shim environment is tested on Linux and macOS only.
+        case "$(uname -s)" in
+            Linux|Darwin) ;;
+            *)
+                echo "openjd_fail: This demo supports Linux and macOS only (found $(uname -s))."
+                exit 1
+                ;;
+        esac
+
+        REPO='{{Param.RezDemoRepository}}'
+        REZ_INSTALL_DIR="{{Session.WorkingDirectory}}/rez-install"
+
+        # Install Rez into the session directory so it is removed with the
+        # session. A production farm has Rez on the worker image instead.
+        echo "Installing Rez into the session directory..."
+        python3 -m venv "$REZ_INSTALL_DIR"
+        "$REZ_INSTALL_DIR/bin/pip" install --quiet rez
+
+        # Build a demo package that sets variables and defines a shell function.
+        # The shell function is the part a variable diff cannot carry across
+        # actions, which is what the shim environment exists to preserve.
+        mkdir -p "$REPO/demotool/1.0.0/bin"
+        cat > "$REPO/demotool/1.0.0/package.py" <<'PKG'
+        name = "demotool"
+        version = "1.0.0"
+        tools = ["demorender", "democonvert"]
+        build_command = False
+
+        def commands():
+            env.PATH.prepend("{root}/bin")
+            env.DEMOTOOL_VERSION = "1.0.0"
+            env.DEMOTOOL_LICENSE_SERVER = "license.example.internal:1234"
+        PKG
+
+        cat > "$REPO/demotool/1.0.0/bin/demorender" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "demorender: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET}"
+        echo "demorender: DEMOTOOL_LICENSE_SERVER=${DEMOTOOL_LICENSE_SERVER:-UNSET}"
+        echo "demorender: args=$*"
+        TOOL
+        cat > "$REPO/demotool/1.0.0/bin/democonvert" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "democonvert: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET} args=$*"
+        TOOL
+        chmod +x "$REPO/demotool/1.0.0/bin/"*
+
+        echo "Created demo Rez package 'demotool-1.0.0' in $REPO"
+
+        # Put Rez on PATH so the shim environment's plain `rez` calls resolve.
+        echo "openjd_env: PATH=$REZ_INSTALL_DIR/bin:$PATH"

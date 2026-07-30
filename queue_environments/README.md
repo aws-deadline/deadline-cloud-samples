@@ -15,7 +15,7 @@ This table covers every queue environment YAML file in `queue_environments/`.
 | [Cached inline Conda environment](conda_queue_env_inline_improved_caching.yaml) | Portable named-environment reuse and expiration logic | Customer-managed fleets need reusable Conda environments |
 | [Rez environment](rez_queue_env.yaml) | Resolving packages from a shared Rez repository | Your studio already distributes software with Rez |
 | [Rez shim environment](rez_queue_env_shim.yaml) | Wrapping each task in a resolved Rez context through `PATH` shims | Rez software needs shell functions, aliases, or ordered `PATH` edits |
-| [Rez shim demo environment](rez_queue_env_shim_demo.yaml) | The shim mechanism with Rez and a demo package built in the session | You want to try the shim approach without preparing a worker or repository |
+| [Rez demo setup](rez_demo_setup_queue_env.yaml) | Installing Rez and building a demo package as test scaffolding | You want to try the shim environment without preparing a worker or repository |
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
 
@@ -141,12 +141,24 @@ Tool names come from `rez context -t` on the saved context, so no list of execut
 Consider these tradeoffs:
 
 * Only bare command names are intercepted. A template invoking an absolute path bypasses the shims.
-* The shims assume a POSIX shell. Windows and git bash are untested.
+* Linux and macOS only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there. Use [rez_queue_env.yaml](rez_queue_env.yaml) for Windows workers.
 * Place this environment after any other environment that edits `PATH`, such as a higher priority number than a Conda environment, because the last writer wins.
 
-### Rez shim demo environment
+### Rez demo setup
 
-The demo variant installs Rez and builds a small demo package inside the session directory, so the shim mechanism can be exercised on any Linux worker without Rez on the image or a mounted repository. Pair it with the [Rez shim demo job](../job_bundles/rez_shim_demo/). Use `rez_queue_env_shim.yaml` on real farms.
+This environment is test scaffolding, not a production sample. It installs Rez into the session directory and builds a small `demotool` package, so the shim environment above can be exercised on a worker that has neither Rez nor a package repository.
+
+Attach it at a lower priority number than the shim environment so it runs first, and pass the same directory as both its `RezDemoRepository` and the shim environment's `RezRepositories`. The shim environment is used unmodified, so what you test is what a farm would run. Pair it with the [Rez shim demo job](../job_bundles/rez_shim_demo/).
+
+```console
+openjd run job_bundles/rez_shim_demo/template.yaml \
+  --environment queue_environments/rez_demo_setup_queue_env.yaml \
+  --environment queue_environments/rez_queue_env_shim.yaml \
+  -p RezDemoRepository=/tmp/rez-demo-repository \
+  -p RezPackages=demotool \
+  -p RezRepositories=/tmp/rez-demo-repository \
+  --step VerifyEnvironment
+```
 
 ### Pip environment
 
