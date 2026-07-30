@@ -15,7 +15,6 @@ This table covers every queue environment YAML file in `queue_environments/`.
 | [Cached inline Conda environment](conda_queue_env_inline_improved_caching.yaml) | Portable named-environment reuse and expiration logic | Customer-managed fleets need reusable Conda environments |
 | [Rez environment](rez_queue_env.yaml) | Resolving packages from a shared Rez repository | Your studio already distributes software with Rez |
 | [Rez shim environment](rez_queue_env_shim.yaml) | Wrapping each task in a resolved Rez context through `PATH` shims | Rez software needs shell functions, aliases, or ordered `PATH` edits |
-| [Rez demo setup](rez_demo_setup_queue_env.yaml) | Installing Rez and building a demo package as test scaffolding | You want to try the shim environment without preparing a worker or repository |
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
 
@@ -132,33 +131,23 @@ The Rez sample resolves software from a shared package repository. Use it with c
 
 ### Rez shim environment
 
-The Rez sample activates a context during `onEnter` and then publishes the resulting environment variables with `openjd_env`. A queue environment action runs in its own subprocess, so only variables can cross into later actions. Shell functions, aliases, and ordered `PATH` edits are lost, which matters for software distributed with Rez.
+Choose this environment if your Rez packages configure software with anything other than plain environment variables. Studios commonly hit this when a package defines an `alias` for a launcher, relies on a shell function, or prepends to `PATH` expecting its own binary to shadow a system one. If your packages only set variables, [rez_queue_env.yaml](rez_queue_env.yaml) is simpler and works.
 
-The shim sample keeps the resolve out of that path. It saves the resolved context to a `.rxt` file once, then writes one small executable per tool into the session directory and prepends that directory to `PATH`. Job templates still call tools by bare name, such as `command: mayapy`, and each call re-enters the saved context in its own shell. Job bundles need no changes.
+The reason the simpler sample cannot cover those cases is structural. A queue environment action runs in its own subprocess, so the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. `rez_queue_env.yaml` therefore activates a context, diffs the environment before and after, and replays the difference. Anything that is not a name-value pair does not survive that round trip. A Rez `alias` becomes an exported shell function, which Bash exports under a name like `BASH_FUNC_launch%%` with a multi-line value; the session runtime rejects that assignment outright and the alias is silently gone by the time a task runs.
+
+This environment keeps the resolve out of that path. It saves the resolved context to a `.rxt` file once, then writes one small executable per tool into the session directory and prepends that directory to `PATH`. Job templates still call tools by bare name, such as `command: mayapy`, and each call re-enters the saved context in its own shell, so Rez applies the full context inside the task's own process. Job bundles need no changes.
 
 Tool names come from `rez context -t` on the saved context, so no list of executables is hard-coded. Set `RezExtraTools` for commands a package provides without declaring them in its `tools` list.
 
 Consider these tradeoffs:
 
 * Only bare command names are intercepted. A template invoking an absolute path bypasses the shims.
-* Linux and macOS only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there. Use [rez_queue_env.yaml](rez_queue_env.yaml) for Windows workers.
+* Linux and macOS workers only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there with a message pointing at the alternative. Use [rez_queue_env.yaml](rez_queue_env.yaml) for Windows fleets.
 * Place this environment after any other environment that edits `PATH`, such as a higher priority number than a Conda environment, because the last writer wins.
 
-### Rez demo setup
+This is a workaround for a gap in the environment specification rather than a permanent design. [RFC0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/issues/132) proposes `onWrapTaskRun`, which lets a queue environment wrap each task's command directly instead of exporting variables to it. Once that ships in the worker agent, the wrap hook replaces the shim directory and the `PATH` manipulation, and the tradeoffs above go away. The RFC has reached final comments upstream.
 
-This environment is test scaffolding, not a production sample. It installs Rez into the session directory and builds a small `demotool` package, so the shim environment above can be exercised on a worker that has neither Rez nor a package repository.
-
-Attach it at a lower priority number than the shim environment so it runs first, and pass the same directory as both its `RezDemoRepository` and the shim environment's `RezRepositories`. The shim environment is used unmodified, so what you test is what a farm would run. Pair it with the [Rez shim demo job](../job_bundles/rez_shim_demo/).
-
-```console
-openjd run job_bundles/rez_shim_demo/template.yaml \
-  --environment queue_environments/rez_demo_setup_queue_env.yaml \
-  --environment queue_environments/rez_queue_env_shim.yaml \
-  -p RezDemoRepository=/tmp/rez-demo-repository \
-  -p RezPackages=demotool \
-  -p RezRepositories=/tmp/rez-demo-repository \
-  --step VerifyEnvironment
-```
+To try this environment without preparing a worker or a package repository, see [rez_demo_setup_queue_env.yaml](rez_demo_setup_queue_env.yaml) and the [Rez shim demo job](../job_bundles/rez_shim_demo/).
 
 ### Pip environment
 

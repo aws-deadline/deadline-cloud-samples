@@ -9,11 +9,24 @@ A queue environment action runs in its own subprocess, so the only way it can af
 The shim approach resolves once to a `.rxt` context file, writes one executable per Rez tool into the session directory, and prepends that directory to `PATH`. This bundle proves the result with two steps:
 
 * `RunRezTool` calls `demorender` as a bare command name, so the shim is what actually runs.
-* `VerifyEnvironment` shows that the tool's own variables are visible inside the tool's process but were never exported into the session.
+* `VerifyEnvironment` runs three fidelity checks and fails the task if any of them regress.
+
+The three checks cover increasingly demanding kinds of environment state:
+
+| Check | State under test | Under harvest-and-replay |
+|---|---|---|
+| 1 | A plain variable, `DEMOTOOL_VERSION` | Survives |
+| 2 | A Rez `alias`, which becomes an exported shell function | Lost. The session runtime rejects the `BASH_FUNC_demoalias%%` assignment |
+| 3 | A `PATH` prepend where the package ships its own `sort` | Depends on environment order rather than the resolved context |
+
+Check 2 is the sharpest: run this bundle under [rez_queue_env.yaml](../../queue_environments/rez_queue_env.yaml) and the session log shows the runtime refusing the alias with `ERROR: Failed to parse environment variable assignment`, which is why the alias cannot reach a task that way.
+
+A future specification change will make this unnecessary. [RFC0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/issues/132), now in final comments upstream, adds `onWrapTaskRun` so a queue environment can wrap a task's command directly instead of exporting variables to it.
 
 ## Prerequisites
 
-* A Linux or macOS queue with two queue environments attached, in this order: [Rez demo setup](../../queue_environments/rez_demo_setup_queue_env.yaml) at the lower priority number, then [Rez shim](../../queue_environments/rez_queue_env_shim.yaml). The shim environment is used unmodified, so this exercises the same code a farm would run.
+* A queue with two queue environments attached, in this order: [Rez demo setup](../../queue_environments/rez_demo_setup_queue_env.yaml) at the lower priority number, then [Rez shim](../../queue_environments/rez_queue_env_shim.yaml). The shim environment is used unmodified, so this exercises the same code a farm would run.
+* A fleet of Linux or macOS workers. The shims are POSIX shell scripts and the environments fail on Windows workers.
 * Workers with `python3` and network access to PyPI, because the setup environment installs Rez into the session directory. A production farm provides Rez on the worker image and does not need the setup environment.
 * No Rez installation or package repository is required on the worker.
 
@@ -49,16 +62,24 @@ deadline bundle submit job_bundles/rez_shim_demo
 |---|---|---|
 | `ToolName` | `demorender` | The Rez-provided command the first step invokes by bare name |
 
-The job writes no output files. Success is shown in the session log:
+The job writes no output files. It reports through the session log and fails the task if any check regresses:
 
 ```text
 === DEMOTOOL_VERSION as seen by the session (expected UNSET) ===
 DEMOTOOL_VERSION=UNSET
 === DEMOTOOL_VERSION as seen inside the tool (expected 1.0.0) ===
 demorender: DEMOTOOL_VERSION=1.0.0
+=== Check 1: plain variable reaches the tool ===
+PASS: variable visible inside the tool
+=== Check 2: Rez alias survives into the task ===
+PASS: alias is callable
+=== Check 3: package PATH prepend shadows the system command ===
+PASS: package command shadows the system one
+=== Result ===
+All 3 environment fidelity checks passed.
 ```
 
-`UNSET` in the session with `1.0.0` inside the tool is the point of the sample. The variable was never harvested and replayed; Rez applied it inside the task's own process.
+`UNSET` in the session with `1.0.0` inside the tool is the core of the sample. The variable was never harvested and replayed; Rez applied it inside the task's own process.
 
 ## Security, cost, and cleanup
 
