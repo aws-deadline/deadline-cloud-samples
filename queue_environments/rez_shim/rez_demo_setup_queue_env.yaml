@@ -67,7 +67,7 @@ environment:
         cat > "$REPO/demotool/1.0.0/package.py" <<'PKG'
         name = "demotool"
         version = "1.0.0"
-        tools = ["demorender", "democonvert"]
+        tools = ["demorender", "democonvert", "demosleep"]
         build_command = False
 
         def commands():
@@ -88,6 +88,18 @@ environment:
         cat > "$REPO/demotool/1.0.0/bin/democonvert" <<'TOOL'
         #!/usr/bin/env bash
         echo "democonvert: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET} args=$*"
+        TOOL
+        # A long-running tool that reports the signals it receives, used by the
+        # CancelThroughShim step to prove cancelation reaches through a shim.
+        cat > "$REPO/demotool/1.0.0/bin/demosleep" <<'TOOL'
+        #!/usr/bin/env bash
+        trap 'echo "demosleep: caught SIGTERM, exiting"; exit 42' TERM
+        trap 'echo "demosleep: caught SIGINT, exiting"; exit 43' INT
+        echo "demosleep: pid=$$ sleeping for ${1:-600}s"
+        # Sleep in short increments so the trap runs promptly. A single long
+        # sleep would not be interrupted until it returned.
+        for _ in $(seq 1 "${1:-600}"); do sleep 1; done
+        echo "demosleep: finished without receiving a signal"
         TOOL
         # A package-provided `sort` that shadows the system one. The package
         # directory is prepended to PATH, so inside a correctly applied context

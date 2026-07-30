@@ -42,11 +42,21 @@ Tool names come from `rez context -t` on the saved context, so no list of execut
 
 ## Parameters
 
+The shim environment defines these:
+
 | Parameter | Default | Purpose |
 |---|---|---|
 | `RezPackages` | `""` | Space-separated packages to resolve. Empty skips the environment |
 | `RezRepositories` | `REZ_REPOSITORY_PATH` | Colon-separated package search path. Edit the per-platform defaults in the script for your farm |
 | `RezExtraTools` | `""` | Extra command names to shim, for tools a package does not declare |
+
+The demo setup environment and job add these:
+
+| Parameter | Default | Purpose |
+|---|---|---|
+| `RezDemoRepository` | `/tmp/rez-demo-repository` | Where to build the demo package. Pass the same value as `RezRepositories` |
+| `ToolName` | `demorender` | The command the first demo step invokes by bare name |
+| `CancelSleepSeconds` | `600` | How long `CancelThroughShim` sleeps, giving you time to cancel the job |
 
 ## Deploy on a farm
 
@@ -102,6 +112,15 @@ The demo needs a fleet of Linux or macOS workers with `python3` and network acce
 | 2 | A Rez `alias`, which becomes an exported shell function | Lost, rejected by the runtime |
 | 3 | A `PATH` prepend where the package ships its own `sort` | Depends on environment order rather than the resolved context |
 
+A third step, `CancelThroughShim`, is a manual check rather than an automatic one. It sleeps inside a shimmed tool for `CancelSleepSeconds` so you can cancel the job and watch the signal arrive; the tool reports the signal it caught before exiting. Cancel it from the monitor or with:
+
+```console
+aws deadline update-job --farm-id FARM_ID --queue-id QUEUE_ID \
+  --job-id JOB_ID --target-task-run-status CANCELED
+```
+
+Expect the step to end as `CANCELED` with `demosleep: caught SIGTERM, exiting` in the session log. Left alone it simply runs to completion.
+
 A successful session log shows the variable absent from the session but present inside the tool, then all three checks passing:
 
 ```text
@@ -125,7 +144,15 @@ Running the same bundle under [rez_queue_env.yaml](../rez_queue_env.yaml) instea
 * Only bare command names are intercepted. A template invoking an absolute path bypasses the shims.
 * Linux and macOS workers only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there with a message pointing at the alternative. Use [rez_queue_env.yaml](../rez_queue_env.yaml) for Windows fleets.
 * Each task pays a context re-entry. Rez's resolve cache keeps this small, but it is not free.
-* Cancelation through a shim is untested. The shims use `exec` to keep the process tree flat so the worker agent's signal handling reaches the real process, but this has not been verified against a long-running application.
+
+Cancelation does reach through a shim. Rez runs the tool in a shell of its own, so the process tree is `shim` → `rez env` → shell → tool rather than flat, but a `SIGTERM` sent to the top process propagates to the tool and no orphans are left behind. Verified on a Linux service-managed fleet worker: canceling the `CancelThroughShim` step below produced
+
+```text
+INTERRUPT: Sending signal "term" to process 39247
+demosleep: caught SIGTERM, exiting
+```
+
+Applications that install their own signal handlers therefore still get the chance to shut down cleanly. Give `cancelation` a `NOTIFY_THEN_TERMINATE` mode in your step if a tool needs a grace period.
 
 ## A future specification change removes the need for this
 

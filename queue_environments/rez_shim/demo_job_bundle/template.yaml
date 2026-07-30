@@ -9,6 +9,13 @@ parameterDefinitions:
     type: STRING
     description: The Rez-provided command to invoke by bare name.
     default: "demorender"
+  - name: CancelSleepSeconds
+    type: INT
+    description: >
+      How long the CancelThroughShim step sleeps. Cancel the job while that step
+      runs to confirm the signal reaches the tool through its shim.
+    default: 600
+    minValue: 1
 
 steps:
 - name: RunRezTool
@@ -107,3 +114,18 @@ steps:
             exit 1
         fi
         echo "All 3 environment fidelity checks passed."
+
+# Optional manual check. This step sleeps inside a shimmed Rez tool so an
+# operator can cancel the job and confirm the signal reaches the tool rather
+# than stopping at the shim or leaving an orphan behind. It is not part of the
+# automated fidelity checks because it needs someone to trigger the cancel.
+- name: CancelThroughShim
+  dependencies:
+  - dependsOn: VerifyEnvironment
+  script:
+    actions:
+      onRun:
+        command: demosleep
+        args: ["{{Param.CancelSleepSeconds}}"]
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
