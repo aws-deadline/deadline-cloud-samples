@@ -7,10 +7,10 @@
 # Installs Blender, the Deadline Cloud submitter, and Deadline Cloud monitor,
 # then creates a monitor profile so an artist only has to sign in.
 #
-# This is a worked example rather than a general-purpose tool. It targets
-# Debian-family images (Ubuntu, Debian). Edit the constants below for your
-# environment. Run as root during provisioning (EC2 user data, an AMI bake, or
-# by hand).
+# This is a worked example rather than a general-purpose tool. It targets Ubuntu
+# 22.04, which is the last release carrying the libwebkit2gtk-4.0-37 that
+# Deadline Cloud monitor needs. Edit the constants below for your environment.
+# Run as root during provisioning (EC2 user data, an AMI bake, or by hand).
 #
 # Usage: setup_workstation_linux.sh MONITOR_URL [WORKSTATION_USER]
 #
@@ -43,8 +43,8 @@ SUBMITTER_PREFIX="/opt/DeadlineCloudSubmitter"
 
 DOWNLOADS_BASE="https://downloads.deadlinecloud.amazonaws.com"
 
-# Deadline Cloud monitor links against OpenSSL 1.1, which no current Debian or
-# Ubuntu release ships. Ubuntu 20.04 is the last release to carry libssl1.1, so
+# Deadline Cloud monitor links against OpenSSL 1.1, which no current Ubuntu
+# release provides. Ubuntu 20.04 is the last release to carry libssl1.1, so
 # install that package here. Pinned to a specific build and checksum: it is not
 # published with a .sha256 alongside it, so the expected hash lives here. Take a
 # newer hash from the "SHA256:" field for libssl1.1 in
@@ -110,24 +110,24 @@ log "monitor: $MONITOR_SUBDOMAIN in $MONITOR_REGION, profile '$PROFILE_NAME'"
 # Prerequisites
 # ---------------------------------------------------------------------------
 
-# This example targets Debian-family images (Ubuntu, Debian). Adapting it to
-# another distribution means replacing apt-get below and installing the monitor
+# This example was written and tested against Ubuntu 22.04. Adapting it to a
+# non-Debian distribution means replacing apt-get below and installing the monitor
 # from the .rpm instead of the .deb.
 command -v apt-get >/dev/null 2>&1 \
-    || die "this example expects a Debian-family image (apt-get was not found)"
+    || die "this example expects Ubuntu 22.04 (apt-get was not found)"
 
 DEBIAN_FRONTEND=noninteractive apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl xz-utils python3
 
 # Deadline Cloud monitor's .deb depends on libwebkit2gtk-4.0-37, which was
-# dropped after Ubuntu 22.04 and Debian 12 in favor of the 4.1 build. Installing
+# dropped after Ubuntu 22.04 in favor of the 4.1 build. Installing
 # it elsewhere fails at dependency resolution, so say so here rather than partway
 # through. Check before anything is installed.
 # apt-cache policy reports a candidate version only for a package apt can
 # actually install, unlike apt-cache show, which also succeeds for a virtual one.
 webkit_candidate="$(apt-cache policy libwebkit2gtk-4.0-37 2>/dev/null | awk '/Candidate:/ {print $2}')"
 if [[ -z "$webkit_candidate" || "$webkit_candidate" == "(none)" ]]; then
-    die "Deadline Cloud monitor needs libwebkit2gtk-4.0-37, which this image's repositories do not provide. Ubuntu 22.04 and Debian 12 carry it; 24.04 and Debian 13 replaced it with libwebkit2gtk-4.1-0 and no official repository offers the 4.0 build for them. Use Ubuntu 22.04 or Debian 12, or see the README for installing the submitter without the monitor."
+    die "Deadline Cloud monitor needs libwebkit2gtk-4.0-37, which this image's repositories do not provide. Ubuntu 22.04 carries it; 24.04 replaced it with libwebkit2gtk-4.1-0 and no official repository offers the 4.0 build. Use Ubuntu 22.04, or see the README for installing the submitter without the monitor."
 fi
 
 WORK_DIR="$(mktemp -d)"

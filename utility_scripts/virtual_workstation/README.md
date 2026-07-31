@@ -20,9 +20,9 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 
 ## Prerequisites
 
-* Ubuntu 22.04, Debian 12, or a Windows image, with a desktop environment already present because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
+* Ubuntu 22.04 or a Windows image, with a desktop environment already present because the scripts do not install one. Blender, the submitter GUI, and the monitor are all desktop applications. An AWS Deadline Cloud base image, a NICE DCV workstation, or a Windows Server image with the Desktop Experience all work.
 
-  Deadline Cloud monitor's `.deb` depends on `libwebkit2gtk-4.0-37`, which Ubuntu 24.04 and Debian 13 no longer publish; they carry `libwebkit2gtk-4.1-0` instead. No official repository offers the 4.0 build for those releases, so use Ubuntu 22.04 or Debian 12 for the monitor. The Linux script checks for the package up front and stops with an explanation rather than failing partway through.
+  Deadline Cloud monitor's `.deb` depends on `libwebkit2gtk-4.0-37`, which Ubuntu 24.04 no longer publishes; it carries `libwebkit2gtk-4.1-0` instead, and no official repository offers the 4.0 build for it. That is why this example pins Ubuntu 22.04. The Linux script checks for the package up front and stops with an explanation rather than failing partway through.
 
   On a newer release, install the submitter without the monitor and authenticate a different way. `deadline auth login` is not an alternative, because it drives the monitor and only accepts profiles the monitor created. Use an ordinary AWS credential source instead, such as an IAM Identity Center profile created with `aws configure sso` or an instance profile, and delete the monitor and profile steps from the script. The artist then signs in through that mechanism rather than the monitor, so what this sample pre-configures no longer applies.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
@@ -31,7 +31,7 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
-The Linux script targets Debian-family images. To use another distribution, replace the `apt-get` calls, install the monitor from its `.rpm` rather than the `.deb`, and satisfy OpenSSL 1.1 the way that distribution expects.
+The Linux script was written and tested against Ubuntu 22.04 only. Other Debian-family releases are likely to work, since the script uses nothing Ubuntu-specific beyond `apt-get` and the `libssl1.1` package it fetches. On a non-Debian distribution, replace the `apt-get` calls, install the monitor from its `.rpm` rather than the `.deb`, and satisfy OpenSSL 1.1 the way that distribution expects.
 
 ## Run
 
@@ -71,9 +71,9 @@ Both scripts run the same five steps, in the same order, under section headers t
 
 Every download is verified against a published SHA-256 checksum, and the scripts fail if a checksum cannot be fetched. An internal Blender mirror must also serve Blender's `blender-<version>.sha256` manifest.
 
-The Linux script also installs `libssl1.1`, because Deadline Cloud monitor links against OpenSSL 1.1 while no current Debian or Ubuntu release provides it. Ubuntu 20.04 is the last release to carry the package, so the script takes it from the Ubuntu archive. That one artifact is published without a `.sha256` beside it, so its expected hash is a constant at the top of the script alongside the version, with a comment naming the index to read a newer hash from.
+The Linux script also installs `libssl1.1`, because Deadline Cloud monitor links against OpenSSL 1.1 while no current Ubuntu release provides it. Ubuntu 20.04 is the last release to carry the package, so the script takes it from the Ubuntu archive. That one artifact is published without a `.sha256` beside it, so its expected hash is a constant at the top of the script alongside the version, with a comment naming the index to read a newer hash from.
 
-On Debian this installs an Ubuntu-built `.deb`. Its dependencies are satisfiable on Debian 12, but the combination was verified on Ubuntu 22.04 only. On Debian, prefer whatever OpenSSL 1.1 package your own repositories provide and delete that step.
+On another distribution, prefer whatever OpenSSL 1.1 package your own repositories provide and delete that step, rather than installing an Ubuntu-built `.deb` elsewhere.
 
 ### The profile
 
