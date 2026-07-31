@@ -66,11 +66,27 @@ docs do. The preset is what links step 3 to step 2: the dependencies install to
 `*_ROOT` variables that point there. Configuring by hand without it stops at
 `Could NOT find JsonCpp`.
 
-## Memory affinity and `mbind`
+## Where to get the scenes
 
-`moonray` sets memory affinity by default (`-auto_affinity on`), which calls `mbind(2)`. Docker's
-default seccomp profile only permits that syscall with `CAP_SYS_NICE`, so a plain `docker run`
-aborts during render startup:
+No scene files ship with this sample. There are two sources:
+
+* **Bundled test scenes** — small `.rdla` and `.usd` files already present in the image at
+  `/source/testdata`, carried in from the
+  [MoonRay source tree](https://github.com/dreamworksanimation/openmoonray). Nothing to download.
+* **Official example scenes** — the larger `pbrt_scenes` set, published by MoonRay as
+  [example_scenes.zip](https://docs.openmoonray.org/assets/test-scenes/example_scenes.zip) on the
+  [test scenes page](https://docs.openmoonray.org/getting-started/test-scenes/). Download it
+  yourself; it unpacks to roughly 700 MB, and the sample's `.gitignore` keeps `scenes/`,
+  `output/`, and the zip out of git.
+
+## Running moonray needs `CAP_SYS_NICE`
+
+This is a run-time requirement only. `docker build` needs nothing beyond the flags shown above.
+
+`moonray` sets memory affinity by default (`-auto_affinity on`), which calls `mbind(2)` to bind
+memory to a NUMA node. Docker's default seccomp profile permits that syscall only when the
+container has `CAP_SYS_NICE`, so under a plain `docker run` the container starts and the scene
+loads, then the render thread aborts as it initializes:
 
 ```
 what():  numaNodeMBInd() sysCallMBind() failed. numaNodeId:0 size:33554432
@@ -84,19 +100,6 @@ work as well, and the `docker run` commands below use the first:
   the cost of NUMA-aware allocation. Sensible on a single-socket machine.
 
 `hd_render` is unaffected and needs neither.
-
-## Where to get the scenes
-
-No scene files ship with this sample. There are two sources:
-
-* **Bundled test scenes** — small `.rdla` and `.usd` files already present in the image at
-  `/source/testdata`, carried in from the
-  [MoonRay source tree](https://github.com/dreamworksanimation/openmoonray). Nothing to download.
-* **Official example scenes** — the larger `pbrt_scenes` set, published by MoonRay as
-  [example_scenes.zip](https://docs.openmoonray.org/assets/test-scenes/example_scenes.zip) on the
-  [test scenes page](https://docs.openmoonray.org/getting-started/test-scenes/). Download it
-  yourself; it unpacks to roughly 700 MB, and the sample's `.gitignore` keeps `scenes/`,
-  `output/`, and the zip out of git.
 
 ## Render the bundled test scene
 
