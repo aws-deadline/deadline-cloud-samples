@@ -1,0 +1,95 @@
+# MoonRay render job — Open Job Description 2023-09, EXPR extension.
+#
+# Nothing in this template mentions docker. The commands below are written as
+# if they already run inside the openmoonray-rocky9 container, and the
+# WRAP_ACTIONS environment in local-docker-wrap-env.yaml is what actually puts them
+# there: it intercepts this step's onRun and re-executes it via `docker run`,
+# forwarding command and args verbatim with EXPR's repr_sh().
+#
+# Run it with run-render.sh, which supplies the parameters below and applies
+# the wrap environment. Manual equivalent:
+#
+#   openjd run moonray-render-job.yaml \
+#       --environment local-docker-wrap-env.yaml \
+#       -p SessionsDir=<abs path to ./sessions> \
+#       -p ContainerMount=/mnt/session \
+#       -p OutputPrefix=python
+#
+specificationVersion: jobtemplate-2023-09
+
+# EXPR provides the `let` bindings used below. WRAP_ACTIONS is declared by the
+# environment template, not here — this job is deliberately unaware of it.
+extensions:
+- EXPR
+
+name: MoonRayRender
+description: Renders a MoonRay example scene inside a container via WRAP_ACTIONS.
+
+parameterDefinitions:
+# ContainerMount is declared in BOTH this template and local-docker-wrap-env.yaml,
+# with the same type and default. That is legal: the CLI merges job and
+# environment template parameter definitions into one parameter space, and
+# definitions of the same name must agree on type (the last default wins). One
+# `-p ContainerMount=...` therefore moves the bind-mount target and the paths
+# below together, so the two templates cannot drift apart.
+- name: ContainerMount
+  type: STRING
+  default: /mnt/session
+  description: Where the host session directory is mounted inside the container.
+
+# In-container paths are STRING, not PATH, on purpose. PATH parameters are
+# resolved and validated against the *host* filesystem (and are subject to
+# path mapping), which would rewrite or reject a container-only path.
+- name: SceneSubdir
+  type: STRING
+  default: scenes/example_scenes/pbrt_scenes
+  description: Location of the unpacked example scenes, relative to ContainerMount.
+
+- name: OutputSubdir
+  type: STRING
+  default: output
+  description: Where .exr output is written, relative to ContainerMount.
+
+- name: ExecMode
+  type: STRING
+  default: scalar
+  allowedValues:
+  - scalar
+  - vectorized
+  description: MoonRay execution mode. The container is built --nocuda, so xpu is unavailable.
+
+- name: OutputPrefix
+  type: STRING
+  default: render
+  description: Filename prefix, so the python and rust runs do not overwrite each other.
+
+steps:
+- name: Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Scene
+      type: STRING
+      range:
+      - veach-mis
+  script:
+    # EXPR let bindings. These live at script level rather than step level
+    # because they reference Task.Param.*, which step-level `let` cannot see.
+    # Binding names must be lowercase per the EXPR spec.
+    let:
+    - scene_dir = Param.ContainerMount + '/' + Param.SceneSubdir + '/' + Task.Param.Scene
+    - out_exr = Param.ContainerMount + '/' + Param.OutputSubdir + '/' + Param.OutputPrefix + '-' + Task.Param.Scene + '.exr'
+    actions:
+      onRun:
+        # This is the in-container invocation. The wrap hook receives it as
+        # WrappedAction.Command / WrappedAction.Args and forwards it verbatim.
+        # veach-mis ships as a .rdla plus a .rdlb, so both are passed.
+        command: moonray
+        args:
+        - -in
+        - "{{ scene_dir }}/scene.rdla"
+        - -in
+        - "{{ scene_dir }}/scene.rdlb"
+        - -exec_mode
+        - "{{ Param.ExecMode }}"
+        - -out
+        - "{{ out_exr }}"
