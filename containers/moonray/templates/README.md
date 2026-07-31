@@ -40,11 +40,18 @@ farm where the container comes from a queue environment.
 ## Quick start
 
 ```console
-./run-render.sh rust      # render with the Rust openjd CLI
-./run-render.sh python    # render with the Python openjd-cli
-./run-render.sh           # both, one after the other
+./run-render.sh rust      # render with the Rust openjd CLI, from $RUST_BIN
+./run-render.sh python    # render with the Python openjd-cli, from $VENV/bin
+./run-render.sh path      # use whichever openjd is already on PATH
+./run-render.sh           # python then rust, one after the other
 ./run-render.sh --fetch-only   # just download and unpack the scenes
 ```
+
+`python` and `rust` look in the source-checkout locations in the table below, which suits a machine
+with both built from source; `path` is for a normally installed CLI. Each run prints and logs the
+`openjd` it resolved and its version, so an `.exr` can always be traced back to the CLI that made
+it. A missing or mislocated CLI fails immediately with the variable to set, rather than surfacing as
+`openjd: command not found` from inside a session.
 
 On the first run this downloads
 [example_scenes.zip](https://docs.openmoonray.org/assets/test-scenes/example_scenes.zip)
@@ -62,6 +69,8 @@ Overrides, as environment variables:
 | `EXEC_MODE` | `scalar` | `scalar` or `vectorized` |
 | `DOCKER_USER` | invoking user | `docker --user` value |
 | `KEEP_SESSIONS` | `1` | Pass `--preserve` to keep session dirs |
+| `VENV` | `~/work/openjd/.venv` | Venv holding the Python `openjd-cli` |
+| `RUST_BIN` | `~/work/openjd/openjd-rs/target/release` | Directory holding the Rust `openjd` |
 
 ## Running it by hand
 
@@ -152,14 +161,20 @@ works at all: `SessionsDir` is declared by the *environment* template, not the j
 
 ## Verified run
 
-`./run-render.sh rust` on a 16-core x86_64 Linux host, Rust `openjd` CLI, docker 25.0:
+Both implementations, on a 16-core x86_64 Linux host with docker 25.0:
 
 ```
 IMPL     RESULT  SECONDS      EXR_BYTES  LOG
+python   PASS        153        5826348  sessions/logs/render-python.log
 rust     PASS        149        5826348  sessions/logs/render-rust.log
 ```
 
-Produced `sessions/output/rust-veach-mis.exr`:
+`openjd-cli 0.7.5.post21+g4e9a38421` (Python) and the Rust `openjd` built from `openjd-rs`
+`af7e3c2`. The two outputs differ by exactly **3 bytes**, all inside the EXR `capDate` header
+attribute — the capture timestamp. Every pixel is byte-identical, so the wrap environment behaves
+the same under both implementations.
+
+Each render produced a `sessions/output/<impl>-veach-mis.exr`:
 
 | Property | Value |
 |---|---|
@@ -169,7 +184,9 @@ Produced `sessions/output/rust-veach-mis.exr`:
 | Compression | ZIP |
 | Size | 5,826,348 bytes |
 
-MoonRay reported `Render time = 00:02:26.97` inside the container, against 149 s of wall time for
-the whole session — so container startup, scene load and session setup account for roughly two
-seconds. For reference, the `scene.exr` that ships alongside `veach-mis` is 5,798,529 bytes, within
-0.5% of what this render produced.
+MoonRay reported `Render time = 00:02:26.97` inside the container on the Rust run, against 149 s of
+wall time for the whole session — so container startup, scene load and session setup account for
+roughly two seconds. The 4 s spread between the two implementations is render noise, not a
+meaningful difference: the CLI does nothing but start one container per task. For reference, the
+`scene.exr` that ships alongside `veach-mis` is 5,798,529 bytes, within 0.5% of what these renders
+produced.

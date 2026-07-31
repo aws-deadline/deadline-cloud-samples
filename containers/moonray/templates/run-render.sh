@@ -8,11 +8,17 @@
 # image with ./sessions bind mounted, so the scenes are visible inside the
 # container and the .exr comes back out on the host.
 #
-# Usage:
-#   ./run-render.sh                # both implementations
-#   ./run-render.sh python         # Python openjd-cli only
-#   ./run-render.sh rust           # Rust openjd only
+# Which implementation runs is the first argument:
+#   ./run-render.sh                # both, python first then rust
+#   ./run-render.sh python         # openjd-cli   (Python) from $VENV/bin
+#   ./run-render.sh rust           # openjd       (Rust)   from $RUST_BIN
+#   ./run-render.sh path           # whichever openjd is already on PATH
 #   ./run-render.sh --fetch-only   # download and unpack scenes, render nothing
+#
+# python and rust look in the checkout locations below, which suit a machine
+# with both built from source. Use `path` if you installed one of them normally.
+# Each run records the openjd it resolved, and its version, at the top of its
+# log — so which implementation produced a given .exr is never a guess.
 #
 # Environment overrides:
 #   IMAGE=openmoonray-rocky9   container image to run
@@ -20,7 +26,7 @@
 #   EXEC_MODE=scalar           scalar | vectorized
 #   DOCKER_USER=<uid>:<gid>    defaults to the invoking user
 #   KEEP_SESSIONS=1            pass --preserve so session dirs survive (default 1)
-#   VENV=...  RUST_BIN=...     locations of the two implementations
+#   VENV=...  RUST_BIN=...     where to find the python / rust openjd
 
 set -u -o pipefail
 
@@ -52,6 +58,40 @@ RUST_BIN="${RUST_BIN:-$HOME/work/openjd/openjd-rs/target/release}"
 
 die() { echo "error: $*" >&2; exit 1; }
 note() { echo "==> $*"; }
+
+# ------------------------------------------------------- implementation pick --
+# Resolve the openjd executable for one implementation, failing early and
+# specifically rather than letting `openjd: command not found` surface from
+# inside a session. Sets OPENJD_DIR (empty means "leave PATH alone"),
+# OPENJD_EXE and OPENJD_VERSION.
+resolve_openjd() {
+    local impl="$1" dir="" hint=""
+
+    case "$impl" in
+        python) dir="$VENV/bin"  ; hint="set VENV=<path to the venv with openjd-cli installed>" ;;
+        rust)   dir="$RUST_BIN"  ; hint="set RUST_BIN=<openjd-rs>/target/release, or build it with: cargo build --release" ;;
+        path)   dir=""           ; hint="install openjd-cli, or put the openjd-rs binary on PATH" ;;
+        *)      die "resolve_openjd: unknown implementation '$impl'" ;;
+    esac
+
+    if [ -n "$dir" ]; then
+        OPENJD_EXE="$dir/openjd"
+        [ -x "$OPENJD_EXE" ] || die "no openjd executable at $OPENJD_EXE
+    $hint
+    or run ./run-render.sh path to use whichever openjd is on PATH"
+    else
+        OPENJD_EXE="$(command -v openjd 2>/dev/null || true)"
+        [ -n "$OPENJD_EXE" ] || die "no openjd found on PATH
+    $hint"
+    fi
+
+    OPENJD_DIR="$dir"
+
+    # openjd-cli implements --version; the Rust CLI currently does not, so fall
+    # back to naming the binary rather than reporting nothing.
+    OPENJD_VERSION="$("$OPENJD_EXE" --version 2>/dev/null | head -1)"
+    [ -n "$OPENJD_VERSION" ] || OPENJD_VERSION="(no --version flag; openjd-rs does not implement one)"
+}
 
 # ---------------------------------------------------------------- preflight --
 preflight() {
@@ -100,11 +140,14 @@ fetch_scenes() {
 }
 
 # -------------------------------------------------------------------- render --
-# $1 = impl label (python|rust), $2 = directory holding the openjd executable
+# $1 = impl label (python|rust|path)
 render_with() {
-    local impl="$1" bindir="$2"
+    local impl="$1"
     local log="$LOG_DIR/render-$impl.log"
     local expected="$OUTPUT_DIR/$impl-$SCENE.exr"
+
+    resolve_openjd "$impl"
+    local bindir="$OPENJD_DIR"
 
     # Note: bash 4.2 (this host) treats "${arr[@]}" on an empty array as an
     # unbound variable under `set -u`, hence the ${arr[@]+...} guards below.
@@ -113,7 +156,20 @@ render_with() {
 
     rm -f "$expected"
 
+    note "$impl: using $OPENJD_EXE"
+    note "$impl: version $OPENJD_VERSION"
     note "$impl: rendering $SCENE -> $(basename "$expected")  (log: $log)"
+
+    # Record the resolved implementation at the top of the log, so a log or an
+    # .exr can always be traced back to the CLI that produced it.
+    {
+        echo "implementation: $impl"
+        echo "openjd:         $OPENJD_EXE"
+        echo "version:        $OPENJD_VERSION"
+        echo "scene:          $SCENE   exec_mode: $EXEC_MODE   image: $IMAGE"
+        echo "started:        $(date -Is)"
+        echo "----------------------------------------------------------------"
+    } > "$log"
 
     # Neither CLI exposes a session-directory flag; both derive the session
     # root from the system temp dir on POSIX, so TMPDIR is what puts the
@@ -125,7 +181,12 @@ render_with() {
     start=$(date +%s)
     (
         export TMPDIR="$SESSIONS_DIR"
-        export PATH="$bindir:$VENV/bin:$PATH"
+        # Put the chosen implementation first. For `path` there is nothing to
+        # prepend. The venv's bin follows when it exists, so the bare `python`
+        # some job fixtures spawn resolves the same way for every choice.
+        [ -n "$bindir" ] && PATH="$bindir:$PATH"
+        [ -d "$VENV/bin" ] && PATH="$PATH:$VENV/bin"
+        export PATH
         openjd run "$JOB_TEMPLATE" \
             --environment "$WRAP_ENV" \
             --step Render \
@@ -137,7 +198,7 @@ render_with() {
             -p "OutputPrefix=$impl" \
             ${preserve[@]+"${preserve[@]}"} \
             --verbose
-    ) > "$log" 2>&1
+    ) >> "$log" 2>&1
     rc=$?
     end=$(date +%s)
 
@@ -165,13 +226,13 @@ case "$TARGET" in
         note "fetch complete; nothing rendered"
         exit 0
         ;;
-    python|rust|both) ;;
+    python|rust|path|both) ;;
     -h|--help)
-        sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+        sed -n '2,36p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
         exit 0
         ;;
     *)
-        die "unknown target '$TARGET' (expected python, rust, both, or --fetch-only)"
+        die "unknown target '$TARGET' (expected python, rust, path, both, or --fetch-only)"
         ;;
 esac
 
@@ -181,11 +242,12 @@ fetch_scenes
 RESULTS=()
 
 case "$TARGET" in
-    python) render_with python "$VENV/bin" ;;
-    rust)   render_with rust   "$RUST_BIN" ;;
+    python) render_with python ;;
+    rust)   render_with rust ;;
+    path)   render_with path ;;
     both)
-        render_with python "$VENV/bin"
-        render_with rust   "$RUST_BIN"
+        render_with python
+        render_with rust
         ;;
 esac
 
