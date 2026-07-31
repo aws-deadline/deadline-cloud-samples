@@ -200,11 +200,15 @@ if (-not (Test-Path $blenderExe)) {
 
 # Run Blender rather than only testing for the file, so one that unpacked but
 # cannot start fails here instead of during the add-on step with a vaguer error.
-$blenderVersion = (& $blenderExe --version 2>&1 | Select-Object -First 1)
+# Capture the whole output before narrowing it: Select-Object -First 1 halts the
+# upstream pipeline once it has its object, which can terminate a still-running
+# native command and leave $LASTEXITCODE reflecting that rather than Blender's own
+# exit. Same reason the Linux script does not pipe into head.
+$blenderOutput = (& $blenderExe --version 2>&1)
 if ($LASTEXITCODE -ne 0) {
-    Write-Fatal "Blender installed to $BlenderPrefix but will not run: $blenderVersion"
+    Write-Fatal "Blender installed to $BlenderPrefix but will not run: $($blenderOutput | Select-Object -First 1)"
 }
-Write-Step "Blender installed: $blenderVersion"
+Write-Step "Blender installed: $($blenderOutput | Select-Object -First 1)"
 
 # ---------------------------------------------------------------------------
 # Install the Deadline Cloud submitter

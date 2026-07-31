@@ -211,16 +211,18 @@ tar -xJf "$WORK_DIR/$blender_archive" -C "$BLENDER_PREFIX" --strip-components=1
 ln -sf "$BLENDER_PREFIX/blender" /usr/local/bin/blender
 
 # Run Blender rather than only testing for the file, so one that unpacked but
-# cannot start fails here. Capture in an assignment: a command substitution inside
-# an argument cannot abort under set -e. The usual cause is a server image with no
-# desktop, which Blender's own X11 and GL dependencies need, so report those.
-if ! blender_version="$("$BLENDER_PREFIX/blender" --version 2>&1 | head -1)"; then
+# cannot start fails here. Capture the whole output before taking a line: piping
+# into head closes the pipe early, and under pipefail Blender's SIGPIPE would make
+# a working Blender look broken. Assign rather than interpolate, because a command
+# substitution inside an argument cannot abort under set -e. The usual cause of a
+# real failure is a server image lacking Blender's X11 and GL libraries.
+if ! blender_output="$("$BLENDER_PREFIX/blender" --version 2>&1)"; then
     missing="$(ldd "$BLENDER_PREFIX/blender" 2>/dev/null | awk '/not found/ {print $1}' | paste -sd' ' -)"
     [[ -n "$missing" ]] \
         && die "Blender cannot start: missing shared libraries: $missing. This image has no desktop environment, which this example requires. Install one, or add Blender's dependencies."
-    die "Blender installed to $BLENDER_PREFIX but will not run: $blender_version"
+    die "Blender installed to $BLENDER_PREFIX but will not run: $(head -1 <<<"$blender_output")"
 fi
-log "Blender installed: $blender_version"
+log "Blender installed: $(head -1 <<<"$blender_output")"
 
 # ---------------------------------------------------------------------------
 # Install the Deadline Cloud submitter
