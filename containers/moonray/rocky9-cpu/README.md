@@ -23,8 +23,35 @@ The resulting image needs no snapd, no systemd, and no `--privileged` — MoonRa
 docker build --platform linux/amd64 -t openmoonray-rocky9 .
 ```
 
-The MoonRay git ref defaults to the `main` branch; override it with
-`--build-arg OPENMOONRAY_REF=<tag-or-branch>`.
+### Choosing a MoonRay version
+
+`OPENMOONRAY_REF` selects which MoonRay to build. It defaults to the released tag
+`v2026.29.1` rather than a branch, so rebuilding this `Dockerfile` months from now produces the
+same MoonRay instead of whatever `main` happens to be that day.
+
+Available versions are listed on the
+[openmoonray tags page](https://github.com/dreamworksanimation/openmoonray/tags) (also on the
+[releases page](https://github.com/dreamworksanimation/openmoonray/releases)). Upstream has used
+two tag series: the older `openmoonray-<major>.<minor>.0.0` scheme, which ends at
+`openmoonray-3.6.0.1`, and the current date-based `v<year>.<week>.<n>` scheme.
+
+```console
+docker build --platform linux/amd64 \
+    --build-arg OPENMOONRAY_REF=openmoonray-3.6.0.1 \
+    -t openmoonray-rocky9:3.6.0.1 .
+```
+
+The value goes to `git clone --branch`, so a tag or a branch name works — pass `main` to build the
+tip of development — but a bare commit sha does not. Older tags are not tested by this sample and
+may need different system packages than `building/Rocky9/install_packages.sh` installs at the
+pinned version.
+
+The version that was actually built is recorded in the image at `/openmoonray-ref.txt`, as the
+requested ref plus the commit it resolved to:
+
+```console
+docker run --rm openmoonray-rocky9 'cat /openmoonray-ref.txt'
+```
 
 Two deviations from the official docs, both encoded in the `Dockerfile` with comments:
 
@@ -32,6 +59,31 @@ Two deviations from the official docs, both encoded in the `Dockerfile` with com
   deactivated before `git submodule update`.
 * cmake is installed from pip (`pip3 install "cmake<4"`): the EPEL cmake crashes in libuv's
   signal handling when the build runs under x86_64 emulation on an arm64 host.
+
+MoonRay itself is configured through upstream's `rocky9-release` CMake preset, as the official
+docs do. The preset is what links step 3 to step 2: the dependencies install to
+`/opt/MoonRay/installs`, and the preset supplies the `CMAKE_PREFIX_PATH` and per-dependency
+`*_ROOT` variables that point there. Configuring by hand without it stops at
+`Could NOT find JsonCpp`.
+
+## Memory affinity and `mbind`
+
+`moonray` sets memory affinity by default (`-auto_affinity on`), which calls `mbind(2)`. Docker's
+default seccomp profile only permits that syscall with `CAP_SYS_NICE`, so a plain `docker run`
+aborts during render startup:
+
+```
+what():  numaNodeMBInd() sysCallMBind() failed. numaNodeId:0 size:33554432
+```
+
+The official docs work around this with `--security-opt seccomp=unconfined`. Two narrower options
+work as well, and the `docker run` commands below use the first:
+
+* `--cap-add SYS_NICE` — keeps the default seccomp profile and leaves affinity control enabled.
+* `-auto_affinity off` on the `moonray` command line — no added capability or relaxed sandbox, at
+  the cost of NUMA-aware allocation. Sensible on a single-socket machine.
+
+`hd_render` is unaffected and needs neither.
 
 ## Where to get the scenes
 
@@ -52,7 +104,7 @@ The source tree (kept at `/source` in the image) includes small test scenes:
 
 ```console
 mkdir -p output
-docker run --rm -v "$(pwd)/output:/output" openmoonray-rocky9 \
+docker run --rm --cap-add SYS_NICE -v "$(pwd)/output:/output" openmoonray-rocky9 \
     'moonray -in /source/testdata/rectangle.rdla -out /output/rectangle.exr'
 ```
 
@@ -64,7 +116,7 @@ Download and unpack the example scenes, then mount them into the container:
 curl -LO https://docs.openmoonray.org/assets/test-scenes/example_scenes.zip
 mkdir -p scenes output
 unzip example_scenes.zip -d scenes/
-docker run --rm -v "$(pwd)/scenes:/scenes" -v "$(pwd)/output:/output" \
+docker run --rm --cap-add SYS_NICE -v "$(pwd)/scenes:/scenes" -v "$(pwd)/output:/output" \
     -w /scenes/example_scenes/pbrt_scenes/veach-mis openmoonray-rocky9 \
     'moonray -in scene.rdla -in scene.rdlb -exec_mode scalar -out /output/veach-mis.exr'
 ```
