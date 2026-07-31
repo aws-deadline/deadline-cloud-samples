@@ -1,0 +1,33 @@
+{
+  "name": "deadline-cloud-starter-farm-cdk",
+  "version": "1.0.0",
+  "description": "AWS CDK app that deploys the AWS Deadline Cloud starter farm",
+  "license": "MIT-0",
+  "private": true,
+  "bin": {
+    "starter-farm": "bin/starter-farm.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.2",
+    "aws-cdk": "^2.1000.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.7.2",
+    "yaml": "^2.9.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.184.0",
+    "constructs": "^10.0.0"
+  }
+}

@@ -1,0 +1,138 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Rez shim demo
+description: |
+  Demonstrates that a Rez-provided tool can be invoked by bare command name
+  from a job template, with the Rez environment applied by the queue
+  environment's PATH shims rather than by replaying captured variables.
+parameterDefinitions:
+  - name: ToolName
+    type: STRING
+    description: The Rez-provided command to invoke by bare name.
+    default: "demorender"
+  - name: CancelSleepSeconds
+    type: INT
+    description: >
+      How long the CancelThroughShim step sleeps. Cancel the job while that step
+      runs to confirm the signal reaches the tool through its shim.
+    default: 600
+    minValue: 1
+
+steps:
+- name: RunRezTool
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "1-2"
+  script:
+    actions:
+      onRun:
+        command: "{{Param.ToolName}}"
+        args: ["frame-{{Task.Param.Frame}}"]
+
+- name: VerifyEnvironment
+  dependencies:
+  - dependsOn: RunRezTool
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Verify}}"]
+    embeddedFiles:
+    - name: Verify
+      filename: verify.sh
+      type: TEXT
+      data: |
+        set -uo pipefail
+
+        echo "=== PATH ==="
+        echo "$PATH" | tr ':' '\n' | head -3
+
+        echo "=== Shim directory ==="
+        echo "REZ_SHIM_DIR=${REZ_SHIM_DIR:-UNSET}"
+        echo "REZ_CONTEXT_FILE=${REZ_CONTEXT_FILE:-UNSET}"
+        ls -l "${REZ_SHIM_DIR:-/nonexistent}" || echo "no shim dir"
+
+        echo "=== Which resolves to a shim ==="
+        command -v "${1:-demorender}" || true
+
+        # The tool's own environment variables must be visible INSIDE the tool's
+        # process, supplied by Rez, even though they were never exported into the
+        # session via openjd_env.
+        echo "=== DEMOTOOL_VERSION as seen by the session (expected UNSET) ==="
+        echo "DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET}"
+
+        echo "=== DEMOTOOL_VERSION as seen inside the tool (expected 1.0.0) ==="
+        demorender check-env
+
+        # The three checks below are the point of the sample. Each one passes
+        # with the shim environment and fails with an environment that harvests
+        # variables from a subshell and replays them.
+        FAILURES=0
+
+        # Capture output into a variable before matching. Piping directly into
+        # `grep -q` makes grep exit at the first match, which closes the pipe and
+        # kills the writer with SIGPIPE (exit 141); under `pipefail` that reads
+        # as a failed check even though the output was correct.
+        echo "=== Check 1: plain variable reaches the tool ==="
+        tool_out="$(demorender check-env)"
+        if printf '%s\n' "$tool_out" | grep -q "DEMOTOOL_VERSION=1.0.0"; then
+            echo "PASS: variable visible inside the tool"
+        else
+            echo "FAIL: variable missing inside the tool"
+            FAILURES=$((FAILURES + 1))
+        fi
+
+        # Checks 2 and 3 both read `demoprobe`, which is a Rez-declared tool and
+        # so has a shim of its own. Calling it by bare name means the result
+        # depends on the shim mechanism working: if PATH injection were broken,
+        # `demoprobe` would not be found and both checks would fail. Probing the
+        # saved context directly with `rez env --input` would instead pass even
+        # with the shims entirely absent.
+        probe_out="$(demoprobe 2>/dev/null || true)"
+
+        # An `alias` in a Rez package becomes an exported shell function. Bash
+        # exports it as BASH_FUNC_demoalias%%, a name containing '%%' with a
+        # multiline value, which openjd_env cannot express, so replaying captured
+        # variables drops it. The alias is not itself a command on PATH; the
+        # probe reports whether it is callable from inside the context.
+        echo "=== Check 2: Rez alias survives into the task ==="
+        if printf '%s\n' "$probe_out" | grep -q "alias=demorender: DEMOTOOL_VERSION"; then
+            echo "PASS: alias is callable"
+        else
+            echo "FAIL: alias was lost"
+            FAILURES=$((FAILURES + 1))
+        fi
+
+        # demotool provides its own `sort` and prepends its bin directory to
+        # PATH, so inside a correctly applied context it must shadow the system
+        # binary. This checks ordered PATH edits, not just PATH's contents.
+        echo "=== Check 3: package PATH prepend shadows the system command ==="
+        if printf '%s\n' "$probe_out" | grep -q "sort-shadowed=yes"; then
+            echo "PASS: package command shadows the system one"
+        else
+            echo "FAIL: system command won, PATH order was not preserved"
+            FAILURES=$((FAILURES + 1))
+        fi
+
+        echo "=== Result ==="
+        if [ "$FAILURES" -ne 0 ]; then
+            echo "openjd_fail: $FAILURES of 3 environment fidelity checks failed."
+            exit 1
+        fi
+        echo "All 3 environment fidelity checks passed."
+
+# Optional manual check. This step sleeps inside a shimmed Rez tool so an
+# operator can cancel the job and confirm the signal reaches the tool rather
+# than stopping at the shim or leaving an orphan behind. It is not part of the
+# automated fidelity checks because it needs someone to trigger the cancel.
+- name: CancelThroughShim
+  dependencies:
+  - dependsOn: VerifyEnvironment
+  script:
+    actions:
+      onRun:
+        command: demosleep
+        args: ["{{Param.CancelSleepSeconds}}"]
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE

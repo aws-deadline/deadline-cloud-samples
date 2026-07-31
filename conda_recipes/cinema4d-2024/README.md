@@ -50,8 +50,26 @@ for use by the conda build recipe.
 4. From the AWS EC2 management console, select the instance you used and terminate it.
 5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the Cinema 4D-2024 conda build recipe meta.yaml.
 
-## Instructions for Cinema4D plugin packages
-This repository contains examples for how to create plugin conda packages for Cinema4D (DISCLAIMER: These samples were only tested with 2025):
+## Plugin Sync
+
+This package includes Plugin Sync activation hooks. During a Deadline Cloud session, the hooks
+download the contents of the following S3 prefix and add the session directory to Cinema 4D's
+`g_additionalModulePath`:
+
+```text
+s3://<job-attachments-bucket>/<root-prefix>/plugins/windows/cinema4d/2024.5/
+```
+
+Upload extracted plugin directories and files under that prefix. Plugin Sync also downloads shared
+files from `plugins/generic/`. Both non-empty directories are added to
+`g_additionalModulePath`. The worker role must be able to read the objects. See the
+[Plugin Sync documentation](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/plugin-sync.html)
+for the job attachment bucket variables and upload workflow.
+
+## Instructions for Cinema 4D plugin packages
+
+This repository also contains examples for creating versioned plugin conda packages for Cinema 4D.
+These samples were tested with Cinema 4D 2025:
 
 * [Cinema4D to Arnold](../cinema4d-c4dtoa-2025/)
 * [Cinema4D - Insydium](../cinema4d-insydium-2025/)

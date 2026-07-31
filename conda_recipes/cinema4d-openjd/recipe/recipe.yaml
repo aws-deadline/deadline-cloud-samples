@@ -1,12 +1,11 @@
 # Recipe in rattler-build format.
 # See https://prefix-dev.github.io/rattler-build/latest/
-# Before building this recipe, build the conda
-# packages for "deadline" and "openjd-adaptor-runtime" dependencies.
-# Find these recipes for building the packages at :
-# https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/conda_recipes
+# This release requires deadline 0.59.x and openjd-adaptor-runtime 0.7.x-0.9.x
+# in the target channel. The standalone deadline sample may track a newer,
+# incompatible minor release.
 
 context:
-  version: "0.10.0"
+  version: "0.11.4"
 
 package:
   name: cinema4d-openjd
@@ -15,12 +14,15 @@ package:
 # This source reference uses the source archive published to PyPI
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-${{ version }}.tar.gz
-  sha256: b6fc66f785ffba44666ce6b83df2b87f0cd2b75bab649f0aed6036ed89c9b7e5
+  sha256: 474830446bd67adffa6d435dd8dbf7b37993486c268a42d8949d632747977427
 
 build:
   number: 0
   script:
     - python -m pip install . -vv --no-deps
+  python:
+    entry_points:
+      - cinema4d-openjd = deadline.cinema4d_adaptor.Cinema4DAdaptor:main
 
 requirements:
   host:
@@ -30,9 +32,9 @@ requirements:
     - pip
   run:
     - python
-    - deadline >=0.51.1,<0.55
+    - deadline >=0.59,<0.60
     - openjd-adaptor-runtime >=0.7,<0.10
-    - ${{ "fonttools >=4.59.2,<4.62" if win }}
+    - ${{ "fonttools >=4.59.2,<4.64" if win }}
 
 tests:
 - python:
@@ -43,8 +45,7 @@ tests:
       - pip
   script:
     - pip check
-# This doesn't work on Windows, possibly a rattler-build bug since cinema4d-openjd.exe is in $PREFIX/Scripts
-#    - cinema4d-openjd --help
+    - cinema4d-openjd --help
 
 about:
   summary: AWS Deadline Cloud for Cinema 4D

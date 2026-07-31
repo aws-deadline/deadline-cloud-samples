@@ -36,6 +36,7 @@ user-selectable sample tables.
 deadline-cloud-samples/
 ├── cloudformation/             CloudFormation farm and infrastructure templates
 ├── terraform/                  Terraform farm and infrastructure templates
+├── cdk/                        AWS CDK farm apps (TypeScript)
 ├── job_bundles/                OpenJD job bundles (template.yaml plus assets)
 ├── conda_recipes/              DCC and application Conda recipes
 ├── containers/                 Worker-compatible and application containers

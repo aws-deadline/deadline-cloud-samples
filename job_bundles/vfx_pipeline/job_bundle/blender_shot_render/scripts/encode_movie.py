@@ -26,8 +26,12 @@ p.add_argument("--frame-rate", type=int, required=True)
 p.add_argument("--output", required=True)
 args = p.parse_args(argv)
 
-start_s, end_s = args.frame_range.split("-")
-start, end = int(start_s), int(end_s)
+# Contiguous "start-end", or a single frame like "5".
+if "-" in args.frame_range:
+    start_s, end_s = args.frame_range.split("-")
+    start, end = int(start_s), int(end_s)
+else:
+    start = end = int(args.frame_range)
 count = end - start + 1
 
 first_file = f"{args.prefix}{start:04d}.png"

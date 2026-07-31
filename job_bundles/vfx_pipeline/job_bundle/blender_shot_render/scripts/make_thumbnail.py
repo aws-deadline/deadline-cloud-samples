@@ -26,8 +26,12 @@ p.add_argument("--max-width", type=int, default=640)
 p.add_argument("--output", required=True)
 args = p.parse_args(argv)
 
-start_s, end_s = args.frame_range.split("-")
-start, end = int(start_s), int(end_s)
+# Contiguous "start-end", or a single frame like "5".
+if "-" in args.frame_range:
+    start_s, end_s = args.frame_range.split("-")
+    start, end = int(start_s), int(end_s)
+else:
+    start = end = int(args.frame_range)
 mid = (start + end) // 2
 src = os.path.join(args.frames_dir, f"{args.prefix}{mid:04d}.png")
 if not os.path.isfile(src):

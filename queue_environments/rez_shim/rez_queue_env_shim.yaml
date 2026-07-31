@@ -1,0 +1,168 @@
+specificationVersion: 'environment-2023-09'
+parameterDefinitions:
+  - name: RezPackages
+    type: STRING
+    description: >
+      This is a space-separated list of Rez packages to install for the job.
+      E.g. "blender-3.6" for a job that renders frames in Blender 3.6.
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Packages
+  - name: RezRepositories
+    type: STRING
+    description: >
+      This is a ':'-separated list of Rez repositories from which to install
+      packages.
+    # Edit the script code below to set the Linux and MacOS repository path,
+    # it will search/replace the token REZ_REPOSITORY_PATH in the default to that.
+    default: "REZ_REPOSITORY_PATH"
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Repositories
+  - name: RezExtraTools
+    type: STRING
+    description: >
+      Optional space-separated list of extra command names to create shims for,
+      in addition to the tools Rez reports for the resolved packages. Use this
+      for commands a package provides but does not declare in its "tools" list.
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Extra Tools
+
+environment:
+  name: Rez
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: rez-queue-env-enter.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        if [ -z '{{Param.RezPackages}}' ]; then
+            echo "Skipping Rez env as RezPackages parameter was empty."
+            exit 0
+        fi
+
+        # The shims this environment writes are POSIX shell scripts that rely on
+        # a shebang line to be executable. That does not work on Windows, so
+        # fail with a clear message rather than producing shims that cannot run.
+        case "$(uname -s)" in
+            Linux|Darwin) ;;
+            *)
+                echo "openjd_fail: This queue environment supports Linux and macOS only (found $(uname -s))."
+                echo "Use rez_queue_env.yaml on Windows workers."
+                exit 1
+                ;;
+        esac
+
+        # Edit these paths for your farm
+        LINUX_REZ_REPOSITORY_PATH="/mnt/REZ_REPOSITORY"
+        MACOS_REZ_REPOSITORY_PATH="/Volumes/REZ_REPOSITORY"
+
+        REZ_PACKAGES='{{Param.RezPackages}}'
+        REZ_REPOSITORIES='{{Param.RezRepositories}}'
+        REZ_EXTRA_TOOLS='{{Param.RezExtraTools}}'
+
+        if [[ "$(uname)" == Darwin ]]; then
+            REZ_REPOSITORY_PATH="$MACOS_REZ_REPOSITORY_PATH"
+        else
+            REZ_REPOSITORY_PATH="$LINUX_REZ_REPOSITORY_PATH"
+        fi
+        REZ_REPOSITORIES="${REZ_REPOSITORIES//REZ_REPOSITORY_PATH/$REZ_REPOSITORY_PATH}"
+
+        echo "Rez Package List:"
+        echo "   $REZ_PACKAGES"
+
+        # Resolve the Rez context once and save it to the session directory. Each
+        # task re-enters this saved context instead of re-resolving, so every task
+        # sees an identical environment and pays no resolve cost.
+        #
+        # Unlike the environment-variable capture approach in rez_queue_env.yaml,
+        # the resolved context is applied by Rez itself inside each task's own
+        # process. Shell functions, aliases and ordered PATH edits that a plain
+        # variable diff cannot represent are therefore preserved.
+        CTX="{{Session.WorkingDirectory}}/rez-context.rxt"
+        rez env --paths "$REZ_REPOSITORIES" $REZ_PACKAGES --output "$CTX"
+
+        # Ask Rez which executables the resolved packages provide, so the shims
+        # below do not need a hard-coded list of tool names. `rez context -t`
+        # prints a two-line header followed by "TOOL  PACKAGE" rows.
+        REZ_TOOLS="$(rez context -t "$CTX" | awk 'NR>2 && NF {print $1}' | sort -u)"
+
+        SHIM_DIR="{{Session.WorkingDirectory}}/rez-shims"
+        mkdir -p "$SHIM_DIR"
+
+        SHIM_COUNT=0
+        SHIMMED_TOOLS=""
+        SKIPPED_TOOLS=""
+        for TOOL in $REZ_TOOLS $REZ_EXTRA_TOOLS; do
+            # Skip Rez's own commands. Shimming them would mean `rez` inside a
+            # task recursed back through the shim instead of running Rez.
+            case "$TOOL" in
+                rez|rez-*) continue ;;
+            esac
+
+            # Resolve the tool to an absolute path inside the context, so each
+            # shim execs the real binary rather than a bare name.
+            #
+            # A bare name would be re-resolved against whatever PATH exists when
+            # the shim runs. Rez normally rebuilds PATH from the context and
+            # drops SHIM_DIR, so a bare name is usually safe -- but a farm whose
+            # rez config lists PATH in `parent_variables` keeps SHIM_DIR ahead of
+            # the package's own bin directory, and the shim would then re-invoke
+            # itself and fork until the worker runs out of processes. Resolving
+            # once here removes that possibility regardless of Rez configuration.
+            TOOL_PATH="$(rez env --input "$CTX" --shell bash -- \
+                bash -c "command -v -- '$TOOL'" 2>/dev/null | tail -n 1 || true)"
+
+            # Refuse anything that resolves back into the shim directory, or that
+            # the context cannot resolve at all. Either would loop or fail
+            # confusingly at task time, so report it now instead.
+            case "$TOOL_PATH" in
+                "$SHIM_DIR"/*|"")
+                    SKIPPED_TOOLS="$SKIPPED_TOOLS $TOOL"
+                    continue
+                    ;;
+            esac
+
+            # Each shim re-enters the resolved context in a real shell and then
+            # execs the tool by absolute path, forwarding all arguments. `exec`
+            # avoids leaving an extra shell in the process tree; Rez still starts
+            # a shell of its own, and signals reach the tool through it.
+            cat > "$SHIM_DIR/$TOOL" <<SHIM
+        #!/usr/bin/env bash
+        exec rez env --input "$CTX" --shell bash -- "$TOOL_PATH" "\$@"
+        SHIM
+            chmod +x "$SHIM_DIR/$TOOL"
+            SHIM_COUNT=$((SHIM_COUNT + 1))
+            SHIMMED_TOOLS="$SHIMMED_TOOLS $TOOL"
+        done
+
+        if [ -n "$SKIPPED_TOOLS" ]; then
+            echo "Warning: no shim created for:$SKIPPED_TOOLS"
+            echo "  The resolved Rez context does not provide these commands at a"
+            echo "  path outside $SHIM_DIR. Tasks calling them use whatever the"
+            echo "  worker provides instead."
+        fi
+
+        if [ "$SHIM_COUNT" -eq 0 ]; then
+            echo "openjd_fail: Rez reported no usable tools for packages '$REZ_PACKAGES'."
+            echo "Set the RezExtraTools parameter to name the commands explicitly."
+            exit 1
+        fi
+
+        echo "Created $SHIM_COUNT Rez tool shims in $SHIM_DIR:"
+        printf '   %s\n' $SHIMMED_TOOLS
+
+        # Put the shim directory first on PATH so that bare command names in job
+        # templates (for example `command: mayapy`) resolve to the shims.
+        echo "openjd_env: REZ_SHIM_DIR=$SHIM_DIR"
+        echo "openjd_env: REZ_CONTEXT_FILE=$CTX"
+        echo "openjd_env: PATH=$SHIM_DIR:$PATH"

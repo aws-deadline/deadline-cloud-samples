@@ -17,7 +17,7 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 49 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 50 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -34,8 +34,9 @@ This table covers all 49 immediate user-selectable recipe directories in `conda_
 | [Blender 5.1](blender-5.1/) | Packaging Blender 5.1 with tested plugin-sync scripts | Your jobs require Blender 5.1 |
 | [Blender FLIP Fluids](blender-flipfluids/) | Installing the FLIP Fluids add-on into Blender | You need a Blender simulation add-on recipe |
 | [Blender plugin bundle](blender-plugin-bundle/) | Packaging multiple Blender add-on ZIP files together | You deliver a changing studio collection of Blender plugins |
-| [Cinema 4D 2024](cinema4d-2024/) | Packaging Cinema 4D 2024 for Windows | Your jobs require Cinema 4D 2024 |
-| [Cinema 4D 2025](cinema4d-2025/) | Packaging Cinema 4D 2025 for Windows | Your jobs require Cinema 4D 2025 |
+| [Cinema 4D 2024](cinema4d-2024/) | Packaging Cinema 4D 2024 with Plugin Sync for Windows | Your jobs require Cinema 4D 2024 |
+| [Cinema 4D 2025](cinema4d-2025/) | Packaging Cinema 4D 2025 with Plugin Sync for Windows | Your jobs require Cinema 4D 2025 |
+| [Cinema 4D 2026](cinema4d-2026/) | Packaging Cinema 4D 2026.3.3 with Plugin Sync for Windows | Your jobs require Cinema 4D 2026 |
 | [Arnold for Cinema 4D 2025](cinema4d-c4dtoa-2025/) | Packaging the C4DtoA renderer plugin | Cinema 4D 2025 jobs render with Arnold |
 | [INSYDIUM for Cinema 4D 2025](cinema4d-insydium-2025/) | Packaging supplied INSYDIUM plugin files | Cinema 4D jobs use X-Particles or related plugins |
 | [Cinema 4D OpenJD adaptor](cinema4d-openjd/) | Packaging the Cinema 4D integration adaptor | Cinema 4D jobs need OpenJD session integration |
@@ -324,8 +325,9 @@ condaPlatforms:
     sourceDownloadInstructions: 'Copy from internal drive /mnt/tools/internal/source'
 ```
 
-If you want to build different variants on a platform, such as with CUDA support
-and without, you can add a variant field along with additional host requirements to append.
+To define multiple builds for one platform, such as CUDA and CPU-only variants, add a
+`variant` field. The `additionalHostRequirements` field appends the worker capabilities
+needed by that variant.
 You can also control the value of a `variant_config.yaml` file to provide parameter
 values to the conda variants (See [conda-build variants](https://docs.conda.io/projects/conda-build/en/latest/resources/variants.html)
 or [rattler-build variants](https://prefix-dev.github.io/rattler-build/latest/variants/)).

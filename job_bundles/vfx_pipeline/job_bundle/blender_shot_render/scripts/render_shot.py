@@ -53,8 +53,13 @@ def enable_addons(addon_modules):
         print(f"Enabling studio add-on: {module}")
         bpy.ops.preferences.addon_enable(module=module)
 
-start_s, end_s = args.frame_range.split("-")
-start, end = int(start_s), int(end_s)
+# Contiguous "start-end", or a single frame like "5". Step ranges ("1-48:2") and
+# comma lists ("1,4,9") are not supported by this sample's scripts.
+if "-" in args.frame_range:
+    start_s, end_s = args.frame_range.split("-")
+    start, end = int(start_s), int(end_s)
+else:
+    start = end = int(args.frame_range)
 span = max(end - start + 1, 1)
 rotation = 2.0 * math.pi * (args.frame - start) / span
 

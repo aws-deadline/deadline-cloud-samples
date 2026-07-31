@@ -13,12 +13,14 @@ This table covers every immediate sample directory below `terraform/farm_templat
 
 The starter farm can run rendering, reconstruction, and data-transformation jobs from the [job bundle index](../job_bundles/). It is the Terraform equivalent of the [CloudFormation starter farm](../cloudformation/farm_templates/starter_farm/) and includes support for [building custom Conda packages](../conda_recipes/).
 
-## CloudFormation vs Terraform
+## CloudFormation vs Terraform vs AWS CDK
 
-Both starter configurations create equivalent infrastructure. Choose based on your team's existing tooling and state-management practices.
+All three starter configurations create equivalent Deadline Cloud infrastructure. Choose based on your team's existing tooling and state-management practices.
 
-| Aspect | CloudFormation | Terraform |
-|---|---|---|
-| Provider | AWS native | HashiCorp AWSCC |
-| Deadline resources | `AWS::Deadline::*` | `awscc_deadline_*` |
-| State | Managed by AWS | Local or remote backend |
+| Aspect | CloudFormation | Terraform | [AWS CDK](../cdk/farm_templates/starter_farm/) |
+|---|---|---|---|
+| Authoring | YAML template | HCL configuration | TypeScript, compiled to CloudFormation |
+| Provider | AWS native | HashiCorp AWSCC | AWS native |
+| Deadline resources | `AWS::Deadline::*` | `awscc_deadline_*` | `CfnFarm`, `CfnQueue`, `CfnFleet` |
+| State | Managed by AWS | Local or remote backend | Managed by AWS |
+| Job attachments bucket | You supply an existing bucket | You supply an existing bucket | Created by the app |

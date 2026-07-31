@@ -1,0 +1,31 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2026.3.3"
+  version_major: "2026"
+
+package:
+  name: cinema4d
+  version: ${{ version }}
+
+source:
+  # This archive is created by following the instructions in ../README.md.
+  - path: ../../archive_files/Cinema4D_${{ version_major }}_${{ version }}_Win.zip
+    target_directory: cinema4d
+
+build:
+  number: 0
+  script:
+    - 'bash "%RECIPE_DIR%\build_win.sh"'
+  prefix_detection:
+    ignore_binary_files: true
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+about:
+  homepage: https://www.maxon.net/en/cinema-4d
+  license: LicenseRef-Commercial
+  summary: 3D computer animation, modeling, simulation, and rendering software.
