@@ -127,7 +127,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl xz-ut
 # actually install, unlike apt-cache show, which also succeeds for a virtual one.
 webkit_candidate="$(apt-cache policy libwebkit2gtk-4.0-37 2>/dev/null | awk '/Candidate:/ {print $2}')"
 if [[ -z "$webkit_candidate" || "$webkit_candidate" == "(none)" ]]; then
-    die "Deadline Cloud monitor needs libwebkit2gtk-4.0-37, which this image's repositories do not provide. Ubuntu 22.04 and Debian 12 carry it; later releases ship libwebkit2gtk-4.1-0 instead. Use one of those releases, or add a repository that provides the 4.0 build."
+    die "Deadline Cloud monitor needs libwebkit2gtk-4.0-37, which this image's repositories do not provide. Ubuntu 22.04 and Debian 12 carry it; 24.04 and Debian 13 replaced it with libwebkit2gtk-4.1-0 and no official repository offers the 4.0 build for them. Use Ubuntu 22.04 or Debian 12, or see the README for installing the submitter without the monitor."
 fi
 
 WORK_DIR="$(mktemp -d)"
