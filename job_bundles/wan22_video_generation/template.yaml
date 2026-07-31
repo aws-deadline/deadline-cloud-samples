@@ -148,13 +148,17 @@ parameterDefinitions:
     label: HuggingFace Cache Directory
     groupLabel: Model Settings
   description: >
-    Worker-local directory for the ~34 GiB model download. Deliberately a STRING
-    rather than a PATH so the weights stay out of job attachments and are never
-    uploaded back. Reused across tasks in a session, so only the first task on a
-    worker pays the download cost. Must live on a real disk: Deadline Cloud
-    service-managed fleet workers mount /tmp as a RAM-backed tmpfs that is far
-    too small for this checkpoint.
-  default: "/var/tmp/wan22_hf_cache"
+    Where the ~34 GiB model download is cached. Leave empty to cache on the
+    fleet's persistent volume when it has one, located through the
+    DEADLINE_PERSISTENT_MOUNT variable Deadline Cloud sets on workers, and
+    otherwise on the root volume under /var/tmp. Only the persistent volume
+    survives worker replacement, so it is what lets a later worker reuse the
+    checkpoint rather than downloading it again. Set a path to cache elsewhere; it
+    needs 60 GiB free on a real disk, not under /tmp, which Linux service-managed
+    fleet workers mount as a RAM-backed tmpfs limited to half of system memory.
+    Deliberately a STRING rather than a PATH so the weights stay out of job
+    attachments and are never uploaded back.
+  default: ""
 
 - name: GenerateScript
   type: PATH

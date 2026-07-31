@@ -40,11 +40,61 @@ def _configure_hf_cache(cache_dir: str) -> Path:
 
 
 # The TI2V-5B checkpoint is ~34 GiB on disk, and Xet needs room for its staging
-# chunks on top of that. Deadline Cloud workers mount /tmp as a RAM-backed
-# tmpfs, so a cache placed there both competes with the model for memory and
-# hits ENOSPC partway through the download. Fail early with a clear message
-# instead of dying 20 GiB in.
+# chunks on top of that. Fail early with a clear message instead of dying 20 GiB
+# in. Note that Linux service-managed fleet workers mount /tmp as a RAM-backed
+# tmpfs limited to half of system memory (the Amazon Linux 2023 default), so on
+# the 64 GiB worker this job requires it tops out near 32 GiB and cannot hold the
+# checkpoint at all.
 MIN_CACHE_FREE_GIB = 60
+
+# Set by Deadline Cloud on service-managed fleet workers when the fleet has
+# persistent storage enabled, holding the volume's mount path.
+PERSISTENT_MOUNT_ENV = "DEADLINE_PERSISTENT_MOUNT"
+
+# Subdirectory created under the persistent mount for this sample's weights.
+CACHE_SUBDIR = "wan22_hf_cache"
+
+# Used when the fleet has no persistent volume. On a Linux service-managed fleet
+# worker /var/tmp is on the root EBS volume, so it is a real disk with room for
+# the checkpoint, unlike the tmpfs at /tmp. It just does not outlive the worker.
+FALLBACK_CACHE_DIR = f"/var/tmp/{CACHE_SUBDIR}"
+
+
+def _resolve_cache_dir(explicit: str) -> str:
+    """Choose where the ~34 GiB checkpoint is cached.
+
+    An explicit --hf-cache-dir (or WAN_HF_CACHE_DIR) always wins. Otherwise the
+    cache goes on the fleet's persistent volume when there is one, because only
+    that volume survives worker replacement; the root volume is discarded, so
+    caching there re-downloads 34 GiB on every new worker.
+
+    Without a persistent volume the job still runs, falling back to the root
+    volume. That is correct for space and merely slower across workers, so it is
+    logged rather than treated as an error.
+    """
+    if explicit:
+        return explicit
+
+    mount = os.environ.get(PERSISTENT_MOUNT_ENV, "")
+    if mount:
+        resolved = str(Path(mount) / CACHE_SUBDIR)
+        print(
+            f"Caching weights on the fleet's persistent volume: {resolved} "
+            f"(from {PERSISTENT_MOUNT_ENV}={mount}). The checkpoint is reused by "
+            "later workers instead of being downloaded again.",
+            flush=True,
+        )
+        return resolved
+
+    print(
+        f"{PERSISTENT_MOUNT_ENV} is not set, so this fleet has no persistent "
+        f"volume. Caching weights on the root volume at {FALLBACK_CACHE_DIR}, "
+        "which has room but is discarded when a worker is replaced: every new "
+        "worker downloads the ~34 GiB checkpoint again. Enable persistent "
+        "storage on the fleet to avoid that.",
+        flush=True,
+    )
+    return FALLBACK_CACHE_DIR
 
 
 def _cached_bytes(cache_dir: str) -> int:
@@ -167,10 +217,12 @@ def _check_cache_space(cache_dir: str, model_id: str) -> None:
         raise SystemExit(
             f"Only {free_gib:.1f} GiB free at {cache_dir} with {cached_gib:.1f} "
             f"GiB already cached, but the Wan2.2 checkpoint needs at least "
-            f"{MIN_CACHE_FREE_GIB} GiB including download staging space. Point "
-            "--hf-cache-dir at a real disk; on Deadline Cloud service-managed "
-            "fleets /tmp is a RAM-backed tmpfs, so prefer a path under /var/tmp "
-            "or the session directory."
+            f"{MIN_CACHE_FREE_GIB} GiB including download staging space. If this "
+            "is the fleet's persistent volume, raise its size; if it is the root "
+            "volume, raise the fleet's root EBS volume size; otherwise point "
+            "HFCacheDir (--hf-cache-dir) at a disk with more room. Avoid /tmp, "
+            "which Linux service-managed fleet workers mount as a RAM-backed "
+            "tmpfs limited to half of system memory."
         )
 
 
@@ -346,14 +398,18 @@ def main():
     parser.add_argument(
         "--hf-cache-dir",
         default=_env_default("WAN_HF_CACHE_DIR"),
-        help="Directory for the HuggingFace hub cache, shared across tasks.",
+        help=(
+            "Directory for the HuggingFace hub cache, shared across tasks. "
+            "Defaults to a directory on the fleet's persistent volume, using the "
+            f"{PERSISTENT_MOUNT_ENV} environment variable Deadline Cloud sets on "
+            "workers when the fleet has persistent storage enabled."
+        ),
     )
     args = parser.parse_args()
 
     for name, value in (
         ("--prompt (WAN_PROMPT)", args.prompt),
         ("--output-dir (WAN_OUTPUT_DIR)", args.output_dir),
-        ("--hf-cache-dir (WAN_HF_CACHE_DIR)", args.hf_cache_dir),
     ):
         if not value:
             raise SystemExit(f"{name} is required but was empty.")
@@ -377,7 +433,10 @@ def main():
     except OSError as exc:
         raise SystemExit(f"Output directory {output_dir} is not writable: {exc}")
 
-    cache_dir = _configure_hf_cache(args.hf_cache_dir)
+    # An empty --hf-cache-dir is not an error: it means "use the fleet's
+    # persistent volume". Resolved after the cheap parameter checks so a bad
+    # width or frame count is reported before any storage complaint.
+    cache_dir = _configure_hf_cache(_resolve_cache_dir(args.hf_cache_dir))
     _check_cache_space(cache_dir, args.model_id)
 
     # Imported after HF_HOME is set.
