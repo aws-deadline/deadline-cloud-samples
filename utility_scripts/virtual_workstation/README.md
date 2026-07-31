@@ -27,7 +27,7 @@ Blender stands in for whichever DCC you run. It is used here because it installs
   On a newer release, install the submitter without the monitor and authenticate a different way. `deadline auth login` is not an alternative, because it drives the monitor and only accepts profiles the monitor created. Use an ordinary AWS credential source instead, such as an IAM Identity Center profile created with `aws configure sso` or an instance profile, and delete the monitor and profile steps from the script. The artist then signs in through that mechanism rather than the monitor, so what this sample pre-configures no longer applies.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
-* A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images include Microsoft Edge. On Ubuntu 22.04 and later, Firefox and Chromium are published only as snaps, which do not work in every remote-desktop session. Install Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) instead, and add an apt pin so the `.deb` wins over Ubuntu's snap transitional package. Verified on Ubuntu 22.04: the Mozilla `.deb` completes sign-in in a VNC session.
+* A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images normally include Microsoft Edge, so nothing extra is needed there. On Ubuntu 22.04 and later, `apt install firefox` gets a transitional package that installs the Firefox snap, and snaps do not work in every remote-desktop session. Install Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) instead, and add an apt pin so the `.deb` wins over Ubuntu's snap transitional package. Verified on Ubuntu 22.04: the Mozilla `.deb` completes sign-in in a VNC session.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
@@ -127,7 +127,7 @@ To install more than one DCC, pass a comma-separated `--enable-components` list 
 | AWS profile | `~/.aws/config` | `%USERPROFILE%\.aws\config` |
 | Deadline Cloud CLI config | `~/.deadline/config` | `%USERPROFILE%\.deadline\config` |
 
-The submitter installer puts the `deadline` CLI on `PATH` itself, through `/etc/profile.d/deadline.sh` on Linux, so it is available in new login shells rather than the one that ran the script.
+The submitter installer puts the `deadline` CLI on `PATH` itself. On Linux it writes `/etc/profile.d/deadline.sh`, which appends `/opt/DeadlineCloudSubmitter/DeadlineClient`, so the CLI appears in new login shells rather than the one that ran the script.
 
 ## Security, cost, and cleanup
 
@@ -140,6 +140,7 @@ The submitter installer puts the `deadline` CLI on `PATH` itself, through `/etc/
   ```console
   # Linux
   sudo /opt/DeadlineCloudSubmitter/uninstall --mode unattended
+  sudo rm -rf /opt/DeadlineCloudSubmitter   # the uninstaller leaves THIRD_PARTY_LICENSES behind
   sudo apt-get remove -y deadline-cloud-monitor
   sudo rm -rf /opt/blender /usr/local/bin/blender
 
@@ -148,7 +149,7 @@ The submitter installer puts the `deadline` CLI on `PATH` itself, through `/etc/
   Remove-Item -Recurse -Force "C:\Program Files\Blender"
   ```
 
-  Remove the monitor on Windows through **Settings > Apps > Installed apps**. Then remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`, and delete the monitor's credential cache (`~/.cache/com.amazonaws.deadline.monitor` on Linux).
+  The Linux uninstaller removes `/etc/profile.d/deadline.sh`, so the `deadline` CLI leaves new login shells. Remove the monitor on Windows through **Settings > Apps > Installed apps**. Then remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`, and delete the monitor's credential cache (`~/.cache/com.amazonaws.deadline.monitor` on Linux).
 
 ## Troubleshooting
 
