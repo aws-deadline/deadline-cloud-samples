@@ -588,6 +588,46 @@ describe('ServiceManagedFleet', () => {
         }),
     ).toThrow(/at least one accelerator/);
   });
+
+  test('a fleet can wait for cheaper capacity', () => {
+    const { farm, template } = scaffold();
+    new ServiceManagedFleet(farm, 'BatchFleet', {
+      farm,
+      displayName: 'Batch Fleet',
+      osFamily: 'LINUX',
+      instanceMarketType: 'wait-and-save',
+      maxWorkerCount: 10,
+      vCpuCount: { min: 2, max: 8 },
+      memoryMiB: { min: 16384 },
+    });
+
+    template().hasResourceProperties('AWS::Deadline::Fleet', {
+      Configuration: {
+        ServiceManagedEc2: Match.objectLike({
+          InstanceMarketOptions: { Type: 'wait-and-save' },
+        }),
+      },
+    });
+  });
+
+  test('a GPU fleet cannot wait for cheaper capacity', () => {
+    // The service rejects accelerators on a wait-and-save fleet, and synth would
+    // otherwise render a template that only fails partway through deployment.
+    const { farm } = scaffold();
+    expect(
+      () =>
+        new ServiceManagedFleet(farm, 'GpuFleet', {
+          farm,
+          displayName: 'GPU Fleet',
+          osFamily: 'LINUX',
+          instanceMarketType: 'wait-and-save',
+          maxWorkerCount: 1,
+          vCpuCount: { min: 4 },
+          memoryMiB: { min: 16384 },
+          accelerators: { names: ['l4'] },
+        }),
+    ).toThrow(/wait-and-save/);
+  });
 });
 
 describe('fleet presets', () => {

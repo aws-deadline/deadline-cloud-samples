@@ -76,14 +76,28 @@ export interface ServiceManagedFleetProps {
    */
   readonly cpuArchitecture?: 'x86_64' | 'arm64';
   /**
-   * Whether to run on spot or on-demand instances.
+   * Which EC2 instance market worker hosts come from, trading cost against how
+   * soon a job starts and whether it can be interrupted.
    *
-   * Spot instances cost less but can be interrupted, which Deadline Cloud
-   * handles by retrying the interrupted task on another worker.
+   * - `on-demand` costs the most and is not interrupted. Use it for work that
+   *   has to finish by a deadline, and for long tasks.
+   * - `spot` uses unreserved capacity at a discount, and can be interrupted by
+   *   on-demand requests.
+   * - `wait-and-save` costs the least and schedules jobs with a delay, waiting
+   *   for cheap capacity rather than starting as soon as work is queued. It can
+   *   be interrupted by both on-demand and spot requests. Suited to work with no
+   *   deadline, such as an overnight batch.
+   *
+   * An interruption is not a save: Deadline Cloud retries the interrupted task on
+   * another worker from the beginning, so a long task loses its progress. Weigh
+   * that against the discount, and prefer `on-demand` as tasks get longer.
+   *
+   * The service rejects `wait-and-save` together with {@link accelerators}, so a
+   * GPU fleet uses `spot` or `on-demand`.
    *
    * @default 'spot'
    */
-  readonly instanceMarketType?: 'on-demand' | 'spot';
+  readonly instanceMarketType?: 'on-demand' | 'spot' | 'wait-and-save';
   /** The maximum number of worker hosts the fleet scales up to. */
   readonly maxWorkerCount: number;
   /**
@@ -171,6 +185,17 @@ export class ServiceManagedFleet extends Construct {
       this.role = createWorkerRole(this, props.farm, this.policy);
     }
 
+    const instanceMarketType = props.instanceMarketType ?? 'spot';
+    if (instanceMarketType === 'wait-and-save' && props.accelerators) {
+      // The service rejects the combination at CreateFleet, which CloudFormation
+      // surfaces only partway through a deployment.
+      throw new Error(
+        `The fleet ${id} asks for GPU accelerators on a wait-and-save fleet, which ` +
+          'AWS Deadline Cloud does not support. Use `spot` or `on-demand` for a fleet ' +
+          'with accelerators.',
+      );
+    }
+
     this.cfnFleet = new deadline.CfnFleet(this, 'Resource', {
       displayName: props.displayName,
       description: props.description,
@@ -188,7 +213,7 @@ export class ServiceManagedFleet extends Construct {
             rootEbsVolume: props.rootEbsVolume ?? DEFAULT_ROOT_EBS_VOLUME,
             acceleratorCapabilities: acceleratorCapabilities(props.accelerators),
           },
-          instanceMarketOptions: { type: props.instanceMarketType ?? 'spot' },
+          instanceMarketOptions: { type: instanceMarketType },
         },
       },
     });
@@ -263,8 +288,9 @@ function createWorkerRole(
  *
  * Everything except the farm is optional, because the preset supplies a default
  * for it. Pass a property to override that default -- for example a higher
- * `maxWorkerCount`, or `instanceMarketType: 'on-demand'` for work that must not
- * be interrupted.
+ * `maxWorkerCount`, `instanceMarketType: 'on-demand'` for work that must not be
+ * interrupted, or `instanceMarketType: 'wait-and-save'` for work that can wait
+ * for cheaper capacity.
  */
 export type PresetFleetProps = { readonly farm: Farm } & Partial<
   Omit<ServiceManagedFleetProps, 'farm'>
@@ -275,6 +301,8 @@ export type PresetFleetProps = { readonly farm: Farm } & Partial<
  * CPU rendering.
  *
  * Defaults to up to 10 spot instances with 2-8 vCPUs and at least 16 GiB of RAM.
+ * Pass `instanceMarketType` to trade that discount for jobs that start sooner
+ * (`on-demand`) or cost less still (`wait-and-save`).
  */
 export class CpuLinuxFleet extends ServiceManagedFleet {
   constructor(scope: Construct, id: string, props: PresetFleetProps) {

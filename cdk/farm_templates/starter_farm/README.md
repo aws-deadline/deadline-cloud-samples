@@ -232,6 +232,16 @@ new CudaLinuxFleet(this, 'CudaLinuxFleet', {
 
 If you use spot instances, you generally want to include wider ranges of these properties when possible to increase the available instance types you can get.
 
+`instanceMarketType` trades cost against how soon a job starts:
+
+| Market type | Cost | Behavior |
+|---|---|---|
+| `on-demand` | Highest | Runs without interruption, for work with a deadline and for long tasks |
+| `spot` (default) | Discounted | Unreserved capacity, interrupted by on-demand requests |
+| `wait-and-save` | Lowest | Waits for cheap capacity rather than starting right away, and is interrupted by on-demand and spot requests. Suits work with no deadline, such as an overnight batch |
+
+An interruption is not a save. The task is retried from the beginning on another worker, so a long task loses its progress. The service does not allow `wait-and-save` on a fleet with GPU accelerators, and the constructs reject that at synth rather than mid-deployment.
+
 For hardware no preset covers, build a `ServiceManagedFleet` directly:
 
 ```ts
