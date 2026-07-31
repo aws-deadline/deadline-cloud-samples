@@ -1,0 +1,137 @@
+specificationVersion: 'environment-2023-09'
+# Test scaffolding for rez_queue_env_shim.yaml.
+#
+# Installs Rez and builds a small demo Rez package so the shim environment can
+# be exercised on a worker that has neither. Attach this at a LOWER priority
+# number than the shim environment so it runs first, and set the shim
+# environment's RezRepositories parameter to the RezDemoRepository path below.
+#
+# This is for trying out and testing the shim environment. A production farm
+# provides Rez on the worker image and a package repository on shared storage,
+# and does not need this environment at all.
+parameterDefinitions:
+  - name: RezDemoRepository
+    type: STRING
+    description: >
+      Directory to create the demo Rez package repository in. Pass this same
+      value as the shim environment's RezRepositories parameter.
+    default: "/tmp/rez-demo-repository"
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Demo Repository
+
+environment:
+  name: RezDemoSetup
+  script:
+    actions:
+      onEnter:
+        command: "bash"
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      filename: rez-demo-setup-enter.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        # The shim environment is tested on Linux and macOS only.
+        case "$(uname -s)" in
+            Linux|Darwin) ;;
+            *)
+                echo "openjd_fail: This demo supports Linux and macOS only (found $(uname -s))."
+                exit 1
+                ;;
+        esac
+
+        REPO='{{Param.RezDemoRepository}}'
+        REZ_INSTALL_DIR="{{Session.WorkingDirectory}}/rez-install"
+
+        # Install Rez into the session directory so it is removed with the
+        # session. A production farm has Rez on the worker image instead.
+        echo "Installing Rez into the session directory..."
+        python3 -m venv "$REZ_INSTALL_DIR"
+        "$REZ_INSTALL_DIR/bin/pip" install --quiet rez
+
+        # Build a demo package that exercises three kinds of environment state,
+        # in increasing order of how badly a variable diff handles them:
+        #
+        #   1. A plain variable. Harvest-and-replay carries this correctly.
+        #   2. An `alias`, which Rez implements as an exported shell function.
+        #      Bash exports it as `BASH_FUNC_name%%`, whose name contains `%%`
+        #      and whose value spans lines. The Open Job Description
+        #      `openjd_env` directive accepts neither, so the alias is dropped.
+        #   3. A PATH prepend that shadows a system command. Replay restores the
+        #      variable, but any later environment that also edits PATH can
+        #      reorder it, so which binary wins depends on environment order.
+        mkdir -p "$REPO/demotool/1.0.0/bin"
+        cat > "$REPO/demotool/1.0.0/package.py" <<'PKG'
+        name = "demotool"
+        version = "1.0.0"
+        tools = ["demorender", "democonvert", "demosleep", "demoprobe"]
+        build_command = False
+
+        def commands():
+            env.PATH.prepend("{root}/bin")
+            env.DEMOTOOL_VERSION = "1.0.0"
+            env.DEMOTOOL_LICENSE_SERVER = "license.example.internal:1234"
+            # Rez turns this into an exported shell function, which cannot be
+            # represented as an `openjd_env` name=value pair.
+            alias("demoalias", "demorender --via-alias")
+        PKG
+
+        cat > "$REPO/demotool/1.0.0/bin/demorender" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "demorender: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET}"
+        echo "demorender: DEMOTOOL_LICENSE_SERVER=${DEMOTOOL_LICENSE_SERVER:-UNSET}"
+        echo "demorender: args=$*"
+        TOOL
+        cat > "$REPO/demotool/1.0.0/bin/democonvert" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "democonvert: DEMOTOOL_VERSION=${DEMOTOOL_VERSION:-UNSET} args=$*"
+        TOOL
+        # Reports on state that only exists inside a correctly applied context:
+        # the alias Rez defines, and whether the package's own `sort` shadows the
+        # system one. Because this is a declared tool it gets a shim of its own,
+        # so the verify step can probe both through the shim mechanism rather
+        # than by re-entering the context itself.
+        cat > "$REPO/demotool/1.0.0/bin/demoprobe" <<'TOOL'
+        #!/usr/bin/env bash
+        # Rez exports an alias as a shell function, which is inherited here.
+        if type demoalias > /dev/null 2>&1; then
+            echo "demoprobe: alias=$(demoalias)"
+        else
+            echo "demoprobe: alias=MISSING"
+        fi
+        # `sort` must resolve to the package's copy, not /usr/bin/sort.
+        echo "demoprobe: sort=$(command -v sort)"
+        if sort --help 2>&1 | grep -q "demotool's sort"; then
+            echo "demoprobe: sort-shadowed=yes"
+        else
+            echo "demoprobe: sort-shadowed=no"
+        fi
+        TOOL
+        # A long-running tool that reports the signals it receives, used by the
+        # CancelThroughShim step to prove cancelation reaches through a shim.
+        cat > "$REPO/demotool/1.0.0/bin/demosleep" <<'TOOL'
+        #!/usr/bin/env bash
+        trap 'echo "demosleep: caught SIGTERM, exiting"; exit 42' TERM
+        trap 'echo "demosleep: caught SIGINT, exiting"; exit 43' INT
+        echo "demosleep: pid=$$ sleeping for ${1:-600}s"
+        # Sleep in short increments so the trap runs promptly. A single long
+        # sleep would not be interrupted until it returned.
+        for _ in $(seq 1 "${1:-600}"); do sleep 1; done
+        echo "demosleep: finished without receiving a signal"
+        TOOL
+        # A package-provided `sort` that shadows the system one. The package
+        # directory is prepended to PATH, so inside a correctly applied context
+        # this must win over /usr/bin/sort.
+        cat > "$REPO/demotool/1.0.0/bin/sort" <<'TOOL'
+        #!/usr/bin/env bash
+        echo "sort: this is demotool's sort, not the system one"
+        TOOL
+        chmod +x "$REPO/demotool/1.0.0/bin/"*
+
+        echo "Created demo Rez package 'demotool-1.0.0' in $REPO"
+
+        # Put Rez on PATH so the shim environment's plain `rez` calls resolve.
+        echo "openjd_env: PATH=$REZ_INSTALL_DIR/bin:$PATH"

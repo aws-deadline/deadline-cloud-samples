@@ -43,11 +43,14 @@ on purpose, even though the repo root normally ignores built `.conda` files.)
 ## Commands
 
 ```bash
-# Build a recipe into this channel (writes the .conda AND updates repodata.json)
-rattler-build build --recipe ../conda_recipes/moonrise_scatter-1.0.0/recipe/recipe.yaml --output-dir .
+# Build a recipe into this channel (writes the .conda AND updates repodata.json).
+# --test skip skips the post-build test, which needs Blender from the farm's
+# deadline-cloud channel and cannot be solved on your workstation.
+rattler-build build --recipe ../conda_recipes/moonrise_scatter-1.0.0/recipe/recipe.yaml --output-dir . --test skip
 
-# Install from this local channel to test (a local channel is referenced by path)
-conda create -n test -c ./ -c conda-forge moonrise_scatter    # or  -c file://$(pwd)
+# Install from this local channel to test. moonrise_scatter depends on blender,
+# which comes from the deadline-cloud channel, so include it in the solve.
+conda create -n test -c ./ -c deadline-cloud -c conda-forge moonrise_scatter
 
 # Publish the channel to S3
 aws s3 sync . s3://<bucket>/Conda
@@ -56,9 +59,10 @@ aws s3 sync . s3://<bucket>/Conda
 ## Add a new package
 
 1. Write or copy a recipe under `../conda_recipes/<name>/recipe/recipe.yaml`.
-2. `rattler-build build --recipe ../conda_recipes/<name>/recipe/recipe.yaml --output-dir .`
+2. `rattler-build build --recipe ../conda_recipes/<name>/recipe/recipe.yaml --output-dir . --test skip`
    drops the package in the right subdir and rebuilds `repodata.json`
-   automatically.
+   automatically. (`--test skip` avoids solving a runtime dependency, such as
+   Blender, that only the farm's channel provides.)
 3. Commit it (or `aws s3 sync . s3://<bucket>/Conda`) to publish.
 4. Reference it from a job via `CondaPackages`/`CondaChannels`. See the
    [pipeline README](../README.md) for how the channel is wired in at run time.
