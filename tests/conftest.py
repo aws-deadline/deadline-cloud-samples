@@ -109,6 +109,25 @@ def find_host_configuration_scripts() -> list[Path]:
     return sorted(set(scripts))
 
 
+def find_utility_scripts() -> list[Path]:
+    """Shell / PowerShell scripts under ``utility_scripts/``.
+
+    These are run by an administrator on a workstation rather than uploaded to the
+    service, so the host configuration length limit does not apply to them. They
+    still get the same syntax checks, since a sample that does not parse is broken
+    for everyone who copies it.
+    """
+    base = REPO_ROOT / "utility_scripts"
+    if not base.is_dir():
+        return []
+    scripts = []
+    for pattern in ("*.sh", "*.ps1"):
+        for path in base.rglob(pattern):
+            if not _is_excluded(path.relative_to(REPO_ROOT)):
+                scripts.append(path)
+    return sorted(set(scripts))
+
+
 def find_cloudformation_templates() -> list[Path]:
     """CloudFormation templates (YAML files under ``cloudformation/``).
 

@@ -39,8 +39,10 @@ $InformationPreference = "Continue"       # Show progress messages during provis
 
 $BlenderVersion = "4.5.0"
 
-# The Deadline Cloud submitter supports specific Blender versions. This is the
-# installer component for the version above; see "Adapting to another DCC".
+# The submitter's installer components for this DCC: the submitter plug-in itself,
+# and the specific DCC version it integrates with. Both change together when you
+# switch DCC; see "Adapting to another DCC".
+$SubmitterComponent = "deadline_cloud_for_blender"
 $BlenderComponent = "blender_45"
 
 # download.blender.org rejects some automated clients, so this points at
@@ -63,9 +65,10 @@ $DownloadsBase = "https://downloads.deadlinecloud.amazonaws.com"
 # every DCC, so switching to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After
 # Effects, or VRED means changing three things:
 #
-#   1. $BlenderComponent above. Run "<installer> --help" for the current
-#      --enable-components values, for example deadline_cloud_for_maya or
-#      deadline_cloud_for_houdini plus a version component like houdini_20_5.
+#   1. $SubmitterComponent and $BlenderComponent above, for example
+#      deadline_cloud_for_houdini plus houdini_20_5. Run "<installer> --help" for
+#      the current --enable-components values. The --<dcc>-path flag is derived
+#      from $BlenderComponent, so it follows automatically.
 #   2. The "Install Blender" step. Commercial DCCs need a vendor installer and
 #      usually a license server, so replace that block entirely.
 #   3. The "Enable the add-on in Blender" step. It is Blender-specific. Other
@@ -79,9 +82,25 @@ function Write-Fatal { param([string]$Message) throw "[setup-workstation] ERROR:
 # Arguments
 # ---------------------------------------------------------------------------
 
+# The monitor profile and Blender's add-on preferences are per user, so this must
+# run as the account that signs in. #Requires -RunAsAdministrator is satisfied by
+# SYSTEM, which Systems Manager Run Command and EC2 user data both run as, and
+# every check below would still pass: they read the invoking user's own state, so
+# the script would report success after writing everything into a service profile
+# no artist ever logs in to. Refuse that instead.
+if ([System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
+    Write-Fatal "running as SYSTEM. The profile and Blender preferences are per user, so they would be written to a service profile the artist never logs in to. Run this as the artist's own account in an elevated session."
+}
+
 # The Region segment is required. The monitor accepts a URL without it and then
-# writes a profile with a wrong region, so reject that here instead.
-$monitorHost = ([System.Uri]$MonitorUrl).Host
+# writes a profile with a wrong region, so reject that here instead. Check the
+# scheme separately: [System.Uri] parses the host out of any scheme, so matching
+# on the host alone would accept http:// and write it into the artist's profile.
+$monitorUri = [System.Uri]$MonitorUrl
+if ($monitorUri.Scheme -ne "https") {
+    Write-Fatal "monitor URL must use https (got: $MonitorUrl)"
+}
+$monitorHost = $monitorUri.Host
 if ($monitorHost -notmatch '^([a-z0-9-]+)\.([a-z0-9-]+)\.deadlinecloud\.amazonaws\.com$') {
     Write-Fatal "monitor URL must be https://<subdomain>.<region>.deadlinecloud.amazonaws.com/ (got: $MonitorUrl)"
 }
@@ -159,7 +178,15 @@ Get-VerifiedFile -Uri "$BlenderMirror/Blender$blenderSeries/$blenderArchive" -Ou
     -ChecksumUri "$BlenderMirror/Blender$blenderSeries/blender-$BlenderVersion.sha256" `
     -MatchName $blenderArchive
 
-if (Test-Path $BlenderPrefix) { Remove-Item -Recurse -Force $BlenderPrefix }
+# Replace any previous install so re-runs are clean. Only ever delete a directory
+# this script created: $BlenderPrefix is a constant an administrator edits, and
+# removing it unconditionally as an administrator would destroy whatever it names.
+if (Test-Path $BlenderPrefix) {
+    if (-not (Test-Path (Join-Path $BlenderPrefix "blender.exe"))) {
+        Write-Fatal "$BlenderPrefix exists but holds no blender.exe. Refusing to delete it; check `$BlenderPrefix."
+    }
+    Remove-Item -Recurse -Force $BlenderPrefix
+}
 $extractDir = Join-Path $WorkDir "blender-extract"
 if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
 Expand-Archive -Path $blenderZip -DestinationPath $extractDir -Force
@@ -170,7 +197,14 @@ $blenderExe = Join-Path $BlenderPrefix "blender.exe"
 if (-not (Test-Path $blenderExe)) {
     Write-Fatal "expected blender.exe at $blenderExe after extraction"
 }
-Write-Step "Blender installed at $BlenderPrefix"
+
+# Run Blender rather than only testing for the file, so one that unpacked but
+# cannot start fails here instead of during the add-on step with a vaguer error.
+$blenderVersion = (& $blenderExe --version 2>&1 | Select-Object -First 1)
+if ($LASTEXITCODE -ne 0) {
+    Write-Fatal "Blender installed to $BlenderPrefix but will not run: $blenderVersion"
+}
+Write-Step "Blender installed: $blenderVersion"
 
 # ---------------------------------------------------------------------------
 # Install the Deadline Cloud submitter
@@ -203,7 +237,7 @@ $installerArgs = @(
     "--unattendedmodeui", "none"
     "--installscope", "system"
     "--prefix", "`"$SubmitterPrefix`""
-    "--enable-components", "deadline_cloud_for_blender,$BlenderComponent"
+    "--enable-components", "$SubmitterComponent,$BlenderComponent"
     ("--" + $BlenderComponent.Replace("_", "-") + "-path"), "`"$blenderExe`""
 )
 $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -NoNewWindow
@@ -319,6 +353,11 @@ if (-not (Select-String -Path $awsConfig -SimpleMatch -Pattern "[profile $Profil
     Write-Fatal "profile $ProfileName is missing from $awsConfig"
 }
 Write-Step "profile created and verified in $awsConfig"
+
+# The downloads total roughly 1 GB, so remove them. A run that fails earlier leaves
+# them in place on purpose, so the installer logs can be inspected.
+Remove-Item -Recurse -Force $WorkDir -ErrorAction SilentlyContinue
+Write-Step "removed temporary downloads from $WorkDir"
 
 Write-Information @"
 

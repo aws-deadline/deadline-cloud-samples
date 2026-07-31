@@ -27,8 +27,10 @@ set -euo pipefail
 
 BLENDER_VERSION="4.5.0"
 
-# The Deadline Cloud submitter supports specific Blender versions. This is the
-# installer component for the version above; see "Adapting to another DCC".
+# The submitter's installer components for this DCC: the submitter plug-in itself,
+# and the specific DCC version it integrates with. Both change together when you
+# switch DCC; see "Adapting to another DCC".
+SUBMITTER_COMPONENT="deadline_cloud_for_blender"
 BLENDER_COMPONENT="blender_45"
 
 # download.blender.org rejects some automated clients, so this points at
@@ -60,9 +62,10 @@ LIBSSL_DEB_SHA256="7cf39d70a639017d1dd7c8d36daa2258063608688e449fddf40ffdd46f992
 # every DCC, so switching to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After
 # Effects, or VRED means changing three things:
 #
-#   1. BLENDER_COMPONENT above. Run "<installer> --help" for the current
-#      --enable-components values, for example deadline_cloud_for_maya or
-#      deadline_cloud_for_houdini plus a version component like houdini_20_5.
+#   1. SUBMITTER_COMPONENT and BLENDER_COMPONENT above, for example
+#      deadline_cloud_for_houdini plus houdini_20_5. Run "<installer> --help" for
+#      the current --enable-components values. The --<dcc>-path flag is derived
+#      from BLENDER_COMPONENT, so it follows automatically.
 #   2. The "Install Blender" step. Commercial DCCs need a vendor installer and
 #      usually a license server, so replace that block entirely.
 #   3. The "Enable the add-on in Blender" step. It is Blender-specific. Other
@@ -83,8 +86,12 @@ WORKSTATION_USER="${2:-${SUDO_USER:-$(id -un)}}"
 [[ $EUID -eq 0 ]] || die "run as root: this installs system packages"
 
 # The Region segment is required. The monitor accepts a URL without it and then
-# writes a profile with a wrong region, so reject that here instead.
-monitor_host="${MONITOR_URL#https://}"
+# writes a profile with a wrong region, so reject that here instead. Hostnames and
+# schemes are case-insensitive, so compare in lowercase.
+monitor_url_lc="${MONITOR_URL,,}"
+[[ "$monitor_url_lc" == https://* ]] \
+    || die "monitor URL must use https (got: $MONITOR_URL)"
+monitor_host="${monitor_url_lc#https://}"
 monitor_host="${monitor_host%%/*}"
 [[ "$monitor_host" =~ ^([a-z0-9-]+)\.([a-z0-9-]+)\.deadlinecloud\.amazonaws\.com$ ]] \
     || die "monitor URL must be https://<subdomain>.<region>.deadlinecloud.amazonaws.com/ (got: $MONITOR_URL)"
@@ -133,7 +140,8 @@ download_verified() {
     local url="$1" dest="$2" checksum_url="$3" match_name="${4:-}" body expected actual
 
     log "downloading ${url##*/}"
-    curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url"
+    curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url" \
+        || die "cannot download ${dest##*/} from $url"
 
     body="$(curl -fsSL --retry 3 --retry-delay 2 "$checksum_url")" \
         || die "cannot fetch the checksum for ${dest##*/} from $checksum_url"
@@ -165,7 +173,11 @@ verify_sha256() {
 # dependency, so a missing libssl.so.1.1 does not fail the install: the monitor
 # installs and then cannot start. Check for the library rather than for a
 # package name, since it may already be present from another source.
-if ! ldconfig -p | grep -q 'libssl\.so\.1\.1'; then
+# Capture first rather than piping into grep -q: under pipefail, grep -q exits on
+# the first match and ldconfig dies with SIGPIPE, so the pipeline reports 141 and a
+# library that is present looks missing.
+ldconfig_libs="$(ldconfig -p)"
+if ! grep -qF 'libssl.so.1.1' <<<"$ldconfig_libs"; then
     log "installing libssl1.1 for Deadline Cloud monitor"
     curl -fsSL --retry 3 --retry-delay 2 -o "$WORK_DIR/$LIBSSL_DEB" \
         "https://archive.ubuntu.com/ubuntu/pool/main/o/openssl/$LIBSSL_DEB"
@@ -186,11 +198,24 @@ download_verified \
     "${BLENDER_MIRROR}/Blender${blender_series}/blender-${BLENDER_VERSION}.sha256" \
     "$blender_archive"
 
-rm -rf "$BLENDER_PREFIX"
+# Replace any previous install so re-runs are clean. Only ever delete a directory
+# this script created: BLENDER_PREFIX is a constant an administrator edits, and
+# removing it unconditionally as root would destroy whatever it names.
+if [[ -e "$BLENDER_PREFIX" ]]; then
+    [[ -x "$BLENDER_PREFIX/blender" ]] \
+        || die "$BLENDER_PREFIX exists but holds no blender executable. Refusing to delete it; check BLENDER_PREFIX."
+    rm -rf "$BLENDER_PREFIX"
+fi
 mkdir -p "$BLENDER_PREFIX"
 tar -xJf "$WORK_DIR/$blender_archive" -C "$BLENDER_PREFIX" --strip-components=1
 ln -sf "$BLENDER_PREFIX/blender" /usr/local/bin/blender
-log "Blender installed: $("$BLENDER_PREFIX/blender" --version | head -1)"
+
+# Run Blender rather than only testing for the file, so one that unpacked but
+# cannot start (a missing shared library on a minimal image) fails here. Capture in
+# an assignment: a command substitution inside an argument cannot abort under set -e.
+blender_version="$("$BLENDER_PREFIX/blender" --version | head -1)" \
+    || die "Blender installed to $BLENDER_PREFIX but will not run"
+log "Blender installed: $blender_version"
 
 # ---------------------------------------------------------------------------
 # Install the Deadline Cloud submitter
@@ -232,7 +257,7 @@ log "installing the submitter (unattended)"
     --unattendedmodeui none \
     --installscope system \
     --prefix "$SUBMITTER_PREFIX" \
-    --enable-components "deadline_cloud_for_blender,${BLENDER_COMPONENT}" \
+    --enable-components "${SUBMITTER_COMPONENT},${BLENDER_COMPONENT}" \
     --"${BLENDER_COMPONENT//_/-}-path" "$BLENDER_PREFIX"
 log "submitter installed at $SUBMITTER_PREFIX"
 

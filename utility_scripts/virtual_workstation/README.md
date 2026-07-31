@@ -59,7 +59,7 @@ After either script finishes, the artist signs in through a desktop session on t
 
 ## How it works
 
-Both scripts run the same five steps, in the same order, under matching section headers.
+Both scripts run the same five steps, in the same order, under section headers that name each one. The Linux script has one extra section, `Prerequisites`, covering the packages and OpenSSL 1.1 described below.
 
 1. **Validate the monitor URL** and derive the Region, the subdomain, and the profile name (`<subdomain>-<region>`).
 2. **Install Blender** from the official archive, verified against its published checksum, into a fixed prefix (`/opt/blender` or `C:\Program Files\Blender`).
@@ -70,6 +70,8 @@ Both scripts run the same five steps, in the same order, under matching section 
 Every download is verified against a published SHA-256 checksum, and the scripts fail if a checksum cannot be fetched. An internal Blender mirror must also serve Blender's `blender-<version>.sha256` manifest.
 
 The Linux script also installs `libssl1.1`, because Deadline Cloud monitor links against OpenSSL 1.1 while no current Debian or Ubuntu release provides it. Ubuntu 20.04 is the last release to carry the package, so the script takes it from the Ubuntu archive. That one artifact is published without a `.sha256` beside it, so its expected hash is a constant at the top of the script alongside the version, with a comment naming the index to read a newer hash from.
+
+On Debian this installs an Ubuntu-built `.deb`. Its dependencies are satisfiable on Debian 12, but the combination was verified on Ubuntu 22.04 only. On Debian, prefer whatever OpenSSL 1.1 package your own repositories provide and delete that step.
 
 ### The profile
 
@@ -84,7 +86,10 @@ identity_store_id=
 monitor_id=pending-first-login
 ```
 
-It also points the Deadline Cloud CLI at that profile in `~/.deadline/config`.
+The scripts pass two further flags, both optional:
+
+* `--set-as-deadline-default` points the Deadline Cloud CLI at this profile, by writing `aws_profile_name` under `[defaults]` in `~/.deadline/config`. Without it, `deadline` commands need `--profile` or `AWS_PROFILE`. Drop it on a workstation that submits to more than one monitor.
+* `--enable-auto-login` starts sign-in as soon as the monitor opens, rather than making the artist pick the profile first. Keep it unless you want the picker, since skipping the picker is most of what pre-configuring the profile buys.
 
 On Windows the same profile instead delegates to the monitor executable:
 
@@ -102,9 +107,9 @@ Because the cache path is written into the profile at creation time and lives un
 
 Everything Deadline Cloud does is identical for every DCC, so switching to Maya, Nuke, Houdini, 3ds Max, Cinema 4D, After Effects, or VRED means changing three things, called out in comments in both scripts:
 
-1. **The component name** (`BLENDER_COMPONENT` / `$BlenderComponent`). Run `<installer> --help` for the current `--enable-components` values, such as `deadline_cloud_for_maya` or `deadline_cloud_for_houdini` plus a version component like `houdini_20_5`.
-2. **The Blender install step.** Commercial DCCs need a vendor installer and, in most cases, a license server, so replace that block entirely.
-3. **The add-on enable step.** It is Blender-specific. Other DCCs are wired up by the installer itself or by an environment variable such as `MAYA_MODULE_PATH` or `NUKE_PATH`, so you can often delete it.
+1. **The component names** (`SUBMITTER_COMPONENT` and `BLENDER_COMPONENT`, or `$SubmitterComponent` and `$BlenderComponent`), such as `deadline_cloud_for_houdini` plus `houdini_20_5`. Run `<installer> --help` for the current `--enable-components` values. The `--<dcc>-path` flag is derived from the version component, so it follows automatically.
+2. **The Blender install step.** Commercial DCCs need a vendor installer and, in most cases, a license server, so replace that block entirely. Also update the install prefix constant.
+3. **The add-on enable step.** It is Blender-specific, including the `Submitters/Blender/` paths and the `deadline_cloud_blender_submitter` name it verifies. Other DCCs are wired up by the installer itself or by an environment variable such as `MAYA_MODULE_PATH` or `NUKE_PATH`, so you can often delete it.
 
 Note that the submitter installer's `--<dcc>-path` flag takes the DCC executable on Windows but the install directory on Linux.
 
@@ -128,19 +133,36 @@ The submitter installer puts the `deadline` CLI on `PATH` itself, through `/etc/
 * **Every installer is checksum-verified**, and verification cannot be skipped. If you mirror Blender internally, serve its checksum manifest too and point the mirror constant at it.
 * **Licensing.** Blender is distributed under the GNU GPL. Review its terms for your use.
 * **Cost.** The scripts create no AWS resources. Running the workstation is billable, and jobs submitted from it are billed normally.
-* **Cleanup.** Run `/opt/DeadlineCloudSubmitter/uninstall` or its Windows equivalent, remove the monitor with your package manager or through Windows "Apps & features", and delete the Blender prefix. Then remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`.
+* **Cleanup.** Uninstall the submitter, then the monitor, then delete the Blender prefix:
+
+  ```console
+  # Linux
+  sudo /opt/DeadlineCloudSubmitter/uninstall --mode unattended
+  sudo apt-get remove -y deadline-cloud-monitor
+  sudo rm -rf /opt/blender /usr/local/bin/blender
+
+  # Windows
+  & "C:\Program Files\DeadlineCloudSubmitter\uninstall.exe" --mode unattended
+  Remove-Item -Recurse -Force "C:\Program Files\Blender"
+  ```
+
+  Remove the monitor on Windows through **Settings > Apps > Installed apps**. Then remove the profile stanza from `~/.aws/config` and the `[defaults]` entry from `~/.deadline/config`, and delete the monitor's credential cache (`~/.cache/com.amazonaws.deadline.monitor` on Linux).
 
 ## Troubleshooting
 
 **Blender downloads fail with HTTP 403.** `download.blender.org` rejects some automated clients, so the scripts default to a mirror. Pick another from [mirror.blender.org](https://mirror.blender.org/), or host the archive and its checksum manifest internally.
 
-**The Deadline Cloud menu is missing in Blender.** Add-ons register per user, so confirm the script ran for the right account: the second argument on Linux, or the signed-in account on Windows. To check directly:
+**The Deadline Cloud menu is missing in Blender.** Add-ons register per user, so confirm the script ran for the account that is signing in. On Linux that is the second argument. On Windows it is the account that ran the script. To check, as that same user:
 
 ```console
 blender --background --python-expr 'import bpy; print("deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys())'
 ```
 
-On Windows, call `& 'C:\Program Files\Blender\blender.exe'` instead, since the script does not add Blender to `PATH`.
+On Windows, write the same two lines to a file and pass `--python <file>` instead. Windows PowerShell does not preserve the inner quotes of an expression passed on the command line, so `--python-expr` raises `NameError` there. The script itself uses a file for this reason. Blender is not on `PATH`, so call it by path:
+
+```console
+& 'C:\Program Files\Blender\blender.exe' --background --python C:\Temp\check_addon.py
+```
 
 **Deadline Cloud monitor does not appear in the applications menu.** Its desktop entry declares no menu category, so some desktop environments file it nowhere. Launch it by path instead, or add a launcher of your own:
 
@@ -152,7 +174,10 @@ deadline-cloud-monitor
 & "$env:LOCALAPPDATA\DeadlineCloudMonitor\DeadlineCloudMonitor.exe"
 ```
 
-**The monitor asks for a monitor URL instead of using the profile.** The profile's `monitor_id` is empty, so the monitor dropped the profile from its picker. Check the stanza in `~/.aws/config`, then re-run the script or recreate the profile with a non-empty placeholder as described under [The profile](#the-profile).
+**The monitor asks for a monitor URL instead of using the profile.** The monitor found no usable profile, most often for one of these reasons:
+
+* The profile went to a different account than the one signing in. On Windows, running the script as `SYSTEM` produces exactly that. Check that the stanza is in the signing-in user's own `~/.aws/config` or `%USERPROFILE%\.aws\config`.
+* The profile's `monitor_id` is empty, which makes the monitor drop it from the picker. The scripts always write a non-empty placeholder, so this points to a profile created by hand. Recreate it with a non-empty `--monitor-id` as described under [The profile](#the-profile).
 
 **Submission fails with a credentials error.** Expected until the artist signs in to the monitor once. Check with `deadline auth status`, which reports `NEEDS_LOGIN` before sign-in and `AUTHENTICATED` after.
 
