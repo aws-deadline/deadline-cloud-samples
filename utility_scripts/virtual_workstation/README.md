@@ -25,7 +25,7 @@ Blender stands in for whichever DCC you run. It is used here because it installs
   Deadline Cloud monitor's `.deb` depends on `libwebkit2gtk-4.0-37`, which Ubuntu 24.04 and Debian 13 no longer publish. The Linux script checks for it up front and stops with an explanation rather than failing partway through. On a later release, add a repository that provides the 4.0 build.
 * Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
-* A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images include Microsoft Edge. On Ubuntu 22.04 and later, Firefox and Chromium are published only as snaps, which do not work in every remote-desktop session. Installing Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) gives a working browser.
+* A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images include Microsoft Edge. On Ubuntu 22.04 and later, Firefox and Chromium are published only as snaps, which do not work in every remote-desktop session. Install Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) instead, and add an apt pin so the `.deb` wins over Ubuntu's snap transitional package. Verified on Ubuntu 22.04: the Mozilla `.deb` completes sign-in in a VNC session.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
@@ -52,6 +52,10 @@ Windows, in an elevated PowerShell session **as the artist's own account**. Star
 ```
 
 The monitor, its profile, and Blender's add-on preferences are all per user. Linux writes them for another account with `runuser`, but Windows cannot do so without that account's password, so the Windows script has no equivalent of the second argument.
+
+On Windows, running the script through a mechanism that executes as `SYSTEM` rather than as a user, such as Systems Manager Run Command or an EC2 user data script, writes the profile and Blender preferences into a service profile the artist never logs in to. The artist then sees no pre-configured monitor. Run it as the artist's own account: interactively, or as a scheduled task created with `/RU <artist> /RL HIGHEST`.
+
+After either script finishes, the artist signs in through a desktop session on the machine. The scripts install no desktop or remote-access server, so provide one separately.
 
 ## How it works
 
@@ -82,7 +86,13 @@ monitor_id=pending-first-login
 
 It also points the Deadline Cloud CLI at that profile in `~/.deadline/config`.
 
-The placeholder and empty fields are expected. `create-profile` requires a `--monitor-id`, but the real ID cannot be discovered without AWS credentials, so the scripts pass `pending-first-login`. The monitor replaces it, along with `user_id` and `identity_store_id`, with authoritative values from the portal at the artist's first sign-in. `credential_process` reads a cache file that the same sign-in creates, so the profile yields no credentials until then. That sign-in is the intended remaining step.
+On Windows the same profile instead delegates to the monitor executable:
+
+```ini
+credential_process="C:\Users\artist\AppData\Local\DeadlineCloudMonitor\DeadlineCloudMonitor.exe" get-credentials --profile mystudio-us-west-2
+```
+
+The placeholder and empty fields are expected. `create-profile` requires a `--monitor-id`, but the real ID cannot be discovered without AWS credentials, so the scripts pass `pending-first-login`. The monitor replaces it, along with `user_id` and `identity_store_id`, with authoritative values from the portal at the artist's first sign-in. Either form of `credential_process` yields no credentials until that sign-in happens, so it is the intended remaining step.
 
 The placeholder must be non-empty. An empty `--monitor-id` makes the monitor drop the profile from its picker and fall back to asking for the monitor URL, which defeats the point of pre-configuring it. The value is shown verbatim in the monitor's profile list until first sign-in, so it reads as a status rather than looking like a real ID.
 
@@ -106,7 +116,7 @@ To install more than one DCC, pass a comma-separated `--enable-components` list 
 |---|---|---|
 | Blender | `/opt/blender`, symlinked to `/usr/local/bin/blender` | `C:\Program Files\Blender` |
 | Submitter and Deadline Cloud CLI | `/opt/DeadlineCloudSubmitter` | `C:\Program Files\DeadlineCloudSubmitter` |
-| Monitor | `/usr/bin/deadline-cloud-monitor` | `%LOCALAPPDATA%\DeadlineCloudMonitor` |
+| Monitor | `/usr/bin/deadline-cloud-monitor` (system-wide) | `%LOCALAPPDATA%\DeadlineCloudMonitor` (per user) |
 | AWS profile | `~/.aws/config` | `%USERPROFILE%\.aws\config` |
 | Deadline Cloud CLI config | `~/.deadline/config` | `%USERPROFILE%\.deadline\config` |
 
