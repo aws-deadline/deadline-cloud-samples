@@ -17,16 +17,19 @@ This job bundle uses the [diffusers](https://github.com/huggingface/diffusers)
 Hugging Face at runtime, so nothing is redistributed in this repository.
 
 The job has a single step, `GenerateVideo`, whose task parameter space is
-`1-NumClips`. Workers download the checkpoint once per session into a
-worker-local cache, then render their assigned clips and write MP4 files into
-the output directory.
+`1-NumClips`. Workers download the checkpoint into a cache on the fleet's
+persistent volume, then render their assigned clips and write MP4 files into
+the output directory. Because that volume outlives individual workers, later
+workers reuse the checkpoint instead of downloading it again.
 
 ## Prerequisites
 
 - AWS Deadline Cloud farm with a GPU-enabled Linux queue
 - [Deadline Cloud CLI](https://github.com/aws-deadline/deadline-cloud) installed
 - Worker with an NVIDIA GPU, **24 GB VRAM minimum**, and **64 GiB of system memory**
-- At least 60 GiB of free space on a real (non-tmpfs) disk for the model cache
+- At least 60 GiB free for the model cache. Enabling persistent storage on the
+  fleet is recommended so workers share one download. See
+  [Model cache location](#model-cache-location).
 
 No Hugging Face token is required, because the Wan2.2 repositories are ungated.
 
@@ -63,7 +66,7 @@ Verified end to end on an NVIDIA L4 at both reduced and default settings.
 | `Seed` | -1 | Base seed, offset per clip; -1 derives from clip index |
 | `NegativePrompt` | *(empty)* | Empty uses the tuned default from the model card |
 | `ModelId` | `Wan-AI/Wan2.2-TI2V-5B-Diffusers` | Hugging Face repo ID |
-| `HFCacheDir` | `/var/tmp/wan22_hf_cache` | Worker-local model cache |
+| `HFCacheDir` | *(empty)* | Model cache; empty uses the fleet's persistent volume |
 
 ### Resolution and frame count constraints
 
@@ -90,11 +93,25 @@ near those dimensions gives the best results.
 
 ### Model cache location
 
-`HFCacheDir` must point at a real disk. Deadline Cloud service-managed fleet
-workers mount `/tmp` as a **RAM-backed tmpfs** that is too small for a 34 GiB
-checkpoint. Pointing the cache there fails partway through the download with
-`No space left on device`. The default `/var/tmp/wan22_hf_cache` is on the root
-volume, which has ample space.
+With `HFCacheDir` empty, the script picks the cache location at runtime:
+
+1. The fleet's [persistent volume](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/volumes.html),
+   via the `DEADLINE_PERSISTENT_MOUNT` path Deadline Cloud sets on workers when
+   the fleet has persistent storage enabled. **Prefer this.** Only that volume
+   survives worker replacement, so later workers reuse the checkpoint instead of
+   downloading it again. The default 250 GiB volume is well above the 60 GiB
+   needed here.
+2. Otherwise `/var/tmp/wan22_hf_cache`, which on a Linux service-managed fleet
+   worker is on the root EBS volume. The job runs fine, but that volume is
+   discarded with the worker, so every new worker re-downloads all ~34 GiB. The
+   log names the fallback path when it is used.
+
+Setting `HFCacheDir` to an explicit path overrides both. It needs 60 GiB free on
+a real disk. Not `/tmp`: on a Linux service-managed fleet worker that is a
+RAM-backed tmpfs limited to half of system memory, or about 32 GiB on this job's
+64 GiB worker, so the download dies with `No space left on device`. This follows
+the [Amazon Linux 2023 default](https://docs.aws.amazon.com/linux/al2023/ug/compare-al2-al2023-tmp.html)
+that service-managed fleet workers are built on.
 
 `HFCacheDir` is deliberately a `STRING` rather than a `PATH` parameter so the
 downloaded weights stay out of job attachments and are never uploaded back to
@@ -120,7 +137,7 @@ script also runs standalone:
 ```bash
 WAN_PROMPT="a red fox in a snowy forest" \
 WAN_OUTPUT_DIR=./out \
-WAN_HF_CACHE_DIR=/var/tmp/wan22_hf_cache \
+WAN_HF_CACHE_DIR=~/wan22_hf_cache \
   python generate_video.py --clip-index 1
 ```
 
@@ -188,10 +205,11 @@ memory ceiling during decode. Without it, full-resolution renders complete every
 denoising step and then run out of memory in the VAE.
 
 Because a multi-clip job spreads tasks across workers, wall-clock time for
-`NumClips=8` on eight workers is close to the time for one clip, plus each
-worker's one-time setup. Note that the setup cost is per worker, not per job:
-the cache is local to a worker, so eight workers each download the checkpoint
-once. Tasks that share a worker reuse it and start generating immediately.
+`NumClips=8` on eight workers is close to the time for one clip, plus setup.
+Tasks sharing a worker reuse its cache and start generating immediately. Each
+persistent volume serves one worker at a time, so eight concurrent workers each
+download the checkpoint once. Later workers that pick up a warm volume skip it.
+Without persistent storage, every worker downloads it.
 
 ## Licensing
 
