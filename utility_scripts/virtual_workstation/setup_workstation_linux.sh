@@ -8,16 +8,18 @@
 # then creates a monitor profile so an artist only has to sign in.
 #
 # This is a worked example rather than a general-purpose tool. It targets Ubuntu
-# 22.04, which is the last release carrying the libwebkit2gtk-4.0-37 that
-# Deadline Cloud monitor needs. Edit the constants below for your environment.
-# Run as root during provisioning (EC2 user data, an AMI bake, or by hand).
+# 22.04 on x86-64, which is the last release carrying the libwebkit2gtk-4.0-37
+# that Deadline Cloud monitor needs. Edit the constants below for your
+# environment. Run as root during provisioning (EC2 user data, an AMI bake, or by
+# hand).
 #
 # Usage: setup_workstation_linux.sh MONITOR_URL [WORKSTATION_USER]
 #
 #   MONITOR_URL       https://<subdomain>.<region>.deadlinecloud.amazonaws.com/
 #   WORKSTATION_USER  Account that signs in to the monitor. The profile is written
-#                     to this user's home directory. Defaults to SUDO_USER, or the
-#                     invoking user.
+#                     to this user's home directory. Defaults to SUDO_USER when
+#                     run under sudo. Required otherwise, including under EC2 user
+#                     data and in an AMI bake, where there is no account to infer.
 
 set -euo pipefail
 
@@ -81,9 +83,23 @@ die() { printf '[setup-workstation] ERROR: %s\n' "$*" >&2; exit 1; }
 
 MONITOR_URL="${1:-}"
 [[ -n "$MONITOR_URL" ]] || die "usage: $0 MONITOR_URL [WORKSTATION_USER]"
-WORKSTATION_USER="${2:-${SUDO_USER:-$(id -un)}}"
 
 [[ $EUID -eq 0 ]] || die "run as root: this installs system packages"
+
+# Refuse an implicitly-resolved root, for the same reason the Windows script
+# refuses SYSTEM: the monitor profile and Blender's add-on preferences are both
+# per user, and every check below reads the invoking user's own state. Under EC2
+# user data SUDO_USER is unset, so this would resolve to root, write everything
+# into /root, pass every check, and report success while the artist finds nothing
+# configured. An explicit root is allowed, since naming it makes it a choice --
+# a root-login container or an AMI bake for a single-user image is a real case.
+if [[ -n "${2:-}" ]]; then
+    WORKSTATION_USER="$2"
+else
+    WORKSTATION_USER="${SUDO_USER:-$(id -un)}"
+    [[ "$WORKSTATION_USER" != "root" ]] || die \
+        "no workstation user given and none could be inferred (SUDO_USER is unset, as under EC2 user data or in an AMI bake). The monitor profile and Blender preferences are per user, so they would be written to root's home directory, where no artist signs in. Pass the artist's account: $0 MONITOR_URL ARTIST_USER"
+fi
 
 # The Region segment is required. The monitor accepts a URL without it and then
 # writes a profile with a wrong region, so reject that here instead. Hostnames and
@@ -116,8 +132,16 @@ log "monitor: $MONITOR_SUBDOMAIN in $MONITOR_REGION, profile '$PROFILE_NAME'"
 command -v apt-get >/dev/null 2>&1 \
     || die "this example expects Ubuntu 22.04 (apt-get was not found)"
 
+# Blender's archive, the monitor's .deb, and libssl1.1 are all pinned to x86-64
+# below. On another architecture every download and checksum still succeeds and
+# the binaries then fail to exec, so refuse here rather than after the downloads.
+host_arch="$(uname -m)"
+[[ "$host_arch" == "x86_64" ]] \
+    || die "this example installs x86-64 artifacts only (this host is $host_arch). Substitute your architecture's Blender archive, monitor .deb, and OpenSSL 1.1 package."
+
+# Refresh the package index only, so the checks below can read it. Nothing is
+# installed until every up-front check has passed.
 DEBIAN_FRONTEND=noninteractive apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl xz-utils python3
 
 # Deadline Cloud monitor's .deb depends on libwebkit2gtk-4.0-37, which was
 # dropped after Ubuntu 22.04 in favor of the 4.1 build. Installing
@@ -130,8 +154,26 @@ if [[ -z "$webkit_candidate" || "$webkit_candidate" == "(none)" ]]; then
     die "Deadline Cloud monitor needs libwebkit2gtk-4.0-37, which this image's repositories do not provide. Ubuntu 22.04 carries it; 24.04 replaced it with libwebkit2gtk-4.1-0 and no official repository offers the 4.0 build. Use Ubuntu 22.04, or see the README for installing the submitter without the monitor."
 fi
 
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl xz-utils python3
+
 WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "$WORK_DIR"' EXIT
+
+# Keep the downloads and any installer logs when a run fails, so the failure can
+# be diagnosed, and remove them on success: they total roughly 1 GB. The Windows
+# script does the same.
+# blender_staging is set later and may not exist yet, so test before removing it:
+# "rm -rf" on an empty string is an error on GNU coreutils, and this runs under
+# set -e.
+cleanup() {
+    local status=$?
+    [[ -z "${blender_staging:-}" ]] || rm -rf "$blender_staging"
+    if [[ $status -eq 0 ]]; then
+        rm -rf "$WORK_DIR"
+    else
+        printf '[setup-workstation] downloads and installer logs left in %s\n' "$WORK_DIR" >&2
+    fi
+}
+trap cleanup EXIT
 
 # Download a file and verify it against a published sha256. Verification is not
 # optional: an unreachable checksum is an error, not a reason to skip the check.
@@ -198,16 +240,30 @@ download_verified \
     "${BLENDER_MIRROR}/Blender${blender_series}/blender-${BLENDER_VERSION}.sha256" \
     "$blender_archive"
 
+# Extract to a staging directory and move it into place, so BLENDER_PREFIX only
+# ever exists complete. Extracting into it directly means a run interrupted
+# partway leaves a prefix with no ./blender in it, which the guard below then
+# refuses to delete on every later run, and the script cannot proceed without
+# someone removing the directory by hand.
+#
+# Stage beside the prefix rather than in WORK_DIR, which is under /tmp and may be
+# a different filesystem: then the mv would copy rather than rename, reopening the
+# same window.
+blender_staging="$(mktemp -d "${BLENDER_PREFIX}.staging.XXXXXX")"
+tar -xJf "$WORK_DIR/$blender_archive" -C "$blender_staging" --strip-components=1
+[[ -x "$blender_staging/blender" ]] \
+    || die "the Blender archive did not contain a blender executable"
+
 # Replace any previous install so re-runs are clean. Only ever delete a directory
 # this script created: BLENDER_PREFIX is a constant an administrator edits, and
 # removing it unconditionally as root would destroy whatever it names.
 if [[ -e "$BLENDER_PREFIX" ]]; then
     [[ -x "$BLENDER_PREFIX/blender" ]] \
-        || die "$BLENDER_PREFIX exists but holds no blender executable. Refusing to delete it; check BLENDER_PREFIX."
+        || die "$BLENDER_PREFIX exists but holds no blender executable. Refusing to delete it; check BLENDER_PREFIX, and see Troubleshooting in the README if a previous run was interrupted."
     rm -rf "$BLENDER_PREFIX"
 fi
-mkdir -p "$BLENDER_PREFIX"
-tar -xJf "$WORK_DIR/$blender_archive" -C "$BLENDER_PREFIX" --strip-components=1
+mv "$blender_staging" "$BLENDER_PREFIX"
+blender_staging=""
 ln -sf "$BLENDER_PREFIX/blender" /usr/local/bin/blender
 
 # Run Blender rather than only testing for the file, so one that unpacked but
@@ -217,7 +273,13 @@ ln -sf "$BLENDER_PREFIX/blender" /usr/local/bin/blender
 # substitution inside an argument cannot abort under set -e. The usual cause of a
 # real failure is a server image lacking Blender's X11 and GL libraries.
 if ! blender_output="$("$BLENDER_PREFIX/blender" --version 2>&1)"; then
-    missing="$(ldd "$BLENDER_PREFIX/blender" 2>/dev/null | awk '/not found/ {print $1}' | paste -sd' ' -)"
+    # "|| true" on the ldd itself, not on the whole assignment: ldd exits non-zero
+    # for a binary it cannot even recognize as dynamic, which is exactly the case
+    # this diagnostic exists for -- a wrong-architecture build. Without it, that
+    # status propagates and set -e exits here, before either message is printed.
+    # Keeping the "|| true" narrow leaves a genuine awk or paste failure visible.
+    missing="$( { ldd "$BLENDER_PREFIX/blender" || true; } 2>/dev/null \
+        | awk '/not found/ {print $1}' | paste -sd' ' - )"
     [[ -n "$missing" ]] \
         && die "Blender cannot start: missing shared libraries: $missing. This image has no desktop environment, which this example requires. Install one, or add Blender's dependencies."
     die "Blender installed to $BLENDER_PREFIX but will not run: $(head -1 <<<"$blender_output")"
