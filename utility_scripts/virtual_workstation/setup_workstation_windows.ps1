@@ -78,6 +78,23 @@ $DownloadsBase = "https://downloads.deadlinecloud.amazonaws.com"
 function Write-Step { param([string]$Message) Write-Information "[setup-workstation] $Message" }
 function Write-Fatal { param([string]$Message) throw "[setup-workstation] ERROR: $Message" }
 
+# Run a native command and return its merged stdout and stderr, leaving
+# $LASTEXITCODE for the caller to check.
+#
+# Windows PowerShell 5.1 turns each stderr line from a native command into an
+# error record, which $ErrorActionPreference = "Stop" escalates to a terminating
+# NativeCommandError. A Blender or monitor build that writes an unrelated startup
+# warning to stderr -- a GPU or driver notice, say -- would then fail the script
+# with a .NET error instead of reaching the exit-code check below. Whether that
+# happens depends on the build and the host rather than on anything here, so relax
+# the preference for the duration of the call only.
+function Get-NativeOutput {
+    param([scriptblock]$Command)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & $Command 2>&1 } finally { $ErrorActionPreference = $previous }
+}
+
 # ---------------------------------------------------------------------------
 # Arguments
 # ---------------------------------------------------------------------------
@@ -90,6 +107,14 @@ function Write-Fatal { param([string]$Message) throw "[setup-workstation] ERROR:
 # no artist ever logs in to. Refuse that instead.
 if ([System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
     Write-Fatal "running as SYSTEM. The profile and Blender preferences are per user, so they would be written to a service profile the artist never logs in to. Run this as the artist's own account in an elevated session."
+}
+
+# Blender's archive and the monitor's installer are both pinned to x64 below. On
+# another architecture the downloads and checksums still succeed and the binaries
+# then fail to run, so refuse here rather than after roughly 1 GB of downloads.
+$hostArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+if ($hostArch -ne [System.Runtime.InteropServices.Architecture]::X64) {
+    Write-Fatal "this example installs x64 artifacts only (this host is $hostArch). Substitute your architecture's Blender archive and monitor installer."
 }
 
 # The Region segment is required. The monitor accepts a URL without it and then
@@ -178,25 +203,43 @@ Get-VerifiedFile -Uri "$BlenderMirror/Blender$blenderSeries/$blenderArchive" -Ou
     -ChecksumUri "$BlenderMirror/Blender$blenderSeries/blender-$BlenderVersion.sha256" `
     -MatchName $blenderArchive
 
+# Expand to a staging directory beside the prefix, then move it into place, so
+# $BlenderPrefix only ever exists complete. A run interrupted partway through
+# would otherwise leave a prefix with no blender.exe in it, which the guard below
+# then refuses to delete on every later run, leaving the script stuck until
+# someone removes the directory by hand.
+#
+# Stage beside the prefix rather than in $WorkDir, which is under %TEMP% and is
+# usually on the same volume but need not be: a cross-volume Move-Item copies
+# rather than renames, which reopens the same window.
+$extractDir = "$BlenderPrefix.staging"
+if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
+Expand-Archive -Path $blenderZip -DestinationPath $extractDir -Force
+
+# The archive contains a single blender-<version>-windows-x64\ directory. Capture
+# it and check it before the move: with no directory, .FullName is $null and
+# Move-Item throws a parameter-binding error under $ErrorActionPreference = "Stop"
+# before any message here could explain what went wrong.
+$extracted = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1
+if (-not $extracted) {
+    Write-Fatal "the Blender archive did not expand to a top-level directory in $extractDir"
+}
+if (-not (Test-Path (Join-Path $extracted.FullName "blender.exe"))) {
+    Write-Fatal "the Blender archive did not contain blender.exe"
+}
+
 # Replace any previous install so re-runs are clean. Only ever delete a directory
 # this script created: $BlenderPrefix is a constant an administrator edits, and
 # removing it unconditionally as an administrator would destroy whatever it names.
 if (Test-Path $BlenderPrefix) {
     if (-not (Test-Path (Join-Path $BlenderPrefix "blender.exe"))) {
-        Write-Fatal "$BlenderPrefix exists but holds no blender.exe. Refusing to delete it; check `$BlenderPrefix."
+        Write-Fatal "$BlenderPrefix exists but holds no blender.exe. Refusing to delete it; check `$BlenderPrefix, and see Troubleshooting in the README if a previous run was interrupted."
     }
     Remove-Item -Recurse -Force $BlenderPrefix
 }
-$extractDir = Join-Path $WorkDir "blender-extract"
-if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
-Expand-Archive -Path $blenderZip -DestinationPath $extractDir -Force
-
-# The archive contains a single blender-<version>-windows-x64\ directory.
-Move-Item -Path (Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1).FullName -Destination $BlenderPrefix
+Move-Item -Path $extracted.FullName -Destination $BlenderPrefix
+Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
 $blenderExe = Join-Path $BlenderPrefix "blender.exe"
-if (-not (Test-Path $blenderExe)) {
-    Write-Fatal "expected blender.exe at $blenderExe after extraction"
-}
 
 # Run Blender rather than only testing for the file, so one that unpacked but
 # cannot start fails here instead of during the add-on step with a vaguer error.
@@ -204,7 +247,7 @@ if (-not (Test-Path $blenderExe)) {
 # upstream pipeline once it has its object, which can terminate a still-running
 # native command and leave $LASTEXITCODE reflecting that rather than Blender's own
 # exit. Same reason the Linux script does not pipe into head.
-$blenderOutput = (& $blenderExe --version 2>&1)
+$blenderOutput = Get-NativeOutput { & $blenderExe --version }
 if ($LASTEXITCODE -ne 0) {
     Write-Fatal "Blender installed to $BlenderPrefix but will not run: $($blenderOutput | Select-Object -First 1)"
 }
@@ -261,9 +304,11 @@ $addonScript = Join-Path $SubmitterPrefix "Submitters\Blender\add_submitter_to_p
 $addonPath = Join-Path $SubmitterPrefix "Submitters\Blender\python"
 
 Write-Step "enabling the Blender add-on"
-& $blenderExe --background --python $addonScript -- --deadline_cloud_install_path $addonPath | Out-Null
+$addonOutput = Get-NativeOutput {
+    & $blenderExe --background --python $addonScript -- --deadline_cloud_install_path $addonPath
+}
 if ($LASTEXITCODE -ne 0) {
-    Write-Fatal "failed to enable the Blender add-on (exit code $LASTEXITCODE)"
+    Write-Fatal "failed to enable the Blender add-on (exit code $LASTEXITCODE): $($addonOutput | Out-String)"
 }
 
 # Confirm from Blender's preferences rather than trusting the exit code. Use a
@@ -276,7 +321,7 @@ import sys
 
 sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)
 '@
-& $blenderExe --background --python $checkScript | Out-Null
+Get-NativeOutput { & $blenderExe --background --python $checkScript } | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Fatal "the Blender add-on did not register in Blender preferences"
 }
@@ -340,19 +385,28 @@ Write-Step "monitor installed: $monitorBin"
 $monitorIdPlaceholder = "pending-first-login"
 
 Write-Step "creating monitor profile '$ProfileName'"
-$profileOutput = & $monitorBin create-profile `
-    --profile $ProfileName `
-    --monitor-id $monitorIdPlaceholder `
-    --monitor-url $MonitorUrl `
-    --enable-auto-login `
-    --set-as-deadline-default 2>&1 | Out-String
+$profileOutput = Get-NativeOutput {
+    & $monitorBin create-profile `
+        --profile $ProfileName `
+        --monitor-id $monitorIdPlaceholder `
+        --monitor-url $MonitorUrl `
+        --enable-auto-login `
+        --set-as-deadline-default
+} | Out-String
 
 # create-profile exits 0 even when it fails, so confirm from its output and then
 # from the file it should have written.
 if ($profileOutput -notmatch [regex]::Escape("Created profile $ProfileName")) {
     Write-Fatal "failed to create the monitor profile: $profileOutput"
 }
+
+# Test for the file before reading it: Select-String on a missing path throws
+# ItemNotFoundException under $ErrorActionPreference = "Stop", so the message
+# below would never be reached when create-profile wrote nothing at all.
 $awsConfig = Join-Path $env:USERPROFILE ".aws\config"
+if (-not (Test-Path $awsConfig)) {
+    Write-Fatal "profile $ProfileName is missing from $awsConfig (the file does not exist)"
+}
 if (-not (Select-String -Path $awsConfig -SimpleMatch -Pattern "[profile $ProfileName]" -Quiet)) {
     Write-Fatal "profile $ProfileName is missing from $awsConfig"
 }
