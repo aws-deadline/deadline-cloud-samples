@@ -174,6 +174,22 @@ Remove-Item -Recurse -Force "C:\Program Files\Blender"
 
 Runs interrupted after this point do not recur: Blender is now unpacked to a staging directory beside the prefix and moved into place, so the prefix only ever exists complete.
 
+**The add-on step fails with `qtpy.QtBindingsNotFoundError: No Qt bindings could be found`.** The bindings are present: the submitter bundles PySide6. That message is `qtpy` reporting an `ImportError` it could not attribute, and the real cause is a system library that PySide6 links against and this image does not have. On a minimal Ubuntu 22.04 image, this is the set:
+
+```console
+sudo apt-get install -y libglib2.0-0 libfontconfig1 libfreetype6 \
+    libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+    libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xkb1
+```
+
+To see the actual cause rather than the `qtpy` summary, run `ldd` over the bundled Qt and look for `not found`:
+
+```console
+ldd /opt/DeadlineCloudSubmitter/Submitters/Blender/python/modules/PySide6/QtCore.abi3.so | grep "not found"
+```
+
+Ignore the `libQt6*.so.6` entries there: those resolve within the bundle at load time. A full desktop environment provides all of these, which is why this only appears on an image that has none. It is the same class of failure as Blender's own missing X11 and GL libraries, which the script reports directly.
+
 **The Deadline Cloud menu is missing in Blender.** Add-ons register per user, so confirm the script ran for the account that is signing in. On Linux that is the second argument. On Windows it is the account that ran the script. To check, as that same user:
 
 ```console

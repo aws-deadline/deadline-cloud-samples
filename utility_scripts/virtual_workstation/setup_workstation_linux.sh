@@ -254,6 +254,13 @@ tar -xJf "$WORK_DIR/$blender_archive" -C "$blender_staging" --strip-components=1
 [[ -x "$blender_staging/blender" ]] \
     || die "the Blender archive did not contain a blender executable"
 
+# mktemp -d creates the directory 0700 and mv preserves that, which would leave
+# every account but root unable to even traverse the prefix -- so the artist's
+# add-on step would fail with "Permission denied". Blender is a system-wide
+# install that every user runs, so widen it to the 0755 that mkdir would have
+# produced under the usual umask.
+chmod 755 "$blender_staging"
+
 # Replace any previous install so re-runs are clean. Only ever delete a directory
 # this script created: BLENDER_PREFIX is a constant an administrator edits, and
 # removing it unconditionally as root would destroy whatever it names.
@@ -340,18 +347,22 @@ log "submitter installed at $SUBMITTER_PREFIX"
 addon_script="$SUBMITTER_PREFIX/Submitters/Blender/add_submitter_to_pref.py"
 addon_path="$SUBMITTER_PREFIX/Submitters/Blender/python"
 
+# Capture the output and report it on failure. Discarding it leaves the operator
+# with "failed to enable the Blender add-on" and nothing to act on, when the
+# actual cause is in the message -- a prefix the artist cannot execute, say.
 log "enabling the Blender add-on for $WORKSTATION_USER"
-runuser -u "$WORKSTATION_USER" -- env HOME="$USER_HOME" \
-    "$BLENDER_PREFIX/blender" --background --python "$addon_script" \
-    -- --deadline_cloud_install_path "$addon_path" >/dev/null \
-    || die "failed to enable the Blender add-on"
+addon_output="$(
+    runuser -u "$WORKSTATION_USER" -- env HOME="$USER_HOME" \
+        "$BLENDER_PREFIX/blender" --background --python "$addon_script" \
+        -- --deadline_cloud_install_path "$addon_path" 2>&1
+)" || die "failed to enable the Blender add-on: $addon_output"
 
 # Confirm from Blender's preferences rather than trusting the exit code.
-runuser -u "$WORKSTATION_USER" -- env HOME="$USER_HOME" \
-    "$BLENDER_PREFIX/blender" --background --python-expr \
-    'import bpy, sys; sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)' \
-    >/dev/null 2>&1 \
-    || die "the Blender add-on did not register in $WORKSTATION_USER's preferences"
+verify_output="$(
+    runuser -u "$WORKSTATION_USER" -- env HOME="$USER_HOME" \
+        "$BLENDER_PREFIX/blender" --background --python-expr \
+        'import bpy, sys; sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)' 2>&1
+)" || die "the Blender add-on did not register in $WORKSTATION_USER's preferences: $verify_output"
 log "Blender add-on enabled"
 
 # ---------------------------------------------------------------------------
