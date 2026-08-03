@@ -68,6 +68,14 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    # Every step here needs bash, and in a bare container Actions does not pick it
+    # by default -- it resolves "sh -e {0}", where "set -o pipefail" fails with
+    # "Illegal option". Declaring it once at the job level covers every step
+    # rather than each one repeating it. The bootstrap step below overrides this
+    # back to sh, because bash does not exist yet when it runs.
+    defaults:
+      run:
+        shell: bash
     steps:
       # A container job has no git for actions/checkout, and the sample documents
       # a desktop environment as a prerequisite it deliberately does not install.
@@ -87,10 +95,9 @@ jobs:
       # ImportError as "No Qt bindings could be found" -- a message that sends you
       # looking for a missing PySide6 that is in fact present and bundled. The
       # sample's README documents this under Troubleshooting.
-      # shell: sh, not the default. A bare ubuntu:22.04 image has no bash on the
-      # runner's PATH when this first step runs, so Actions falls back to
-      # "sh -e {0}" and a "set -o pipefail" here fails with "Illegal option".
-      # Every later step can use the default, because bash is installed below.
+      # shell: sh overrides the job default, because this step is what installs
+      # bash: the image has none on the runner's PATH until it finishes. Hence
+      # "set -eu" rather than "set -euo pipefail", which sh rejects.
       - name: Install the prerequisites the sample documents
         shell: sh
         run: |

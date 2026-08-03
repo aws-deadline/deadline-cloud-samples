@@ -385,19 +385,40 @@ Write-Step "monitor installed: $monitorBin"
 $monitorIdPlaceholder = "pending-first-login"
 
 Write-Step "creating monitor profile '$ProfileName'"
-$profileOutput = Get-NativeOutput {
-    & $monitorBin create-profile `
+
+# Keep this call as a direct pipeline into Out-String rather than routing it
+# through Get-NativeOutput like the Blender calls above. DeadlineCloudMonitor.exe
+# is a GUI-subsystem binary, and PowerShell does not wait for one of those: it is
+# the pipe here that forces the wait and collects the output. Wrapping it in a
+# scriptblock loses that, and the call returns instantly with nothing captured, so
+# the "Created profile" check below fails on an empty string against a profile
+# that may or may not have been written.
+#
+# The 5.1 stderr concern that Get-NativeOutput exists for still applies, so relax
+# $ErrorActionPreference around just this call instead, in a finally so it is
+# restored even when the pipeline throws.
+$previousEap = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $profileOutput = & $monitorBin create-profile `
         --profile $ProfileName `
         --monitor-id $monitorIdPlaceholder `
         --monitor-url $MonitorUrl `
         --enable-auto-login `
-        --set-as-deadline-default
-} | Out-String
+        --set-as-deadline-default 2>&1 | Out-String
+}
+finally {
+    $ErrorActionPreference = $previousEap
+}
 
 # create-profile exits 0 even when it fails, so confirm from its output and then
-# from the file it should have written.
+# from the file it should have written. Report whether the file appeared either
+# way: "no output" and "no output but the profile is there" are different faults,
+# and the difference is what says whether the command ran at all.
 if ($profileOutput -notmatch [regex]::Escape("Created profile $ProfileName")) {
-    Write-Fatal "failed to create the monitor profile: $profileOutput"
+    $configPath = Join-Path $env:USERPROFILE ".aws\config"
+    $configState = if (Test-Path $configPath) { "$configPath exists" } else { "$configPath does not exist" }
+    Write-Fatal "failed to create the monitor profile ($configState). Output was: '$($profileOutput.Trim())'"
 }
 
 # Test for the file before reading it: Select-String on a missing path throws
