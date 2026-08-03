@@ -1,0 +1,273 @@
+name: Virtual Workstation Checks
+
+# Runs the utility_scripts/virtual_workstation/ sample end to end on both
+# platforms, so a change to it is proven to still produce a working workstation
+# rather than only to still parse.
+#
+# This lives in its own workflow rather than in static_checks.yml because those
+# checks are deliberately offline and fast, whereas this one installs system
+# packages and downloads roughly 1 GB per platform from three third-party
+# endpoints.
+#
+# Keep this job out of the repository's required status checks, for two reasons:
+# a path-filtered run reports no status at all rather than success, and every
+# artifact comes from an endpoint (mirror.blender.org, archive.ubuntu.com,
+# downloads.deadlinecloud.amazonaws.com) that can be unavailable for reasons
+# unrelated to a pull request.
+#
+# The weekly schedule is the main point of the cron: the scripts resolve "latest"
+# from the submitter manifest and from dcm/latest, so a new submitter or monitor
+# release can break this sample with no change in this repository.
+#
+# The two path lists below are duplicated rather than shared with a YAML anchor,
+# because GitHub Actions does not support anchors in workflow files. Keep them in
+# sync.
+on:
+  pull_request:
+    branches: ["mainline"]
+    paths:
+      - "utility_scripts/virtual_workstation/**"
+      - ".github/workflows/virtual_workstation_checks.yml"
+  push:
+    branches: ["mainline"]
+    paths:
+      - "utility_scripts/virtual_workstation/**"
+      - ".github/workflows/virtual_workstation_checks.yml"
+  schedule:
+    - cron: "23 9 * * 2"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: virtual-workstation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Shape-valid but nonexistent. create-profile does not contact the monitor URL,
+  # and the scripts call no AWS APIs, so no real monitor and no credentials are
+  # needed. A nonexistent subdomain is the stronger test: it proves the profile is
+  # written from the URL alone.
+  MONITOR_URL: "https://ci-example.us-west-2.deadlinecloud.amazonaws.com/"
+  PROFILE_NAME: "ci-example-us-west-2"
+
+jobs:
+  linux:
+    name: Ubuntu 22.04
+    runs-on: ubuntu-latest
+    # The sample pins Ubuntu 22.04, the last release carrying the
+    # libwebkit2gtk-4.0-37 that Deadline Cloud monitor depends on. Test it in a
+    # container rather than on the ubuntu-22.04 runner label, which began
+    # deprecation in September 2026 and is unsupported after April 2027. The
+    # container keeps this testing the distribution the sample actually claims.
+    #
+    # Pinned by digest, like every action in this repository. The tag is kept in
+    # the comment because the digest alone says nothing about which release it is.
+    # ubuntu:22.04 as of 2026-08-03.
+    container: ubuntu@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      # A container job has no git for actions/checkout, and the sample documents
+      # a desktop environment as a prerequisite it deliberately does not install.
+      # Blender's X11 and GL libraries stand in for that here: this is CI setup,
+      # not something the sample should be doing on a real workstation.
+      - name: Install the prerequisites the sample documents
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            git sudo ca-certificates \
+            libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxext6 \
+            libxkbcommon0 libsm6 libice6 libgl1 libegl1 libglu1-mesa libdbus-1-3
+
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # These all fail before any download, so run them first: a broken guard is
+      # reported in seconds rather than after a 1 GB install.
+      - name: Argument validation refuses bad input
+        working-directory: utility_scripts/virtual_workstation
+        run: |
+          set -uo pipefail
+          expect_failure() {
+            local why="$1"
+            shift
+            if ./setup_workstation_linux.sh "$@" >/dev/null 2>&1; then
+              echo "::error::expected a failure but the script succeeded: $why"
+              exit 1
+            fi
+            echo "refused as expected: $why"
+          }
+          expect_failure "no arguments"
+          expect_failure "no Region segment" "https://mystudio.deadlinecloud.amazonaws.com/"
+          expect_failure "scheme is not https" "http://mystudio.us-west-2.deadlinecloud.amazonaws.com/"
+          expect_failure "wrong domain" "https://mystudio.us-west-2.example.com/"
+          expect_failure "user does not exist" "$MONITOR_URL" "nosuchuser"
+          # A container job runs as root with SUDO_USER unset, which is the exact
+          # shape of the EC2 user data case: the script must refuse rather than
+          # configure root and report success.
+          expect_failure "implicit root with no workstation user" "$MONITOR_URL"
+
+      - name: Create the artist account
+        run: useradd --create-home artist
+
+      - name: Run the setup script
+        working-directory: utility_scripts/virtual_workstation
+        run: ./setup_workstation_linux.sh "$MONITOR_URL" artist
+
+      # Assert against the machine rather than trusting the script's own output:
+      # the script self-verifies, so a check of its exit code alone proves little.
+      - name: Verify the workstation independently
+        run: |
+          set -euo pipefail
+
+          echo "::group::Blender runs"
+          /opt/blender/blender --version
+          test -x /usr/local/bin/blender
+          echo "::endgroup::"
+
+          echo "::group::the add-on is registered for the artist"
+          sudo -u artist -H /opt/blender/blender --background --python-expr \
+            'import bpy, sys; sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)'
+          echo "::endgroup::"
+
+          echo "::group::the CLI is on the artist's login PATH"
+          # A login shell, because the submitter installs its PATH entry via
+          # /etc/profile.d/deadline.sh rather than into the running shell.
+          sudo -u artist -H bash -lc 'deadline --version'
+          echo "::endgroup::"
+
+          echo "::group::the profile is complete"
+          config=/home/artist/.aws/config
+          grep -qF "[profile ${PROFILE_NAME}]" "$config"
+          grep -qE '^region[[:space:]]*=[[:space:]]*us-west-2$' "$config"
+          # A non-empty monitor_id is the whole point: an empty one makes the
+          # monitor drop the profile from its picker and ask for the URL instead.
+          grep -qE '^monitor_id[[:space:]]*=[[:space:]]*.+$' "$config"
+          test "$(stat -c '%U' "$config")" = artist
+          echo "::endgroup::"
+
+          echo "::group::auth status reports NEEDS_LOGIN"
+          sudo -u artist -H bash -lc 'deadline auth status' | tee /tmp/auth-status
+          grep -q NEEDS_LOGIN /tmp/auth-status
+          echo "::endgroup::"
+
+      # The script replaces an existing install, so a second run must succeed
+      # too. This is also what catches a regression in the Blender prefix guard.
+      - name: Re-run for idempotency
+        working-directory: utility_scripts/virtual_workstation
+        run: ./setup_workstation_linux.sh "$MONITOR_URL" artist
+
+      - name: Verify the profile survived the re-run
+        run: grep -qF "[profile ${PROFILE_NAME}]" /home/artist/.aws/config
+
+  windows:
+    name: Windows Server 2022 (${{ matrix.shell }})
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # "powershell" is Windows PowerShell 5.1 and "pwsh" is PowerShell 7. The
+        # two differ in ways this script depends on: whether a native command's
+        # stderr under $ErrorActionPreference = "Stop" becomes a terminating
+        # NativeCommandError, and whether Invoke-WebRequest returns Content as a
+        # Byte[] or a String. 5.1 is the shell an artist gets by default on a
+        # Windows workstation and cannot be tested on a developer's macOS machine,
+        # so it is the more valuable of the two here.
+        shell: [powershell, pwsh]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Argument validation refuses bad input
+        shell: ${{ matrix.shell }}
+        working-directory: utility_scripts/virtual_workstation
+        run: |
+          $cases = @(
+            @{ Why = "no Region segment"; Url = "https://mystudio.deadlinecloud.amazonaws.com/" },
+            @{ Why = "scheme is not https"; Url = "http://mystudio.us-west-2.deadlinecloud.amazonaws.com/" },
+            @{ Why = "wrong domain"; Url = "https://mystudio.us-west-2.example.com/" },
+            @{ Why = "not a URL at all"; Url = "mystudio" }
+          )
+          foreach ($case in $cases) {
+            # A separate process per case: the script throws, and #Requires plus
+            # the throw would otherwise end this step at the first case.
+            & (Get-Process -Id $PID).Path -NoProfile -File .\setup_workstation_windows.ps1 $case.Url *> $null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Output "::error::expected a failure but the script succeeded: $($case.Why)"
+              exit 1
+            }
+            Write-Output "refused as expected: $($case.Why)"
+          }
+
+      - name: Run the setup script
+        shell: ${{ matrix.shell }}
+        working-directory: utility_scripts/virtual_workstation
+        run: .\setup_workstation_windows.ps1 $env:MONITOR_URL
+
+      - name: Verify the workstation independently
+        shell: ${{ matrix.shell }}
+        run: |
+          $blender = "C:\Program Files\Blender\blender.exe"
+
+          Write-Output "::group::Blender runs"
+          & $blender --version
+          if ($LASTEXITCODE -ne 0) { throw "Blender did not run" }
+          Write-Output "::endgroup::"
+
+          Write-Output "::group::the add-on is registered"
+          # A script file rather than --python-expr: PowerShell does not preserve
+          # the inner quotes of an expression passed on the command line.
+          Set-Content -Path check_addon.py -Encoding ASCII -Value @'
+          import bpy
+          import sys
+
+          sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)
+          '@
+          & $blender --background --python check_addon.py | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "the Blender add-on is not registered" }
+          Write-Output "::endgroup::"
+
+          Write-Output "::group::the profile is complete"
+          $config = Join-Path $env:USERPROFILE ".aws\config"
+          if (-not (Select-String -Path $config -SimpleMatch -Quiet -Pattern "[profile $env:PROFILE_NAME]")) {
+            throw "the profile stanza is missing from $config"
+          }
+          if (-not (Select-String -Path $config -Quiet -Pattern '^region\s*=\s*us-west-2$')) {
+            throw "the profile has the wrong region"
+          }
+          if (-not (Select-String -Path $config -Quiet -Pattern '^monitor_id\s*=\s*.+$')) {
+            throw "monitor_id is empty, so the monitor would drop the profile from its picker"
+          }
+          Write-Output "::endgroup::"
+
+          Write-Output "::group::the temporary downloads were removed"
+          $workDir = Join-Path $env:TEMP "deadline-workstation-setup"
+          if (Test-Path $workDir) { throw "$workDir survived a successful run" }
+          Write-Output "::endgroup::"
+
+      - name: Re-run for idempotency
+        shell: ${{ matrix.shell }}
+        working-directory: utility_scripts/virtual_workstation
+        run: .\setup_workstation_windows.ps1 $env:MONITOR_URL
+
+      # The script keeps its downloads on failure precisely so the installer logs
+      # survive, so collect them when there is something to collect.
+      - name: Collect installer logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installer-logs-${{ matrix.shell }}
+          path: ${{ runner.temp }}\deadline-workstation-setup
+          if-no-files-found: ignore
+          retention-days: 7
