@@ -25,27 +25,34 @@ Blender stands in for whichever DCC you run. It is used here because it installs
   Deadline Cloud monitor's `.deb` depends on `libwebkit2gtk-4.0-37`, which Ubuntu 24.04 no longer publishes; it carries `libwebkit2gtk-4.1-0` instead, and no official repository offers the 4.0 build for it. That is why this example pins Ubuntu 22.04. The Linux script checks for the package up front and stops with an explanation rather than failing partway through.
 
   On a newer release, install the submitter without the monitor and authenticate a different way. `deadline auth login` is not an alternative, because it drives the monitor and only accepts profiles the monitor created. Use an ordinary AWS credential source instead, such as an IAM Identity Center profile created with `aws configure sso` or an instance profile, and delete the monitor and profile steps from the script. The artist then signs in through that mechanism rather than the monitor, so what this sample pre-configures no longer applies.
-* Administrator access: `root` on Linux, an elevated PowerShell session on Windows.
+* An x86-64 host. Blender's archive, Deadline Cloud monitor, and the `libssl1.1` package the Linux script fetches are all pinned to x86-64 here, so an arm64 instance such as Graviton needs those three substituted. Both scripts check the architecture up front and stop before downloading anything.
+* Administrator access, and on Windows it has to be **the artist's own account**. The Windows script must run elevated *as* the account that signs in, because Windows cannot write another user's per-user state without that user's password, and it refuses to run as `SYSTEM` for the same reason. That account therefore has to be able to elevate, which in practice means membership in the local `Administrators` group. Linux only needs `root`, since it writes the per-user state with `runuser`.
+
+  If your artists are standard users who cannot elevate, split the Windows script in two. Run the Blender, submitter, and monitor installers under any administrator account, then run only the add-on enable step and `create-profile` as the artist, unelevated: the monitor installs per user into `%LOCALAPPDATA%`, and `create-profile` writes to `%USERPROFILE%`, so neither of those steps needs elevation.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
 * A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images normally include Microsoft Edge, so nothing extra is needed there. On Ubuntu 22.04 and later, `apt install firefox` gets a transitional package that installs the Firefox snap, and snaps do not work in every remote-desktop session. Install Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) instead, and add an apt pin so the `.deb` wins over Ubuntu's snap transitional package. Verified on Ubuntu 22.04: the Mozilla `.deb` completes sign-in in a VNC session.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
 * No AWS credentials. The scripts call no AWS APIs.
 
-The Linux script was written and tested against Ubuntu 22.04 only. Other Debian-family releases are likely to work, since the script uses nothing Ubuntu-specific beyond `apt-get` and the `libssl1.1` package it fetches. On a non-Debian distribution, replace the `apt-get` calls, install the monitor from its `.rpm` rather than the `.deb`, and satisfy OpenSSL 1.1 the way that distribution expects.
+The Linux script was written and tested against Ubuntu 22.04 on x86-64 only. Other Debian-family releases are likely to work, since the script uses nothing Ubuntu-specific beyond `apt-get` and the `libssl1.1` package it fetches. On a non-Debian distribution, replace the `apt-get` calls, install the monitor from its `.rpm` rather than the `.deb`, and satisfy OpenSSL 1.1 the way that distribution expects.
+
+Both scripts are also exercised end to end in CI by [`virtual_workstation_checks.yml`](../../.github/workflows/virtual_workstation_checks.yml), on Ubuntu 22.04 and on Windows Server 2022 under both Windows PowerShell 5.1 and PowerShell 7, whenever this sample changes and once a week. The weekly run is what catches a new submitter or monitor release breaking the sample, since both are resolved as "latest" rather than pinned.
 
 ## Run
 
-Linux, as root:
+Linux, as root. Under `sudo` the artist's account is inferred from `SUDO_USER`:
 
 ```console
 sudo ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 ```
 
-When provisioning runs as `root` but a different account signs in, name that account:
+Name the account explicitly when provisioning runs as `root` with nothing to infer from, which includes EC2 user data and an AMI bake. **The second argument is required there**, and the script refuses to run without it rather than configuring `root`:
 
 ```console
-sudo ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/ artist
+./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/ artist
 ```
+
+The refusal exists because every check in the script reads the invoking user's own state, so a run that configured `root` would pass all of them and report success while the artist found nothing set up. Pass `root` explicitly if that genuinely is the account that signs in, as on a single-user image.
 
 Windows, in an elevated PowerShell session **as the artist's own account**. Start PowerShell with **Run as administrator** first: the script declares `#Requires -RunAsAdministrator`, so launching it from an unelevated shell fails with `ScriptRequiresElevation` rather than prompting.
 
@@ -154,6 +161,18 @@ The submitter installer puts the `deadline` CLI on `PATH` itself. On Linux it wr
 ## Troubleshooting
 
 **Blender downloads fail with HTTP 403.** `download.blender.org` rejects some automated clients, so the scripts default to a mirror. Pick another from [mirror.blender.org](https://mirror.blender.org/), or host the archive and its checksum manifest internally.
+
+**The script stops with "exists but holds no blender executable."** A previous run was interrupted partway through installing Blender, leaving the prefix incomplete. The guard refuses to delete a prefix it cannot recognize as one of its own, because that constant is meant to be edited and deleting it unconditionally as root would destroy whatever it names. Confirm the path is the one you intended, then remove it and re-run:
+
+```console
+# Linux
+sudo rm -rf /opt/blender
+
+# Windows
+Remove-Item -Recurse -Force "C:\Program Files\Blender"
+```
+
+Runs interrupted after this point do not recur: Blender is now unpacked to a staging directory beside the prefix and moved into place, so the prefix only ever exists complete.
 
 **The Deadline Cloud menu is missing in Blender.** Add-ons register per user, so confirm the script ran for the account that is signing in. On Linux that is the second argument. On Windows it is the account that ran the script. To check, as that same user:
 

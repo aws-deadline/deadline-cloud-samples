@@ -44,10 +44,11 @@ See the [sample README](upload_to_job_attachments/) for installation, permission
 Example scripts for Linux and Windows prepare a workstation for Deadline Cloud submission. Each one installs Blender, then installs the Deadline Cloud submitter and monitor through their silent installers. It finishes by creating a monitor profile non-interactively, so an artist only has to sign in.
 
 ```console
-# Linux, as root
+# Linux, as root. Add the artist's account when there is no SUDO_USER to infer,
+# as under EC2 user data.
 sudo virtual_workstation/setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 
-# Windows, in an elevated PowerShell session
+# Windows, in an elevated PowerShell session as the artist's own account
 .\virtual_workstation\setup_workstation_windows.ps1 https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 ```
 

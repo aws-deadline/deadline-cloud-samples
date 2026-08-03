@@ -29,6 +29,7 @@ suite. To run locally, install the tools listed in
 |------|------|-------|
 | Open Job Description job & environment templates | `test_openjd_templates.py` | Every standalone template with an OpenJD `specificationVersion` passes `openjd check`. |
 | Host configuration scripts | `test_host_configuration_scripts.py` | Byte length is within the Deadline Cloud service limit (`HostConfiguration.scriptBody` max **15000**). Linux (`*.sh`) scripts pass `bash -n`, and Windows (`*.ps1`) scripts parse with the PowerShell parser. |
+| Utility scripts | `test_utility_scripts.py` | Linux (`*.sh`) scripts pass `bash -n`, and Windows (`*.ps1`) scripts parse with the PowerShell parser. Unlike a host configuration script, these are run by an administrator on a workstation rather than uploaded to the service, so no `scriptBody` length limit applies to them. Some are additionally run end to end in their own workflow; see [Beyond parsing](#beyond-parsing). |
 | Queue environments | `test_openjd_templates.py` | Serialized `environment-2023-09` templates are within the service limit for `EnvironmentTemplate` (max **15000**). |
 | CloudFormation templates | `test_cloudformation.py` | Templates parse as CloudFormation YAML (intrinsic tags such as `!Sub`/`!Ref` supported) and pass `cfn-lint` (errors only). |
 | CDK apps | `test_cdk.py` | A queue environment copied into a CDK app is byte-identical to its original under `queue_environments/`. Everything else about a CDK app is proven by building it. See [Why so little here for CDK?](#why-so-little-here-for-cdk) |
@@ -41,6 +42,21 @@ check substitutes a syntactically valid dummy checksum into a temporary copy
 before rendering. The full recipe is still validated, and only the
 intentionally-blank checksum field is normalized. Genuinely invalid recipes
 (unknown fields, bad structure) still fail.
+
+### Beyond parsing
+
+Parsing is the most this offline suite can prove about a script it must not run:
+these install system packages and download roughly 1 GB, so executing one here
+would defeat the "fast and offline" property the whole suite depends on.
+
+Where a script is worth proving further, that belongs in its own workflow. The
+[virtual workstation](../utility_scripts/virtual_workstation/) sample is run end
+to end by
+[`virtual_workstation_checks.yml`](../.github/workflows/virtual_workstation_checks.yml)
+on Ubuntu 22.04 and Windows Server 2022, which asserts against the resulting
+machine rather than against the script's own output. It is path-filtered to that
+sample and also runs weekly, because the submitter and monitor it installs are
+resolved as "latest" and can change with no commit here.
 
 ### Why so little here for CDK?
 
