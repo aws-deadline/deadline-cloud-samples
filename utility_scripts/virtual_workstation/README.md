@@ -9,7 +9,7 @@ Treat each script as a worked example to copy and adapt. Each takes one argument
 How to complete the workstation setup that normally requires a person clicking through installers and a monitor sign-in dialog:
 
 * Installing Blender from an official release archive.
-* Installing the Deadline Cloud submitter with its silent installer, resolved from the published submitter manifest.
+* Installing the Deadline Cloud submitter with its silent installer.
 * Enabling the submitter's Blender add-on, which the silent installer alone does not do.
 * Installing Deadline Cloud monitor.
 * Creating a monitor profile non-interactively with `deadline-cloud-monitor create-profile`, so the profile exists before anyone signs in.
@@ -25,7 +25,7 @@ Blender stands in for whichever DCC you run. It is used here because it installs
   Deadline Cloud monitor's `.deb` depends on `libwebkit2gtk-4.0-37`, which Ubuntu 24.04 no longer publishes; it carries `libwebkit2gtk-4.1-0` instead, and no official repository offers the 4.0 build for it. That is why this example pins Ubuntu 22.04. The Linux script checks for the package up front and stops with an explanation rather than failing partway through.
 
   On a newer release, install the submitter without the monitor and authenticate a different way. `deadline auth login` is not an alternative, because it drives the monitor and only accepts profiles the monitor created. Use an ordinary AWS credential source instead, such as an IAM Identity Center profile created with `aws configure sso` or an instance profile, and delete the monitor and profile steps from the script. The artist then signs in through that mechanism rather than the monitor, so what this sample pre-configures no longer applies.
-* An x86-64 host. Blender's archive, Deadline Cloud monitor, and the `libssl1.1` package the Linux script fetches are all pinned to x86-64 here, so an arm64 instance such as Graviton needs those three substituted. Both scripts check the architecture up front and stop before downloading anything.
+* An x86-64 host. Blender's archive, Deadline Cloud monitor, and the `libssl1.1` package the Linux script fetches are all pinned to x86-64, so an arm64 instance such as Graviton needs those three substituted.
 * Administrator access, and on Windows it has to be **the artist's own account**. The Windows script must run elevated *as* the account that signs in, because Windows cannot write another user's per-user state without that user's password, and it refuses to run as `SYSTEM` for the same reason. That account therefore has to be able to elevate, which in practice means membership in the local `Administrators` group. Linux only needs `root`, since it writes the per-user state with `runuser`.
 
   If your artists are standard users who cannot elevate, split the Windows script in two. Run the Blender, submitter, and monitor installers under any administrator account, then run only the add-on enable step and `create-profile` as the artist, unelevated: the monitor installs per user into `%LOCALAPPDATA%`, and `create-profile` writes to `%USERPROFILE%`, so neither of those steps needs elevation.
@@ -36,7 +36,7 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 
 The Linux script was written and tested against Ubuntu 22.04 on x86-64 only. Other Debian-family releases are likely to work, since the script uses nothing Ubuntu-specific beyond `apt-get` and the `libssl1.1` package it fetches. On a non-Debian distribution, replace the `apt-get` calls, install the monitor from its `.rpm` rather than the `.deb`, and satisfy OpenSSL 1.1 the way that distribution expects.
 
-Both scripts are also exercised end to end in CI by [`virtual_workstation_checks.yml`](../../.github/workflows/virtual_workstation_checks.yml), on Ubuntu 22.04 and on Windows Server 2022 under both Windows PowerShell 5.1 and PowerShell 7, whenever this sample changes and once a week. The weekly run is what catches a new submitter or monitor release breaking the sample, since both are resolved as "latest" rather than pinned.
+Both scripts are run end to end in CI by [`virtual_workstation_checks.yml`](../../.github/workflows/virtual_workstation_checks.yml), on Ubuntu 22.04 and on Windows Server 2022 under both Windows PowerShell 5.1 and PowerShell 7, whenever this sample changes and once a week. The weekly run catches a new submitter or monitor release breaking the sample, since both are resolved as "latest" rather than pinned.
 
 ## Run
 
@@ -46,13 +46,11 @@ Linux, as root. Under `sudo` the artist's account is inferred from `SUDO_USER`:
 sudo ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/
 ```
 
-Name the account explicitly when provisioning runs as `root` with nothing to infer from, which includes EC2 user data and an AMI bake. **The second argument is required there**, and the script refuses to run without it rather than configuring `root`:
+Name the account explicitly when provisioning runs as `root` with nothing to infer from, which includes EC2 user data and an AMI bake. **Pass it there**, because the profile and Blender's add-on preferences are per user: without it the script configures `root` and the artist finds nothing set up.
 
 ```console
 ./setup_workstation_linux.sh https://mystudio.us-west-2.deadlinecloud.amazonaws.com/ artist
 ```
-
-The refusal exists because every check in the script reads the invoking user's own state, so a run that configured `root` would pass all of them and report success while the artist found nothing set up. Pass `root` explicitly if that genuinely is the account that signs in, as on a single-user image.
 
 Windows, in an elevated PowerShell session **as the artist's own account**. Start PowerShell with **Run as administrator** first: the script declares `#Requires -RunAsAdministrator`, so launching it from an unelevated shell fails with `ScriptRequiresElevation` rather than prompting.
 
@@ -72,11 +70,29 @@ Both scripts run the same five steps, in the same order, under section headers t
 
 1. **Validate the monitor URL** and derive the Region, the subdomain, and the profile name (`<subdomain>-<region>`).
 2. **Install Blender** from the official archive, verified against its published checksum, into a fixed prefix (`/opt/blender` or `C:\Program Files\Blender`).
-3. **Install the submitter.** Read [`manifest.json`](https://downloads.deadlinecloud.amazonaws.com/submitters/manifest.json) to turn "latest" into a concrete version, download that pinned installer, verify its checksum, and run it with `--mode unattended`.
+3. **Install the submitter** from its `latest` URL, verify its checksum, and run it with `--mode unattended`.
 4. **Enable the Blender add-on.** The silent install stages the add-on but cannot enable it, because add-ons live in Blender's per-user preferences while the install runs at system scope. The scripts run the installer's own `add_submitter_to_pref.py` through Blender in background mode, then read the preferences back to confirm.
 5. **Install the monitor and create the profile** with `create-profile`, a non-GUI subcommand that writes the profile and exits without needing a display.
 
 Every download is verified against a published SHA-256 checksum, and the scripts fail if a checksum cannot be fetched. An internal Blender mirror must also serve Blender's `blender-<version>.sha256` manifest.
+
+### Download links
+
+Both the submitter and the monitor publish a `latest` path per platform that always serves the current release, each with a `.sha256` beside it. The scripts use the two that apply to them; the rest are here for adapting to another platform.
+
+| Component | Platform | URL, under `https://downloads.deadlinecloud.amazonaws.com/` |
+|---|---|---|
+| Submitter | Linux | `submitters/latest/linux/DeadlineCloudSubmitter-linux-x64-installer.run` |
+| Submitter | Windows | `submitters/latest/windows/DeadlineCloudSubmitter-windows-x64-installer.exe` |
+| Submitter | macOS | `submitters/latest/macos/DeadlineCloudSubmitter-osx-installer.app.zip` |
+| Monitor | Debian family | `dcm/latest/deadline-cloud-monitor_amd64.deb` |
+| Monitor | RPM family | `dcm/latest/deadline-cloud-monitor.x86_64.rpm` |
+| Monitor | Linux, generic | `dcm/latest/deadline-cloud-monitor_amd64.AppImage` |
+| Monitor | Windows | `dcm/latest/DeadlineCloudMonitor_x64-setup.exe` |
+| Monitor | macOS, Intel | `dcm/latest/Deadline Cloud Monitor x64.dmg` |
+| Monitor | macOS, Apple silicon | `dcm/latest/Deadline Cloud Monitor aarch64.dmg` |
+
+Append `.sha256` to any of these for its checksum.
 
 The Linux script also installs `libssl1.1`, because Deadline Cloud monitor links against OpenSSL 1.1 while no current Ubuntu release provides it. Ubuntu 20.04 is the last release to carry the package, so the script takes it from the Ubuntu archive. That one artifact is published without a `.sha256` beside it, so its expected hash is a constant at the top of the script alongside the version, with a comment naming the index to read a newer hash from.
 
@@ -172,7 +188,7 @@ sudo rm -rf /opt/blender
 Remove-Item -Recurse -Force "C:\Program Files\Blender"
 ```
 
-Runs interrupted after this point do not recur: Blender is now unpacked to a staging directory beside the prefix and moved into place, so the prefix only ever exists complete.
+Interrupted runs do not cause this any more: Blender is unpacked to a staging directory beside the prefix and moved into place, so the prefix only ever exists complete.
 
 **The add-on step fails with `qtpy.QtBindingsNotFoundError: No Qt bindings could be found`.** The bindings are present: the submitter bundles PySide6. That message is `qtpy` reporting an `ImportError` it could not attribute, and the real cause is a system library that PySide6 links against and this image does not have. On a minimal Ubuntu 22.04 image, this is the set:
 

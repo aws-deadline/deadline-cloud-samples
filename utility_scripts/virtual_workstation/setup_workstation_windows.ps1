@@ -78,16 +78,11 @@ $DownloadsBase = "https://downloads.deadlinecloud.amazonaws.com"
 function Write-Step { param([string]$Message) Write-Information "[setup-workstation] $Message" }
 function Write-Fatal { param([string]$Message) throw "[setup-workstation] ERROR: $Message" }
 
-# Run a native command and return its merged stdout and stderr, leaving
-# $LASTEXITCODE for the caller to check.
-#
-# Windows PowerShell 5.1 turns each stderr line from a native command into an
-# error record, which $ErrorActionPreference = "Stop" escalates to a terminating
-# NativeCommandError. A Blender or monitor build that writes an unrelated startup
-# warning to stderr -- a GPU or driver notice, say -- would then fail the script
-# with a .NET error instead of reaching the exit-code check below. Whether that
-# happens depends on the build and the host rather than on anything here, so relax
-# the preference for the duration of the call only.
+# Run a native command, returning its merged output and leaving $LASTEXITCODE for
+# the caller. Windows PowerShell 5.1 turns a native command's stderr into error
+# records, which $ErrorActionPreference = "Stop" escalates to a terminating
+# NativeCommandError -- so a Blender that prints a driver warning would fail the
+# script instead of reaching the exit-code check. Relax it for the call only.
 function Get-NativeOutput {
     param([scriptblock]$Command)
     $previous = $ErrorActionPreference
@@ -99,28 +94,17 @@ function Get-NativeOutput {
 # Arguments
 # ---------------------------------------------------------------------------
 
-# The monitor profile and Blender's add-on preferences are per user, so this must
-# run as the account that signs in. #Requires -RunAsAdministrator is satisfied by
-# SYSTEM, which Systems Manager Run Command and EC2 user data both run as, and
-# every check below would still pass: they read the invoking user's own state, so
-# the script would report success after writing everything into a service profile
-# no artist ever logs in to. Refuse that instead.
+# The profile and Blender's add-on preferences are per user, so this must run as
+# the account that signs in. #Requires -RunAsAdministrator is satisfied by SYSTEM,
+# which Run Command and EC2 user data both use, and everything would then land in
+# a service profile no artist logs in to.
 if ([System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
     Write-Fatal "running as SYSTEM. The profile and Blender preferences are per user, so they would be written to a service profile the artist never logs in to. Run this as the artist's own account in an elevated session."
 }
 
-# Blender's archive and the monitor's installer are both pinned to x64 below. On
-# another architecture the downloads and checksums still succeed and the binaries
-# then fail to run, so refuse here rather than after roughly 1 GB of downloads.
-$hostArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-if ($hostArch -ne [System.Runtime.InteropServices.Architecture]::X64) {
-    Write-Fatal "this example installs x64 artifacts only (this host is $hostArch). Substitute your architecture's Blender archive and monitor installer."
-}
-
-# The Region segment is required. The monitor accepts a URL without it and then
-# writes a profile with a wrong region, so reject that here instead. Check the
-# scheme separately: [System.Uri] parses the host out of any scheme, so matching
-# on the host alone would accept http:// and write it into the artist's profile.
+# The URL must carry its Region segment: the monitor accepts one without it and
+# then writes a profile with the wrong region. Check the scheme separately, since
+# [System.Uri] parses a host out of any scheme, http:// included.
 $monitorUri = [System.Uri]$MonitorUrl
 if ($monitorUri.Scheme -ne "https") {
     Write-Fatal "monitor URL must use https (got: $MonitorUrl)"
@@ -203,23 +187,16 @@ Get-VerifiedFile -Uri "$BlenderMirror/Blender$blenderSeries/$blenderArchive" -Ou
     -ChecksumUri "$BlenderMirror/Blender$blenderSeries/blender-$BlenderVersion.sha256" `
     -MatchName $blenderArchive
 
-# Expand to a staging directory beside the prefix, then move it into place, so
-# $BlenderPrefix only ever exists complete. A run interrupted partway through
-# would otherwise leave a prefix with no blender.exe in it, which the guard below
-# then refuses to delete on every later run, leaving the script stuck until
-# someone removes the directory by hand.
-#
-# Stage beside the prefix rather than in $WorkDir, which is under %TEMP% and is
-# usually on the same volume but need not be: a cross-volume Move-Item copies
-# rather than renames, which reopens the same window.
+# Expand into a staging directory beside the prefix and move it into place, so an
+# interrupted run cannot leave a half-extracted prefix behind. Beside the prefix,
+# not in $WorkDir: a cross-volume Move-Item copies rather than renames.
 $extractDir = "$BlenderPrefix.staging"
 if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
 Expand-Archive -Path $blenderZip -DestinationPath $extractDir -Force
 
-# The archive contains a single blender-<version>-windows-x64\ directory. Capture
-# it and check it before the move: with no directory, .FullName is $null and
-# Move-Item throws a parameter-binding error under $ErrorActionPreference = "Stop"
-# before any message here could explain what went wrong.
+# The archive holds a single blender-<version>-windows-x64\ directory. Capture it
+# before the move: .FullName on $null makes Move-Item throw a parameter-binding
+# error before any message here could explain why.
 $extracted = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1
 if (-not $extracted) {
     Write-Fatal "the Blender archive did not expand to a top-level directory in $extractDir"
@@ -228,9 +205,8 @@ if (-not (Test-Path (Join-Path $extracted.FullName "blender.exe"))) {
     Write-Fatal "the Blender archive did not contain blender.exe"
 }
 
-# Replace any previous install so re-runs are clean. Only ever delete a directory
-# this script created: $BlenderPrefix is a constant an administrator edits, and
-# removing it unconditionally as an administrator would destroy whatever it names.
+# Only delete a prefix that looks like one of ours: $BlenderPrefix is a constant
+# you are meant to edit, and a blind recursive delete is unforgiving.
 if (Test-Path $BlenderPrefix) {
     if (-not (Test-Path (Join-Path $BlenderPrefix "blender.exe"))) {
         Write-Fatal "$BlenderPrefix exists but holds no blender.exe. Refusing to delete it; check `$BlenderPrefix, and see Troubleshooting in the README if a previous run was interrupted."
@@ -241,12 +217,10 @@ Move-Item -Path $extracted.FullName -Destination $BlenderPrefix
 Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
 $blenderExe = Join-Path $BlenderPrefix "blender.exe"
 
-# Run Blender rather than only testing for the file, so one that unpacked but
-# cannot start fails here instead of during the add-on step with a vaguer error.
-# Capture the whole output before narrowing it: Select-Object -First 1 halts the
-# upstream pipeline once it has its object, which can terminate a still-running
-# native command and leave $LASTEXITCODE reflecting that rather than Blender's own
-# exit. Same reason the Linux script does not pipe into head.
+# Run Blender, so one that unpacked but cannot start fails here. Capture the
+# output before narrowing it: Select-Object -First 1 halts the upstream pipeline,
+# which can terminate the still-running native command and leave $LASTEXITCODE
+# reflecting that rather than Blender's own exit.
 $blenderOutput = Get-NativeOutput { & $blenderExe --version }
 if ($LASTEXITCODE -ne 0) {
     Write-Fatal "Blender installed to $BlenderPrefix but will not run: $($blenderOutput | Select-Object -First 1)"
@@ -257,20 +231,11 @@ Write-Step "Blender installed: $($blenderOutput | Select-Object -First 1)"
 # Install the Deadline Cloud submitter
 # ---------------------------------------------------------------------------
 
-# The manifest maps "latest" to a concrete version, so the download is a pinned,
-# checksummed artifact rather than a moving target.
-Write-Step "resolving the latest submitter from the manifest"
-$manifest = Get-RemoteText -Uri "$DownloadsBase/submitters/manifest.json" | ConvertFrom-Json
-$root = $manifest.DeadlineCloudSubmitter
-$submitterVersion = $root.latest.windows
-$node = $root.versions
-foreach ($part in $submitterVersion.Split(".")) { $node = $node.$part }
-$node = $node.windows
-Write-Step "submitter version: $submitterVersion"
+# The "latest" path always serves the current release, and its .sha256 alongside.
+$submitterUrl = "$DownloadsBase/submitters/latest/windows/DeadlineCloudSubmitter-windows-x64-installer.exe"
 
 $installer = Join-Path $WorkDir "submitter-installer.exe"
-Get-VerifiedFile -Uri "$DownloadsBase/submitters$($node.installer)" -OutFile $installer `
-    -ChecksumUri "$DownloadsBase/submitters$($node.sha256)"
+Get-VerifiedFile -Uri $submitterUrl -OutFile $installer -ChecksumUri "$submitterUrl.sha256"
 
 # --mode unattended runs without a GUI. deadline_client (the Deadline Cloud CLI
 # and libraries) is always installed; enable only the DCC components needed here.
@@ -341,11 +306,9 @@ if ($process.ExitCode -ne 0) {
     Write-Fatal "the monitor installer exited with code $($process.ExitCode)"
 }
 
-# Find the installed executable. The monitor installer is 32-bit, so when it runs
-# under a service account its writes are redirected from the System32 view of the
-# profile into the SysWOW64 view, while the InstallLocation it records in the
-# registry still names System32. Neither source alone is reliable, so collect
-# candidates from both and take the first that exists on disk.
+# Find the installed executable. The installer is 32-bit, so its writes can be
+# redirected into the SysWOW64 view of the profile while the InstallLocation it
+# records still names System32. Neither is reliable alone, so try both.
 $monitorCandidates = [System.Collections.Generic.List[string]]::new()
 
 foreach ($key in @(
@@ -370,33 +333,21 @@ if (-not $monitorBin) {
 }
 Write-Step "monitor installed: $monitorBin"
 
-# create-profile is a non-GUI subcommand: it writes the profile and exits without
-# needing a display.
-#
-# --monitor-id is required, but the real ID is not needed and cannot be discovered
-# without AWS credentials, so pass a placeholder. The monitor replaces it, along
-# with the user and identity store IDs, using authoritative values from the portal
-# on the artist's first sign-in.
-#
-# The placeholder must be non-empty. An empty value makes the monitor drop the
-# profile from its picker and fall back to asking for the monitor URL, which
-# defeats the point of pre-configuring it. The value is shown verbatim in the
-# monitor's profile list until first sign-in, so use something self-explanatory.
+# create-profile needs no display. --monitor-id is required but need not be
+# correct: the real ID cannot be found without AWS credentials, and the monitor
+# overwrites it, along with the user and identity store IDs, at first sign-in. It
+# must be non-empty though -- an empty value makes the monitor drop the profile
+# from its picker and ask for the URL instead. It shows verbatim until first
+# sign-in, so make it self-explanatory.
 $monitorIdPlaceholder = "pending-first-login"
 
 Write-Step "creating monitor profile '$ProfileName'"
 
-# Keep this call as a direct pipeline into Out-String rather than routing it
-# through Get-NativeOutput like the Blender calls above. DeadlineCloudMonitor.exe
-# is a GUI-subsystem binary, and PowerShell does not wait for one of those: it is
-# the pipe here that forces the wait and collects the output. Wrapping it in a
-# scriptblock loses that, and the call returns instantly with nothing captured, so
-# the "Created profile" check below fails on an empty string against a profile
-# that may or may not have been written.
-#
-# The 5.1 stderr concern that Get-NativeOutput exists for still applies, so relax
-# $ErrorActionPreference around just this call instead, in a finally so it is
-# restored even when the pipeline throws.
+# A direct pipeline into Out-String, not Get-NativeOutput like the calls above:
+# DeadlineCloudMonitor.exe is a GUI-subsystem binary and PowerShell does not wait
+# for one, so it is this pipe that forces the wait and captures the output. In a
+# scriptblock the call returns instantly with nothing. The 5.1 stderr concern still
+# applies, so relax $ErrorActionPreference around just this call.
 $previousEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = "Continue"
@@ -411,19 +362,16 @@ finally {
     $ErrorActionPreference = $previousEap
 }
 
-# create-profile exits 0 even when it fails, so confirm from its output and then
-# from the file it should have written. Report whether the file appeared either
-# way: "no output" and "no output but the profile is there" are different faults,
-# and the difference is what says whether the command ran at all.
+# create-profile exits 0 even when it fails, so check its output and the file.
+# Report whether the file appeared: it says whether the command ran at all.
 if ($profileOutput -notmatch [regex]::Escape("Created profile $ProfileName")) {
     $configPath = Join-Path $env:USERPROFILE ".aws\config"
     $configState = if (Test-Path $configPath) { "$configPath exists" } else { "$configPath does not exist" }
     Write-Fatal "failed to create the monitor profile ($configState). Output was: '$($profileOutput.Trim())'"
 }
 
-# Test for the file before reading it: Select-String on a missing path throws
-# ItemNotFoundException under $ErrorActionPreference = "Stop", so the message
-# below would never be reached when create-profile wrote nothing at all.
+# Test for the file first: Select-String on a missing path throws
+# ItemNotFoundException, so the message below would never be reached.
 $awsConfig = Join-Path $env:USERPROFILE ".aws\config"
 if (-not (Test-Path $awsConfig)) {
     Write-Fatal "profile $ProfileName is missing from $awsConfig (the file does not exist)"
@@ -433,8 +381,8 @@ if (-not (Select-String -Path $awsConfig -SimpleMatch -Pattern "[profile $Profil
 }
 Write-Step "profile created and verified in $awsConfig"
 
-# The downloads total roughly 1 GB, so remove them. A run that fails earlier leaves
-# them in place on purpose, so the installer logs can be inspected.
+# Remove the ~1 GB of downloads on success. A failed run keeps them on purpose,
+# so the installer logs survive.
 Remove-Item -Recurse -Force $WorkDir -ErrorAction SilentlyContinue
 Write-Step "removed temporary downloads from $WorkDir"
 
