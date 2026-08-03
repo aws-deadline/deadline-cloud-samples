@@ -185,7 +185,7 @@ jobs:
         run: grep -qF "[profile ${PROFILE_NAME}]" /home/artist/.aws/config
 
   windows:
-    name: Windows Server 2022 (${{ matrix.shell }})
+    name: Windows Server 2022 (${{ matrix.label }})
     runs-on: windows-2022
     timeout-minutes: 45
     permissions:
@@ -193,23 +193,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # "powershell" is Windows PowerShell 5.1 and "pwsh" is PowerShell 7. The
-        # two differ in ways this script depends on: whether a native command's
-        # stderr under $ErrorActionPreference = "Stop" becomes a terminating
-        # NativeCommandError, and whether Invoke-WebRequest returns Content as a
-        # Byte[] or a String. 5.1 is the shell an artist gets by default on a
-        # Windows workstation and cannot be tested on a developer's macOS machine,
-        # so it is the more valuable of the two here.
-        shell: [powershell, pwsh]
+        # powershell.exe is Windows PowerShell 5.1 and pwsh.exe is PowerShell 7.
+        # The two differ in ways this script depends on: whether a native
+        # command's stderr under $ErrorActionPreference = "Stop" becomes a
+        # terminating NativeCommandError, and whether Invoke-WebRequest returns
+        # Content as a Byte[] or a String. 5.1 is what an artist gets by default
+        # on a Windows workstation and cannot be tested on a developer's macOS
+        # machine, so it is the more valuable of the two here.
+        #
+        # This is the interpreter the script under test runs under, passed in the
+        # run: body. It deliberately is not the step's own `shell:` key, which
+        # takes no expression at all -- no context is available there, so
+        # "shell: ${{ matrix.exe }}" makes the whole workflow file invalid and
+        # GitHub rejects it at startup with no jobs and no annotation. The steps
+        # below therefore orchestrate under a fixed pwsh and invoke this
+        # explicitly, passed through an env var rather than expanded into the run
+        # body so the template-injection audit stays clean.
+        include:
+          - exe: powershell
+            label: Windows PowerShell 5.1
+          - exe: pwsh
+            label: PowerShell 7
     steps:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
+      - name: Report the interpreter under test
+        shell: pwsh
+        env:
+          PS_EXE: ${{ matrix.exe }}
+        run: |
+          & $env:PS_EXE -NoProfile -Command '$PSVersionTable.PSVersion.ToString(); $PSVersionTable.PSEdition'
+          if ($LASTEXITCODE -ne 0) { throw "$env:PS_EXE did not run" }
+
       - name: Argument validation refuses bad input
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         working-directory: utility_scripts/virtual_workstation
+        env:
+          PS_EXE: ${{ matrix.exe }}
         run: |
           $cases = @(
             @{ Why = "no Region segment"; Url = "https://mystudio.deadlinecloud.amazonaws.com/" },
@@ -218,9 +241,9 @@ jobs:
             @{ Why = "not a URL at all"; Url = "mystudio" }
           )
           foreach ($case in $cases) {
-            # A separate process per case: the script throws, and #Requires plus
-            # the throw would otherwise end this step at the first case.
-            & (Get-Process -Id $PID).Path -NoProfile -File .\setup_workstation_windows.ps1 $case.Url *> $null
+            # A separate process per case, because the script throws and would
+            # otherwise end this step at the first one.
+            & $env:PS_EXE -NoProfile -File .\setup_workstation_windows.ps1 $case.Url *> $null
             if ($LASTEXITCODE -eq 0) {
               Write-Output "::error::expected a failure but the script succeeded: $($case.Why)"
               exit 1
@@ -229,12 +252,19 @@ jobs:
           }
 
       - name: Run the setup script
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         working-directory: utility_scripts/virtual_workstation
-        run: .\setup_workstation_windows.ps1 $env:MONITOR_URL
+        env:
+          PS_EXE: ${{ matrix.exe }}
+        run: |
+          & $env:PS_EXE -NoProfile -File .\setup_workstation_windows.ps1 $env:MONITOR_URL
+          if ($LASTEXITCODE -ne 0) { throw "the setup script exited $LASTEXITCODE" }
 
+      # The assertions themselves are interpreter-agnostic, so they always run
+      # under pwsh. What varies per matrix entry is the interpreter that ran the
+      # script above, which is what produced the state being asserted on.
       - name: Verify the workstation independently
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         run: |
           $blender = "C:\Program Files\Blender\blender.exe"
 
@@ -275,9 +305,13 @@ jobs:
           Write-Output "::endgroup::"
 
       - name: Re-run for idempotency
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         working-directory: utility_scripts/virtual_workstation
-        run: .\setup_workstation_windows.ps1 $env:MONITOR_URL
+        env:
+          PS_EXE: ${{ matrix.exe }}
+        run: |
+          & $env:PS_EXE -NoProfile -File .\setup_workstation_windows.ps1 $env:MONITOR_URL
+          if ($LASTEXITCODE -ne 0) { throw "the second run exited $LASTEXITCODE" }
 
       # The script keeps its downloads on failure precisely so the installer logs
       # survive, so collect them when there is something to collect.
@@ -285,7 +319,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: installer-logs-${{ matrix.shell }}
+          name: installer-logs-${{ matrix.exe }}
           path: ${{ runner.temp }}\deadline-workstation-setup
           if-no-files-found: ignore
           retention-days: 7
