@@ -87,13 +87,18 @@ jobs:
       # ImportError as "No Qt bindings could be found" -- a message that sends you
       # looking for a missing PySide6 that is in fact present and bundled. The
       # sample's README documents this under Troubleshooting.
+      # shell: sh, not the default. A bare ubuntu:22.04 image has no bash on the
+      # runner's PATH when this first step runs, so Actions falls back to
+      # "sh -e {0}" and a "set -o pipefail" here fails with "Illegal option".
+      # Every later step can use the default, because bash is installed below.
       - name: Install the prerequisites the sample documents
+        shell: sh
         run: |
-          set -euo pipefail
+          set -eu
           export DEBIAN_FRONTEND=noninteractive
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends \
-            git sudo ca-certificates \
+            bash git sudo ca-certificates \
             libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxext6 \
             libxkbcommon0 libsm6 libice6 libgl1 libegl1 libglu1-mesa libdbus-1-3 \
             libglib2.0-0 libfontconfig1 libfreetype6 \
@@ -130,6 +135,10 @@ jobs:
           # shape of the EC2 user data case: the script must refuse rather than
           # configure root and report success.
           expect_failure "implicit root with no workstation user" "$MONITOR_URL"
+          # Explicit, so this does not depend on the last echo having reset $?.
+          # The PowerShell job needs the same for a stronger reason: $LASTEXITCODE
+          # there survives the loop and the runner propagates it.
+          exit 0
 
       - name: Create the artist account
         run: useradd --create-home artist
@@ -250,6 +259,12 @@ jobs:
             }
             Write-Output "refused as expected: $($case.Why)"
           }
+          # Exit 0 explicitly. Every case above is *expected* to exit non-zero,
+          # so $LASTEXITCODE still holds the last refusal's code when the loop
+          # ends, and the runner's shell wrapper propagates that as this step's
+          # status -- a step that did exactly what it should would be reported as
+          # a failure.
+          exit 0
 
       - name: Run the setup script
         shell: pwsh
