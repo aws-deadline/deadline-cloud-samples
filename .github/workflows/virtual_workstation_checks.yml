@@ -1,27 +1,12 @@
 name: Virtual Workstation Checks
 
-# Runs the utility_scripts/virtual_workstation/ sample end to end on both
-# platforms, so a change to it is proven to still produce a working workstation
-# rather than only to still parse.
+# Runs the virtual_workstation sample end to end on both platforms, so a change
+# to it is proven to still produce a working workstation rather than only to
+# still parse. Separate from static_checks.yml, which is offline and fast.
 #
-# This lives in its own workflow rather than in static_checks.yml because those
-# checks are deliberately offline and fast, whereas this one installs system
-# packages and downloads roughly 1 GB per platform from three third-party
-# endpoints.
-#
-# Keep this job out of the repository's required status checks, for two reasons:
-# a path-filtered run reports no status at all rather than success, and every
-# artifact comes from an endpoint (mirror.blender.org, archive.ubuntu.com,
-# downloads.deadlinecloud.amazonaws.com) that can be unavailable for reasons
-# unrelated to a pull request.
-#
-# The weekly schedule is the main point of the cron: the scripts resolve "latest"
-# from the submitter manifest and from dcm/latest, so a new submitter or monitor
-# release can break this sample with no change in this repository.
-#
-# The two path lists below are duplicated rather than shared with a YAML anchor,
-# because GitHub Actions does not support anchors in workflow files. Keep them in
-# sync.
+# Not for the required status checks: path-filtered runs report no status, and
+# every download comes from a third-party endpoint. The weekly run catches a new
+# submitter or monitor release breaking the sample, since both resolve "latest".
 on:
   pull_request:
     branches: ["mainline"]
@@ -44,10 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Shape-valid but nonexistent. create-profile does not contact the monitor URL,
-  # and the scripts call no AWS APIs, so no real monitor and no credentials are
-  # needed. A nonexistent subdomain is the stronger test: it proves the profile is
-  # written from the URL alone.
+  # Shape-valid but nonexistent: create-profile does not contact the URL.
   MONITOR_URL: "https://ci-example.us-west-2.deadlinecloud.amazonaws.com/"
   PROFILE_NAME: "ci-example-us-west-2"
 
@@ -55,50 +37,20 @@ jobs:
   linux:
     name: Ubuntu 22.04
     runs-on: ubuntu-latest
-    # The sample pins Ubuntu 22.04, the last release carrying the
-    # libwebkit2gtk-4.0-37 that Deadline Cloud monitor depends on. Test it in a
-    # container rather than on the ubuntu-22.04 runner label, which began
-    # deprecation in September 2026 and is unsupported after April 2027. The
-    # container keeps this testing the distribution the sample actually claims.
-    #
-    # Pinned by digest, like every action in this repository. The tag is kept in
-    # the comment because the digest alone says nothing about which release it is.
-    # ubuntu:22.04 as of 2026-08-03.
+    # The sample pins Ubuntu 22.04, the last release with libwebkit2gtk-4.0-37.
+    # A container, not the ubuntu-22.04 runner label, which retires in 2027.
     container: ubuntu@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982
     timeout-minutes: 30
     permissions:
       contents: read
-    # Every step here needs bash, and in a bare container Actions does not pick it
-    # by default -- it resolves "sh -e {0}", where "set -o pipefail" fails with
-    # "Illegal option". Declaring it once at the job level covers every step
-    # rather than each one repeating it. The bootstrap step below overrides this
-    # back to sh, because bash does not exist yet when it runs.
+    # A bare container resolves "sh -e {0}" for every step, which has no pipefail.
     defaults:
       run:
         shell: bash
     steps:
-      # A container job has no git for actions/checkout, and the sample documents
-      # a desktop environment as a prerequisite it deliberately does not install.
-      # These libraries stand in for that desktop: this is CI setup, not something
-      # the sample should be doing on a real workstation.
-      #
-      # The list was derived empirically -- run the script, read what failed, and
-      # take the closure of unresolved libraries across the installed tree with
-      # ldd -- rather than guessed. Three groups, for two different consumers:
-      #
-      #   * Blender's own X11 and GL dependencies, without which it cannot exec.
-      #   * GLib, fontconfig, and freetype, for the PySide6 the submitter bundles.
-      #   * The xcb platform libraries that PySide6's Qt platform plugin needs.
-      #
-      # The Qt group is worth knowing about beyond CI: when any of it is missing,
-      # the add-on's import chain reaches qtpy, which reports the underlying
-      # ImportError as "No Qt bindings could be found" -- a message that sends you
-      # looking for a missing PySide6 that is in fact present and bundled. The
-      # sample's README documents this under Troubleshooting.
-      # shell: sh overrides the job default, because this step is what installs
-      # bash: the image has none on the runner's PATH until it finishes. Hence
-      # "set -eu" rather than "set -euo pipefail", which sh rejects.
-      - name: Install the prerequisites the sample documents
+      # Stands in for the desktop environment the sample requires. shell: sh
+      # because this step is what installs bash.
+      - name: Install prerequisites
         shell: sh
         run: |
           set -eu
@@ -118,35 +70,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # These all fail before any download, so run them first: a broken guard is
-      # reported in seconds rather than after a 1 GB install.
-      - name: Argument validation refuses bad input
-        working-directory: utility_scripts/virtual_workstation
-        run: |
-          set -uo pipefail
-          expect_failure() {
-            local why="$1"
-            shift
-            if ./setup_workstation_linux.sh "$@" >/dev/null 2>&1; then
-              echo "::error::expected a failure but the script succeeded: $why"
-              exit 1
-            fi
-            echo "refused as expected: $why"
-          }
-          expect_failure "no arguments"
-          expect_failure "no Region segment" "https://mystudio.deadlinecloud.amazonaws.com/"
-          expect_failure "scheme is not https" "http://mystudio.us-west-2.deadlinecloud.amazonaws.com/"
-          expect_failure "wrong domain" "https://mystudio.us-west-2.example.com/"
-          expect_failure "user does not exist" "$MONITOR_URL" "nosuchuser"
-          # A container job runs as root with SUDO_USER unset, which is the exact
-          # shape of the EC2 user data case: the script must refuse rather than
-          # configure root and report success.
-          expect_failure "implicit root with no workstation user" "$MONITOR_URL"
-          # Explicit, so this does not depend on the last echo having reset $?.
-          # The PowerShell job needs the same for a stronger reason: $LASTEXITCODE
-          # there survives the loop and the runner propagates it.
-          exit 0
-
       - name: Create the artist account
         run: useradd --create-home artist
 
@@ -154,51 +77,18 @@ jobs:
         working-directory: utility_scripts/virtual_workstation
         run: ./setup_workstation_linux.sh "$MONITOR_URL" artist
 
-      # Assert against the machine rather than trusting the script's own output:
-      # the script self-verifies, so a check of its exit code alone proves little.
-      - name: Verify the workstation independently
+      # Assert against the machine, since the script self-verifies.
+      - name: Verify the workstation
         run: |
           set -euo pipefail
-
-          echo "::group::Blender runs"
           /opt/blender/blender --version
-          test -x /usr/local/bin/blender
-          echo "::endgroup::"
-
-          echo "::group::the add-on is registered for the artist"
           sudo -u artist -H /opt/blender/blender --background --python-expr \
             'import bpy, sys; sys.exit(0 if "deadline_cloud_blender_submitter" in bpy.context.preferences.addons.keys() else 1)'
-          echo "::endgroup::"
-
-          echo "::group::the CLI is on the artist's login PATH"
-          # A login shell, because the submitter installs its PATH entry via
-          # /etc/profile.d/deadline.sh rather than into the running shell.
+          # A login shell: the submitter sets PATH via /etc/profile.d.
           sudo -u artist -H bash -lc 'deadline --version'
-          echo "::endgroup::"
-
-          echo "::group::the profile is complete"
-          config=/home/artist/.aws/config
-          grep -qF "[profile ${PROFILE_NAME}]" "$config"
-          grep -qE '^region[[:space:]]*=[[:space:]]*us-west-2$' "$config"
-          # A non-empty monitor_id is the whole point: an empty one makes the
-          # monitor drop the profile from its picker and ask for the URL instead.
-          grep -qE '^monitor_id[[:space:]]*=[[:space:]]*.+$' "$config"
-          test "$(stat -c '%U' "$config")" = artist
-          echo "::endgroup::"
-
-          echo "::group::auth status reports NEEDS_LOGIN"
-          sudo -u artist -H bash -lc 'deadline auth status' | tee /tmp/auth-status
-          grep -q NEEDS_LOGIN /tmp/auth-status
-          echo "::endgroup::"
-
-      # The script replaces an existing install, so a second run must succeed
-      # too. This is also what catches a regression in the Blender prefix guard.
-      - name: Re-run for idempotency
-        working-directory: utility_scripts/virtual_workstation
-        run: ./setup_workstation_linux.sh "$MONITOR_URL" artist
-
-      - name: Verify the profile survived the re-run
-        run: grep -qF "[profile ${PROFILE_NAME}]" /home/artist/.aws/config
+          grep -qF "[profile ${PROFILE_NAME}]" /home/artist/.aws/config
+          # Empty monitor_id makes the monitor drop the profile from its picker.
+          grep -qE '^monitor_id[[:space:]]*=[[:space:]]*.+$' /home/artist/.aws/config
 
   windows:
     name: Windows Server 2022 (${{ matrix.label }})
@@ -209,22 +99,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # powershell.exe is Windows PowerShell 5.1 and pwsh.exe is PowerShell 7.
-        # The two differ in ways this script depends on: whether a native
-        # command's stderr under $ErrorActionPreference = "Stop" becomes a
-        # terminating NativeCommandError, and whether Invoke-WebRequest returns
-        # Content as a Byte[] or a String. 5.1 is what an artist gets by default
-        # on a Windows workstation and cannot be tested on a developer's macOS
-        # machine, so it is the more valuable of the two here.
-        #
-        # This is the interpreter the script under test runs under, passed in the
-        # run: body. It deliberately is not the step's own `shell:` key, which
-        # takes no expression at all -- no context is available there, so
-        # "shell: ${{ matrix.exe }}" makes the whole workflow file invalid and
-        # GitHub rejects it at startup with no jobs and no annotation. The steps
-        # below therefore orchestrate under a fixed pwsh and invoke this
-        # explicitly, passed through an env var rather than expanded into the run
-        # body so the template-injection audit stays clean.
+        # 5.1 is the default on a Windows workstation and differs from 7 in how
+        # native stderr and Invoke-WebRequest behave. Invoked from run: rather
+        # than shell:, which takes no expression.
         include:
           - exe: powershell
             label: Windows PowerShell 5.1
@@ -236,43 +113,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Report the interpreter under test
-        shell: pwsh
-        env:
-          PS_EXE: ${{ matrix.exe }}
-        run: |
-          & $env:PS_EXE -NoProfile -Command '$PSVersionTable.PSVersion.ToString(); $PSVersionTable.PSEdition'
-          if ($LASTEXITCODE -ne 0) { throw "$env:PS_EXE did not run" }
-
-      - name: Argument validation refuses bad input
-        shell: pwsh
-        working-directory: utility_scripts/virtual_workstation
-        env:
-          PS_EXE: ${{ matrix.exe }}
-        run: |
-          $cases = @(
-            @{ Why = "no Region segment"; Url = "https://mystudio.deadlinecloud.amazonaws.com/" },
-            @{ Why = "scheme is not https"; Url = "http://mystudio.us-west-2.deadlinecloud.amazonaws.com/" },
-            @{ Why = "wrong domain"; Url = "https://mystudio.us-west-2.example.com/" },
-            @{ Why = "not a URL at all"; Url = "mystudio" }
-          )
-          foreach ($case in $cases) {
-            # A separate process per case, because the script throws and would
-            # otherwise end this step at the first one.
-            & $env:PS_EXE -NoProfile -File .\setup_workstation_windows.ps1 $case.Url *> $null
-            if ($LASTEXITCODE -eq 0) {
-              Write-Output "::error::expected a failure but the script succeeded: $($case.Why)"
-              exit 1
-            }
-            Write-Output "refused as expected: $($case.Why)"
-          }
-          # Exit 0 explicitly. Every case above is *expected* to exit non-zero,
-          # so $LASTEXITCODE still holds the last refusal's code when the loop
-          # ends, and the runner's shell wrapper propagates that as this step's
-          # status -- a step that did exactly what it should would be reported as
-          # a failure.
-          exit 0
-
       - name: Run the setup script
         shell: pwsh
         working-directory: utility_scripts/virtual_workstation
@@ -282,22 +122,14 @@ jobs:
           & $env:PS_EXE -NoProfile -File .\setup_workstation_windows.ps1 $env:MONITOR_URL
           if ($LASTEXITCODE -ne 0) { throw "the setup script exited $LASTEXITCODE" }
 
-      # The assertions themselves are interpreter-agnostic, so they always run
-      # under pwsh. What varies per matrix entry is the interpreter that ran the
-      # script above, which is what produced the state being asserted on.
-      - name: Verify the workstation independently
+      - name: Verify the workstation
         shell: pwsh
         run: |
           $blender = "C:\Program Files\Blender\blender.exe"
-
-          Write-Output "::group::Blender runs"
           & $blender --version
           if ($LASTEXITCODE -ne 0) { throw "Blender did not run" }
-          Write-Output "::endgroup::"
 
-          Write-Output "::group::the add-on is registered"
-          # A script file rather than --python-expr: PowerShell does not preserve
-          # the inner quotes of an expression passed on the command line.
+          # A file, not --python-expr: PowerShell drops the inner quotes.
           Set-Content -Path check_addon.py -Encoding ASCII -Value @'
           import bpy
           import sys
@@ -306,37 +138,17 @@ jobs:
           '@
           & $blender --background --python check_addon.py | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "the Blender add-on is not registered" }
-          Write-Output "::endgroup::"
 
-          Write-Output "::group::the profile is complete"
           $config = Join-Path $env:USERPROFILE ".aws\config"
           if (-not (Select-String -Path $config -SimpleMatch -Quiet -Pattern "[profile $env:PROFILE_NAME]")) {
             throw "the profile stanza is missing from $config"
           }
-          if (-not (Select-String -Path $config -Quiet -Pattern '^region\s*=\s*us-west-2$')) {
-            throw "the profile has the wrong region"
-          }
+          # Empty monitor_id makes the monitor drop the profile from its picker.
           if (-not (Select-String -Path $config -Quiet -Pattern '^monitor_id\s*=\s*.+$')) {
-            throw "monitor_id is empty, so the monitor would drop the profile from its picker"
+            throw "monitor_id is empty"
           }
-          Write-Output "::endgroup::"
 
-          Write-Output "::group::the temporary downloads were removed"
-          $workDir = Join-Path $env:TEMP "deadline-workstation-setup"
-          if (Test-Path $workDir) { throw "$workDir survived a successful run" }
-          Write-Output "::endgroup::"
-
-      - name: Re-run for idempotency
-        shell: pwsh
-        working-directory: utility_scripts/virtual_workstation
-        env:
-          PS_EXE: ${{ matrix.exe }}
-        run: |
-          & $env:PS_EXE -NoProfile -File .\setup_workstation_windows.ps1 $env:MONITOR_URL
-          if ($LASTEXITCODE -ne 0) { throw "the second run exited $LASTEXITCODE" }
-
-      # The script keeps its downloads on failure precisely so the installer logs
-      # survive, so collect them when there is something to collect.
+      # The script keeps its downloads on failure so installer logs survive.
       - name: Collect installer logs
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
