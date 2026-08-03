@@ -26,9 +26,9 @@ Blender stands in for whichever DCC you run. It is used here because it installs
 
   On a newer release, install the submitter without the monitor and authenticate a different way. `deadline auth login` is not an alternative, because it drives the monitor and only accepts profiles the monitor created. Use an ordinary AWS credential source instead, such as an IAM Identity Center profile created with `aws configure sso` or an instance profile, and delete the monitor and profile steps from the script. The artist then signs in through that mechanism rather than the monitor, so what this sample pre-configures no longer applies.
 * An x86-64 host. Blender's archive, Deadline Cloud monitor, and the `libssl1.1` package the Linux script fetches are all pinned to x86-64, so an arm64 instance such as Graviton needs those three substituted.
-* Administrator access, and on Windows it has to be **the artist's own account**. The Windows script must run elevated *as* the account that signs in, because Windows cannot write another user's per-user state without that user's password, and it refuses to run as `SYSTEM` for the same reason. That account therefore has to be able to elevate, which in practice means membership in the local `Administrators` group. Linux only needs `root`, since it writes the per-user state with `runuser`.
+* Administrator access, and on Windows it has to be **the artist's own account**. Windows cannot write another user's per-user state without that user's password, so the script has to run as an administrator and as the account that signs in, both at once. It refuses to run as `SYSTEM` for the same reason. That means the artist's account needs to be in the local `Administrators` group. Linux only needs `root`, since it writes the per-user state with `runuser`.
 
-  If your artists are standard users who cannot elevate, split the Windows script in two. Run the Blender, submitter, and monitor installers under any administrator account, then run only the add-on enable step and `create-profile` as the artist, unelevated: the monitor installs per user into `%LOCALAPPDATA%`, and `create-profile` writes to `%USERPROFILE%`, so neither of those steps needs elevation.
+  Where artists are standard users, split the Windows script in two. Run the Blender, submitter, and monitor installers under any administrator account. Then run only the add-on step and `create-profile` as the artist, without administrator rights. The monitor installs per user into `%LOCALAPPDATA%` and `create-profile` writes to `%USERPROFILE%`, so those two steps do not need them.
 * Outbound HTTPS to `downloads.deadlinecloud.amazonaws.com` and to the Blender mirror.
 * A working default web browser. Deadline Cloud monitor hands off to it to complete sign-in, so without one the artist sees "Failed to execute default Web Browser". Windows Server images normally include Microsoft Edge, so nothing extra is needed there. On Ubuntu 22.04 and later, `apt install firefox` gets a transitional package that installs the Firefox snap, and snaps do not work in every remote-desktop session. Install Firefox from the [Mozilla apt repository](https://support.mozilla.org/kb/install-firefox-linux) instead, and add an apt pin so the `.deb` wins over Ubuntu's snap transitional package. Verified on Ubuntu 22.04: the Mozilla `.deb` completes sign-in in a VNC session.
 * Your monitor URL, from the **Monitors** page of the Deadline Cloud console. It must include the Region segment, as in `https://mystudio.us-west-2.deadlinecloud.amazonaws.com/`.
@@ -78,7 +78,7 @@ Every download is verified against a published SHA-256 checksum, and the scripts
 
 ### Download links
 
-Both the submitter and the monitor publish a `latest` path per platform that always serves the current release, each with a `.sha256` beside it. The scripts use the two that apply to them; the rest are here for adapting to another platform.
+Both the submitter and the monitor publish a `latest` path per platform that always serves the current release, each with a `.sha256` beside it. The scripts use the two that apply to them. The rest are here for adapting to another platform.
 
 | Component | Platform | URL, under `https://downloads.deadlinecloud.amazonaws.com/` |
 |---|---|---|
@@ -190,7 +190,7 @@ Remove-Item -Recurse -Force "C:\Program Files\Blender"
 
 Interrupted runs do not cause this any more: Blender is unpacked to a staging directory beside the prefix and moved into place, so the prefix only ever exists complete.
 
-**The add-on step fails with `qtpy.QtBindingsNotFoundError: No Qt bindings could be found`.** The bindings are present: the submitter bundles PySide6. That message is `qtpy` reporting an `ImportError` it could not attribute, and the real cause is a system library that PySide6 links against and this image does not have. On a minimal Ubuntu 22.04 image, this is the set:
+**The add-on step fails with `qtpy.QtBindingsNotFoundError: No Qt bindings could be found`.** The bindings are present: the submitter bundles PySide6. That message is `qtpy` reporting an `ImportError` it could not attribute, and the real cause is a system library that PySide6 links against and this image does not have. On a minimal Ubuntu 22.04 image, the missing packages are:
 
 ```console
 sudo apt-get install -y libglib2.0-0 libfontconfig1 libfreetype6 \
@@ -204,7 +204,7 @@ To see the actual cause rather than the `qtpy` summary, run `ldd` over the bundl
 ldd /opt/DeadlineCloudSubmitter/Submitters/Blender/python/modules/PySide6/QtCore.abi3.so | grep "not found"
 ```
 
-Ignore the `libQt6*.so.6` entries there: those resolve within the bundle at load time. A full desktop environment provides all of these, which is why this only appears on an image that has none. It is the same class of failure as Blender's own missing X11 and GL libraries, which the script reports directly.
+Ignore the `libQt6*.so.6` entries there: those resolve within the bundle at load time. A full desktop environment provides every one of these packages, so the failure only appears on an image that has no desktop. It is the same class of failure as Blender's own missing X11 and GL libraries, which the script reports directly.
 
 **The Deadline Cloud menu is missing in Blender.** Add-ons register per user, so confirm the script ran for the account that is signing in. On Linux that is the second argument. On Windows it is the account that ran the script. To check, as that same user:
 
