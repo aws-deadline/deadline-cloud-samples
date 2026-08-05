@@ -4,7 +4,7 @@ V-Ray is a professional rendering engine by Chaos Group that integrates as a plu
 
 ## Reference Script
 
-See `host_configuration_scripts/3dsmax/3dsmax-2025-and-vray/3dsmax-2025-and-vray.ps1` for a working example.
+See `host_configuration_scripts/3dsmax/3dsmax-2025-and-vray.ps1` for a working example.
 
 ## What to add to the script
 

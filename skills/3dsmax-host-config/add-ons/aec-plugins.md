@@ -5,7 +5,7 @@ and FloorGenerator and MultiTexture (by CG-Source). Use any combination as neede
 
 ## Reference Script
 
-See `host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-aec-plugins/3dsmax-2025-vray-and-aec-plugins.ps1` for a working example.
+See `host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-aec-plugins.ps1` for a working example.
 
 ## What to add to the script
 

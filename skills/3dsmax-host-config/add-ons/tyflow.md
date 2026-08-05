@@ -5,7 +5,7 @@ tyFlow is a particle system and physics simulation plugin for 3ds Max. It comes 
 
 ## Reference Script
 
-See `host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-tyflow/3dsmax-2025-vray-and-tyflow.ps1` for a working example.
+See `host_configuration_scripts/3dsmax/3dsmax-2025-vray-and-tyflow.ps1` for a working example.
 
 ## What to add to the script
 

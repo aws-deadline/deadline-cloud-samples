@@ -51,7 +51,7 @@ use the `host-config-from-installer` skill instead.
   - `Path`: also add the Python and Scripts dirs
 - Every script MUST install `deadline-cloud-for-3ds-max` via the bundled Python pip
 - Scripts MUST end with `Exit 0`
-- Each script lives in its own subfolder alongside a `README.md`
+- Each script lives directly under `host_configuration_scripts/3dsmax/`; a single shared `README.md` there documents every script with one sample-index row
 
 ## Workflow
 
@@ -68,20 +68,20 @@ Ask the user (if not already specified):
 
 Look in `host_configuration_scripts/3dsmax/` for the most similar existing script and read it in full.
 
-**If updating an existing script** (e.g. bumping 3ds Max 2025 → 2026, or V-Ray 7 → 8):
-- Create a new folder and script. Do not edit the existing one
+**If updating an existing script** (e.g. bumping 3ds Max 2025 to 2026, or V-Ray 7 to 8):
+- Create a new script at the directory root. Do not edit the existing one
 - Update every version occurrence: `$VARIABLES`, `Write-Host` messages, install paths, env var names
-  (e.g. `VRAY_FOR_3DSMAX2025_MAIN` → `VRAY_FOR_3DSMAX2026_MAIN`)
+  (e.g. `VRAY_FOR_3DSMAX2025_MAIN` to `VRAY_FOR_3DSMAX2026_MAIN`)
 
-### Step 3: Determine folder and file names
+### Step 3: Determine the script file name
 
-Follow the existing naming convention:
-- Base only: `3dsmax-<YEAR>/3dsmax-<YEAR>.ps1`
-- One plugin: `3dsmax-<YEAR>-and-<plugin>/3dsmax-<YEAR>-and-<plugin>.ps1`
-- Multiple plugins: `3dsmax-<YEAR>-<plugin1>-and-<plugin2>/...`
+Scripts live directly under `host_configuration_scripts/3dsmax/` (no per-script subfolder). Follow the existing naming convention:
 
-When in doubt, look at existing folder names in `host_configuration_scripts/3dsmax/`.
+- Base only: `3dsmax-<YEAR>.ps1`
+- One plugin: `3dsmax-<YEAR>-and-<plugin>.ps1`
+- Multiple plugins: `3dsmax-<YEAR>-<plugin1>-and-<plugin2>.ps1`
 
+When in doubt, look at the existing script names in `host_configuration_scripts/3dsmax/`.
 ### Step 4: Write the script
 
 Structure:
@@ -96,14 +96,14 @@ Structure:
 
 Key patterns:
 ```powershell
-# TODO variables — one full S3 URI per installer/plugin
+# TODO variables: one full S3 URI per installer/plugin
 # Guide on how to create the 3ds Max installer zip file: https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/host_configuration_scripts/3dsmax/README.md
 $3DS_MAX_INSTALLER_ZIP_S3_URI="s3://your-bucket-name/path/to/3ds-max-<YEAR>.zip"
 
 # Download from S3 using the URI variable directly
 aws s3 cp --no-progress "$3DS_MAX_INSTALLER_ZIP_S3_URI" C:\3dsmax_setup\3dsmax.zip
 
-# Install 3ds Max silently — Setup.exe is at the root after extracting
+# Install 3ds Max silently. Setup.exe is at the root after extracting
 Start-Process "C:\3dsmax_setup\Setup.exe" -ArgumentList '-q' -Wait
 
 # Set env vars
@@ -114,16 +114,14 @@ Start-Process "C:\3dsmax_setup\Setup.exe" -ArgumentList '-q' -Wait
 & "C:\Program Files\Autodesk\3ds Max $VERSION\Python\python.exe" -m pip install deadline-cloud-for-3ds-max
 ```
 
-### Step 5: Write the README.md
+### Step 5: Document the script in the shared README
 
-Follow the style of `3dsmax-2025-and-vray/README.md`. Include:
-- Title and one-line description
-- Brief description of any plugins
-- Installation guide (S3 bucket, upload installers, configure fleet, save, IAM role, test)
-- Note about TODO variables
-- Note that config changes only affect Workers launched after the update
-- CloudWatch log group: `/aws/deadline/farm-<farm-id>/fleet-<fleet-id>`
+All scripts share a single `host_configuration_scripts/3dsmax/README.md`. Do NOT create a per-script README. Add a row for the new script to the sample-index table under its 3ds Max version section (`### 3ds Max <YEAR>`) with:
+- A link to the `.ps1`
+- What it installs
+- Extra vendor installers to stage in S3 (V-Ray, Corona, tyFlow, Forest Pack, RailClone, etc.), or a dash if none
 
+If a `### 3ds Max <YEAR>` section does not exist yet, add one in version order.
 ### Step 6: Test the script locally and on a fleet worker
 
 Before considering the script done:
@@ -135,15 +133,10 @@ Before considering the script done:
 3. Configure a Service Managed Fleet with the script, set min worker count to 1, and wait for a worker to start
 4. If the script includes V-Ray, submit the `sunflower_sphere` test bundle against the fleet to verify rendering works end-to-end:
    ```
-   deadline bundle submit host_configuration_scripts/3dsmax/3dsmax-2025-and-vray/sunflower_sphere
+   deadline bundle submit host_configuration_scripts/3dsmax/examples/sunflower_sphere
    ```
    The job should complete and produce a rendered sphere with a sunflower texture.
 5. For other plugin combinations, create a minimal job bundle that exercises the plugin and submit it to the fleet to confirm the setup is good before production use.
-
-### Step 7: Update the top-level README
-
-Check `host_configuration_scripts/3dsmax/README.md` and update if the new script introduces a
-version or plugin not already listed.
 
 ## Common Mistakes
 
@@ -154,4 +147,4 @@ version or plugin not already listed.
 - Using `&&` as a command separator. PowerShell uses `;` or separate lines
 - Forgetting `-m ensurepip` before `-m pip install`
 - When bumping versions: forgetting to update year suffixes in env var names
-  (e.g. `VRAY_FOR_3DSMAX2025_MAIN` → `VRAY_FOR_3DSMAX2026_MAIN`)
+  (e.g. `VRAY_FOR_3DSMAX2025_MAIN` to `VRAY_FOR_3DSMAX2026_MAIN`)

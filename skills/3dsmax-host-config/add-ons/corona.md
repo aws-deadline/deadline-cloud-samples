@@ -5,7 +5,7 @@ It shares the same licensing structure as V-Ray.
 
 ## Reference Script
 
-See `host_configuration_scripts/3dsmax/3dsmax-2025-and-corona-13/3dsmax-2025-and-corona.ps1` for a working example.
+See `host_configuration_scripts/3dsmax/3dsmax-2025-and-corona-13.ps1` for a working example.
 
 ## What to add to the script
 
