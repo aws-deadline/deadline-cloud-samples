@@ -370,7 +370,9 @@ def collect_external_links(paths: list[Path] | None = None) -> dict[str, list[st
                 network_url = parse_target(target).url
             except UnsafeTarget:
                 network_url = target.split("#", 1)[0]
-            location = f"{source.relative_to(REPOSITORY_ROOT)}:{line}"
+            # as_posix() so reported locations use forward slashes on every
+            # platform; str() on a Windows path yields "docs\guide.md".
+            location = f"{source.relative_to(REPOSITORY_ROOT).as_posix()}:{line}"
             links.setdefault(network_url, set()).add(location)
     return {url: sorted(locations) for url, locations in sorted(links.items())}
 

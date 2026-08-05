@@ -1,0 +1,459 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Genetic Variant Calling from DNA Sequencing
+description: |
+  Finds the genetic differences between an individual and a reference genome.
+
+  A sequencing machine produces hundreds of millions of short DNA fragments from
+  random positions rather than reading a genome end to end. This job aligns those
+  fragments to a reference to work out where each came from (bwa), compares the
+  stacked-up fragments against the reference to decide where the individual
+  genuinely differs (bcftools), and merges the results into one list of variants.
+  Input is FASTQ, output is VCF. "Germline" means the variants an individual was
+  born with, rather than ones a tumor acquired later.
+
+  Both expensive stages divide cleanly: each sample is aligned on its own worker,
+  and separate regions of the genome are then called in parallel (the scatter)
+  and stitched back together (the gather).
+
+  The tool sequence follows the AWS HealthOmics WDL variant-calling tutorial
+  pipeline, reimplemented for Open Job Description:
+  https://github.com/aws-samples/aws-healthomics-tutorials/tree/main/example-workflows/wdl/variant-calling-pipeline
+
+  Two things differ. That pipeline scatters over samples and then gathers every
+  sample into one whole-genome call; this bundle adds a second scatter over
+  regions so calling itself is distributed. It also takes paired-end reads, which
+  sequencers usually produce in pairs, where the WDL takes one FASTQ per sample.
+
+  Where that pipeline runs each tool in its own container image, this bundle
+  declares them as conda packages. Those images are BioContainers, which are
+  themselves built from bioconda, so the tool builds are equivalent.
+
+  Requires a Deadline Cloud queue with a conda queue environment whose channels
+  include conda-forge and bioconda. See ../../queue_environments/.
+
+parameterDefinitions:
+
+# --- Input / Output ---
+- name: ReadsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: sample_inputs/reads
+  description: >
+    Directory holding paired-end FASTQ files. For each sample name S, this
+    directory must contain S_R1.fastq.gz and S_R2.fastq.gz.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Reads Directory
+    groupLabel: Input / Output
+
+- name: ReferenceDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: sample_inputs/reference
+  description: >
+    Directory holding the reference genome FASTA and any indexes already built
+    beside it. BuildIndex reuses a staged .fai and bwa index when it finds them
+    and builds whichever are missing.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Reference Directory
+    groupLabel: Input / Output
+
+- name: ReferenceFastaName
+  type: STRING
+  default: human_g1k_v37_decoy.small.fasta
+  description: >
+    Filename of the reference FASTA within the reference directory. A name only,
+    not a path, so that a directory holding several genomes selects one.
+  userInterface:
+    control: LINE_EDIT
+    label: Reference FASTA Name
+    groupLabel: Input / Output
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  description: "Directory for alignments, per-region VCFs, the merged VCF, and QC reports."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Input / Output
+
+# --- Parallelism ---
+#
+# Samples and Regions are comma-separated lists, each paired with a range that
+# selects which entries to process. A 2023-09 task parameter range cannot be
+# computed from another parameter's length, so the range is a parameter of its
+# own and must be kept in step with its list. The scripts index into the list
+# and no-op when the index is past the end, so a range reaching beyond the list
+# is safe; MergeVariants fails loudly if any listed entry was skipped, since a
+# range that omits one would otherwise drop it from the result silently.
+# The EXPR extension's LIST[STRING] type removes the need for the paired range.
+- name: Samples
+  type: STRING
+  default: "tiny_n,tiny_t"
+  description: >
+    Comma-separated sample names to align in parallel. Each name S requires
+    S_R1.fastq.gz and S_R2.fastq.gz in the reads directory.
+  userInterface:
+    control: LINE_EDIT
+    label: Samples
+    groupLabel: Parallelism
+
+- name: SampleRange
+  type: STRING
+  default: "0-1"
+  description: >
+    Which entries of Samples to align, as indices from 0, so '0-1' for two
+    samples. This must cover the whole list: MergeVariants requires an alignment
+    for every name in Samples, and a job starts with an empty output directory,
+    so a run that skips an entry has nothing to fall back on. To work on a subset,
+    shorten Samples itself rather than narrowing this range.
+  userInterface:
+    control: LINE_EDIT
+    label: Sample Range
+    groupLabel: Parallelism
+
+- name: Regions
+  type: STRING
+  default: "1:131000-133999,1:134000-136999,1:137000-139999,1:140000-142999"
+  description: >
+    Comma-separated reference regions to call variants over, in parallel. Each
+    value is passed to 'bcftools mpileup -r', so it may be a whole contig (1) or
+    a subrange (1:131000-133999). Names must match the reference FASTA.
+
+    The default splits contig 1 into four windows over the stretch the sample
+    reads align to, so the scatter tasks have real data to work on. Windowing is
+    also how you scatter a real genome: chromosomes vary widely in size, so one
+    task would run far longer than the rest. Keep the windows non-overlapping,
+    since overlapping ones would call the same site twice.
+
+    Whichever you choose, RegionRange must cover every entry. The practical
+    ceiling is around 100 entries, because a job parameter string is limited to
+    1024 characters. Past that, stage the list as a FILE-typed PATH parameter
+    holding one region per line; the README section "Scaling the region list past
+    the parameter limit" sketches the change.
+  userInterface:
+    control: LINE_EDIT
+    label: Regions
+    groupLabel: Parallelism
+
+- name: RegionRange
+  type: STRING
+  default: "0-3"
+  description: >
+    Which entries of Regions to call, as indices from 0, so '0-3' for four
+    regions. This must cover the whole list, for the same reason as SampleRange:
+    MergeVariants requires a VCF for every entry in Regions. To call a subset,
+    shorten Regions itself rather than narrowing this range.
+  userInterface:
+    control: LINE_EDIT
+    label: Region Range
+    groupLabel: Parallelism
+
+# --- Calling Parameters ---
+- name: MinMappingQuality
+  type: INT
+  default: 20
+  minValue: 0
+  maxValue: 60
+  description: "Skip alignments with mapping quality below this value (bcftools mpileup -q)."
+  userInterface:
+    control: SPIN_BOX
+    label: Min Mapping Quality
+    groupLabel: Calling Parameters
+
+- name: MinBaseQuality
+  type: INT
+  default: 20
+  minValue: 0
+  maxValue: 60
+  description: "Skip bases with base quality below this value (bcftools mpileup -Q)."
+  userInterface:
+    control: SPIN_BOX
+    label: Min Base Quality
+    groupLabel: Calling Parameters
+
+- name: Ploidy
+  type: STRING
+  default: "2"
+  allowedValues: ["1", "2"]
+  description: >
+    Ploidy preset for bcftools call: 2 treats every sample as diploid, 1 as
+    haploid. This applies to the whole job; a real analysis needs per-contig
+    ploidy so that chrX, chrY, and the mitochondrion are handled correctly.
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Ploidy
+    groupLabel: Calling Parameters
+
+- name: MinQual
+  type: FLOAT
+  default: 20.0
+  minValue: 0.0
+  description: >
+    Discard called sites below this QUAL. 'bcftools call --variants-only' emits
+    every variant site, not only confident ones, so without a filter roughly half
+    the raw calls on a small test dataset are noise. Set to 0 to keep every site.
+  userInterface:
+    control: SPIN_BOX
+    label: Min Variant QUAL
+    groupLabel: Calling Parameters
+
+- name: MinDepth
+  type: INT
+  default: 5
+  minValue: 0
+  description: >
+    Discard called sites whose total depth (INFO/DP) is below this. Guards against
+    genotypes asserted from one or two reads. Set to 0 to keep every site.
+  userInterface:
+    control: SPIN_BOX
+    label: Min Depth
+    groupLabel: Calling Parameters
+
+# --- Software Environment ---
+- name: CondaPackages
+  type: STRING
+  default: "bwa samtools bcftools fastqc multiqc"
+  description: >
+    Packages the conda queue environment installs. bwa, samtools, bcftools and
+    fastqc come from bioconda; multiqc is noarch.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+
+- name: CondaChannels
+  type: STRING
+  default: "conda-forge bioconda"
+  description: >
+    Conda channels, highest priority first. bioconda depends on conda-forge for
+    its runtime libraries and documents this order, so conda-forge must come
+    first for packages to resolve correctly.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+    groupLabel: Software Environment
+
+- name: RequiredTools
+  type: STRING
+  default: "bwa,samtools,bcftools,fastqc,multiqc"
+  description: >
+    Comma-separated commands the BioToolchain environment requires on PATH before
+    any step runs. Every step's tools are listed, so a queue environment missing
+    one fails immediately with the packages and channels to add rather than
+    partway through a step. Keep this in step with CondaPackages.
+  userInterface:
+    control: LINE_EDIT
+    label: Required Tools
+    groupLabel: Software Environment
+
+# The scripts live in a directory carried with the bundle rather than embedded in
+# this template. A PATH parameter stages them, which means the scripts cannot use
+# "{{Param.Name}}" substitution themselves; values reach them as named command
+# line arguments instead. See scripts/common.sh for the helpers they share.
+- name: JobScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: "Directory containing the bundled scripts this job runs."
+  userInterface:
+    control: HIDDEN
+
+jobEnvironments:
+- name: BioToolchain
+  description: "Verify the bioconda-provided tools are on PATH before any step runs."
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/verify_toolchain.sh'
+        - '--required-tools={{Param.RequiredTools}}'
+        - '--conda-packages={{Param.CondaPackages}}'
+        - '--conda-channels={{Param.CondaChannels}}'
+        timeout: 60
+
+steps:
+
+- name: BuildIndex
+  description: "Create the .fai and bwa indexes once, if they are not already present."
+  hostRequirements:
+    amounts:
+    # bwa index and samtools faidx are both single-threaded, so asking for more
+    # cores would reserve capacity that sits idle for the length of the build.
+    - name: "amount.worker.vcpu"
+      min: 2
+    - name: "amount.worker.memory"
+      min: 8192
+    attributes:
+    - name: "attr.worker.os.family"
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/build_index.sh'
+        - '--reference-dir={{Param.ReferenceDir}}'
+        - '--reference-name={{Param.ReferenceFastaName}}'
+        - '--output-dir={{Param.OutputDir}}'
+        timeout: 43200
+
+- name: QualityControl
+  description: "Run FastQC on each sample's read pair. One task per sample."
+  # No dependencies: this step reads only ReadsDir, a job input, so it can start
+  # immediately rather than waiting behind the reference index build.
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: SampleIndex
+      type: INT
+      range: "{{Param.SampleRange}}"
+  hostRequirements:
+    amounts:
+    - name: "amount.worker.vcpu"
+      min: 2
+    - name: "amount.worker.memory"
+      min: 4096
+    attributes:
+    - name: "attr.worker.os.family"
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/qc_sample.sh'
+        - '--samples={{Param.Samples}}'
+        - '--sample-index={{Task.Param.SampleIndex}}'
+        - '--reads-dir={{Param.ReadsDir}}'
+        - '--output-dir={{Param.OutputDir}}'
+        timeout: 3600
+
+- name: AlignReads
+  description: "Align each sample with bwa mem, then sort and index the BAM. One task per sample."
+  dependencies:
+  - dependsOn: BuildIndex
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: SampleIndex
+      type: INT
+      range: "{{Param.SampleRange}}"
+  hostRequirements:
+    amounts:
+    # 2 vCPU, matching the other steps, so that any worker a fleet brings up can
+    # run every step of this job.
+    #
+    # Alignment is the step that most benefits from more cores, so raise this and
+    # the thread counts in align_sample.sh together when running real cohorts on a
+    # fleet whose minimum is higher.
+    - name: "amount.worker.vcpu"
+      min: 2
+    - name: "amount.worker.memory"
+      min: 16384
+    # No amount.worker.disk.scratch requirement: service-managed fleets do not
+    # advertise that capability, so requiring it makes every task NOT_COMPATIBLE.
+    # samtools sort still needs room for temp chunks -- tens of GiB for a
+    # whole-genome BAM -- so size the fleet's root volume accordingly.
+    attributes:
+    - name: "attr.worker.os.family"
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/align_sample.sh'
+        - '--samples={{Param.Samples}}'
+        - '--sample-index={{Task.Param.SampleIndex}}'
+        - '--reads-dir={{Param.ReadsDir}}'
+        - '--output-dir={{Param.OutputDir}}'
+        - '--reference-name={{Param.ReferenceFastaName}}'
+        - '--session-work-dir={{Session.WorkingDirectory}}'
+        timeout: 86400
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+          notifyPeriodInSeconds: 30
+
+- name: CallVariants
+  description: >
+    Call variants over one reference region, jointly across all samples. This is
+    the scatter: one task per region, all able to run in parallel.
+  dependencies:
+  # Dependencies do not chain, so BuildIndex is required here even though
+  # AlignReads already depends on it: mpileup reads its reference and .fai.
+  - dependsOn: BuildIndex
+  - dependsOn: AlignReads
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: RegionIndex
+      type: INT
+      range: "{{Param.RegionRange}}"
+  hostRequirements:
+    amounts:
+    - name: "amount.worker.vcpu"
+      min: 2
+    - name: "amount.worker.memory"
+      min: 8192
+    attributes:
+    - name: "attr.worker.os.family"
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/call_region.sh'
+        - '--regions={{Param.Regions}}'
+        - '--region-index={{Task.Param.RegionIndex}}'
+        - '--samples={{Param.Samples}}'
+        - '--output-dir={{Param.OutputDir}}'
+        - '--reference-name={{Param.ReferenceFastaName}}'
+        - '--min-mapping-quality={{Param.MinMappingQuality}}'
+        - '--min-base-quality={{Param.MinBaseQuality}}'
+        - '--ploidy={{Param.Ploidy}}'
+        - '--min-qual={{Param.MinQual}}'
+        - '--min-depth={{Param.MinDepth}}'
+        timeout: 86400
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+          notifyPeriodInSeconds: 30
+
+- name: MergeVariants
+  description: >
+    Gather the per-region VCFs into one sorted, indexed VCF, summarize it, and
+    build a MultiQC report over the run.
+  dependencies:
+  # All four are required because dependencies do not chain: this step merges
+  # CallVariants' VCFs, and its MultiQC report covers QualityControl's FastQC
+  # output and AlignReads' flagstat summaries.
+  - dependsOn: BuildIndex
+  - dependsOn: QualityControl
+  - dependsOn: AlignReads
+  - dependsOn: CallVariants
+  hostRequirements:
+    amounts:
+    - name: "amount.worker.vcpu"
+      min: 2
+    - name: "amount.worker.memory"
+      min: 4096
+    attributes:
+    - name: "attr.worker.os.family"
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - '{{Param.JobScriptDir}}/merge_variants.sh'
+        - '--regions={{Param.Regions}}'
+        - '--samples={{Param.Samples}}'
+        - '--output-dir={{Param.OutputDir}}'
+        - '--reference-name={{Param.ReferenceFastaName}}'
+        timeout: 3600

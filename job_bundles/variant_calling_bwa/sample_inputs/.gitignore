@@ -1,0 +1,5 @@
+# Test data is downloaded by fetch_test_data.py, not committed. The repository
+# root .gitignore covers *.tar.gz and *.zip archives but not the bare *.fastq.gz
+# and *.fasta files fetched here, so exclude both directories outright.
+reads/
+reference/
