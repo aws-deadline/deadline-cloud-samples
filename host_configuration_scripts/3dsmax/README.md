@@ -1,4 +1,4 @@
-# 3ds Max host configuration scripts for AWS Deadline Cloud
+﻿# 3ds Max host configuration scripts for AWS Deadline Cloud
 
 These Windows host configuration scripts install 3ds Max and selected renderers or plugins on AWS Deadline Cloud service-managed fleet workers. 3ds Max requires administrative installation, so host configuration is the recommended delivery boundary.
 
@@ -22,6 +22,7 @@ Scripts are grouped by 3ds Max version. Each installs the listed software. Some 
 | [3dsmax-2025-and-vray.ps1](3dsmax-2025-and-vray.ps1) | 3ds Max 2025 + V-Ray | V-Ray (Chaos) |
 | [3dsmax-2025-vray-and-aec-plugins.ps1](3dsmax-2025-vray-and-aec-plugins.ps1) | 3ds Max 2025 + V-Ray + Forest Pack + RailClone + FloorGenerator + MultiTexture | V-Ray (Chaos); Forest Pack & RailClone (iToo); FloorGenerator; MultiTexture |
 | [3dsmax-2025-vray-and-tyflow.ps1](3dsmax-2025-vray-and-tyflow.ps1) | 3ds Max 2025 + V-Ray + tyFlow | V-Ray (Chaos); tyFlow |
+| [3dsmax-2025-and-pencilplus-4.ps1](3dsmax-2025-and-pencilplus-4.ps1) | 3ds Max 2025 + Pencil+ 4 (NTR, renders watermark-free under 3dsmaxcmd) | Pencil+ 4 (PSOFT) |
 
 ### 3ds Max 2027
 
@@ -32,6 +33,7 @@ Scripts are grouped by 3ds Max version. Each installs the listed software. Some 
 | [3dsmax-2027-and-vray.ps1](3dsmax-2027-and-vray.ps1) | 3ds Max 2027 + V-Ray | V-Ray (Chaos) |
 | [3dsmax-2027-and-vray-and-tyflow.ps1](3dsmax-2027-and-vray-and-tyflow.ps1) | 3ds Max 2027 + V-Ray + tyFlow | V-Ray (Chaos); tyFlow |
 | [3dsmax-2027-vray-and-aec-plugins.ps1](3dsmax-2027-vray-and-aec-plugins.ps1) | 3ds Max 2027 + V-Ray + Forest Pack + RailClone + FloorGenerator + MultiTexture | V-Ray (Chaos); Forest Pack & RailClone (iToo); FloorGenerator; MultiTexture |
+| [3dsmax-2027-and-pencilplus-4.ps1](3dsmax-2027-and-pencilplus-4.ps1) | 3ds Max 2027 + Pencil+ 4 (NTR, renders watermark-free under 3dsmaxcmd) | Pencil+ 4 (PSOFT) |
 
 The samples cover 3ds Max 2024, 2025, and 2027. The Deadline Cloud submitter also supports 3ds Max 2026. Adapt the nearest script for that installer and verify all product-specific silent-install options.
 
