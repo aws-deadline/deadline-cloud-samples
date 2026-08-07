@@ -17,7 +17,7 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 50 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 51 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -51,6 +51,7 @@ This table covers all 50 immediate user-selectable recipe directories in `conda_
 | [KeyShot 2025](keyshot-2025/) | Packaging KeyShot 2025.2 for Windows | Your jobs render with KeyShot |
 | [Maya 2025](maya-2025/) | Packaging Maya and configuring module/plugin search paths | Your jobs require Maya 2025 |
 | [Maya 2026](maya-2026/) | Packaging Maya with Plugin Sync activation | Your jobs require Maya 2026 or frequently updated plugins |
+| [Maya 2027](maya-2027/) | Packaging Maya with Plugin Sync activation | Your jobs require Maya 2027 |
 | [Bifrost for Maya 2026](maya-bifrost-2026/) | Packaging Autodesk Bifrost for Maya | Maya 2026 jobs use Bifrost graphs or simulations |
 | [Arnold for Maya 2025](maya-mtoa-2025/) | Packaging MtoA against the Maya 2025 package | Maya 2025 jobs render with Arnold |
 | [Arnold for Maya 2026](maya-mtoa-2026/) | Packaging MtoA against the Maya 2026 package | Maya 2026 jobs render with Arnold |
