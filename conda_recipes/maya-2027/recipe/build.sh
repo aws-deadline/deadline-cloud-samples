@@ -36,13 +36,12 @@ ln -r -s "$INSTALL_DIR/bin/maya$MAYA_VERSION" "$INSTALL_DIR/bin/maya"
 unzip -q -o "$SRC_DIR/installer/Packages/AdpSdk/adp-desktop-sdk.zip" -d "$INSTALL_DIR/lib"
 
 # Give the ADP libraries an rpath so they can find each other. The generic rpath pass
-# further down only globs "*.so.*", and these files are plain "*.so".
-patchelf --set-rpath '$ORIGIN' \
-    "$INSTALL_DIR"/lib/AdpSDKCore.so \
-    "$INSTALL_DIR"/lib/AdpSDKUI.so \
-    "$INSTALL_DIR"/lib/libAdpIPC.so \
-    "$INSTALL_DIR"/lib/libAdpSDKIdentityWrapper.so \
-    "$INSTALL_DIR"/lib/libAdskIdentitySDK.so
+# further down only sets an RPATH on files that have none, so set these explicitly here
+# to guarantee $ORIGIN regardless of what the SDK ships with. Matched by pattern rather
+# than by name so that a renamed or added library in a future SDK drop does not fail the
+# build.
+find "$INSTALL_DIR/lib" -maxdepth 1 -type f \( -name '*Adp*.so' -o -name '*Adsk*.so' \) \
+    -exec patchelf --set-rpath '$ORIGIN' {} +
 
 # Install dependencies not available on Deadline Cloud service-managed fleets
 # from the system package manager, dnf.
@@ -102,7 +101,7 @@ tar -xzf "$SRC_DIR/installer/Packages/package.tgz" -C "$INSTALL_DIR/lib" \
     --strip-components=1 bin/ProductInformation.pit
 
 cat <<EOF > "$INSTALL_DIR"/AdlmThinClientCustomEnv.xml
-<?xml version="1.0"encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <ADLMCUSTOMENV VERSION="1.0.0.0">
    <PLATFORM OS="Linux">
        <KEY ID="ADLM_PIT_FILE_LOCATION">

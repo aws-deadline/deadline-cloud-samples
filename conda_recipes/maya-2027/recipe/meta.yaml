@@ -26,6 +26,7 @@ build:
 requirements:
   build:
     - patchelf
+    - unzip
 
 test:
   commands:
