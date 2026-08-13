@@ -94,8 +94,6 @@ ln -r -s $PREFIX/$MAYA_ROOT/bin/Render $PREFIX/bin/Render
 # where mayapy can silently load another package's libpython3.13 (the maya-openjd adaptor
 # stack installs one) and crash. Exec'ing the real path keeps the lookup inside the
 # installation.
-#
-# Do not revert to a symlink. bin/maya and bin/Render resolve symlinks themselves.
 cat > $PREFIX/bin/mayapy <<EOF
 #!/bin/sh
 exec "$PREFIX/$MAYA_ROOT/bin/mayapy" "\$@"
