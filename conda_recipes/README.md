@@ -44,6 +44,7 @@ This table covers all 51 immediate user-selectable recipe directories in `conda_
 | [Deadline Cloud CLI](deadline/) | Building the `deadline` Python package and command line tools | Another package or worker environment needs the Deadline client |
 | [Houdini 20.5](houdini-20.5/) | Packaging Houdini 20.5 with plugin activation support | Your jobs require Houdini 20.5 |
 | [Houdini 21.0](houdini-21.0/) | Packaging Houdini 21.0 with Plugin Sync activation | Your jobs require Houdini 21 or frequently updated plugins |
+| [Houdini 22.0](houdini-22.0/) | Packaging Houdini 22.0 with Plugin Sync activation | Your jobs require Houdini 22 or frequently updated plugins |
 | [Redshift for Houdini 2025](houdini-redshift-2025/) | Packaging Redshift for Houdini 2025 | Houdini 20.5 jobs render with Redshift |
 | [Redshift for Houdini 2026](houdini-redshift-2026/) | Packaging Redshift for Houdini 2026 | Houdini 21 jobs render with Redshift |
 | [V-Ray 7 for Houdini](houdini-vray-7/) | Packaging V-Ray for Houdini | Houdini jobs render with V-Ray 7 |
