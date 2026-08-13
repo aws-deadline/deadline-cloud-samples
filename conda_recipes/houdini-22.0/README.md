@@ -118,10 +118,8 @@ See the [AWS Deadline Cloud licensing documentation](https://docs.aws.amazon.com
 ### Adaptor Compatibility
 
 Jobs submitted with the Deadline Cloud Houdini submitter use the `houdini-openjd`
-adaptor package. Houdini 22.0 requires `houdini-openjd` 0.7.13 or later. Earlier
-adaptor versions are pinned to `houdini >=19.5,<22.5` and will resolve, but 0.7.12
-specifically fails during adaptor initialization on scenes that contain a keyframed
-LOP file path parameter.
+adaptor package. The adaptor's `houdini >=19.5,<22.5` version constraint already
+covers Houdini 22.0, so no separate adaptor change is needed to run 22.0 jobs.
 
 ### System Requirements
 
