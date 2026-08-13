@@ -1,0 +1,35 @@
+# See https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html for information
+# about this file.
+
+{% set version = "2027.0" %}
+{% set major_version = "2027" %}
+{% set minor_version = "0" %}
+
+package:
+  name: maya-mtoa
+  version: {{ version }}
+
+source:
+- url: archive_files/Autodesk_Maya_{{ major_version }}_Linux_64bit.tgz
+  sha256: c713ce176972268284a740bff6d346e01e03511c9bf0f090128f63f001ac8cf6
+  folder: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+requirements:
+  build:
+    - maya =={{ version }}.*
+  run:
+    - maya =={{ version }}.*
+
+about:
+  home: https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_maya_am_Arnold_for_Maya_User_Guide_html
+  license: Commercial
+  summary: Autodesk Arnold is an advanced cross-platform rendering library, or API, developed by Solid Angle and used by a number of prominent organizations in film, television, and animation, including Sony Pictures Imageworks. It was developed as a photo-realistic, physically-based ray tracing alternative to traditional scanline-based rendering software for CG animation.
