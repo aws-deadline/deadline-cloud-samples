@@ -18,7 +18,7 @@ Before building this package, ensure you have:
 
 1. **AWS Deadline Cloud infrastructure** set up with:
    - A farm configured for package building. See https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/cloudformation/farm_templates/starter_farm for instructions to create a Farm.
-   - A queue named "Package Build Queue". See https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html for instructions on creating a package building queue.
+   - A queue for building packages. The submit command looks for a queue whose name starts with "Package". See https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html for instructions on creating one.
    - Linux-64 fleet for building linux packages
 
 2. **Deadline Cloud CLI** installed on your workstation
@@ -127,7 +127,7 @@ LOP file path parameter.
 
 - Linux x86_64 with GCC 14.2 compatibility
 - Sufficient memory for scene processing
-- Optional: GPU acceleration may be needed for certain workloads
+- Optional: a GPU to render with Karma XPU
 
 ## Adapting to Other Versions
 
@@ -154,7 +154,7 @@ To adapt this recipe for Houdini 21.0, 20.5 or 20.0:
 
 3. **Check Dependencies**
    - Review and update dependency versions
-   - Houdini 22.0 additionally requires `libatomic` from the system package manager
+   - Houdini 22.0 needs `libatomic` from the system package manager, which 21.0 did not
 
 4. **Update Build Scripts**
    - Check for changes in installation directory structure
