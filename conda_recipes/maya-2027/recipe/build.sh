@@ -85,8 +85,22 @@ mkdir -p $PREFIX/bin
 ln -r -s $PREFIX/$MAYA_ROOT/bin/maya$MAYA_VERSION $PREFIX/bin/maya$MAYA_VERSION
 ln -r -s $PREFIX/$MAYA_ROOT/bin/maya$MAYA_VERSION $PREFIX/bin/maya
 ln -r -s $PREFIX/$MAYA_ROOT/bin/mayapy.bin $PREFIX/bin/mayapy.bin
-ln -r -s $PREFIX/$MAYA_ROOT/bin/mayapy $PREFIX/bin/mayapy
 ln -r -s $PREFIX/$MAYA_ROOT/bin/Render $PREFIX/bin/Render
+
+# Expose mayapy through a wrapper script instead of a symlink.
+#
+# Autodesk's bin/mayapy looks for Maya's libraries in ../lib relative to the directory it
+# was invoked from, so exec'ing a symlink in $PREFIX/bin sends the lookup to $PREFIX/lib,
+# where mayapy can silently load another package's libpython3.13 (the maya-openjd adaptor
+# stack installs one) and crash. Exec'ing the real path keeps the lookup inside the
+# installation.
+#
+# Do not revert to a symlink. bin/maya and bin/Render resolve symlinks themselves.
+cat > $PREFIX/bin/mayapy <<EOF
+#!/bin/sh
+exec "$PREFIX/$MAYA_ROOT/bin/mayapy" "\$@"
+EOF
+chmod +x $PREFIX/bin/mayapy
 
 # Use thin client licensing configuration to use the ProductInformation.pit from the Arnold installation.
 #
