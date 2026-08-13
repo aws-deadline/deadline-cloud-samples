@@ -6,6 +6,10 @@ This bundle is the Windows sibling of [`ssh_to_smf`](../ssh_to_smf/README.md). T
 
 > **Security note.** The RDP user is a local Administrator, and `job-user` is also made a local Administrator so the job can control the SSM service and the elevated task. Use this host config and job bundle for debugging purposes, not for production. Shut down all workers in this fleet once debugging is done. Do not leave an RDP-capable instance running.
 
+## Why Shell Access to a Worker?
+
+The motivation matches the Linux bundle: see [Why Shell Access to a Worker?](../ssh_to_smf/README.md#why-shell-access-to-a-worker) for the use cases. Windows adds a full desktop over the same tunnel, which is what makes it useful for GUI-only problems, such as an Autodesk licensing dialog that only appears on first launch, a plugin that fails to register in a DCC's UI, or a Windows-specific path or permission issue that reproduces only under `job-user`. Port forwarding carries RDP as well as any HTTP service, so `mstsc` and a browser both work against `localhost`.
+
 ## How It Works
 
 1. The submit script creates a one-time SSM hybrid activation (`aws ssm create-activation`).

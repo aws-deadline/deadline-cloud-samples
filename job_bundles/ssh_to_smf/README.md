@@ -2,6 +2,21 @@
 
 Register a Deadline Cloud worker as an SSM hybrid managed node, enabling SSH access via Session Manager for the duration of the job.
 
+## Why Shell Access to a Worker?
+
+Service-managed fleet workers have no public IP, no inbound ports, and no SSH keys to distribute, so a failing job normally has to be diagnosed from its log alone. That works until the question is environmental: which CUDA version is actually on the host, whether a license server is reachable from the worker's subnet, what the job attachments mount really looks like, or why a plugin loads on your workstation but not here. This bundle gives you a shell on the real worker, as the same `job-user` the job runs as, for the lifetime of a job you submit. Access goes through Session Manager, so it is IAM-gated and logged in CloudTrail, and the node is deregistered when the job ends.
+
+Some ways customers use it:
+
+- **Diagnose a failing job in place.** Inspect environment variables, license variables, mounted job attachments, and path mapping exactly as the job sees them, rather than inferring from log output.
+- **Prototype a host configuration script.** Install and test packages interactively until the steps work, then paste the finished commands into the fleet host configuration. Pairs well with [`sudo_for_job_user`](../../host_configuration_scripts/sudo_for_job_user/README.md).
+- **Reach interactive tools through a port forward.** Jupyter notebooks, TensorBoard, a ComfyUI web UI, or a GPU profiler running on the worker become available on `localhost`. See [Port forwarding](#port-forwarding) below.
+- **Confirm what is on the AMI.** Check driver versions, DCC installs, conda environments, and disk layout on the actual instance type your fleet uses before committing a large render to it.
+- **Verify network reachability.** Test license servers, package repositories, and VPC endpoints from inside the worker's subnet, which is often where a job's real failure lives.
+- **Validate a container setup.** Run images by hand and check GPU passthrough before wiring them into a job template, alongside [`docker_nvidia_container_toolkit`](../../host_configuration_scripts/docker_nvidia_container_toolkit/README.md).
+
+This is a debugging tool. Interactive sessions are billed as worker time for as long as the job runs, so keep `SessionMinutes` tight and let the job finish when you are done.
+
 ## How It Works
 
 1. The submit script creates a one-time SSM hybrid activation (`aws ssm create-activation`)
