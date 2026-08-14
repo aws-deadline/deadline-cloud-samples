@@ -207,7 +207,7 @@ Log in as the RDP user configured in `host_config.ps1` (default: username `RDP`,
 
 ##### Logging in as `job-user` (optional)
 
-`job-user` is the Deadline worker service account that actually runs the job. By default it does not support login with an exposed password, so you cannot RDP in as `job-user` directly. If you want to inspect the job environment as `job-user` (same token, same env vars, same filesystem view), first RDP in as the `RDP` admin, open an elevated PowerShell, and run:
+`job-user` is the Deadline worker service account that actually runs the job. By default it does not support login with an exposed password, so you cannot RDP in as `job-user` directly. To inspect the job environment as `job-user` (same token, same env vars, same filesystem view), first RDP in as the `RDP` admin, open an elevated PowerShell, and run:
 
 ```powershell
 Set-LocalUser -Name job-user -Password (ConvertTo-SecureString -AsPlainText -Force 'ChangeMe2026!!@@##')
