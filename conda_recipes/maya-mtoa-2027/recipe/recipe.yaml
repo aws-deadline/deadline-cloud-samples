@@ -38,13 +38,11 @@ tests:
     # Maya's Python interpreter
     - mayapy --help
     # Confirm that the mtoa plugin is available in mayapy
-    # - mayapy -c 'import maya.standalone; maya.standalone.initialize(); import mtoa; from maya.cmds import arnoldRender; print("Hello from mayapy"); print(dir(mtoa)); maya.standalone.uninitialize()'
     - mayapy -c 'import maya.standalone; maya.standalone.initialize(); import mtoa; print("Hello from mayapy"); print(dir(mtoa)); maya.standalone.uninitialize()'
     # The maya -batch command
     - maya -batch -command 'print "Hello from maya -batch"; quit -exitCode 0 -force'
 
-
 about:
-  homepage: https://www.autodesk.com/products/maya/overview
+  homepage: https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_maya_am_Arnold_for_Maya_User_Guide_html
   license: LicenseRef-AutodeskEULA
-  summary: Maya is professional 3D software for creating realistic characters and blockbuster-worthy effects.
+  summary: Autodesk Arnold is an advanced cross-platform rendering library, or API, developed by Solid Angle and used by a number of prominent organizations in film, television, and animation, including Sony Pictures Imageworks. It was developed as a photo-realistic, physically-based ray tracing alternative to traditional scanline-based rendering software for CG animation.
