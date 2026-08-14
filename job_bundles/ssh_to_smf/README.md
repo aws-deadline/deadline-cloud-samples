@@ -4,18 +4,26 @@ Register a Deadline Cloud worker as an SSM hybrid managed node, enabling SSH acc
 
 ## Why Shell Access to a Worker?
 
-Service-managed fleet workers have no public IP, no inbound ports, and no SSH keys to distribute, so a failing job normally has to be diagnosed from its log alone. That works until the question is environmental: which CUDA version is actually on the host, whether a license server is reachable from the worker's subnet, what the job attachments mount really looks like, or why a plugin loads on your workstation but not here. This bundle gives you a shell on the real worker, as the same `job-user` the job runs as, for the lifetime of a job you submit. Access goes through Session Manager, so it is IAM-gated and logged in CloudTrail, and the node is deregistered when the job ends.
+A service-managed fleet worker has no public address and accepts no inbound connections, so a failing job normally has to be diagnosed from its log alone. That works until the question turns environmental: whether the license server answers from the worker's subnet, or why a plugin that loads on your workstation fails on the worker.
+
+The job in this bundle registers the worker as an SSM managed node, which gets you an interactive shell on the machine that ran your job. Session Manager brokers the connection, so access is IAM-gated and audited in CloudTrail, and the node is deregistered when the job ends.
+
+Session Manager logs you in as `ssm-user` rather than the `job-user` account the job itself runs under, so a fresh session does not show you the job's own environment. Switch accounts once you are connected:
+
+```bash
+sudo -u job-user -i
+```
 
 Some ways customers use it:
 
-- **Diagnose a failing job in place.** Inspect environment variables, license variables, mounted job attachments, and path mapping exactly as the job sees them, rather than inferring from log output.
-- **Prototype a host configuration script.** Install and test packages interactively until the steps work, then paste the finished commands into the fleet host configuration. Pairs well with [`sudo_for_job_user`](../../host_configuration_scripts/sudo_for_job_user/README.md).
-- **Reach interactive tools through a port forward.** Jupyter notebooks, TensorBoard, a ComfyUI web UI, or a GPU profiler running on the worker become available on `localhost`. See [Port forwarding](#port-forwarding) below.
-- **Confirm what is on the AMI.** Check driver versions, DCC installs, conda environments, and disk layout on the actual instance type your fleet uses before committing a large render to it.
-- **Verify network reachability.** Test license servers, package repositories, and VPC endpoints from inside the worker's subnet, which is often where a job's real failure lives.
+- **Diagnose a failing job in place.** Read the environment variables and job attachment mounts as `job-user` sees them, rather than inferring from log output.
+- **Prototype a host configuration script.** Install and test packages by hand until the steps work, then paste the finished commands into your fleet's host configuration. Pairs well with [`sudo_for_job_user`](../../host_configuration_scripts/sudo_for_job_user/README.md).
+- **Reach interactive tools through a port forward.** A Jupyter notebook or a GPU profiler running on the worker becomes available on `localhost`. See [Port forwarding](#port-forwarding) below.
+- **Confirm what the AMI includes.** Check driver versions and conda environments on the instance type your fleet uses, before you commit a long render to it.
+- **Verify network reachability.** Test license servers and package repositories from inside the worker's subnet, where a job's real failure often lives.
 - **Validate a container setup.** Run images by hand and check GPU passthrough before wiring them into a job template, alongside [`docker_nvidia_container_toolkit`](../../host_configuration_scripts/docker_nvidia_container_toolkit/README.md).
 
-This is a debugging tool. Interactive sessions are billed as worker time for as long as the job runs, so keep `SessionMinutes` tight and let the job finish when you are done.
+Treat the bundle as a debugging tool. The job holds the worker for the full `SessionMinutes` whether or not anyone is connected, and disconnecting your session does not release it, so worker time bills until the timer expires. Keep `SessionMinutes` short and cancel the job when you finish.
 
 ## How It Works
 
