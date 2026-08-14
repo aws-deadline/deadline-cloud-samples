@@ -6,7 +6,7 @@ Register a Deadline Cloud worker as an SSM hybrid managed node, enabling SSH acc
 
 A service-managed fleet worker has no public address and accepts no inbound connections, so a failing job normally has to be diagnosed from its log alone. That works until the question turns environmental: whether the license server answers from the worker's subnet, or why a plugin that loads on your workstation fails on the worker.
 
-The job in this bundle registers the worker as an SSM managed node, which gets you an interactive shell on the machine that ran your job. Session Manager brokers the connection, so access is IAM-gated and audited in CloudTrail. When the keep-alive timer runs out, the job deregisters the node on its way out.
+The job in this bundle registers the worker as an SSM managed node, which gets you an interactive shell on the machine that ran your job. Session Manager brokers the connection, so access is IAM-gated and audited in CloudTrail. Reaching the node depends on the SSM agent, which the job stops on its way out, so the shell dies with the job.
 
 Session Manager logs you in as `ssm-user` rather than the `job-user` account the job itself runs under. Switch accounts once you are connected:
 
@@ -25,9 +25,9 @@ Some ways customers use it:
 - **Verify network reachability.** Test license servers and package repositories from inside the worker's subnet, where a job's real failure often lives.
 - **Validate a container setup.** Run images by hand and check GPU passthrough before wiring them into a job template, alongside [`docker_nvidia_container_toolkit`](../../host_configuration_scripts/docker_nvidia_container_toolkit/README.md).
 
-Treat the bundle as a debugging tool. The job holds the worker for the full `SessionMinutes` whether or not anyone is connected, and disconnecting your session does not release it, so worker time bills until the timer expires. Keep `SessionMinutes` short.
+Treat the bundle as a debugging tool. The job holds the worker for the full `SessionMinutes` whether or not anyone is connected, and disconnecting your session does not release it, so worker time bills until the timer expires. Keep `SessionMinutes` short and cancel the job when you finish.
 
-Cancelling the job stops that billing early, at a cost: cancellation kills the session action before the cleanup block at `job/template.yaml:120-126` runs, so the node stays registered and the agent keeps running with the hybrid activation identity on disk. Deregistration only happens when the timer completes normally. After a cancel, clean up yourself:
+Cancelling stops the billing, but the `mi-` entry remains in your account's SSM inventory either way. Deregister it afterwards:
 
 ```bash
 aws ssm deregister-managed-instance --instance-id mi-XXXXXXXXX --region us-west-2

@@ -8,7 +8,7 @@ This bundle is the Windows sibling of [`ssh_to_smf`](../ssh_to_smf/README.md). T
 
 ## Why Shell Access to a Worker?
 
-The motivation matches the Linux bundle: see [Why Shell Access to a Worker?](../ssh_to_smf/README.md#why-shell-access-to-a-worker) for the use cases. Windows adds a full desktop over the same tunnel, which makes it useful for problems that only surface in a GUI, such as an Autodesk licensing dialog that appears on first launch or a plugin that fails to register in a DCC's interface. Port forwarding carries RDP alongside any HTTP service, so `mstsc` and a browser both work against `localhost`. Reaching the job's own environment takes an extra step here, since `job-user` cannot log in until you give it a password: see [Logging in as `job-user`](#logging-in-as-job-user-optional) below.
+The motivation matches the Linux bundle: see [Why Shell Access to a Worker?](../ssh_to_smf/README.md#why-shell-access-to-a-worker) for the use cases. Windows adds a full desktop, which makes it useful for problems that only surface in a GUI, such as an Autodesk licensing dialog that appears on first launch or a plugin that fails to register in a DCC's interface.
 
 ## How It Works
 
@@ -207,7 +207,7 @@ Log in as the RDP user configured in `host_config.ps1` (default: username `RDP`,
 
 ##### Logging in as `job-user` (optional)
 
-`job-user` is the Deadline worker service account that actually runs the job. By default it does not support login with an exposed password, so you cannot RDP in as `job-user` directly. Giving it a password lets you in, with the same token and the same view of the filesystem the job gets. First RDP in as the `RDP` admin. Then open an elevated PowerShell and run:
+`job-user` is the Deadline worker service account that actually runs the job. By default it does not support login with an exposed password, so you cannot RDP in as `job-user` directly. If you want to inspect the job environment as `job-user` (same token, same env vars, same filesystem view), first RDP in as the `RDP` admin, open an elevated PowerShell, and run:
 
 ```powershell
 Set-LocalUser -Name job-user -Password (ConvertTo-SecureString -AsPlainText -Force 'ChangeMe2026!!@@##')
