@@ -59,7 +59,7 @@ This table covers all 53 immediate user-selectable recipe directories in `conda_
 | [Arnold for Maya 2027](maya-mtoa-2027/) | Packaging MtoA against the Maya 2027 package | Maya 2027 jobs render with Arnold |
 | [Maya OpenJD adaptor](maya-openjd/) | Packaging the Maya integration adaptor | Maya jobs need OpenJD session integration |
 | [Redshift for Maya 2025](maya-redshift-2025/) | Packaging Redshift 2025 for supported Maya versions | Maya jobs use Redshift 2025 |
-| [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya jobs use Redshift 2026 |
+| [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya 2025, 2026 or 2027 jobs use Redshift 2026 |
 | [V-Ray for Maya 2025](maya-vray-2025/) | Packaging V-Ray for Maya 2025 | Maya 2025 jobs render with V-Ray |
 | [V-Ray for Maya 2026](maya-vray-2026/) | Packaging V-Ray for Maya 2026 | Maya 2026 jobs render with V-Ray |
 | [V-Ray 7.2 for Maya 2025](maya-vray-7.2-2025/) | Pinning V-Ray 7.20.02 to Maya 2025 | You need the exact V-Ray 7.2/Maya 2025 combination |
