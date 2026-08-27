@@ -28,6 +28,10 @@ The included `redshift_spheres.ma` is three spheres on a ground plane with `Reds
 shaders, a `RedshiftDomeLight`, and a camera named `renderCamera`. It was saved from Maya
 2025 so that it opens in every Maya version the `maya-redshift` package supports.
 
+Maya records the Redshift version the scene was saved with in that `requires` statement, but
+the version is informational: any Redshift release that supports the Maya version you render
+with will load the plugin and render the scene.
+
 ## Job submission
 
 ```sh

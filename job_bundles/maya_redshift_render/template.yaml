@@ -127,7 +127,7 @@ steps:
             -s {{Task.Param.Frame}} \
             -e {{Task.Param.Frame}} \
             -pad 4 \
-            -cam {{Param.CameraName}} \
+            -cam '{{Param.CameraName}}' \
             -x {{Param.ImageWidth}} \
             -y {{Param.ImageHeight}} \
             '{{Param.MayaSceneFile}}'
