@@ -285,7 +285,7 @@ job to Deadline Cloud.
 
 You can select the default build tool between rattler-build and conda-build (deprecated) for the whole recipe
 by setting this option. [Rattler build](https://prefix-dev.github.io/rattler-build/)
-is a newer tool built with rust and using a new package build recipe format established
+is a newer tool built with rust and using a new recipe format for building packages, established
 in conda enhancement proposals [CEP 13](https://github.com/conda/ceps/blob/main/cep-0013.md)
 and [CEP 14](https://github.com/conda/ceps/blob/main/cep-0014.md). [Conda build](https://docs.conda.io/projects/conda-build/)
 (support in this sample is deprecated) is the original package building tool implemented for conda. Rattler build typically

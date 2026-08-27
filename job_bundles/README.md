@@ -9,7 +9,7 @@ for more about submitting these jobs to your farm.
 
 ## Job bundle index
 
-This table covers every immediate user-selectable sample directory or collection in `job_bundles/`.
+This table is the complete index of user-selectable sample directories and collections in `job_bundles/`.
 Nested collections provide their own complete indexes where applicable.
 
 | Sample | What it demonstrates | Start here when |
@@ -106,4 +106,4 @@ If you do not want to use the `deadline` Python package's support for features l
 ## Example Husk USD render with asset introspection
 
 The [Houdini Husk USD render](houdini_husk_usd_render/) sample shows how to use the Houdini Husk CLI USD renderer using a short job template and service-provided Conda packages.
-It also shows how to write a custom asset introspection tool for job attachments, ensuring that only the required data is uploaded while removing manual steps for artists.
+It also shows how to write a custom tool that introspects assets for job attachments, ensuring that only the required data is uploaded while removing manual steps for artists.
