@@ -42,7 +42,7 @@ $ deadline bundle submit maya_vray_render \
 
 ## Job bundle customization
 
-V-Ray rejects `-fnc` with `Invalid flag`, which is why this bundle does not pass it. Run
+V-Ray rejects `-fnc` with `Invalid flag`, so this bundle does not pass it. Run
 `Render -r vray -help` to list the supported flags. The output image format comes from the
 scene's `vraySettings.imageFormatStr`, so change it in the scene rather than here.
 
