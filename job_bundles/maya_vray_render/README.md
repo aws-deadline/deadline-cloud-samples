@@ -24,8 +24,8 @@ its `requires "vrayformaya"` statement, which Maya writes for any scene containi
 nodes. Rendering a scene without them fails with `Unrecognized node type 'VRaySettingsNode'`.
 
 The included `vray_spheres.ma` is three spheres on a ground plane with a camera named
-`renderCamera` and a `VRaySettingsNode` set to write EXR. Rebuild it for a new Maya or V-Ray
-version with `mayapy scripts/make_vray_scene.py`.
+`renderCamera` and a `VRaySettingsNode` set to write EXR. It was saved from Maya 2027, so if
+you render with an older Maya, save your own scene from that version instead.
 
 ## Job submission
 
