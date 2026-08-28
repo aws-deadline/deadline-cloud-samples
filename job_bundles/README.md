@@ -44,6 +44,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Maya Arnold export and render](maya_arnold_ass_export_render/) | Exporting `.ass` once, then rendering frames with Arnold `kick` | You want separate DCC export and renderer-only steps |
 | [Maya CLI render](maya_cli_render/) | Rendering a Maya scene with the CLI `Render` command | You need a small Maya command-line example |
 | [Maya Redshift render](maya_redshift_render/) | Rendering a Maya scene with the GPU-accelerated Redshift renderer | Your Maya jobs render with Redshift |
+| [Maya V-Ray render](maya_vray_render/) | Rendering a Maya scene with V-Ray, plus a PNG for quick checking | Your Maya jobs render with V-Ray |
 | [Monte Carlo simulation](monte_carlo_simulation/) | Parallel financial simulation followed by result aggregation | You want a non-rendering fan-out/fan-in workload |
 | [MuJoCo sim-to-policy](mujoco_sim_to_policy/) | Simulation data generation, policy training, and rendered evaluation | You need a multi-step robotics ML workflow |
 | [Nuke render](nuke_render/) | Frame-parallel headless compositing with `nuke -x` | You need to render Nuke scripts on workers |
