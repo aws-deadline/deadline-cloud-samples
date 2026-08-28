@@ -62,7 +62,7 @@ This table covers all 54 immediate user-selectable recipe directories in `conda_
 | [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya 2025, 2026 or 2027 jobs use Redshift 2026 |
 | [V-Ray for Maya 2025](maya-vray-2025/) | Packaging V-Ray for Maya 2025 | Maya 2025 jobs render with V-Ray |
 | [V-Ray for Maya 2026](maya-vray-2026/) | Packaging V-Ray for Maya 2026 | Maya 2026 jobs render with V-Ray |
-| [V-Ray for Maya 2027](maya-vray-2027/) | Packaging V-Ray 7.40.04 for Maya 2027 | Maya 2027 jobs render with V-Ray |
+| [V-Ray for Maya 2027](maya-vray-2027/) | Packaging V-Ray for Maya 2027 | Maya 2027 jobs render with V-Ray |
 | [V-Ray 7.2 for Maya 2025](maya-vray-7.2-2025/) | Pinning V-Ray 7.20.02 to Maya 2025 | You need the exact V-Ray 7.2/Maya 2025 combination |
 | [V-Ray 7.2 for Maya 2026](maya-vray-7.2-2026/) | Pinning V-Ray 7.20.02 to Maya 2026 | You need the exact V-Ray 7.2/Maya 2026 combination |
 | [Nerfstudio](nerfstudio/) | Packaging Nerfstudio and Gaussian Splatting extras | You train NeRF or Gaussian Splatting models |

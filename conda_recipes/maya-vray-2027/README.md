@@ -9,10 +9,11 @@ Download the `vray_74004_maya2027_dr2_rhel8` installer from
 `conda_recipes/archive_files` directory in your git clone of the
 [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository.
 
-If you use a different installer version, update the filename and version in
-`deadline-cloud.yaml` and `recipe/recipe.yaml`, and the module name in `recipe/build.sh`.
-Chaos does not use one naming scheme for every release, so compare the filename against
-your download rather than assuming it follows the 2026 pattern.
+## Use a different V-Ray or Maya version
+
+Update the filename and version in `deadline-cloud.yaml` and `recipe/recipe.yaml`, and the
+module name in `recipe/build.sh`. Chaos does not use one naming scheme for every release, so
+compare the filename against your download rather than assuming it follows the 2026 pattern.
 
 ## Build the package
 
@@ -24,4 +25,12 @@ $ ./submit-package-job maya-2027
 $ ./submit-package-job maya-vray-2027
 ```
 
-To render with it, see the [maya_vray_render](../../job_bundles/maya_vray_render/) job bundle.
+## Test it end to end
+
+Render the [maya_vray_render](../../job_bundles/maya_vray_render/) sample. It ships a V-Ray
+scene and writes a PNG next to the EXR, so you can confirm the package works by looking at
+the output.
+
+```sh
+$ deadline bundle submit maya_vray_render
+```
