@@ -65,10 +65,9 @@ mkdir -p $PREFIX/etc/conda/activate.d
 cat <<EOF > $PREFIX/etc/conda/activate.d/$PKG_NAME-$PKG_VERSION-vars.sh
 export "VRAY_EULA=https://docs.chaos.com/display/VNS/End+User+License+Agreement"
 
-# When Maya dlopens vrayformaya.so, the loader picks Maya's own libQt6XcbQpa.so.6, which
-# needs libxcb-cursor.so.0 and has a DT_RUNPATH of only \$ORIGIN. That makes the lib/aux
-# copy unreachable through RPATHs, and LD_LIBRARY_PATH is read at process start, so it must
-# be set here. Appended so a system copy still wins when one exists.
+# V-Ray needs libxcb-cursor.so.0, which this package ships in lib/aux. The loader picks
+# Maya's Qt over V-Ray's, and Maya's Qt cannot see lib/aux, so vrayformaya fails to load.
+# Set LD_LIBRARY_PATH at activation to make lib/aux discoverable by Maya.
 export MAYA_VRAY_${MAYA_VERSION}_SAVED_LD_LIBRARY_PATH="\${LD_LIBRARY_PATH-}"
 export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH:+\$LD_LIBRARY_PATH:}\$CONDA_PREFIX/opt/chaos/maya-vray-$MAYA_VERSION/lib/aux"
 EOF
