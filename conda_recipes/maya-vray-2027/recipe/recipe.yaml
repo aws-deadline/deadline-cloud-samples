@@ -1,0 +1,40 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version_maya: "2027"
+  version_vray: "7.40.04"
+
+package:
+  name: maya-vray
+  version: ${{ version_maya + "." + version_vray }}
+
+source:
+  url: file://archive_files/vray_${{ version_vray | replace(".", "") }}_maya${{ version_maya }}_dr2_rhel8
+  sha256: 67dab04ce9f71a23d0fcbfd76bdd096b7fc90863c47e86eae7824a4464dff2cf
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#prefix-detection-replacement-options
+  prefix_detection:
+    ignore_binary_files: True
+  # https://prefix-dev.github.io/rattler-build/latest/build_options/#dynamic-linking-configuration
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  build:
+    - patchelf
+  run:
+    - maya ${{ version_maya }}.*
+
+about:
+  homepage: https://www.chaos.com/vray/maya
+  documentation: https://docs.chaos.com/display/VMAYA
+  license: LicenseRef-ChaosEULA
+  summary: |
+    V-Ray is a 3D photorealistic ray-traced rendering plug-in.
+    V-Ray for Maya is a 3D rendering plugin for Maya that's used to create visual effects and animations for film, television, and other industries.
