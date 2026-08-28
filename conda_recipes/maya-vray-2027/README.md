@@ -27,9 +27,9 @@ $ ./submit-package-job maya-vray-2027
 
 ## Test it end to end
 
-Render the [maya_vray_render](../../job_bundles/maya_vray_render/) sample. It ships a V-Ray
-scene and writes a PNG next to the EXR, so you can confirm the package works by looking at
-the output.
+Render the [maya_vray_render](../../job_bundles/maya_vray_render/) sample. It includes a
+V-Ray scene and writes a PNG next to the EXR, so you can confirm the package works by
+looking at the output.
 
 ```sh
 $ deadline bundle submit maya_vray_render
