@@ -67,9 +67,13 @@ export "VRAY_EULA=https://docs.chaos.com/display/VNS/End+User+License+Agreement"
 
 # V-Ray needs libxcb-cursor.so.0, which this package ships in lib/aux. The loader picks
 # Maya's Qt over V-Ray's, and Maya's Qt cannot see lib/aux, so vrayformaya fails to load.
-# Set LD_LIBRARY_PATH at activation to make lib/aux discoverable by Maya.
-export MAYA_VRAY_${MAYA_VERSION}_SAVED_LD_LIBRARY_PATH="\${LD_LIBRARY_PATH-}"
-export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH:+\$LD_LIBRARY_PATH:}\$CONDA_PREFIX/opt/chaos/maya-vray-$MAYA_VERSION/lib/aux"
+# Set LD_LIBRARY_PATH at activation to make lib/aux discoverable by Maya. Only save the
+# original value once, so activating twice cannot overwrite it and leave lib/aux on the
+# path after deactivation.
+if [ -z "\${MAYA_VRAY_${MAYA_VERSION}_SAVED_LD_LIBRARY_PATH+x}" ]; then
+    export MAYA_VRAY_${MAYA_VERSION}_SAVED_LD_LIBRARY_PATH="\${LD_LIBRARY_PATH-}"
+    export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH:+\$LD_LIBRARY_PATH:}\$CONDA_PREFIX/opt/chaos/maya-vray-$MAYA_VERSION/lib/aux"
+fi
 EOF
 
 mkdir -p $PREFIX/etc/conda/deactivate.d

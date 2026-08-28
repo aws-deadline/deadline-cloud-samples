@@ -98,6 +98,18 @@ parameterDefinitions:
     control: HIDDEN
   description: Choose which conda packages to install for the render. Requires a conda queue environment to process the value.
   default: maya maya-vray openimageio
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
+  description: >
+    Choose which conda channels to install packages from. Requires a conda queue
+    environment to process the value. Maya 2027 is only on the "deadline-cloud-v2"
+    channel, and openimageio comes from the conda-forge community channel. Add the
+    channel hosting your own maya-vray package to this list.
+  default: deadline-cloud-v2 deadline-cloud conda-forge
 
 steps:
 
