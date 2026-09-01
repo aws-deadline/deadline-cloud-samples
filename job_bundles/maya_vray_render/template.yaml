@@ -1,15 +1,18 @@
 specificationVersion: 'jobtemplate-2023-09'
-name: Maya CLI Render
+name: Maya V-Ray Render
 description: |
-  This job bundle renders a Maya software renderer scene with the Maya CLI `Render` command.
+  This job bundle renders a Maya scene with the V-Ray renderer using the
+  Maya CLI `Render` command.
 
-  To run it, you will need a Maya installation available in the PATH in one of the following ways:
-    * As a conda package when your queue has a conda queue environment set up to
-      provide virtual environments for jobs.
+  To run it, you will need Maya and V-Ray available in the PATH in one of the following ways:
+    * As conda packages when your queue has a conda queue environment set up to
+      provide virtual environments for jobs. The `maya-vray` package provides the
+      vrayformaya plugin as a Maya module.
     * Installed on the worker hosts that run the job. You can customize your Deadline Cloud
       queue, fleets, and this job to fit your own production pipeline.
 
-  See the embedded README.md for more information about this job and its default scene file.
+  V-Ray renders on CPU by default and requires a license. See the embedded README.md for
+  more information about this job, its default scene file, and its licensing requirements.
 
 parameterDefinitions:
 
@@ -28,25 +31,29 @@ parameterDefinitions:
     - label: All Files
       patterns: ["*"]
   description: >
-    Choose the Maya scene file you want to render.
+    Choose the Maya scene file you want to render with V-Ray.
+
+    The scene must select V-Ray as its renderer. A scene that contains V-Ray
+    nodes records a `requires "vrayformaya"` statement, which makes Maya load the
+    plugin when it reads the scene.
 
     Use the 'Job Attachments' tab of the submitter GUI to add textures
     and other files that the job needs.
-  default: fallinggears.ma
+  default: vray_spheres.ma
 - name: Frames
   type: STRING
   userInterface:
     control: LINE_EDIT
     label: Frames
     groupLabel: Render Parameters
-  default: 1-60
+  default: "1"
 - name: CameraName
   type: STRING
   userInterface:
     control: LINE_EDIT
     label: Camera Name
     groupLabel: Render Parameters
-  default: persp
+  default: renderCamera
 - name: ImageWidth
   type: INT
   userInterface:
@@ -77,8 +84,9 @@ parameterDefinitions:
   dataFlow: IN
   userInterface:
     control: CHOOSE_DIRECTORY
-    label: Output Directory
+    label: Project Path
     groupLabel: Render Parameters
+  description: Choose the Maya project directory.
   default: "."
 
 # Software Environment
@@ -89,7 +97,19 @@ parameterDefinitions:
     # so leave the GUI for the queue environment to display.
     control: HIDDEN
   description: Choose which conda packages to install for the render. Requires a conda queue environment to process the value.
-  default: maya
+  default: maya maya-vray openimageio
+- name: CondaChannels
+  type: STRING
+  userInterface:
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
+  description: >
+    Choose which conda channels to install packages from. Requires a conda queue
+    environment to process the value. Maya 2027 is only on the "deadline-cloud-v2"
+    channel, and openimageio comes from the conda-forge community channel. Add the
+    channel hosting your own maya-vray package to this list.
+  default: deadline-cloud-v2 deadline-cloud conda-forge
 
 steps:
 
@@ -110,17 +130,27 @@ steps:
         cd '{{Param.ProjectPath}}'
 
         set -x
-        Render -r sw \
+        # The V-Ray renderer accepts a different set of flags than the Maya software
+        # renderer. Notably it rejects -fnc with "Invalid flag". Run
+        # `Render -r vray -help` to list the flags it supports.
+        Render -r vray \
             -proj '{{Param.ProjectPath}}' \
             -rd '{{Param.OutputDir}}' \
             -s {{Task.Param.Frame}} \
             -e {{Task.Param.Frame}} \
             -pad 4 \
-            -fnc "name.#.ext" \
             -cam '{{Param.CameraName}}' \
             -x {{Param.ImageWidth}} \
             -y {{Param.ImageHeight}} \
             '{{Param.MayaSceneFile}}'
+
+        # Also write a PNG next to each rendered EXR so you can check the result without
+        # an EXR viewer. oiiotool comes from the openimageio conda package. If the scene
+        # is set to write a format other than EXR, there is nothing to convert.
+        shopt -s nullglob
+        for RENDERED in '{{Param.OutputDir}}'/*.exr; do
+            oiiotool "$RENDERED" --colorconvert linear sRGB -o "${RENDERED%.exr}.png"
+        done
     actions:
       onRun:
         command: bash

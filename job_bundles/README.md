@@ -9,7 +9,7 @@ for more about submitting these jobs to your farm.
 
 ## Job bundle index
 
-This table covers every immediate user-selectable sample directory or collection in `job_bundles/`.
+This table is the complete index of user-selectable sample directories and collections in `job_bundles/`.
 Nested collections provide their own complete indexes where applicable.
 
 | Sample | What it demonstrates | Start here when |
@@ -43,6 +43,8 @@ Nested collections provide their own complete indexes where applicable.
 | [List available Conda packages](list_available_conda_packages/) | Querying a Conda channel from a Deadline Cloud job | You need to inspect packages visible to workers |
 | [Maya Arnold export and render](maya_arnold_ass_export_render/) | Exporting `.ass` once, then rendering frames with Arnold `kick` | You want separate DCC export and renderer-only steps |
 | [Maya CLI render](maya_cli_render/) | Rendering a Maya scene with the CLI `Render` command | You need a small Maya command-line example |
+| [Maya Redshift render](maya_redshift_render/) | Rendering a Maya scene with the GPU-accelerated Redshift renderer | Your Maya jobs render with Redshift |
+| [Maya V-Ray render](maya_vray_render/) | Rendering a Maya scene with V-Ray, plus a PNG for quick checking | Your Maya jobs render with V-Ray |
 | [Monte Carlo simulation](monte_carlo_simulation/) | Parallel financial simulation followed by result aggregation | You want a non-rendering fan-out/fan-in workload |
 | [MuJoCo sim-to-policy](mujoco_sim_to_policy/) | Simulation data generation, policy training, and rendered evaluation | You need a multi-step robotics ML workflow |
 | [Nuke render](nuke_render/) | Frame-parallel headless compositing with `nuke -x` | You need to render Nuke scripts on workers |
@@ -105,4 +107,4 @@ If you do not want to use the `deadline` Python package's support for features l
 ## Example Husk USD render with asset introspection
 
 The [Houdini Husk USD render](houdini_husk_usd_render/) sample shows how to use the Houdini Husk CLI USD renderer using a short job template and service-provided Conda packages.
-It also shows how to write a custom asset introspection tool for job attachments, ensuring that only the required data is uploaded while removing manual steps for artists.
+It also shows how to write a custom tool that introspects assets for job attachments, ensuring that only the required data is uploaded while removing manual steps for artists.
