@@ -48,6 +48,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Monte Carlo simulation](monte_carlo_simulation/) | Parallel financial simulation followed by result aggregation | You want a non-rendering fan-out/fan-in workload |
 | [MuJoCo sim-to-policy](mujoco_sim_to_policy/) | Simulation data generation, policy training, and rendered evaluation | You need a multi-step robotics ML workflow |
 | [Nuke render](nuke_render/) | Frame-parallel headless compositing with `nuke -x` | You need to render Nuke scripts on workers |
+| [OpenDroneMap simple job](opendronemap_simple_job/) | One-task CPU container photogrammetry for an attached aerial survey, with progress reporting and validated geospatial outputs | You want to process a small aerial survey on one Docker-enabled Linux worker |
 | [Pip package job](pip_package_job/) | Declaring Python dependencies for a pip queue environment | A shared queue environment should provide job packages |
 | [Pip self-contained job](pip_self_contained_job/) | Creating and activating a pip environment inside one bundle | You cannot or do not want to configure the queue |
 | [POV-Ray 3.7](povray-3.7/) | Raytracing with a Conda-provided command-line renderer | You want a portable, lightweight render example |

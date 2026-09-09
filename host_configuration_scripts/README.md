@@ -11,6 +11,7 @@ This table covers every immediate user-selectable group or leaf directory in `ho
 | [3ds Max](3dsmax/) | Windows installation for multiple 3ds Max, renderer, and plugin combinations | You need 3ds Max on service-managed workers |
 | [After Effects and Red Giant](aftereffects/) | Installing After Effects with optional Red Giant plugins | You need Adobe and Maxon software installed as administrator |
 | [Cinema 4D and Red Giant](cinema4d/) | Installing Cinema 4D with Red Giant plugins | You need Cinema 4D and Maxon plugins on Windows workers |
+| [Docker Engine](docker_engine/) | Installing Docker for CPU-only containers on Amazon Linux 2023 | Jobs run trusted Linux application containers without GPU access |
 | [Docker and NVIDIA Container Toolkit](docker_nvidia_container_toolkit/) | Installing Docker and the NVIDIA runtime on Linux GPU workers | Jobs run GPU-accelerated containers |
 | [Linux font installation](linux_font_installation/) | Downloading fonts from S3 and registering them system-wide | Render applications need studio fonts |
 | [Memory overcommit override](overcommit_override_for_smf/) | Changing `vm.overcommit_memory` on Linux workers | Large attachments or allocations fail despite free memory |
