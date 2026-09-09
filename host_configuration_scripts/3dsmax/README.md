@@ -24,6 +24,14 @@ Scripts are grouped by 3ds Max version. Each installs the listed software. Some 
 | [3dsmax-2025-vray-and-tyflow.ps1](3dsmax-2025-vray-and-tyflow.ps1) | 3ds Max 2025 + V-Ray + tyFlow | V-Ray (Chaos); tyFlow |
 | [3dsmax-2025-and-pencilplus-4.ps1](3dsmax-2025-and-pencilplus-4.ps1) | 3ds Max 2025 + Pencil+ 4 (NTR, renders watermark-free under 3dsmaxcmd) | Pencil+ 4 (PSOFT) |
 
+### 3ds Max 2026
+
+| Sample | Installs | Extra installers to stage |
+|---|---|---|
+| [3dsmax-2026-pencilplus-persistent/](3dsmax-2026-pencilplus-persistent/) | 3ds Max 2026 + Pencil+ 4, with S3-first caching and optional persistent-volume acceleration | Pencil+ 4 (PSOFT) |
+
+Unlike the other samples, this one installs only once. The result is cached to S3 and reused on later workers rather than reinstalled. It has its own [README](3dsmax-2026-pencilplus-persistent/README.md) covering the caching model and the S3 bootstrap loader used to deploy it.
+
 ### 3ds Max 2027
 
 | Script | Installs | Extra installers to stage |
@@ -35,7 +43,7 @@ Scripts are grouped by 3ds Max version. Each installs the listed software. Some 
 | [3dsmax-2027-vray-and-aec-plugins.ps1](3dsmax-2027-vray-and-aec-plugins.ps1) | 3ds Max 2027 + V-Ray + Forest Pack + RailClone + FloorGenerator + MultiTexture | V-Ray (Chaos); Forest Pack & RailClone (iToo); FloorGenerator; MultiTexture |
 | [3dsmax-2027-and-pencilplus-4.ps1](3dsmax-2027-and-pencilplus-4.ps1) | 3ds Max 2027 + Pencil+ 4 (NTR, renders watermark-free under 3dsmaxcmd) | Pencil+ 4 (PSOFT) |
 
-The samples cover 3ds Max 2024, 2025, and 2027. The Deadline Cloud submitter also supports 3ds Max 2026. Adapt the nearest script for that installer and verify all product-specific silent-install options.
+The samples cover 3ds Max 2024, 2025, 2026, and 2027. Adapt the nearest script for other installers and verify all product-specific silent-install options.
 
 > **Using 3ds Max 2027?** Read [Known issue: Autodesk ADP "Failed to start"](#known-issue-autodesk-adp-failed-to-start-3ds-max-2027) before provisioning a fleet.
 
