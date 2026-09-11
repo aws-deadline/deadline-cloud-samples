@@ -22,7 +22,7 @@ processes one survey per job on one worker.
   to prevent scheduling on Linux workers without Docker.
 - Fleet capabilities of at least 8 vCPUs, 32 GiB RAM, and 200 GiB through the
   custom amount `amount.WorkerScratchGiB`. The step requests these minimums
-  from the scheduler; larger surveys can require more memory.
+  from the scheduler. Larger surveys can require more memory.
 - At least 20 GiB free worker disk for the image layers, attached inputs,
   processing scratch data, and packaged outputs. The task checks this before
   processing.
@@ -33,7 +33,7 @@ processes one survey per job on one worker.
 
 The pinned ODM image is a multi-architecture manifest for Linux x86_64 and
 ARM64. A worker still needs enough memory and disk; architecture support alone
-does not establish that a given instance size meets the baseline.
+does not establish that an instance size meets the baseline.
 
 ### Create a compatible fleet
 
@@ -125,13 +125,13 @@ output directory because a retry replaces that sample-owned subdirectory.
 | `OrthophotoResolution` | `10` | Orthophoto resolution in centimeters per pixel. |
 | `FeatureQuality` | `low` | ODM feature extraction quality: `ultra`, `high`, `medium`, `low`, or `lowest`. |
 | `PointCloudQuality` | `lowest` | ODM dense point cloud quality using the same quality levels. |
-| `GenerateDsm` | `True` | Generate a digital surface model. |
+| `GenerateDsm` | `True` | Generate ODM's DSM elevation raster. |
 | `GenerateDtm` | `False` | Classify ground points and generate a digital terrain model. |
 | `MaxConcurrency` | `2` | Positive integer limiting concurrent ODM processes. ODM estimates roughly 1 GiB per process for 2-megapixel images. |
 
 The task recursively finds `.jpg` and `.jpeg` files case-insensitively and
-flattens them into ODM's `images/` directory. Image basenames must therefore be
-unique without regard to case. Empty files, symlinks, duplicate content, and
+flattens them into ODM's `images/` directory, so image basenames must be unique
+without regard to case. Empty files, symlinks, duplicate content, and
 directories without JPEGs are rejected. ODM performs the authoritative image,
 camera, and geolocation validation.
 
@@ -152,9 +152,10 @@ all ODM intermediates:
    artifact, and write a checksummed JSON manifest.
 
 The task uses OpenJD's notify-then-terminate cancellation mode. On cancellation,
-the script asks Docker to stop ODM, waits up to 20 seconds, removes the named
-container, packages any partial log/results, and returns the container status.
-Normal nonzero ODM exits are also returned unchanged.
+the script asks Docker to stop ODM and allows up to 20 seconds for shutdown. It
+then removes the ODM task container, packages any partial log/results, and
+returns the container status. Normal nonzero ODM exits are also returned
+unchanged.
 
 Each task uses a fresh, network-disabled `--rm` container labeled for its
 worker session. The job environment removes any labeled container left behind

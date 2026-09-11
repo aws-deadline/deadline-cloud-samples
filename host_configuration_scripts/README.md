@@ -4,7 +4,9 @@ Host configuration scripts run with elevated privileges on service-managed fleet
 
 ## Sample index
 
-This table covers every immediate user-selectable group or leaf directory in `host_configuration_scripts/`. The application groups link to their own installer examples. Implementation scripts remain inside each sample.
+This table lists the user-selectable groups and leaf directories directly under
+`host_configuration_scripts/`. The application groups link to their own
+installer examples. Implementation scripts remain inside each sample.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -39,7 +41,8 @@ Host configuration logs are streamed to the fleet log group and a stream dedicat
 
 ### CloudWatch Logs Insights
 
-This query extracts host configuration exit codes in reverse chronological order:
+This query extracts exit codes from host configuration runs in reverse
+chronological order:
 
 ```text
 fields @timestamp, @message, @logStream, @log

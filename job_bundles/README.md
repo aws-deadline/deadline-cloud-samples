@@ -53,7 +53,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Pip self-contained job](pip_self_contained_job/) | Creating and activating a pip environment inside one bundle | You cannot or do not want to configure the queue |
 | [POV-Ray 3.7](povray-3.7/) | Raytracing with a Conda-provided command-line renderer | You want a portable, lightweight render example |
 | [Redshift 2025](redshift-2025/) | Rendering Cinema 4D Redshift scenes with `redshiftCmdLine` | You need direct Windows Redshift command-line rendering |
-| [Satellite classification](satellite_classification/) | Per-tile image classification followed by mosaic assembly | Independent input files should fan out and merge |
+| [Satellite classification](satellite_classification/) | Per-tile image classification followed by mosaic assembly | Independent input files should run in parallel and merge |
 | [Simple job](simple_job/) | The smallest developer-guide OpenJD job bundle | You are submitting your first custom job |
 | [SSH to SMF](ssh_to_smf/) | Temporary Linux SSH access through an SSM hybrid managed node | You need interactive debugging on a service-managed worker |
 | [SSH to SMF on Windows](ssh_to_smf_windows/) | Temporary RDP, SSH, or PowerShell access through SSM | You need interactive debugging on a Windows worker |

@@ -5,7 +5,7 @@ Amazon Linux 2023 service-managed fleet workers. Use it for Linux jobs that run
 CPU-only application containers, including the
 [OpenDroneMap simple job](../../job_bundles/opendronemap_simple_job/).
 
-## What the script does
+## Installed components
 
 1. Installs Docker, download/archive tools, Python 3, and `runuser` with `dnf`.
 2. Enables and starts the Docker daemon.
@@ -24,9 +24,9 @@ its queue, and do not use this configuration as a sandbox for untrusted code.
 
 ## Create a compatible fleet
 
-No CloudFormation or custom image is required. The Deadline Cloud console can
-create the farm, job-attachment queue, S3 bucket, and service roles through its
-standard setup workflow. Starting with no fleet:
+Use the standard Deadline Cloud console workflow to create the farm,
+job-attachment queue, S3 bucket, and service roles. You do not need a
+CloudFormation template or custom image. To create a fleet:
 
 1. Create or select a farm and a queue with job attachments enabled.
 2. Create a service-managed fleet using Linux and `x86_64`. Set its minimum
@@ -73,9 +73,10 @@ aws deadline update-fleet \
 ```
 
 The fleet must already have the `attr.DockerEngine=available` custom attribute.
-Disk-intensive fleets also need `amount.WorkerScratchGiB` as described above.
-Scale existing workers to zero before launching a replacement worker, because
-an in-service worker does not rerun the updated host configuration.
+Disk-intensive fleets also need `amount.WorkerScratchGiB`, with its minimum and
+maximum set to the root volume size in GiB. Scale existing workers to zero
+before launching a replacement worker, because an in-service worker does not
+rerun the updated host configuration.
 
 ## Prerequisites
 
@@ -83,6 +84,6 @@ an in-service worker does not rerun the updated host configuration.
 - Outbound access to the configured Amazon Linux package repositories.
 - Enough worker disk for Docker layers and job scratch data.
 
-No NVIDIA driver or container toolkit is installed. Use the
+The script does not install an NVIDIA driver or container toolkit. Use the
 [Docker and NVIDIA Container Toolkit](../docker_nvidia_container_toolkit/)
 configuration for GPU containers.
