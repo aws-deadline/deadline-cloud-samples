@@ -410,7 +410,7 @@ class OpenDroneMapJob:
         except KeyboardInterrupt:
             self.cancel_requested = True
             exit_code = 130
-        except BaseException as exc:
+        except Exception as exc:
             exit_code = 1
             print(
                 f"openjd_fail: unexpected OpenDroneMap failure: {exc}",

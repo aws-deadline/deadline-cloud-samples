@@ -44,11 +44,8 @@ def atomic_write_json(path: Path, value: object) -> None:
             json.dump(value, stream, indent=2, sort_keys=True, ensure_ascii=False)
             stream.write("\n")
         os.replace(temporary_name, path)
-    except BaseException:
-        try:
-            os.unlink(temporary_name)
-        except FileNotFoundError:
-            pass
+    except Exception:
+        Path(temporary_name).unlink(missing_ok=True)
         raise
 
 

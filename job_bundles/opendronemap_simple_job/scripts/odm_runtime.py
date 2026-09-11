@@ -7,16 +7,13 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
-import venv
 from pathlib import Path
 
 from odm_manifest import ODM_IMAGE
 
 ODM_IMAGE_DIGEST = ODM_IMAGE.rsplit("@", 1)[1]
-PILLOW_REQUIREMENT = "Pillow==11.3.0"
 CONTAINER_LABEL_KEY = "deadline-cloud-samples.odm-session"
 
 
@@ -93,46 +90,10 @@ def pull_and_verify_image() -> None:
         )
 
 
-def install_pillow(session_working_dir: Path) -> Path:
-    environment_dir = session_working_dir / ".odm-python"
-    shutil.rmtree(environment_dir, ignore_errors=True)
-    print(f"Creating Python environment with {PILLOW_REQUIREMENT}", flush=True)
-    venv.EnvBuilder(with_pip=True).create(environment_dir)
-    binary_dir = environment_dir / ("Scripts" if os.name == "nt" else "bin")
-    python = binary_dir / ("python.exe" if os.name == "nt" else "python")
-    installed = subprocess.run(
-        [
-            os.fspath(python),
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--only-binary=:all:",
-            PILLOW_REQUIREMENT,
-        ],
-        check=False,
-    )
-    if installed.returncode != 0:
-        raise RuntimeSetupError(f"Cannot install {PILLOW_REQUIREMENT}")
-    verified = subprocess.run(
-        [os.fspath(python), "-c", "import PIL; print('Pillow', PIL.__version__)"],
-        check=False,
-    )
-    if verified.returncode != 0:
-        raise RuntimeSetupError("Cannot import Pillow from the job environment")
-    return binary_dir
-
-
-def enter(session_working_dir: Path, with_pillow: bool) -> None:
+def enter(session_working_dir: Path) -> None:
     session_working_dir.mkdir(parents=True, exist_ok=True)
     cleanup_containers(session_working_dir)
     pull_and_verify_image()
-    if with_pillow:
-        binary_dir = install_pillow(session_working_dir)
-        path = os.pathsep.join((os.fspath(binary_dir), os.environ.get("PATH", "")))
-        print(f"openjd_env: PATH={path}", flush=True)
-        print(f"openjd_env: VIRTUAL_ENV={binary_dir.parent}", flush=True)
-        print("openjd_env: PYTHONNOUSERSITE=1", flush=True)
     print(
         f"openjd_env: ODM_SESSION_ID={session_identifier(session_working_dir)}",
         flush=True,
@@ -144,7 +105,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("enter", "exit"))
     parser.add_argument("--session-working-dir", type=Path, required=True)
-    parser.add_argument("--with-pillow", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -152,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         if args.action == "enter":
-            enter(args.session_working_dir, args.with_pillow)
+            enter(args.session_working_dir)
         else:
             cleanup_containers(args.session_working_dir)
     except RuntimeSetupError as exc:

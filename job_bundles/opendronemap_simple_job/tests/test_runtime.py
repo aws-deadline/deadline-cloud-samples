@@ -6,13 +6,11 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import os
 import sys
 import tempfile
-import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest import mock
+from unittest import TestCase, main, mock
 
 BUNDLE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BUNDLE_DIR / "scripts"))
@@ -20,7 +18,7 @@ sys.path.insert(0, str(BUNDLE_DIR / "scripts"))
 import odm_runtime  # noqa: E402
 
 
-class TestRuntime(unittest.TestCase):
+class TestRuntime(TestCase):
     @staticmethod
     def result(returncode: int = 0, stdout: str = "") -> argparse.Namespace:
         return argparse.Namespace(returncode=returncode, stdout=stdout, stderr="")
@@ -64,26 +62,20 @@ class TestRuntime(unittest.TestCase):
             ("rm", "--force", "container-one", "container-two"),
         )
 
-    def test_enter_exports_python_and_session_environment(self) -> None:
+    def test_enter_exports_session_identifier(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             session = Path(temporary)
-            binary_dir = session / ".odm-python" / "bin"
             output = io.StringIO()
             with (
                 mock.patch.object(odm_runtime, "cleanup_containers"),
                 mock.patch.object(odm_runtime, "pull_and_verify_image"),
-                mock.patch.object(
-                    odm_runtime, "install_pillow", return_value=binary_dir
-                ),
-                mock.patch.dict(os.environ, {"PATH": "/usr/bin"}),
                 redirect_stdout(output),
             ):
-                odm_runtime.enter(session, with_pillow=True)
+                odm_runtime.enter(session)
         value = output.getvalue()
-        self.assertIn(f"openjd_env: PATH={binary_dir}{os.pathsep}/usr/bin", value)
-        self.assertIn("openjd_env: VIRTUAL_ENV=", value)
         self.assertIn("openjd_env: ODM_SESSION_ID=", value)
+        self.assertIn("OpenDroneMap runtime ready", value)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

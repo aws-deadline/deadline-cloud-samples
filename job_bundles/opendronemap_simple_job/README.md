@@ -70,6 +70,31 @@ You can instead select a farm and queue for each submission. The job's
 `attr.DockerEngine=available` host requirement prevents it from using a
 generic Linux fleet that does not advertise the Docker configuration.
 
+### Try the public sample survey
+
+The preview below was generated from the CC0-licensed
+[OpenDroneMap data-zoo survey](https://github.com/OpenDroneMap/odm_data_zoo/tree/60a74095e297d76062ba14312fa581a74021916a).
+Download the same pinned revision and verify it before submission:
+
+```console
+curl --fail --location \
+    --output odm-data-zoo.tar.gz \
+    https://github.com/OpenDroneMap/odm_data_zoo/archive/60a74095e297d76062ba14312fa581a74021916a.tar.gz
+echo \
+    "a7a86646e8bd7a170a736d8f0973424e552a7454cbc04c1ffec58b104a99a220  odm-data-zoo.tar.gz" \
+    | shasum -a 256 --check
+tar -xzf odm-data-zoo.tar.gz
+```
+
+The archive expands to
+`odm_data_zoo-60a74095e297d76062ba14312fa581a74021916a/`; select its
+`images/` directory for `InputImages`. It contains 524 JPEGs totaling about
+3.44 GiB, so it is a substantial, multi-hour test rather than a quick smoke
+test. Use a fleet whose memory range starts at 64 GiB for this survey, monitor
+cost while it runs, and remove the downloaded archive and job attachments when
+finished. Runtime code treats this directory exactly like a private survey and
+does not special-case the sample.
+
 ## Submit
 
 From the repository root, review the parameters in the GUI:

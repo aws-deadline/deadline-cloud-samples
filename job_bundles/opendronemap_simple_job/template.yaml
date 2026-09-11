@@ -144,9 +144,11 @@ steps:
             - available
       amounts:
         - name: amount.worker.vcpu
-          min: 2
+          min: 8
         - name: amount.worker.memory
-          min: 8192
+          min: 32768
+        - name: amount.WorkerScratchGiB
+          min: 200
     script:
       actions:
         onRun:
