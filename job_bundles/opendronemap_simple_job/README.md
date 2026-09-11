@@ -157,6 +157,12 @@ open_drone_map/
     `-- ... texture images and supporting model files
 ```
 
+The image below is a browser-sized PNG preview of
+`odm_orthophoto/odm_orthophoto.tif`. The GeoTIFF returned by the job remains
+the authoritative geospatial output.
+
+![Downsampled preview of an ODM orthophoto generated from a drone survey](.readme_images/odm_orthophoto.png)
+
 Enabling `GenerateDtm` also requires and returns `odm_dem/dtm.tif`. The
 manifest records the ODM version and image digest; the relative path, staged
 name, size, and checksum of every input image; all processing parameters,
