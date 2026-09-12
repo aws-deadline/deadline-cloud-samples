@@ -4,13 +4,16 @@ Host configuration scripts run with elevated privileges on service-managed fleet
 
 ## Sample index
 
-This table covers every immediate user-selectable group or leaf directory in `host_configuration_scripts/`. The application groups link to their own installer examples. Implementation scripts remain inside each sample.
+This table lists the user-selectable groups and leaf directories directly under
+`host_configuration_scripts/`. The application groups link to their own
+installer examples. Implementation scripts remain inside each sample.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
 | [3ds Max](3dsmax/) | Windows installation for multiple 3ds Max, renderer, and plugin combinations | You need 3ds Max on service-managed workers |
 | [After Effects and Red Giant](aftereffects/) | Installing After Effects with optional Red Giant plugins | You need Adobe and Maxon software installed as administrator |
 | [Cinema 4D and Red Giant](cinema4d/) | Installing Cinema 4D with Red Giant plugins | You need Cinema 4D and Maxon plugins on Windows workers |
+| [Docker Engine](docker_engine/) | Installing Docker for CPU-only containers on Amazon Linux 2023 | Jobs run trusted Linux application containers without GPU access |
 | [Docker and NVIDIA Container Toolkit](docker_nvidia_container_toolkit/) | Installing Docker and the NVIDIA runtime on Linux GPU workers | Jobs run GPU-accelerated containers |
 | [Linux font installation](linux_font_installation/) | Downloading fonts from S3 and registering them system-wide | Render applications need studio fonts |
 | [Memory overcommit override](overcommit_override_for_smf/) | Changing `vm.overcommit_memory` on Linux workers | Large attachments or allocations fail despite free memory |
@@ -38,7 +41,8 @@ Host configuration logs are streamed to the fleet log group and a stream dedicat
 
 ### CloudWatch Logs Insights
 
-This query extracts host configuration exit codes in reverse chronological order:
+This query extracts exit codes from host configuration runs in reverse
+chronological order:
 
 ```text
 fields @timestamp, @message, @logStream, @log

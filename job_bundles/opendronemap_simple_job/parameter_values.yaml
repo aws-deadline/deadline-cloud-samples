@@ -1,0 +1,15 @@
+parameterValues:
+  - name: OutputDir
+    value: ./output
+  - name: OrthophotoResolution
+    value: 10
+  - name: FeatureQuality
+    value: low
+  - name: PointCloudQuality
+    value: lowest
+  - name: GenerateDsm
+    value: "True"
+  - name: GenerateDtm
+    value: "False"
+  - name: MaxConcurrency
+    value: 2

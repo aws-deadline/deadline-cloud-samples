@@ -1,0 +1,178 @@
+specificationVersion: jobtemplate-2023-09
+name: OpenDroneMap survey reconstruction
+description: |
+  Process a user-selected geotagged JPEG survey with OpenDroneMap 3.6.1 in a
+  CPU-only Docker container. The single task produces a GeoTIFF orthophoto,
+  LAZ point cloud, elevation models, textured OBJ, processing report, complete
+  log, and a checksummed run manifest.
+
+parameterDefinitions:
+  - name: InputImages
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: IN
+    description: Directory containing one geotagged RGB JPEG survey.
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Input images
+      groupLabel: Input and output
+
+  - name: OutputDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+    default: ./output
+    description: Directory that receives the open_drone_map result folder.
+    userInterface:
+      control: CHOOSE_DIRECTORY
+      label: Output directory
+      groupLabel: Input and output
+
+  - name: OrthophotoResolution
+    type: INT
+    default: 10
+    minValue: 1
+    description: Orthophoto ground resolution in centimeters per pixel.
+    userInterface:
+      control: SPIN_BOX
+      label: Orthophoto resolution (cm/pixel)
+      groupLabel: Processing
+
+  - name: FeatureQuality
+    type: STRING
+    default: low
+    allowedValues:
+      - ultra
+      - high
+      - medium
+      - low
+      - lowest
+    description: ODM feature extraction quality.
+    userInterface:
+      control: DROPDOWN_LIST
+      label: Feature quality
+      groupLabel: Processing
+
+  - name: PointCloudQuality
+    type: STRING
+    default: lowest
+    allowedValues:
+      - ultra
+      - high
+      - medium
+      - low
+      - lowest
+    description: ODM dense point cloud quality.
+    userInterface:
+      control: DROPDOWN_LIST
+      label: Point cloud quality
+      groupLabel: Processing
+
+  - name: GenerateDsm
+    type: STRING
+    default: "True"
+    allowedValues:
+      - "True"
+      - "False"
+    description: Generate a digital surface model.
+    userInterface:
+      control: CHECK_BOX
+      label: Generate DSM
+      groupLabel: Elevation models
+
+  - name: GenerateDtm
+    type: STRING
+    default: "False"
+    allowedValues:
+      - "True"
+      - "False"
+    description: Generate a classified digital terrain model.
+    userInterface:
+      control: CHECK_BOX
+      label: Generate DTM
+      groupLabel: Elevation models
+
+  - name: MaxConcurrency
+    type: INT
+    default: 2
+    minValue: 1
+    description: Maximum number of concurrent ODM worker processes.
+    userInterface:
+      control: SPIN_BOX
+      label: Maximum concurrency
+      groupLabel: Processing
+
+  - name: JobScriptDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: IN
+    default: scripts
+    description: Directory containing the bundled execution scripts.
+    userInterface:
+      control: HIDDEN
+
+jobEnvironments:
+  - name: OpenDroneMapRuntime
+    description: Pulls and verifies the pinned ODM image for each worker session.
+    script:
+      actions:
+        onEnter:
+          command: python3
+          args:
+            - "{{Param.JobScriptDir}}/odm_runtime.py"
+            - enter
+            - --session-working-dir
+            - "{{Session.WorkingDirectory}}"
+        onExit:
+          command: python3
+          args:
+            - "{{Param.JobScriptDir}}/odm_runtime.py"
+            - exit
+            - --session-working-dir
+            - "{{Session.WorkingDirectory}}"
+
+steps:
+  - name: ProcessSurvey
+    description: Stage, process, validate, and package the selected survey.
+    hostRequirements:
+      attributes:
+        - name: attr.worker.os.family
+          anyOf:
+            - linux
+        - name: attr.DockerEngine
+          anyOf:
+            - available
+      amounts:
+        - name: amount.worker.vcpu
+          min: 8
+        - name: amount.worker.memory
+          min: 32768
+        - name: amount.WorkerScratchGiB
+          min: 200
+    script:
+      actions:
+        onRun:
+          command: python3
+          args:
+            - "{{Param.JobScriptDir}}/run_open_drone_map.py"
+            - --input-images
+            - "{{Param.InputImages}}"
+            - --output-dir
+            - "{{Param.OutputDir}}"
+            - --session-working-dir
+            - "{{Session.WorkingDirectory}}"
+            - --orthophoto-resolution
+            - "{{Param.OrthophotoResolution}}"
+            - --feature-quality
+            - "{{Param.FeatureQuality}}"
+            - --point-cloud-quality
+            - "{{Param.PointCloudQuality}}"
+            - --generate-dsm
+            - "{{Param.GenerateDsm}}"
+            - --generate-dtm
+            - "{{Param.GenerateDtm}}"
+            - --max-concurrency
+            - "{{Param.MaxConcurrency}}"
+          cancelation:
+            mode: NOTIFY_THEN_TERMINATE
+            notifyPeriodInSeconds: 60
