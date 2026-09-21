@@ -15,35 +15,110 @@ never skipped, because a skipped check is indistinguishable from a passing one.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from conftest import find_host_configuration_scripts, rel, require_tool
+from conftest import (
+    S3_HOSTED_SCRIPT_PREFIX,
+    find_host_configuration_scripts,
+    is_s3_hosted,
+    rel,
+    require_tool,
+)
 from service_limits import HOST_CONFIGURATION_SCRIPT_MAX_CHARS
 
 _SCRIPTS = find_host_configuration_scripts()
 _SHELL_SCRIPTS = [s for s in _SCRIPTS if s.suffix == ".sh"]
 _POWERSHELL_SCRIPTS = [s for s in _SCRIPTS if s.suffix == ".ps1"]
+# Only scripts that become ``scriptBody`` are bound by the service length limit.
+_INLINE_SCRIPTS = [s for s in _SCRIPTS if not is_s3_hosted(s)]
 
 
 def test_host_configuration_scripts_discovered():
     assert _SCRIPTS, "no host configuration scripts were discovered"
 
 
-@pytest.mark.parametrize("script", _SCRIPTS, ids=rel)
+@pytest.mark.parametrize("script", _INLINE_SCRIPTS, ids=rel)
 def test_script_within_service_length_limit(script: Path):
     """The most important check: stay under the service scriptBody limit.
 
     Uses byte length, matching how the service measures the uploaded body and
     giving the more conservative bound for any non-ASCII content.
+
+    Skips scripts named with the ``s3-hosted-`` prefix, which are fetched from S3
+    by an inline loader instead of being uploaded as ``scriptBody``. Their loaders
+    are not skipped, so the limit is still enforced on the file that is subject to
+    it, and ``test_s3_hosted_script_has_loader`` checks one exists.
     """
     size = len(script.read_bytes())
     assert size <= HOST_CONFIGURATION_SCRIPT_MAX_CHARS, (
         f"{rel(script)} is {size} bytes, which exceeds the AWS Deadline Cloud "
         f"host configuration script limit of {HOST_CONFIGURATION_SCRIPT_MAX_CHARS}. "
         f"Split the work or move installation payloads out of the inline script."
+    )
+
+
+_S3_HOSTED_SCRIPTS = [s for s in _SCRIPTS if is_s3_hosted(s)]
+
+# A loader is recognised structurally rather than by substring. Requiring an assignment to the
+# variable, rather than the variable appearing anywhere, stops a file that merely mentions it in a
+# comment from qualifying. Requiring an invocation with -File or -Command stops an unrelated
+# powershell call from qualifying.
+#
+# Deliberately not stricter than that. Matching only ``= "s3://`` would reject a loader that builds
+# its URI in steps, and matching only ``powershell.exe -File`` would reject one that moves to pwsh or
+# to -Command. Both are reasonable rewrites of a loader that still loads, and a test that fails on
+# correct code is worse than one that is slightly permissive.
+_LOADER_ASSIGNS_URI = re.compile(r'^\s*\$HC_SCRIPT_S3_URI\s*=', re.MULTILINE)
+_LOADER_RUNS_SCRIPT = re.compile(
+    r'\b(?:powershell|pwsh)(?:\.exe)?\b[^\n]*-(?:File|Command)\b', re.IGNORECASE
+)
+
+
+@pytest.mark.parametrize("script", _S3_HOSTED_SCRIPTS, ids=rel)
+def test_s3_hosted_script_has_loader(script: Path):
+    """An ``s3-hosted-`` script is exempt only because a loader carries the body.
+
+    The loader is not exempt, so ``test_script_within_service_length_limit`` enforces
+    the limit on it. What this adds is that a real loader exists beside the script and
+    that the script documents which one deploys it, so the exemption cannot be claimed
+    by dropping any second ``.ps1`` into the directory.
+
+    A loader is identified by content rather than by being the other file present: it
+    has to name the S3 URI variable it reads and invoke PowerShell on what it fetched.
+    """
+    candidates = [
+        p
+        for p in script.parent.glob("*.ps1")
+        if p.name != script.name and not is_s3_hosted(p)
+    ]
+    loaders = []
+    for candidate in candidates:
+        body = candidate.read_text(encoding="utf-8", errors="replace")
+        if _LOADER_ASSIGNS_URI.search(body) and _LOADER_RUNS_SCRIPT.search(body):
+            loaders.append(candidate)
+    assert loaders, (
+        f"{rel(script)} uses the {S3_HOSTED_SCRIPT_PREFIX!r} prefix to skip the inline length "
+        f"limit, but no loader sits beside it. A loader must reference HC_SCRIPT_S3_URI and run "
+        f"powershell.exe on the downloaded script. Candidates checked: "
+        f"{', '.join(p.name for p in candidates) or 'none'}."
+    )
+    # The exemption rests entirely on the loader fitting the limit in the exempt script's place, and
+    # nothing else asserted that. A loader that grew past the limit would void the exemption it
+    # justifies while every other check still passed.
+    for loader in loaders:
+        size = len(loader.read_bytes())
+        assert size <= HOST_CONFIGURATION_SCRIPT_MAX_CHARS, (
+            f"{rel(loader)} is the loader for {rel(script)} but is itself {size} bytes, over the "
+            f"{HOST_CONFIGURATION_SCRIPT_MAX_CHARS} limit, so the exemption it justifies is void."
+        )
+    text = script.read_text(encoding="utf-8", errors="replace")
+    assert any(p.name in text for p in loaders), (
+        f"{rel(script)} is exempt from the inline length limit but never names its loader "
+        f"({', '.join(p.name for p in loaders)}). An exemption must be self-documenting."
     )
 
 
