@@ -17,6 +17,7 @@ installer examples. Implementation scripts remain inside each sample.
 | [Docker and NVIDIA Container Toolkit](docker_nvidia_container_toolkit/) | Installing Docker and the NVIDIA runtime on Linux GPU workers | Jobs run GPU-accelerated containers |
 | [Linux font installation](linux_font_installation/) | Downloading fonts from S3 and registering them system-wide | Render applications need studio fonts |
 | [Memory overcommit override](overcommit_override_for_smf/) | Changing `vm.overcommit_memory` on Linux workers | Large attachments or allocations fail despite free memory |
+| [OctaneRender licensing](octane_licensing/) | Downloading an OTOY unattended auth file from S3 to a fixed path under `/etc` | OctaneRender must license itself on Linux workers with no interactive sign-in |
 | [Passwordless sudo for job user](sudo_for_job_user/) | Granting `job-user` unrestricted sudo | A trusted workload requires root commands during tasks |
 | [Swap for SMF](swap_for_smf/) | Creating and enabling a Linux swap file | A workload can temporarily exceed physical memory |
 | [Worker configuration](worker_configuration/) | Windows system configuration such as page-file sizing | Workers need OS-level tuning before jobs start |
