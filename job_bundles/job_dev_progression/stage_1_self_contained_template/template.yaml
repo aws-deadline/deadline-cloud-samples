@@ -54,12 +54,12 @@ steps:
         set -euo pipefail
 
         # Initialize the workspace
-        echo "Initializing the workspace directory {{Param.WorkspacePath}}"
+        echo 'Initializing the workspace directory {{Param.WorkspacePath}}'
         mkdir -p '{{Param.WorkspacePath}}'
         cd '{{Param.WorkspacePath}}'
 
         # Copy the input CSV files
-        echo "Copying the input CSV file {{Param.InputCsvFile}} to csv/dataset.csv"
+        echo 'Copying the input CSV file {{Param.InputCsvFile}} to csv/dataset.csv'
         mkdir -p csv
         cp '{{Param.InputCsvFile}}' csv/dataset.csv
 
