@@ -54,12 +54,16 @@ steps:
         set -euo pipefail
 
         # Initialize the workspace
+        echo "Initializing the workspace directory {{Param.WorkspacePath}}"
         mkdir -p '{{Param.WorkspacePath}}'
         cd '{{Param.WorkspacePath}}'
 
         # Copy the input CSV files
+        echo "Copying the input CSV file {{Param.InputCsvFile}} to csv/dataset.csv"
         mkdir -p csv
         cp '{{Param.InputCsvFile}}' csv/dataset.csv
+
+        echo "Workspace initialization is complete"
 
 - name: ProcessWithPython
   dependencies:
@@ -76,16 +80,23 @@ steps:
         import os
         import polars as pl
 
-        os.chdir(r"{{Param.WorkspacePath}}")
+        # Print tables with ASCII characters so they render in any log encoding
+        pl.Config.set_ascii_tables()
+
+        workspace_path = r"{{Param.WorkspacePath}}"
+        print(f"Processing the dataset in workspace {workspace_path}")
+        os.chdir(workspace_path)
         os.makedirs("output", exist_ok=True)
 
+        print("Summing the durations for each action type in csv/dataset.csv")
         q = (
             pl.scan_csv("csv/dataset.csv")
             .group_by("Action Type")
-            .agg(pl.all().sum())
-            .select("Action Type", "Duration (Seconds)")
+            .agg(pl.col("Duration (Seconds)").sum())
         )
 
         df = q.collect()
+        print(df)
 
         df.write_csv("output/time_per_action_type.csv")
+        print("Wrote the summary to output/time_per_action_type.csv")

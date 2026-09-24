@@ -9,9 +9,13 @@ if [ -z "$2" ]; then
 fi
 
 # Initialize the workspace
+echo "Initializing the workspace directory $2"
 mkdir -p "$2"
 cd "$2"
 
 # Copy the input CSV file
+echo "Copying the input CSV file $1 to csv/dataset.csv"
 mkdir -p csv
 cp "$1" csv/dataset.csv
+
+echo "Workspace initialization is complete"
