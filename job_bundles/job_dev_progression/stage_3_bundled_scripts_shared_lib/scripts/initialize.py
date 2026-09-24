@@ -13,9 +13,13 @@ args = parser.parse_args()
 process_standard_args(args)
 
 # Initialize the workspace
+print(f"Initializing the workspace directory {args.workspace_path}")
 os.makedirs(args.workspace_path, exist_ok=True)
 os.chdir(args.workspace_path)
 
 # Copy the input CSV files
+print(f"Copying the input CSV file {args.input_csv_file} to csv/dataset.csv")
 os.makedirs("csv", exist_ok=True)
 shutil.copyfile(args.input_csv_file, "csv/dataset.csv")
+
+print("Workspace initialization is complete")
