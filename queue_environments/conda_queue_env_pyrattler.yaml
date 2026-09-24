@@ -79,16 +79,30 @@ environment:
         # Turn off multi-line buffering in stdout
         sys.stdout = os.fdopen(sys.stdout.fileno(), "w", buffering=1)
 
-        # Import https://conda.github.io/rattler/py-rattler/, installing it in a cache dir if necessary
-        try:
-            import rattler
-            import yaml
-        except ModuleNotFoundError:
-            cache_dir = os.path.expanduser(
-                f"~/.cache/conda-queue-env/{'.'.join(str(v) for v in sys.version_info)}/site-packages/"
-            )
-            os.makedirs(cache_dir, exist_ok=True)
+        # Import https://conda.github.io/rattler/py-rattler/, installing it in a cache dir if necessary.
+        # The version check matters as well as the presence check: rattler's Python API changes
+        # between minor versions (e.g. solve()'s "channels" parameter became "sources"), so a
+        # globally-installed py-rattler of a different version cannot be used.
+        import importlib.metadata
+
+        cache_dir = os.path.expanduser(
+            f"~/.cache/conda-queue-env/{'.'.join(str(v) for v in sys.version_info)}/site-packages/"
+        )
+        if os.path.isdir(cache_dir):
             sys.path.insert(0, cache_dir)
+
+        def installed_deps_compatible():
+            try:
+                rattler_version = importlib.metadata.version("py-rattler")
+                importlib.metadata.version("pyyaml")
+            except importlib.metadata.PackageNotFoundError:
+                return False
+            return tuple(int(v) for v in rattler_version.split(".")[:2]) == (0, 25)
+
+        if not installed_deps_compatible():
+            os.makedirs(cache_dir, exist_ok=True)
+            if cache_dir not in sys.path:
+                sys.path.insert(0, cache_dir)
             subprocess.check_call(
                 [
                     sys.executable,
@@ -100,12 +114,13 @@ environment:
                     "only-if-needed",
                     "--target",
                     cache_dir,
-                    "py-rattler>=0.18,<0.19",
+                    "py-rattler>=0.25,<0.26",
                     "pyyaml>=6,<7",
                 ]
             )
-            import rattler
-            import yaml
+            importlib.invalidate_caches()
+        import rattler
+        import yaml
         import rattler.shell
 
         def load_channel_aliases():
@@ -162,15 +177,14 @@ environment:
             # This list is copied from https://github.com/conda/rattler/blob/7d36fe334c14ddf6227dc0ec0982379d062c5915/crates/rattler-bin/src/commands/create.rs#L162-L172
             middlewares = [
                 rattler.networking.AuthenticationMiddleware(),
-                ## OciMiddleware not available in py-rattler 0.16.0
-                # rattler.networking.OciMiddleware(),
+                rattler.networking.OciMiddleware(),
                 rattler.networking.S3Middleware(),
                 rattler.networking.GCSMiddleware(),
             ]
             client = rattler.networking.Client(middlewares)
             gateway = rattler.repo_data.Gateway(client=client)
             solved_records = await rattler.solve(
-                channels=[channel_aliases.get(c, c) for c in channels],
+                sources=[channel_aliases.get(c, c) for c in channels],
                 specs=specs,
                 gateway=gateway,
                 virtual_packages=rattler.VirtualPackage.detect(),
