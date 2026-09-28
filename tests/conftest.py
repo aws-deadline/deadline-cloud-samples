@@ -112,6 +112,24 @@ def find_environment_templates() -> list[Path]:
     return [p for p in find_openjd_templates() if (spec_version(p) or "").startswith("environment-")]
 
 
+# Filename prefix marking a host configuration script that is hosted in S3 and fetched at boot by a
+# small inline loader, rather than being uploaded as ``HostConfiguration.scriptBody``. The 15000
+# character body limit applies to the loader, so a script named this way is exempt from it.
+#
+# Deliberately not a bare ``s3`` prefix: the loader itself is conventionally named
+# ``s3-bootstrap-loader.ps1``, and the loader is the one file that must stay within the limit.
+S3_HOSTED_SCRIPT_PREFIX = "s3-hosted-"
+
+
+def is_s3_hosted(path: Path) -> bool:
+    """True when a host configuration script is fetched from S3 by an inline loader.
+
+    Keyed on the filename so the exemption is visible in the repository tree and in the script's own
+    name, rather than in a list a reader has to go find.
+    """
+    return path.name.startswith(S3_HOSTED_SCRIPT_PREFIX)
+
+
 def find_host_configuration_scripts() -> list[Path]:
     """Host configuration shell / PowerShell scripts."""
     base = REPO_ROOT / "host_configuration_scripts"
