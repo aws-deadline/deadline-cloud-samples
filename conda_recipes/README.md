@@ -17,7 +17,7 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 54 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 55 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -32,6 +32,7 @@ This table covers all 54 immediate user-selectable recipe directories in `conda_
 | [Blender 4.5](blender-4.5/) | Packaging Blender 4.5 for Deadline Cloud | Your jobs require Blender 4.5 |
 | [Blender 5.0](blender-5.0/) | Packaging Blender 5.0 with plugin-sync support | Your jobs require Blender 5.0 |
 | [Blender 5.1](blender-5.1/) | Packaging Blender 5.1 with tested plugin-sync scripts | Your jobs require Blender 5.1 |
+| [Blender 5.2](blender-5.2/) | Packaging Blender 5.2 with tested plugin-sync scripts | Your jobs require Blender 5.2 |
 | [Blender FLIP Fluids](blender-flipfluids/) | Installing the FLIP Fluids add-on into Blender | You need a Blender simulation add-on recipe |
 | [Blender plugin bundle](blender-plugin-bundle/) | Packaging multiple Blender add-on ZIP files together | You deliver a changing studio collection of Blender plugins |
 | [Cinema 4D 2024](cinema4d-2024/) | Packaging Cinema 4D 2024 with Plugin Sync for Windows | Your jobs require Cinema 4D 2024 |
