@@ -28,3 +28,5 @@ www.maxon.net
 www.artstation.com
 # 2026-07-22: HEAD and minimal Range GET both returned HTTP 403 for public article pages that load in a browser.
 www.science.org
+# 2026-09-17: HEAD and minimal Range GET both returned HTTP 403 for a sign-in gated account page.
+account.otoy.com

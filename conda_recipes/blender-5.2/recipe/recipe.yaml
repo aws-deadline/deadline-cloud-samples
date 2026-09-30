@@ -1,0 +1,54 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "5.2.2"
+  major_minor_version: "5.2"
+
+package:
+  name: blender
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: https://download.blender.org/release/Blender${{ major_minor_version }}/blender-${{ version }}-linux-x64.tar.xz
+      sha256: 84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168
+      target_directory: blender
+  - if: win
+    then:
+      url: https://download.blender.org/release/Blender${{ major_minor_version }}/blender-${{ version }}-windows-x64.zip
+      sha256: 3849d17a682cba006075aaa3f3597ecb5c9c30ec31035b2e092c53e40679b535
+      target_directory: blender
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - bash $RECIPE_DIR/build.sh
+    - if: win
+      then:
+        - bash %RECIPE_DIR%\build_win.sh
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+tests:
+  - script:
+    - blender -h
+    - ls $CONDA_PREFIX/etc/conda/activate.d/zzz-blender-*-plugins.sh
+    - ls $CONDA_PREFIX/etc/conda/deactivate.d/zzz-blender-*-plugins.sh
+
+about:
+  homepage: https://www.blender.org/
+  license: GPL-3.0-or-later
+  summary: >
+    Blender is the free and open source 3D creation suite. It supports the entirety of
+    the 3D pipeline—modeling, rigging, animation, simulation, rendering, compositing
+    and motion tracking, even video editing and game creation.

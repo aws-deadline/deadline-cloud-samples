@@ -1,0 +1,228 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Octane Render
+description: >
+  Render frames from an Octane ORBX or OCS scene with OctaneRender Standalone. Choose the
+  scene, output directory, frame range, and output settings below. Scene-default values are
+  read from the scene when rendering.
+
+parameterDefinitions:
+- name: OctaneSceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Octane Scene File
+    groupLabel: Input/Output
+    fileFilters:
+    - label: Octane Scene Files
+      patterns: ["*.orbx", "*.ocs"]
+    - label: All Files
+      patterns: ["*"]
+  minLength: 1
+  description: >
+    Choose an ORBX or OCS scene. For OCS scenes, add all referenced assets on the Job
+    Attachments tab.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Input/Output
+  default: "output"
+  description: Choose where rendered images are saved.
+
+# Output Parameters
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frame Range
+    groupLabel: Output Parameters
+  default: "1-120"
+  minLength: 1
+  description: >
+    Enter frames such as 1, 1-3, or 1,2,4-6. Add a step such as 1-10:2 to render every
+    other frame.
+- name: Framerate
+  type: FLOAT
+  userInterface:
+    control: SPIN_BOX
+    label: Frame Rate
+    groupLabel: Output Parameters
+    decimals: 3
+    singleStepDelta: 1
+  default: 0
+  minValue: 0
+  description: Use 0 to read the frame rate from the scene.
+- name: OutputFormat
+  type: STRING
+  userInterface:
+    control: DROPDOWN_LIST
+    label: File Format
+    groupLabel: Output Parameters
+  default: 'PNG8'
+  allowedValues:
+  - 'PNG8'
+  - 'PNG16'
+  - 'TIFF8'
+  - 'TIFF16'
+  - 'JPEG'
+  - 'EXR16'
+  - 'EXR32'
+  - 'Discrete PNG8(s) (multipass)'
+  - 'Discrete PNG16(s) (multipass)'
+  - 'Discrete TIFF8(s) (multipass)'
+  - 'Discrete TIFF16(s) (multipass)'
+  - 'Discrete JPEG(s) (multipass)'
+  - 'Discrete EXR16(s) (multipass)'
+  - 'Discrete EXR32(s) (multipass)'
+  - 'Layered EXR16 (multipass)'
+  - 'Layered EXR32 (multipass)'
+  description: >
+    Choose the image format and how render passes are saved. PNG and TIFF use sRGB; EXR
+    uses linear sRGB.
+- name: FilenameTemplate
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Filename Template
+    groupLabel: Output Parameters
+  default: "%n_%p_%f.%e"
+  minLength: 1
+  description: |
+    Choose how output files are named.
+
+    %f frame number, padded to four digits
+    %n render target node name
+    %p render pass name
+    %e file extension
+    %i render target index
+    %t timestamp in HH_MM_SS format
+
+    Use %% for a percent sign. Tokens can appear in directories; for example, %p/%f.%e
+    creates one directory per render pass.
+
+# Optional Parameters
+- name: RenderTargetNode
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Render Target Node (Camera)
+    groupLabel: Optional Parameters
+  default: ""
+  description: Leave empty to use the scene's preview render target.
+- name: ShutterTime
+  type: FLOAT
+  userInterface:
+    control: SPIN_BOX
+    label: Shutter Time (seconds)
+    groupLabel: Optional Parameters
+    decimals: 3
+    singleStepDelta: 0.1
+  default: -1
+  minValue: -1
+  description: Use -1 to read the shutter time from the scene.
+- name: MaxSamples
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Max Samples
+    groupLabel: Optional Parameters
+  default: 0
+  minValue: 0
+  description: Use 0 to read the maximum samples from the scene.
+- name: DaemonScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  default: octane_daemon.py
+- name: ServerScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  default: octane_server.lua
+- name: ClientScript
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: HIDDEN
+  default: octane_client.py
+
+steps:
+- name: RenderOctane
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+
+  stepEnvironments:
+  - name: Start Octane
+    description: Loads the Octane scene for this render session.
+    script:
+      actions:
+        onEnter:
+          timeout: 300
+          command: python
+          args:
+          - '{{Param.DaemonScript}}'
+          - 'start'
+          - '--connection-file'
+          - '{{Session.WorkingDirectory}}/connection.json'
+          - '--server-script'
+          - '{{Param.ServerScript}}'
+          - '--scene'
+          - '{{Param.OctaneSceneFile}}'
+          - '--'
+          - '-a'
+          - 'output-dir={{Param.OutputDir}}'
+          - '-a'
+          - 'format={{Param.OutputFormat}}'
+          - '-a'
+          - 'template={{Param.FilenameTemplate}}'
+          - '-a'
+          - 'target={{Param.RenderTargetNode}}'
+          - '-a'
+          - 'fps={{Param.Framerate}}'
+          - '-a'
+          - 'shutter-time={{Param.ShutterTime}}'
+          - '-a'
+          - 'max-samples={{Param.MaxSamples}}'
+        onExit:
+          command: python
+          args:
+          - '{{Param.DaemonScript}}'
+          - 'stop'
+          - '--connection-file'
+          - '{{Session.WorkingDirectory}}/connection.json'
+
+  script:
+    actions:
+      onRun:
+        timeout: 43200
+        command: python
+        args:
+        - '{{Param.ClientScript}}'
+        - '--connection-file'
+        - '{{Session.WorkingDirectory}}/connection.json'
+        - '--frame'
+        - '{{Task.Param.Frame}}'
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+
+  hostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
