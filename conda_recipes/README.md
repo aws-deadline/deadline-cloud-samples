@@ -17,7 +17,7 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 50 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 55 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -32,6 +32,7 @@ This table covers all 50 immediate user-selectable recipe directories in `conda_
 | [Blender 4.5](blender-4.5/) | Packaging Blender 4.5 for Deadline Cloud | Your jobs require Blender 4.5 |
 | [Blender 5.0](blender-5.0/) | Packaging Blender 5.0 with plugin-sync support | Your jobs require Blender 5.0 |
 | [Blender 5.1](blender-5.1/) | Packaging Blender 5.1 with tested plugin-sync scripts | Your jobs require Blender 5.1 |
+| [Blender 5.2](blender-5.2/) | Packaging Blender 5.2 with tested plugin-sync scripts | Your jobs require Blender 5.2 |
 | [Blender FLIP Fluids](blender-flipfluids/) | Installing the FLIP Fluids add-on into Blender | You need a Blender simulation add-on recipe |
 | [Blender plugin bundle](blender-plugin-bundle/) | Packaging multiple Blender add-on ZIP files together | You deliver a changing studio collection of Blender plugins |
 | [Cinema 4D 2024](cinema4d-2024/) | Packaging Cinema 4D 2024 with Plugin Sync for Windows | Your jobs require Cinema 4D 2024 |
@@ -44,6 +45,7 @@ This table covers all 50 immediate user-selectable recipe directories in `conda_
 | [Deadline Cloud CLI](deadline/) | Building the `deadline` Python package and command line tools | Another package or worker environment needs the Deadline client |
 | [Houdini 20.5](houdini-20.5/) | Packaging Houdini 20.5 with plugin activation support | Your jobs require Houdini 20.5 |
 | [Houdini 21.0](houdini-21.0/) | Packaging Houdini 21.0 with Plugin Sync activation | Your jobs require Houdini 21 or frequently updated plugins |
+| [Houdini 22.0](houdini-22.0/) | Packaging Houdini 22.0 with Plugin Sync activation | Your jobs require Houdini 22 or frequently updated plugins |
 | [Redshift for Houdini 2025](houdini-redshift-2025/) | Packaging Redshift for Houdini 2025 | Houdini 20.5 jobs render with Redshift |
 | [Redshift for Houdini 2026](houdini-redshift-2026/) | Packaging Redshift for Houdini 2026 | Houdini 21 jobs render with Redshift |
 | [V-Ray 7 for Houdini](houdini-vray-7/) | Packaging V-Ray for Houdini | Houdini jobs render with V-Ray 7 |
@@ -51,14 +53,17 @@ This table covers all 50 immediate user-selectable recipe directories in `conda_
 | [KeyShot 2025](keyshot-2025/) | Packaging KeyShot 2025.2 for Windows | Your jobs render with KeyShot |
 | [Maya 2025](maya-2025/) | Packaging Maya and configuring module/plugin search paths | Your jobs require Maya 2025 |
 | [Maya 2026](maya-2026/) | Packaging Maya with Plugin Sync activation | Your jobs require Maya 2026 or frequently updated plugins |
+| [Maya 2027](maya-2027/) | Packaging Maya with Plugin Sync activation | Your jobs require Maya 2027 |
 | [Bifrost for Maya 2026](maya-bifrost-2026/) | Packaging Autodesk Bifrost for Maya | Maya 2026 jobs use Bifrost graphs or simulations |
 | [Arnold for Maya 2025](maya-mtoa-2025/) | Packaging MtoA against the Maya 2025 package | Maya 2025 jobs render with Arnold |
 | [Arnold for Maya 2026](maya-mtoa-2026/) | Packaging MtoA against the Maya 2026 package | Maya 2026 jobs render with Arnold |
+| [Arnold for Maya 2027](maya-mtoa-2027/) | Packaging MtoA against the Maya 2027 package | Maya 2027 jobs render with Arnold |
 | [Maya OpenJD adaptor](maya-openjd/) | Packaging the Maya integration adaptor | Maya jobs need OpenJD session integration |
 | [Redshift for Maya 2025](maya-redshift-2025/) | Packaging Redshift 2025 for supported Maya versions | Maya jobs use Redshift 2025 |
-| [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya jobs use Redshift 2026 |
+| [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya 2025, 2026 or 2027 jobs use Redshift 2026 |
 | [V-Ray for Maya 2025](maya-vray-2025/) | Packaging V-Ray for Maya 2025 | Maya 2025 jobs render with V-Ray |
 | [V-Ray for Maya 2026](maya-vray-2026/) | Packaging V-Ray for Maya 2026 | Maya 2026 jobs render with V-Ray |
+| [V-Ray for Maya 2027](maya-vray-2027/) | Packaging V-Ray for Maya 2027 | Maya 2027 jobs render with V-Ray |
 | [V-Ray 7.2 for Maya 2025](maya-vray-7.2-2025/) | Pinning V-Ray 7.20.02 to Maya 2025 | You need the exact V-Ray 7.2/Maya 2025 combination |
 | [V-Ray 7.2 for Maya 2026](maya-vray-7.2-2026/) | Pinning V-Ray 7.20.02 to Maya 2026 | You need the exact V-Ray 7.2/Maya 2026 combination |
 | [Nerfstudio](nerfstudio/) | Packaging Nerfstudio and Gaussian Splatting extras | You train NeRF or Gaussian Splatting models |
@@ -282,7 +287,7 @@ job to Deadline Cloud.
 
 You can select the default build tool between rattler-build and conda-build (deprecated) for the whole recipe
 by setting this option. [Rattler build](https://prefix-dev.github.io/rattler-build/)
-is a newer tool built with rust and using a new package build recipe format established
+is a newer tool built with rust and using a new recipe format for building packages, established
 in conda enhancement proposals [CEP 13](https://github.com/conda/ceps/blob/main/cep-0013.md)
 and [CEP 14](https://github.com/conda/ceps/blob/main/cep-0014.md). [Conda build](https://docs.conda.io/projects/conda-build/)
 (support in this sample is deprecated) is the original package building tool implemented for conda. Rattler build typically

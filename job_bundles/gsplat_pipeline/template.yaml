@@ -77,7 +77,6 @@ parameterDefinitions:
     control: DROPDOWN_LIST
     label: Gaussian Splatting Trainer
     groupLabel: Gaussian Splatting
-  type: STRING
   default: "NERFSTUDIO"
   allowedValues: ["NERFSTUDIO", "GSPLAT_SIMPLE_TRAINER"]
 - name: MaxNumIterations

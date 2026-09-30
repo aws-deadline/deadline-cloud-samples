@@ -1,0 +1,10 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename: houdini-22.0.368-linux_x86_64_gcc14.2.tar.gz
+    sourceDownloadInstructions: Download the Houdini 22.0.368 Linux installer archive (not the launcher) from the SideFX downloads page.
+    buildTool: rattler-build
+jobParameters:
+  # conda-forge is used to get patchelf on Linux
+  - name: CondaChannels
+    value: conda-forge

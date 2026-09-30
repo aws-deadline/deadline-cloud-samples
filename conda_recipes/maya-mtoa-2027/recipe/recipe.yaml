@@ -1,0 +1,48 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2027.0"
+  major_version: "2027"
+  minor_version: "0"
+
+package:
+  name: maya-mtoa
+  version: ${{ version }}
+
+source:
+  path: ../../archive_files/Autodesk_Maya_${{ major_version }}_Linux_64bit.tgz
+  sha256: c713ce176972268284a740bff6d346e01e03511c9bf0f090128f63f001ac8cf6
+  target_directory: installer
+
+build:
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  prefix_detection:
+    ignore_binary_files: True
+  dynamic_linking:
+    binary_relocation: False
+    missing_dso_allowlist:
+    - "**"
+
+requirements:
+  build:
+    - maya ${{ version }}.*
+    - patchelf
+  run:
+    - maya ${{ version }}.*
+
+tests:
+  - script:
+    # Maya's Python interpreter
+    - mayapy --help
+    # Confirm that the mtoa plugin is available in mayapy
+    - mayapy -c 'import maya.standalone; maya.standalone.initialize(); import mtoa; print("Hello from mayapy"); print(dir(mtoa)); maya.standalone.uninitialize()'
+    # The maya -batch command
+    - maya -batch -command 'print "Hello from maya -batch"; quit -exitCode 0 -force'
+
+about:
+  homepage: https://help.autodesk.com/view/ARNOL/ENU/?guid=arnold_for_maya_am_Arnold_for_Maya_User_Guide_html
+  license: LicenseRef-AutodeskEULA
+  summary: Autodesk Arnold is an advanced cross-platform rendering library, or API, developed by Solid Angle and used by a number of prominent organizations in film, television, and animation, including Sony Pictures Imageworks. It was developed as a photo-realistic, physically-based ray tracing alternative to traditional scanline-based rendering software for CG animation.

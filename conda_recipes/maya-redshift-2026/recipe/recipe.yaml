@@ -2,7 +2,7 @@
 # See https://prefix-dev.github.io/rattler-build/latest/
 
 context:
-  version: "2026.2.1_2202748377"
+  version: "2026.8.1_2741261432"
 
 package:
   name: maya-redshift
@@ -10,7 +10,7 @@ package:
 
 source:
   - url: file://archive_files/redshift_${{ version }}_linux_x64.run
-    sha256: 7453cb05614c3356d00960ee57e287f064a741242545e1bbc1f5f118e1a07963
+    sha256: d653b210ebd7e51e1ceac8795f385fa0204cc8fde38496a7c92b02c97d384e1f
     target_directory: installer
 
 build:
@@ -27,7 +27,7 @@ build:
 
 requirements:
   run:
-    - maya >=2025, <2027
+    - maya >=2025, <2028
 
 
 about:

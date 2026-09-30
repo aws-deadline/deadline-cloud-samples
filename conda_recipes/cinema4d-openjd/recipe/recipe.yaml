@@ -1,11 +1,11 @@
 # Recipe in rattler-build format.
 # See https://prefix-dev.github.io/rattler-build/latest/
-# This release requires deadline 0.59.x and openjd-adaptor-runtime 0.7.x-0.9.x
+# This release requires deadline 0.60.x and openjd-adaptor-runtime 0.7.x-0.9.x
 # in the target channel. The standalone deadline sample may track a newer,
 # incompatible minor release.
 
 context:
-  version: "0.11.4"
+  version: "0.12.1"
 
 package:
   name: cinema4d-openjd
@@ -14,7 +14,7 @@ package:
 # This source reference uses the source archive published to PyPI
 source:
   url: https://pypi.io/packages/source/d/deadline-cloud-for-cinema-4d/deadline_cloud_for_cinema_4d-${{ version }}.tar.gz
-  sha256: 474830446bd67adffa6d435dd8dbf7b37993486c268a42d8949d632747977427
+  sha256: 1440ab399c024dc194f7b656e8bd2497550442dd4d3d1e17fbf5f1ced4e16fee
 
 build:
   number: 0
@@ -32,7 +32,7 @@ requirements:
     - pip
   run:
     - python
-    - deadline >=0.59,<0.60
+    - deadline >=0.60.1,<0.61
     - openjd-adaptor-runtime >=0.7,<0.10
     - ${{ "fonttools >=4.59.2,<4.64" if win }}
 

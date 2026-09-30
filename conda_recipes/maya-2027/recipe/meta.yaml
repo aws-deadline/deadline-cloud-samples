@@ -1,0 +1,40 @@
+# Recipe in conda-build format.
+
+# See https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html for information
+# about this file.
+
+{% set version = "2027.0" %}
+{% set major_version = "2027" %}
+{% set minor_version = "0" %}
+
+package:
+  name: maya
+  version: {{ version }}
+
+source:
+  url: archive_files/Autodesk_Maya_{{ major_version }}_Linux_64bit.tgz
+  sha256: c713ce176972268284a740bff6d346e01e03511c9bf0f090128f63f001ac8cf6
+  folder: installer
+
+build:
+  number: 0
+  detect_binary_files_with_prefix: false
+  binary_relocation: false
+  missing_dso_whitelist:
+    - "**"
+
+requirements:
+  build:
+    - patchelf
+    - unzip
+
+test:
+  commands:
+    - mayapy --help
+    - mayapy -c 'import maya; import maya.standalone; import maya.OpenMaya as om1; import maya.api.OpenMaya as om2; maya.standalone.initialize(); print("Hello from mayapy"); maya.standalone.uninitialize()'
+    - maya -batch -command 'print "Hello from maya -batch"; quit -exitCode 0 -force'
+
+about:
+  home: https://www.autodesk.com/products/maya/overview
+  license: LicenseRef-AutodeskEULA
+  summary: Maya is professional 3D software for creating realistic characters and blockbuster-worthy effects.

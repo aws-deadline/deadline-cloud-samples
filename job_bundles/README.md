@@ -9,7 +9,7 @@ for more about submitting these jobs to your farm.
 
 ## Job bundle index
 
-This table covers every immediate user-selectable sample directory or collection in `job_bundles/`.
+This table is the complete index of user-selectable sample directories and collections in `job_bundles/`.
 Nested collections provide their own complete indexes where applicable.
 
 | Sample | What it demonstrates | Start here when |
@@ -43,14 +43,18 @@ Nested collections provide their own complete indexes where applicable.
 | [List available Conda packages](list_available_conda_packages/) | Querying a Conda channel from a Deadline Cloud job | You need to inspect packages visible to workers |
 | [Maya Arnold export and render](maya_arnold_ass_export_render/) | Exporting `.ass` once, then rendering frames with Arnold `kick` | You want separate DCC export and renderer-only steps |
 | [Maya CLI render](maya_cli_render/) | Rendering a Maya scene with the CLI `Render` command | You need a small Maya command-line example |
+| [Maya Redshift render](maya_redshift_render/) | Rendering a Maya scene with the GPU-accelerated Redshift renderer | Your Maya jobs render with Redshift |
+| [Maya V-Ray render](maya_vray_render/) | Rendering a Maya scene with V-Ray, plus a PNG for quick checking | Your Maya jobs render with V-Ray |
 | [Monte Carlo simulation](monte_carlo_simulation/) | Parallel financial simulation followed by result aggregation | You want a non-rendering fan-out/fan-in workload |
 | [MuJoCo sim-to-policy](mujoco_sim_to_policy/) | Simulation data generation, policy training, and rendered evaluation | You need a multi-step robotics ML workflow |
 | [Nuke render](nuke_render/) | Frame-parallel headless compositing with `nuke -x` | You need to render Nuke scripts on workers |
+| [Octane standalone render](octane_render/) | Rendering an exported Octane scene, ORBX or OCS, with GPU-only OctaneRender Standalone | Your scenes are already exported and do not need a host application at render time |
+| [OpenDroneMap simple job](opendronemap_simple_job/) | One-task CPU container photogrammetry for an attached aerial survey, with progress reporting and validated geospatial outputs | You want to process a small aerial survey on one Docker-enabled Linux worker |
 | [Pip package job](pip_package_job/) | Declaring Python dependencies for a pip queue environment | A shared queue environment should provide job packages |
 | [Pip self-contained job](pip_self_contained_job/) | Creating and activating a pip environment inside one bundle | You cannot or do not want to configure the queue |
 | [POV-Ray 3.7](povray-3.7/) | Raytracing with a Conda-provided command-line renderer | You want a portable, lightweight render example |
 | [Redshift 2025](redshift-2025/) | Rendering Cinema 4D Redshift scenes with `redshiftCmdLine` | You need direct Windows Redshift command-line rendering |
-| [Satellite classification](satellite_classification/) | Per-tile image classification followed by mosaic assembly | Independent input files should fan out and merge |
+| [Satellite classification](satellite_classification/) | Per-tile image classification followed by mosaic assembly | Independent input files should run in parallel and merge |
 | [Simple job](simple_job/) | The smallest developer-guide OpenJD job bundle | You are submitting your first custom job |
 | [SSH to SMF](ssh_to_smf/) | Temporary Linux SSH access through an SSM hybrid managed node | You need interactive debugging on a service-managed worker |
 | [SSH to SMF on Windows](ssh_to_smf_windows/) | Temporary RDP, SSH, or PowerShell access through SSM | You need interactive debugging on a Windows worker |
@@ -105,4 +109,4 @@ If you do not want to use the `deadline` Python package's support for features l
 ## Example Husk USD render with asset introspection
 
 The [Houdini Husk USD render](houdini_husk_usd_render/) sample shows how to use the Houdini Husk CLI USD renderer using a short job template and service-provided Conda packages.
-It also shows how to write a custom asset introspection tool for job attachments, ensuring that only the required data is uploaded while removing manual steps for artists.
+It also shows how to write a custom tool that introspects assets for job attachments, ensuring that only the required data is uploaded while removing manual steps for artists.

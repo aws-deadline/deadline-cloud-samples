@@ -2,6 +2,37 @@
 
 Register a Deadline Cloud worker as an SSM hybrid managed node, enabling SSH access via Session Manager for the duration of the job.
 
+## Why Shell Access to a Worker?
+
+A service-managed fleet worker has no public address and accepts no inbound connections, so a failing job normally has to be diagnosed from its log alone. That works until the question turns environmental: whether the license server answers from the worker's subnet, or why a plugin that loads on your workstation fails on the worker.
+
+The job in this bundle registers the worker as an SSM managed node, which gets you an interactive shell on the machine that ran your job. Session Manager brokers the connection, so access is IAM-gated and audited in CloudTrail. Reaching the node depends on the SSM agent, which the job stops on its way out, so the shell dies with the job.
+
+Session Manager logs you in as `ssm-user` rather than the `job-user` account the job itself runs under. Switch accounts once you are connected:
+
+```bash
+sudo -u job-user -i
+```
+
+That opens a clean login shell as `job-user`, with that account's own profile and the same view of the filesystem the job has, which is what you want for running a step by hand. The job's live environment is a separate thing: variables that queue environments set exist only inside the session's process tree, so read those from the job log rather than from this shell.
+
+Some ways customers use it:
+
+- **Diagnose a failing job in place.** Inspect the job attachment mounts and whatever a failing step left on disk, as `job-user` sees them, rather than inferring from log output.
+- **Prototype a host configuration script.** Install and test packages by hand until the steps work, then paste the finished commands into your fleet's host configuration. Pairs well with [`sudo_for_job_user`](../../host_configuration_scripts/sudo_for_job_user/README.md).
+- **Reach interactive tools through a port forward.** A Jupyter notebook or a GPU profiler running on the worker becomes available on `localhost`. See [Port forwarding](#port-forwarding) below.
+- **Confirm what the AMI includes.** Check driver versions and conda environments on the instance type your fleet uses, before you commit a long render to it.
+- **Verify network reachability.** Test license servers and package repositories from inside the worker's subnet, where a job's real failure often lives.
+- **Validate a container setup.** Run images by hand and check GPU passthrough before wiring them into a job template, alongside [`docker_nvidia_container_toolkit`](../../host_configuration_scripts/docker_nvidia_container_toolkit/README.md).
+
+Treat the bundle as a debugging tool. The job holds the worker for the full `SessionMinutes` whether or not anyone is connected, and disconnecting your session does not release it, so worker time bills until the timer expires. Keep `SessionMinutes` short and cancel the job when you finish.
+
+Cancelling stops the billing, but the `mi-` entry remains in your account's SSM inventory either way. Deregister it afterwards:
+
+```bash
+aws ssm deregister-managed-instance --instance-id mi-XXXXXXXXX --region us-west-2
+```
+
 ## How It Works
 
 1. The submit script creates a one-time SSM hybrid activation (`aws ssm create-activation`)

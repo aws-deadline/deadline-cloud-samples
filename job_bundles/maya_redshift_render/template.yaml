@@ -1,0 +1,148 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: Maya Redshift Render
+description: |
+  This job bundle renders a Maya scene with the Redshift renderer using the
+  Maya CLI `Render` command.
+
+  To run it, you will need Maya and Redshift available in the PATH in one of the following ways:
+    * As conda packages when your queue has a conda queue environment set up to
+      provide virtual environments for jobs. The `maya-redshift` package provides the
+      redshift4maya plugin as a Maya module.
+    * Installed on the worker hosts that run the job. You can customize your Deadline Cloud
+      queue, fleets, and this job to fit your own production pipeline.
+
+  Redshift is GPU accelerated and requires a license, so this job requests a worker with a
+  GPU. See the embedded README.md for more information about this job, its default scene
+  file, and its licensing requirements.
+
+parameterDefinitions:
+
+# Render Parameters
+- name: MayaSceneFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Maya Scene File
+    groupLabel: Render Parameters
+    fileFilters:
+    - label: Maya Scene Files
+      patterns: ["*.ma", "*.mb"]
+    - label: All Files
+      patterns: ["*"]
+  description: >
+    Choose the Maya scene file you want to render with Redshift.
+
+    The scene must select Redshift as its renderer. A scene that contains Redshift
+    nodes records a `requires "redshift4maya"` statement, which makes Maya load the
+    plugin when it reads the scene.
+
+    Use the 'Job Attachments' tab of the submitter GUI to add textures
+    and other files that the job needs.
+  default: redshift_spheres.ma
+- name: Frames
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Frames
+    groupLabel: Render Parameters
+  default: "1"
+- name: CameraName
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Camera Name
+    groupLabel: Render Parameters
+  default: renderCamera
+- name: ImageWidth
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Width
+    groupLabel: Render Parameters
+  default: 960
+- name: ImageHeight
+  type: INT
+  userInterface:
+    control: SPIN_BOX
+    label: Image Height
+    groupLabel: Render Parameters
+  default: 540
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Render Parameters
+  description: Choose the render output directory.
+  default: output
+- name: ProjectPath
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Project Path
+    groupLabel: Render Parameters
+  description: Choose the Maya project directory.
+  default: "."
+
+# Software Environment
+- name: CondaPackages
+  type: STRING
+  userInterface:
+    # This parameter is for a queue environment, not used directly in the job,
+    # so leave the GUI for the queue environment to display.
+    control: HIDDEN
+  description: Choose which conda packages to install for the render. Requires a conda queue environment to process the value.
+  default: maya maya-redshift
+
+steps:
+
+- name: Render
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "{{Param.Frames}}"
+  script:
+    embeddedFiles:
+    - name: Render
+      filename: render.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        cd '{{Param.ProjectPath}}'
+
+        set -x
+        # The Redshift renderer accepts a different set of flags than the Maya software
+        # renderer. Run `Render -r redshift -help` to list them.
+        Render -r redshift \
+            -proj '{{Param.ProjectPath}}' \
+            -rd '{{Param.OutputDir}}' \
+            -s {{Task.Param.Frame}} \
+            -e {{Task.Param.Frame}} \
+            -pad 4 \
+            -cam '{{Param.CameraName}}' \
+            -x {{Param.ImageWidth}} \
+            -y {{Param.ImageHeight}} \
+            '{{Param.MayaSceneFile}}'
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Render}}"]
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - linux
+    amounts:
+    # Redshift is a GPU renderer and does not run on CPU-only workers.
+    - name: amount.worker.gpu
+      min: 1

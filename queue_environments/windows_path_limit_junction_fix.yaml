@@ -1,0 +1,334 @@
+specificationVersion: 'environment-2023-09'
+environment:
+  name: Short Path Mapping Junctions
+  description: |
+    Points the DEADLINE_JUNCTION_PATHMAPS environment variable to a copy of the session path mapping rules whose destinations are rewritten to go through the junctions.
+    DEADLINE_JUNCTIONS points to a second pathmapping file recording each assetroot folder and the junction created for it, used to remove them when the environment exits.
+
+    Windows has a 260 character path limit that might cause issues with long file and folder names.
+    Long-path-aware applications like Unreal Engine can work around this issue, but some DCCs like After Effects and Cinema 4D cannot.
+    Junctions function like aliases and can help us work around this issue by essentially creating an alternate path to the assets that can be much shorter.
+
+    This queue environment is only meant for queues whose jobs run on Windows fleets.
+
+    To make full use of this queue environment, any DCC integrations need to map their paths to use the junctions instead.
+    Some integrations, like the Deadline Cloud submitter for After Effects (https://github.com/aws-deadline/deadline-cloud-for-after-effects), should detect the environment variables and remap their paths automatically.
+
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - "{{Env.File.Enter}}"
+        - "{{Session.WorkingDirectory}}"
+        - "{{Session.PathMappingRulesFile}}"
+      onExit:
+        command: python
+        args:
+        - "{{Env.File.Exit}}"
+    embeddedFiles:
+    - name: Enter
+      filename: create-junctions.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import subprocess
+        import sys
+
+        # Junctions are numbered by session and then by assetroots within that session.
+        # The numbers start at 1 and just increment up.
+        # The format is <prefix><session_number>_<assetroot_number> so the default prefix of C:\tmp\dc produces C:\tmp\dc1_1.
+        JUNCTION_PATH_PREFIX = r"C:\tmp\dc"
+
+        # The Deadline Cloud worker agent allows a max of 100 concurrent sessions.
+        MAX_SESSION_SLOTS = 100
+
+        class JunctionError(Exception):
+            """A junction could not be created, so this session cannot continue."""
+
+
+        def junction_path(prefix, slot, index):
+            return "{}{}_{}".format(prefix, slot, index)
+
+
+        def create_junction(link, target):
+            """Try to create a junction at link. Returns (created, message).
+
+            Creating the directory entry is atomic and fails if the name is taken,
+            so attempting the create is itself the claim.
+
+            The paths are quoted because mklink is a cmd builtin and cmd re-parses
+            this line. A list would not work: subprocess joins it with list2cmdline,
+            which escapes quotes in a style cmd does not understand.
+            """
+            command = 'cmd /c mklink /J "{}" "{}"'.format(link, target)
+            result = subprocess.run(command, capture_output=True, text=True, errors="replace")
+            if result.returncode == 0:
+                return True, ""
+            return False, (result.stdout + result.stderr).strip()
+
+
+        def write_junctions(junctions_path, junctions):
+            """Write the assetroot to junction mapping as a pathmapping-1.0 file.
+
+            Rewritten after each junction is created, so the file always lists
+            everything that exists for onExit to remove, even if this script fails
+            partway through. Written to a temporary file and renamed so a partial
+            write is never visible.
+            """
+            document = {
+                "version": "pathmapping-1.0",
+                "path_mapping_rules": [
+                    {
+                        "source_path_format": "WINDOWS",
+                        "source_path": target,
+                        "destination_path": link,
+                    }
+                    for target, link in junctions
+                ],
+            }
+
+            temporary_path = junctions_path + ".tmp"
+            with open(temporary_path, "w", encoding="utf-8") as handle:
+                json.dump(document, handle)
+            os.replace(temporary_path, junctions_path)
+
+
+        def claim_junctions(prefix, session_dir, subdirs, junctions_path):
+            """Junction every subdir, all within one session slot.
+
+            Returns {subdir: junction path}. Raises JunctionError if no slot can be
+            claimed, or if a slot is claimed but one of its later junctions cannot
+            be created.
+
+            This only ever creates junctions. It never deletes one, not even a
+            leftover blocking its way: everything it does create is recorded for
+            onExit, and anything else on disk belongs to someone else or to an
+            earlier failure for an administrator to deal with.
+            """
+            first_target = os.path.join(session_dir, subdirs[0])
+            last_message = ""
+
+            for slot in range(1, MAX_SESSION_SLOTS + 1):
+                # The first junction in a slot claims it. If it exists, another
+                # session holds the slot, so try the next one.
+                first_link = junction_path(prefix, slot, 1)
+                created_first, last_message = create_junction(first_link, first_target)
+                if not created_first:
+                    continue
+
+                junctions = [(first_target, first_link)]
+                write_junctions(junctions_path, junctions)
+                junction_for_subdir = {subdirs[0]: first_link}
+
+                for index, subdir in enumerate(subdirs[1:], start=2):
+                    link = junction_path(prefix, slot, index)
+                    target = os.path.join(session_dir, subdir)
+
+                    ok, message = create_junction(link, target)
+                    if not ok:
+                        # We hold this slot, so nothing running owns the rest of it.
+                        # A junction here is debris from an earlier session that
+                        # failed, which is a condition for an administrator to
+                        # resolve rather than something to clear out from here.
+                        raise JunctionError(
+                            "Could not create junction {}: {}".format(link, message)
+                        )
+
+                    junctions.append((target, link))
+                    write_junctions(junctions_path, junctions)
+                    junction_for_subdir[subdir] = link
+
+                return junction_for_subdir
+
+            # Every slot failed. Either the junction location is unusable, or
+            # junctions left behind by earlier failures are occupying the slots.
+            # mklink's message says which.
+            raise JunctionError(
+                "Could not create a junction after trying all {} slots from {}. "
+                "Either JUNCTION_PATH_PREFIX in this script points somewhere unusable, or "
+                "junctions left behind by earlier failures are occupying the slots. "
+                "mklink reported: {}".format(
+                    MAX_SESSION_SLOTS,
+                    junction_path(prefix, 1, 1),
+                    last_message,
+                )
+            )
+
+
+        def session_relative_parts(destination, session_dir):
+            """Split destination into (top level session subdirectory, remainder).
+
+            Returns None when destination is not inside session_dir, which covers
+            shared storage locations that are already wherever the worker mounted
+            them and so are not worth shortening.
+            """
+            if not destination:
+                return None
+
+            try:
+                relative = os.path.relpath(os.path.abspath(destination), session_dir)
+            except ValueError:
+                # Different drive, so not inside the session directory.
+                return None
+
+            if relative == os.curdir or relative.startswith(os.pardir):
+                return None
+
+            top, _, remainder = relative.partition(os.sep)
+            return top, remainder
+
+
+        def referenced_subdirs(rules, session_dir):
+            """Distinct top level session subdirectories the rules point into.
+
+            Ordered by first appearance so that junction numbering is deterministic.
+            """
+            ordered = []
+            for rule in rules:
+                parts = session_relative_parts(rule.get("destination_path"), session_dir)
+                if parts is None:
+                    continue
+                top = parts[0]
+                if top not in ordered:
+                    ordered.append(top)
+            return ordered
+
+
+        def main(argv):
+            session_dir, rules_file = argv[1], argv[2]
+            prefix = JUNCTION_PATH_PREFIX
+
+            if sys.platform != "win32":
+                print("Not a Windows worker; no junctions created.")
+                return 0
+
+            with open(rules_file, encoding="utf-8") as handle:
+                document = json.load(handle)
+
+            # The rules file is allowed to be an empty object when the session has
+            # no path mapping rules.
+            rules = document.get("path_mapping_rules") or []
+            if not rules:
+                print("Session has no path mapping rules; nothing to shorten.")
+                return 0
+
+            session_dir = os.path.abspath(session_dir)
+            subdirs = referenced_subdirs(rules, session_dir)
+            if not subdirs:
+                print(
+                    "No path mapping rule points into the session directory; "
+                    "nothing to shorten."
+                )
+                return 0
+
+            deadline_junctions = os.path.join(session_dir, "deadline_junctions.json")
+            print("openjd_env: DEADLINE_JUNCTIONS={}".format(deadline_junctions))
+
+            # The junction root has to exist before mklink can create a link inside
+            # it. Another session may be doing this at the same moment, so tolerate
+            # the directory already being there.
+            prefix_parent = os.path.dirname(prefix)
+            if prefix_parent:
+                os.makedirs(prefix_parent, exist_ok=True)
+
+            try:
+                junction_for_subdir = claim_junctions(
+                    prefix, session_dir, subdirs, deadline_junctions
+                )
+            except JunctionError as error:
+                # Whatever was created is in the junctions file, so onExit removes it.
+                # openjd_fail surfaces the reason in the session log and the
+                # service, rather than leaving an admin to dig through stderr.
+                #
+                # Only the first line carries the macro, and the rest are printed
+                # as ordinary output. The runtime recognizes the prefix only at the
+                # very start of a line, and it keeps a single fail message that
+                # every openjd_fail line overwrites, so prefixing each line of a
+                # multi-line message would report only its last line. Plain lines
+                # still reach the session log, with the message's own line breaks
+                # left as they are.
+                lines = str(error).splitlines() or [""]
+                print("openjd_fail: {}".format(lines[0]))
+                for line in lines[1:]:
+                    print(line)
+                sys.exit(1)
+
+            # Repoint the destinations that got a junction. Rules left alone here
+            # are written back out unchanged, as is every field of every rule other
+            # than the destinations replaced below.
+            for rule in rules:
+                parts = session_relative_parts(rule.get("destination_path"), session_dir)
+                if parts is None:
+                    continue
+                top, remainder = parts
+
+                junction = junction_for_subdir[top]
+                rule["destination_path"] = (
+                    os.path.join(junction, remainder) if remainder else junction
+                )
+
+            deadline_junctions_pathmaps = os.path.join(session_dir, "deadline_junctions_pathmaps.json")
+            with open(deadline_junctions_pathmaps, "w", encoding="utf-8") as handle:
+                json.dump(document, handle)
+
+            print("Shortened path mapping rules written to: {}".format(deadline_junctions_pathmaps))
+            print("openjd_env: DEADLINE_JUNCTION_PATHMAPS={}".format(deadline_junctions_pathmaps))
+            return 0
+
+
+        if __name__ == "__main__":
+            sys.exit(main(sys.argv))
+    - name: Exit
+      filename: remove-junctions.py
+      type: TEXT
+      data: |
+        """Remove the junctions this session claimed.
+
+        Usage: remove-junctions.py
+        """
+        import json
+        import os
+        import sys
+
+
+        def main():
+            deadline_junctions = os.environ.get("DEADLINE_JUNCTIONS")
+            if not deadline_junctions or not os.path.exists(deadline_junctions):
+                print("No junctions were recorded for this session; nothing to remove.")
+                return 0
+
+            # The junctions are the destinations of the assetroot to junction rules.
+            try:
+                with open(deadline_junctions, encoding="utf-8") as handle:
+                    document = json.load(handle)
+            except (OSError, ValueError) as error:
+                print("Warning: could not read {}: {}".format(deadline_junctions, error))
+                return 0
+
+            links = [
+                rule.get("destination_path")
+                for rule in document.get("path_mapping_rules") or []
+            ]
+
+            # Best effort: keep going after a failure so that one junction we cannot
+            # remove does not leave the rest behind, and do not fail the session over
+            # cleanup.
+            for link in reversed(links):
+                if not link:
+                    continue
+                try:
+                    # rmdir removes the junction itself and leaves its target alone.
+                    os.rmdir(link)
+                    print("Junction removed: {}".format(link))
+                except FileNotFoundError:
+                    pass
+                except OSError as error:
+                    print("Warning: failed to remove junction {}: {}".format(link, error))
+
+            return 0
+
+
+        if __name__ == "__main__":
+            sys.exit(main())

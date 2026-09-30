@@ -9,7 +9,7 @@ set -euo pipefail
 REDSHIFT_VERSION=${PKG_VERSION%.*}
 
 # Redshift supports the following maya versions 
-MAYA_VERSIONS="2022 2023 2024 2025 2026"
+MAYA_VERSIONS="2022 2023 2024 2025 2026 2027"
 
 INSTALLER_DIR="$SRC_DIR/installer"
 REDSHIFT_UNPACK_DIR="$INSTALLER_DIR/redshift_installer_artifacts"
