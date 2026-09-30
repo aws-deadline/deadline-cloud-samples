@@ -1,0 +1,4 @@
+# Downloaded example scenes (~700 MB) and render output stay local.
+scenes/
+output/
+example_scenes.zip

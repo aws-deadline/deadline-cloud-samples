@@ -1,0 +1,166 @@
+# Container wrap environment for LOCAL runs — WRAP_ACTIONS + EXPR.
+#
+# "local" as in this workstation: it shells out to the docker CLI on the
+# machine running openjd, and bind mounts a host directory. It is applied ad
+# hoc with `openjd run --environment ...` (see run-render.sh). On a render farm
+# the same WRAP_ACTIONS hooks would normally arrive as a queue environment
+# managed by the farm rather than from a file next to the job.
+#
+# This is the piece that puts the job inside a container. WRAP_ACTIONS lets an
+# environment replace the lifecycle actions of everything inside it: each hook
+# below runs *instead of* the action it wraps, receiving the original action
+# through the WrappedAction.* variables. Here every hook re-runs the original
+# command inside openmoonray-rocky9, with the host session directory bind
+# mounted so the scenes are visible and the rendered .exr lands back on the
+# host.
+#
+# All three hooks must be defined together — WRAP_ACTIONS is all-or-nothing —
+# and only one environment in a session may define them.
+specificationVersion: environment-2023-09
+
+extensions:
+- WRAP_ACTIONS
+- EXPR
+
+parameterDefinitions:
+# The host directory to bind mount. PATH (not STRING) so that a relative
+# default resolves against this template's directory, giving ./sessions
+# without anyone hardcoding an absolute path. run-render.sh passes an absolute
+# path explicitly rather than relying on that resolution.
+- name: SessionsDir
+  type: PATH
+  default: sessions
+  description: Host directory exposed to the container; holds scenes/, output/ and the session working dirs.
+
+# Also declared in moonray-render-job.yaml with the same type and default, so
+# one -p sets the mount target and the job's in-container paths together.
+- name: ContainerMount
+  type: STRING
+  default: /mnt/session
+  description: Mount point for SessionsDir inside the container.
+
+- name: Image
+  type: STRING
+  default: openmoonray-rocky9
+  description: Container image holding the MoonRay build.
+
+- name: Platform
+  type: STRING
+  default: linux/amd64
+  description: The MoonRay image is x86_64 only.
+
+- name: DockerUser
+  type: STRING
+  default: "0:0"
+  description: >-
+    Passed to docker --user, as UID:GID. run-render.sh defaults this to the
+    invoking user so rendered output is not left root-owned on the host.
+    Running non-root logs a harmless "create_directory: Permission denied:
+    /installs/openmoonray/shader_json/" — MoonRay renders anyway. Set 0:0 if a
+    scene needs to write inside the image.
+
+environment:
+  name: MoonRayDocker
+  script:
+    let:
+    - mount_spec = string(Param.SessionsDir) + ':' + Param.ContainerMount
+
+    actions:
+      # onEnter and onExit belong to the wrapping environment itself, and a
+      # wrap environment's own lifecycle is never intercepted by its own
+      # hooks — so these two run on the HOST, not in the container. onEnter is
+      # a fail-fast check: without it, a missing image surfaces once per task
+      # as a confusing docker error instead of once, up front.
+      onEnter:
+        command: bash
+        args:
+        - -c
+        - >-
+          if docker image inspect {{ repr_sh(Param.Image) }} >/dev/null 2>&1;
+          then echo "wrap-env: image {{ Param.Image }} present, mounting {{ mount_spec }}";
+          else echo "wrap-env: image {{ Param.Image }} not found - build the sibling rocky9-cpu sample first" >&2; exit 1;
+          fi
+
+      # Replaces the onEnter of every environment inside this one.
+      onWrapEnvEnter:
+        command: docker
+        args:
+        - run
+        - --rm
+        # MoonRay binds NUMA memory with mbind(2), which Docker's default
+        # seccomp profile blocks unless the container has CAP_SYS_NICE. Without
+        # this the render aborts in initTLS with
+        # "numaNodeMBInd() sysCallMBind() failed".
+        - --cap-add
+        - SYS_NICE
+        - --platform
+        - "{{ Param.Platform }}"
+        - --user
+        - "{{ Param.DockerUser }}"
+        - -e
+        - HOME=/tmp
+        - -v
+        - "{{ mount_spec }}"
+        - "{{ Param.Image }}"
+        # The image's ENTRYPOINT is `bash -lc`, which takes the whole command
+        # as ONE argument — hence a single composed string here rather than
+        # separate argv entries. repr_sh() shell-quotes the forwarded command
+        # and args so metacharacters, spaces and quotes reach the process
+        # verbatim instead of being interpreted by that login shell. The `env`
+        # prefix applies any session-defined variables inside the container;
+        # with none defined the list is empty and `env` is a no-op passthrough.
+        - "env {{ repr_sh(WrappedAction.Environment) }} {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"
+
+      # Replaces the onRun of every task — this is the hook that renders.
+      onWrapTaskRun:
+        command: docker
+        args:
+        - run
+        - --rm
+        # MoonRay binds NUMA memory with mbind(2), which Docker's default
+        # seccomp profile blocks unless the container has CAP_SYS_NICE. Without
+        # this the render aborts in initTLS with
+        # "numaNodeMBInd() sysCallMBind() failed".
+        - --cap-add
+        - SYS_NICE
+        - --platform
+        - "{{ Param.Platform }}"
+        - --user
+        - "{{ Param.DockerUser }}"
+        - -e
+        - HOME=/tmp
+        - -v
+        - "{{ mount_spec }}"
+        - "{{ Param.Image }}"
+        - "env {{ repr_sh(WrappedAction.Environment) }} {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"
+
+      # Replaces the onExit of every environment inside this one.
+      onWrapEnvExit:
+        command: docker
+        args:
+        - run
+        - --rm
+        # MoonRay binds NUMA memory with mbind(2), which Docker's default
+        # seccomp profile blocks unless the container has CAP_SYS_NICE. Without
+        # this the render aborts in initTLS with
+        # "numaNodeMBInd() sysCallMBind() failed".
+        - --cap-add
+        - SYS_NICE
+        - --platform
+        - "{{ Param.Platform }}"
+        - --user
+        - "{{ Param.DockerUser }}"
+        - -e
+        - HOME=/tmp
+        - -v
+        - "{{ mount_spec }}"
+        - "{{ Param.Image }}"
+        - "env {{ repr_sh(WrappedAction.Environment) }} {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"
+
+      onExit:
+        command: bash
+        args:
+        - -c
+        # Quoted as a YAML string: an unquoted scalar containing ": " would be
+        # parsed as a mapping, not a command.
+        - 'echo "wrap-env: done"'

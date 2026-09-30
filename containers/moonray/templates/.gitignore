@@ -1,0 +1,7 @@
+# The session root: session working directories, unpacked scenes, rendered
+# output and run logs. All generated, none of it belongs in git.
+sessions/
+
+# The example scenes archive (~700 MB) is downloaded on demand by run-render.sh.
+example_scenes.zip
+example_scenes.zip.part
