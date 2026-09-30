@@ -14,6 +14,7 @@ Fixes: *<insert link to GitHub issue here>*
 ### Was this change documented?
 
 - If applicable, has the sample's description been updated?
+- If the change adds support for new software or a new kind of workload, say so here so a maintainer can add it to the repository description or topics, where people searching GitHub will find it.
 
 ---
 
