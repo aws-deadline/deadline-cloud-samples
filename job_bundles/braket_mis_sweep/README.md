@@ -1,23 +1,42 @@
 # Quantum maximum independent set sweep
 
-Solves the maximum independent set problem on unit-disk graphs using Analog
-Hamiltonian Simulation from Amazon Braket, sweeping the annealing schedule
-across a grid of anneal times and final detunings for several random graph
-instances. A dependent step averages the sweep and writes a map showing which
-schedules solve the problem.
+This sample attacks a hard graph problem with a quantum simulator, and uses
+Deadline Cloud to run hundreds of those attempts in parallel.
+
+The problem is **maximum independent set**: choose the largest group of vertices
+in a graph such that no two chosen vertices are connected by an edge. The graphs
+here are **unit-disk graphs**, meaning each vertex is a point in a plane and two
+vertices share an edge whenever they fall within a fixed distance of each other.
+That geometry is what makes the problem a good fit for analog quantum hardware,
+because an arrangement of neutral atoms has the same structure: two atoms sitting
+too close together cannot both be excited.
+
+**Amazon Braket** is the AWS quantum computing service. This sample uses the
+Braket SDK and the free local Analog Hamiltonian Simulation simulator that ships
+with it, so the sweep itself costs no quantum spend and needs no Braket IAM
+permissions. Sweeping on the simulator first is the point of the exercise: once
+the map shows which schedules work, those are the schedules worth submitting to
+real Rydberg hardware such as QuEra Aquila through Braket. Read
+[The physics, briefly](#the-physics-briefly) and [Costs](#costs) first, because
+the hardware limits here have not been validated against a live device.
+
+The quality of the answer depends on the **annealing schedule**, the recipe for how
+the simulated lasers change over time. This job sweeps a grid of anneal times and
+final detunings across several random graph instances, then a dependent step
+averages the sweep and writes a map showing which schedules solve the problem.
 
 ![Schedule quality map and a solved instance](.images/mis_schedule_map.png)
 
 ## New to analog quantum computing?
 
 Skip to [What this sample demonstrates](#what-this-sample-demonstrates) if maximum
-independent set and Analog Hamiltonian Simulation are already familiar.
+independent set and Analog Hamiltonian Simulation are already familiar. Every term
+in bold or italics below is also defined in the [Glossary](#glossary).
 
-**The problem.** A maximum independent set is the largest group of vertices in a
-graph where no two chosen vertices share an edge. Think of picking the most sites
-from a list of candidate cell towers, where towers close enough to interfere
-cannot both be chosen. Finding the true maximum is NP-hard, so the search space
-grows explosively with the number of vertices.
+**Why the problem is hard.** Think of choosing the most sites from a list of
+candidate cell towers, where two towers close enough to interfere cannot both be
+chosen. Finding the true maximum is NP-hard, so the search space grows explosively
+with the number of vertices.
 
 **The machine.** Analog Hamiltonian Simulation is not gate-based quantum
 computing. There are no circuits and no qubit gates. Neutral atoms are held in an
@@ -153,8 +172,9 @@ independent of instance size.
 
 ## Prerequisites
 
-- A Deadline Cloud farm with a queue and an associated **Linux** fleet. The
-  workload is CPU only and needs no GPU.
+- A Deadline Cloud farm with a queue and an associated **Linux** fleet. A
+  service-managed fleet works without any extra setup. The workload is CPU only
+  and needs no GPU, so the default instance types are fine.
 - A **Conda queue environment** on the queue. The default conda queue
   environment created by the Deadline Cloud console works as is. See
   [queue_environments](../../queue_environments) for alternatives.
@@ -367,6 +387,32 @@ environment attached and that `CondaChannels` includes `conda-forge`.
 
 **An aggregation step that fails with no result files** usually means every
 sweep task failed. Check one sweep task's log first.
+
+## Glossary
+
+| Term | Meaning |
+|---|---|
+| **Analog Hamiltonian Simulation (AHS)** | A quantum computing paradigm with no circuits or gates. You specify a continuous Hamiltonian, here a laser schedule applied to an array of atoms, and let the system evolve. Contrast with gate-based quantum computing. |
+| **Anneal time** | How long the schedule takes to run, in microseconds. Longer anneals track the ground state more closely and usually give better answers. The horizontal axis of the output map. |
+| **Annealing** | Starting a system in an easy-to-prepare state and changing the controls slowly enough that it stays in its lowest energy state as the problem is introduced. Named after the metallurgical process. |
+| **Annealing schedule** | The full time-dependent recipe for the controls: how Rabi frequency and detuning vary from the start of the simulation to the end. This is what the sample sweeps. |
+| **Approximation ratio** | Size of the independent set found divided by the true optimum from an exact classical solver. 1.0 means optimal. The color scale of the output map. |
+| **Blockade radius** | The distance within which two atoms cannot both be excited. Set by the Rabi frequency and the interaction strength. Atom pairs closer than this become the edges of the graph. |
+| **Detuning** | How far the laser frequency sits from the atomic transition, in rad/s. Negative detuning discourages excitation, positive detuning rewards it. Sweeping it from negative to positive is what drives the anneal. |
+| **Final detuning** | The detuning value reached at the end of the schedule. The vertical axis of the output map. |
+| **Ground state** | The lowest energy configuration of the system. The problem is set up so that the ground state corresponds to a maximum independent set. |
+| **Hamiltonian** | The mathematical description of a system's energy, which determines how its quantum state evolves over time. |
+| **Hilbert space** | The space of all possible quantum states. It grows as 2^N for N atoms, which is why exact simulation gets expensive quickly and why this sample caps instance size. |
+| **Independent set** | A set of graph vertices with no edge between any two of them. |
+| **Maximum independent set (MIS)** | The largest possible independent set in a graph. Finding it is NP-hard. |
+| **Neutral atom** | An uncharged atom, here rubidium, held in place by an optical trap. The physical carrier of information in this paradigm. |
+| **QuEra Aquila** | The neutral-atom AHS device available through Amazon Braket. This sample runs on a simulator, not on Aquila. |
+| **Rabi frequency** | How strongly the laser drives atoms between their ground and excited states, in rad/s. |
+| **Rydberg state** | A highly excited atomic state with a large electron orbital. Rydberg atoms interact strongly at distance, which produces the blockade. |
+| **Rydberg blockade** | The effect where an excited Rydberg atom shifts its neighbours' energy levels enough to prevent them being excited too. This enforces the independent set constraint physically. |
+| **Shot** | One run of the schedule followed by one measurement, returning one arrangement of excited atoms. Many shots build up a probability distribution over outcomes. |
+| **Unit-disk graph** | A graph whose vertices are points in a plane, with an edge between any two points within a fixed distance of each other. Atom arrangements naturally produce this graph class. |
+| **Z2 ordered phase** | A pattern where excited and unexcited atoms alternate along a chain. Used in `validate.py` as a published reference result to confirm the simulator behaves correctly. |
 
 ## Related resources
 
