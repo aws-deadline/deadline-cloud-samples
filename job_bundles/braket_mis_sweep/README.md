@@ -8,6 +8,51 @@ schedules solve the problem.
 
 ![Schedule quality map and a solved instance](.images/mis_schedule_map.png)
 
+## New to analog quantum computing?
+
+Skip to [What this sample demonstrates](#what-this-sample-demonstrates) if maximum
+independent set and Analog Hamiltonian Simulation are already familiar.
+
+**The problem.** A maximum independent set is the largest group of vertices in a
+graph where no two chosen vertices share an edge. Think of picking the most sites
+from a list of candidate cell towers, where towers close enough to interfere
+cannot both be chosen. Finding the true maximum is NP-hard, so the search space
+grows explosively with the number of vertices.
+
+**The machine.** Analog Hamiltonian Simulation is not gate-based quantum
+computing. There are no circuits and no qubit gates. Neutral atoms are held in an
+optical trap and lasers drive the whole array continuously, so you program a laser
+schedule rather than a sequence of gates. The atom positions encode the graph and
+the physics performs the search.
+
+**Why that solves this problem.** Two atoms closer together than the Rydberg
+blockade radius cannot both be excited at the same time, which is exactly the
+independent set constraint enforced by physics instead of by a solver. Arrange the
+atoms so that graph edges correspond to pairs inside the blockade radius, and the
+excited atoms in any final state form an independent set.
+
+**The two knobs this sample sweeps.**
+
+- **Anneal time**, in microseconds, is how slowly the laser schedule changes.
+  Change it slowly enough and the system stays in its lowest energy state, which
+  is the largest independent set. Rush it and the system is left behind in a worse
+  state.
+- **Final detuning**, in Mrad/s, is how strongly the schedule rewards exciting
+  atoms by the end. Too low and few atoms are excited, giving a small set. Too
+  high and the system is pushed toward states that violate the blockade.
+
+Neither knob has an obvious best value, and the best setting depends on the graph.
+Sweeping a grid of both is the reason this workload has hundreds of independent
+tasks to hand to a fleet.
+
+**Reading the results.** Each task runs its schedule many times. One run is a
+*shot*, and each shot returns one measured arrangement of excited atoms. The
+*approximation ratio* is the size of the set found divided by the true optimum
+from an exact classical solver, so 1.0 means the schedule found the best possible
+answer. In the figure above, the left panel is the approximation ratio across the
+swept grid, where brighter cells are better schedules, and the right panel is a
+single solved instance with the chosen atoms highlighted.
+
 ## What this sample demonstrates
 
 - A non-rendering scientific workload on Deadline Cloud, with no container and
