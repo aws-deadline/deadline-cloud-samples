@@ -47,7 +47,9 @@ def blockade_radius(rabi: float = RABI_MAX, detuning: float = 0.0) -> float:
     Two atoms closer than this cannot both be excited, which is what turns the
     register geometry into the edge set of a unit-disk graph.
     """
-    return (C6 / math.sqrt(rabi**2 + detuning**2)) ** (1.0 / 6.0)
+    # math.hypot rather than sqrt(a**2 + b**2): it avoids intermediate overflow
+    # and loses less precision for widely separated magnitudes.
+    return (C6 / math.hypot(rabi, detuning)) ** (1.0 / 6.0)
 
 
 def build_instance(width: int, height: int, dropout: float, seed: int):
