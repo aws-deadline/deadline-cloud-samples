@@ -1,0 +1,397 @@
+specificationVersion: 'jobtemplate-2023-09'
+
+name: "Quantum Maximum Independent Set Sweep"
+description: |
+  Solves maximum independent set on unit-disk graphs using Analog Hamiltonian
+  Simulation from Amazon Braket, sweeping the annealing schedule across a grid
+  of anneal times and final detunings for several random graph instances.
+
+  Every task runs on the free local AHS simulator that ships with the Braket
+  SDK, so the sweep needs no quantum hardware, no Braket IAM permissions, and
+  no container. An aggregation step averages the results and writes a map of
+  which schedules solve the problem.
+
+  Each task also solves its instance exactly with a classical solver, so the
+  reported approximation ratio is measured against ground truth rather than
+  assumed.
+
+parameterDefinitions:
+
+# Input and output
+
+- name: ResultsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: results
+  description: Directory for the per-point results, the summary, and the figure.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Results Directory
+    groupLabel: Input / Output
+
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: Directory holding the bundled Python scripts.
+  userInterface:
+    control: HIDDEN
+
+# Reusability. The step structure (validate, fan out, aggregate) is workload
+# agnostic. Point these at different scripts to drive a different sweep with
+# this same template.
+
+- name: SolveScript
+  type: STRING
+  default: "solve_point.py"
+  description: Script in ScriptsDir run once per sweep point.
+  userInterface:
+    control: HIDDEN
+
+- name: AggregateScript
+  type: STRING
+  default: "aggregate_results.py"
+  description: Script in ScriptsDir run once after the sweep completes.
+  userInterface:
+    control: HIDDEN
+
+- name: ValidateScript
+  type: STRING
+  default: "validate.py"
+  description: Script in ScriptsDir run once before the sweep starts.
+  userInterface:
+    control: HIDDEN
+
+- name: ExtraSolverArgs
+  type: STRING
+  default: ""
+  description: >
+    Extra command line flags appended to every solve task, for example
+    "--blockade-radius 6.3e-6". Parsed by the solve script, not by a shell.
+    Lets you add knobs without editing the job template.
+  userInterface:
+    control: LINE_EDIT
+    label: Extra Solver Arguments
+    groupLabel: Advanced
+
+# Sweep grid
+
+- name: AnnealPoints
+  type: INT
+  default: 6
+  minValue: 1
+  maxValue: 32
+  description: Number of anneal times to sweep. Total tasks are this times the detunings times the instances.
+  userInterface:
+    control: SPIN_BOX
+    label: Anneal Time Points
+    groupLabel: Sweep Grid
+
+- name: DetuningPoints
+  type: INT
+  default: 6
+  minValue: 1
+  maxValue: 32
+  description: Number of final detunings to sweep.
+  userInterface:
+    control: SPIN_BOX
+    label: Final Detuning Points
+    groupLabel: Sweep Grid
+
+- name: GraphInstances
+  type: INT
+  default: 4
+  minValue: 1
+  maxValue: 32
+  description: Number of random graph instances. Results are averaged across them.
+  userInterface:
+    control: SPIN_BOX
+    label: Graph Instances
+    groupLabel: Sweep Grid
+
+# Schedule bounds
+
+- name: AnnealTimeMinMicroseconds
+  type: FLOAT
+  default: 0.5
+  minValue: 0.2
+  maxValue: 4.0
+  description: Shortest anneal time to try. Aquila allows at most 4 microseconds.
+  userInterface:
+    control: SPIN_BOX
+    label: Anneal Time Min (us)
+    groupLabel: Annealing Schedule
+    decimals: 2
+    singleStepDelta: 0.1
+
+- name: AnnealTimeMaxMicroseconds
+  type: FLOAT
+  default: 3.8
+  minValue: 0.2
+  maxValue: 4.0
+  description: Longest anneal time to try.
+  userInterface:
+    control: SPIN_BOX
+    label: Anneal Time Max (us)
+    groupLabel: Annealing Schedule
+    decimals: 2
+    singleStepDelta: 0.1
+
+- name: DetuningEndMinMegarad
+  type: FLOAT
+  default: -20.0
+  minValue: -125.0
+  maxValue: 125.0
+  description: Lowest final detuning, in Mrad/s. Negative values discourage excitations.
+  userInterface:
+    control: SPIN_BOX
+    label: Final Detuning Min (Mrad/s)
+    groupLabel: Annealing Schedule
+    decimals: 1
+    singleStepDelta: 5.0
+
+- name: DetuningEndMaxMegarad
+  type: FLOAT
+  default: 60.0
+  minValue: -125.0
+  maxValue: 125.0
+  description: Highest final detuning, in Mrad/s. Positive values reward larger independent sets.
+  userInterface:
+    control: SPIN_BOX
+    label: Final Detuning Max (Mrad/s)
+    groupLabel: Annealing Schedule
+    decimals: 1
+    singleStepDelta: 5.0
+
+# Problem instance
+
+- name: LatticeWidth
+  type: INT
+  default: 5
+  minValue: 2
+  maxValue: 5
+  description: >
+    Lattice columns before dropout. Simulator cost roughly doubles per surviving
+    atom, so width times height times (1 - dropout) is the dial that matters.
+    Measured: 9 atoms is about 3 seconds, 12 atoms about 13 seconds, 16 atoms
+    about 4 minutes.
+  userInterface:
+    control: SPIN_BOX
+    label: Lattice Width
+    groupLabel: Problem Instance
+
+- name: LatticeHeight
+  type: INT
+  default: 3
+  minValue: 2
+  maxValue: 5
+  description: Lattice rows before dropout.
+  userInterface:
+    control: SPIN_BOX
+    label: Lattice Height
+    groupLabel: Problem Instance
+
+- name: Dropout
+  type: FLOAT
+  default: 0.2
+  minValue: 0.0
+  maxValue: 0.75
+  description: Fraction of lattice sites removed at random to make each instance irregular.
+  userInterface:
+    control: SPIN_BOX
+    label: Site Dropout
+    groupLabel: Problem Instance
+    decimals: 2
+    singleStepDelta: 0.05
+
+# Simulator settings
+
+- name: Shots
+  type: INT
+  default: 1000
+  minValue: 10
+  maxValue: 100000
+  description: >
+    Measurement samples per simulation. The local simulator solves the dynamics
+    once and then samples, so shots are nearly free and do not meaningfully
+    change task runtime.
+  userInterface:
+    control: SPIN_BOX
+    label: Shots
+    groupLabel: Simulator Settings
+
+- name: TimeSteps
+  type: INT
+  default: 250
+  minValue: 20
+  maxValue: 2000
+  description: >
+    Time resolution of the simulation. Runtime is close to linear in this value
+    below about 10 atoms, where the simulator uses its numpy solver. Above that
+    it switches to an adaptive scipy integrator and runtime becomes nearly
+    independent of this setting, so use the lattice size to change task length
+    on larger instances.
+  userInterface:
+    control: SPIN_BOX
+    label: Time Steps
+    groupLabel: Simulator Settings
+
+# Correctness gate
+
+- name: ValidationLevel
+  type: STRING
+  default: "full"
+  allowedValues: ["full", "quick", "skip"]
+  description: >
+    Correctness checks to run before any simulation. "quick" reproduces a
+    published reference result, verifies the blockade graph matches the scored
+    graph, checks the classical solver against exhaustive enumeration, and
+    confirms the anneal recovers a proven optimum. "full" adds an independent
+    Schrodinger integration compared against the simulator. The whole gate takes
+    about 15 seconds and runs once per job.
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Validation Level
+    groupLabel: Correctness
+
+# Software environment
+
+- name: CondaPackages
+  type: STRING
+  default: "python=3.12 amazon-braket-sdk amazon-braket-default-simulator networkx numpy scipy matplotlib"
+  description: Packages for the queue's Conda environment to install.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Packages
+    groupLabel: Software Environment
+
+- name: CondaChannels
+  type: STRING
+  default: "conda-forge"
+  description: Conda channels to install from.
+  userInterface:
+    control: LINE_EDIT
+    label: Conda Channels
+    groupLabel: Software Environment
+
+steps:
+
+- name: ValidatePhysics
+  description: >
+    Proves the physics and the scoring are correct before spending any fleet
+    time on the sweep. Runs once. If the checks fail, no simulation tasks run.
+  hostRequirements:
+    amounts:
+    - name: amount.worker.vcpu
+      min: 2
+    - name: amount.worker.memory
+      min: 4096
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/{{Param.ValidateScript}}"
+        - "--level"
+        - "{{Param.ValidationLevel}}"
+        timeout: 1800
+
+- name: SweepSchedules
+  description: >
+    One task per combination of anneal time, final detuning, and graph
+    instance. Every task is independent.
+  dependencies:
+  - dependsOn: ValidatePhysics
+  hostRequirements:
+    amounts:
+    - name: amount.worker.vcpu
+      min: 2
+    - name: amount.worker.memory
+      min: 4096
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: AnnealIndex
+      type: INT
+      range: "1-{{Param.AnnealPoints}}"
+    - name: DetuningIndex
+      type: INT
+      range: "1-{{Param.DetuningPoints}}"
+    - name: GraphSeed
+      type: INT
+      range: "1-{{Param.GraphInstances}}"
+    combination: "AnnealIndex * DetuningIndex * GraphSeed"
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/{{Param.SolveScript}}"
+        - "--results-dir"
+        - "{{Param.ResultsDir}}"
+        - "--anneal-index"
+        - "{{Task.Param.AnnealIndex}}"
+        - "--anneal-points"
+        - "{{Param.AnnealPoints}}"
+        - "--anneal-min-microseconds"
+        - "{{Param.AnnealTimeMinMicroseconds}}"
+        - "--anneal-max-microseconds"
+        - "{{Param.AnnealTimeMaxMicroseconds}}"
+        - "--detuning-index"
+        - "{{Task.Param.DetuningIndex}}"
+        - "--detuning-points"
+        - "{{Param.DetuningPoints}}"
+        - "--detuning-min-megarad"
+        - "{{Param.DetuningEndMinMegarad}}"
+        - "--detuning-max-megarad"
+        - "{{Param.DetuningEndMaxMegarad}}"
+        - "--graph-seed"
+        - "{{Task.Param.GraphSeed}}"
+        - "--lattice-width"
+        - "{{Param.LatticeWidth}}"
+        - "--lattice-height"
+        - "{{Param.LatticeHeight}}"
+        - "--dropout"
+        - "{{Param.Dropout}}"
+        - "--shots"
+        - "{{Param.Shots}}"
+        - "--time-steps"
+        - "{{Param.TimeSteps}}"
+        - "--extra-args"
+        - "{{Param.ExtraSolverArgs}}"
+        timeout: 3600
+        cancelation:
+          mode: NOTIFY_THEN_TERMINATE
+          notifyPeriodInSeconds: 30
+
+- name: AggregateResults
+  description: >
+    Averages the sweep across graph instances and writes the schedule map and
+    the summary. Runs once, after every simulation has succeeded.
+  dependencies:
+  - dependsOn: SweepSchedules
+  hostRequirements:
+    amounts:
+    - name: amount.worker.vcpu
+      min: 2
+    - name: amount.worker.memory
+      min: 4096
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/{{Param.AggregateScript}}"
+        - "--results-dir"
+        - "{{Param.ResultsDir}}"
+        timeout: 900

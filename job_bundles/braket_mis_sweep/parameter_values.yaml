@@ -1,0 +1,12 @@
+# Pre-populate values for the queue environment's parameters in the GUI submitter.
+# These values appear as the defaults in the "Queue Environment: Conda" section.
+parameterValues:
+  - name: CondaPackages
+    value: "python=3.12 amazon-braket-sdk amazon-braket-default-simulator networkx numpy scipy matplotlib"
+  - name: CondaChannels
+    value: "conda-forge"
+  # Fail fast while iterating. Raise once the sweep runs cleanly.
+  - name: deadline:maxFailedTasksCount
+    value: 5
+  - name: deadline:maxRetriesPerTask
+    value: 1
