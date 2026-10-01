@@ -3,61 +3,61 @@
 This sample attacks a hard graph problem with a quantum simulator, and uses
 Deadline Cloud to run hundreds of those attempts in parallel.
 
-The problem is **maximum independent set**: choose the largest group of vertices
-in a graph such that no two chosen vertices are connected by an edge. The graphs
-here are **unit-disk graphs**, meaning each vertex is a point in a plane and two
-vertices share an edge whenever they fall within a fixed distance of each other.
+The problem is **maximum independent set**: pick as many vertices from a graph as
+possible while keeping every chosen pair unconnected. The graphs here are
+**unit-disk graphs**. Each vertex is a point in a plane, and two vertices share
+an edge whenever they fall within a fixed distance of each other.
 That geometry is what makes the problem a good fit for analog quantum hardware,
 because an arrangement of neutral atoms has the same structure: two atoms sitting
 too close together cannot both be excited.
 
 **Amazon Braket** is the AWS quantum computing service. This sample uses the
-Braket SDK and the free local Analog Hamiltonian Simulation simulator that ships
-with it, so the sweep itself costs no quantum spend and needs no Braket IAM
-permissions. Sweeping on the simulator first is the point of the exercise: once
-the map shows which schedules work, those are the schedules worth submitting to
-real Rydberg hardware such as QuEra Aquila through Braket. Read
+Braket SDK and the free local Analog Hamiltonian Simulation simulator included
+with it. The sweep costs nothing in quantum hardware charges and runs with
+Deadline Cloud permissions alone. Sweeping on the simulator comes first: once the
+map shows which schedules work, you can submit those schedules to real Rydberg
+hardware such as QuEra Aquila through Braket. Read
 [The physics, briefly](#the-physics-briefly) and [Costs](#costs) first, because
 the hardware limits here have not been validated against a live device.
 
 The quality of the answer depends on the **annealing schedule**, the recipe for how
 the simulated lasers change over time. This job sweeps a grid of anneal times and
-final detunings across several random graph instances, then a dependent step
+final detunings across randomly generated graph instances, then a dependent step
 averages the sweep and writes a map showing which schedules solve the problem.
 
 ![Schedule quality map and a solved instance](.images/mis_schedule_map.png)
 
 ## New to analog quantum computing?
 
-Skip to [What this sample demonstrates](#what-this-sample-demonstrates) if maximum
+Skip to [Features demonstrated](#features-demonstrated) if maximum
 independent set and Analog Hamiltonian Simulation are already familiar. Every term
 in bold or italics below is also defined in the [Glossary](#glossary).
 
-**Why the problem is hard.** Think of choosing the most sites from a list of
+**NP-hardness.** Think of choosing the most sites from a list of
 candidate cell towers, where two towers close enough to interfere cannot both be
-chosen. Finding the true maximum is NP-hard, so the search space grows explosively
+chosen. Finding the true maximum is NP-hard. The search space grows explosively
 with the number of vertices.
 
-**The machine.** Analog Hamiltonian Simulation is not gate-based quantum
-computing. There are no circuits and no qubit gates. Neutral atoms are held in an
-optical trap and lasers drive the whole array continuously, so you program a laser
-schedule rather than a sequence of gates. The atom positions encode the graph and
-the physics performs the search.
+**The machine.** Analog Hamiltonian Simulation differs from gate-based quantum
+computing. Instead of circuits and qubit gates, neutral atoms sit in an optical
+trap while lasers drive the whole array continuously. You program a laser
+schedule rather than a sequence of gates. The atom positions encode the graph,
+and the physics performs the search.
 
-**Why that solves this problem.** Two atoms closer together than the Rydberg
-blockade radius cannot both be excited at the same time, which is exactly the
-independent set constraint enforced by physics instead of by a solver. Arrange the
+**The blockade constraint.** When two atoms sit closer together than the Rydberg
+blockade radius, only one of them can be excited. The physics enforces the
+independent set constraint directly instead of a solver checking it. Arrange the
 atoms so that graph edges correspond to pairs inside the blockade radius, and the
 excited atoms in any final state form an independent set.
 
-**The two knobs this sample sweeps.**
+**Swept controls.**
 
 - **Anneal time**, in microseconds, is how slowly the laser schedule changes.
   Change it slowly enough and the system stays in its lowest energy state, which
   is the largest independent set. Rush it and the system is left behind in a worse
   state.
 - **Final detuning**, in Mrad/s, is how strongly the schedule rewards exciting
-  atoms by the end. Too low and few atoms are excited, giving a small set. Too
+  atoms by the end. Too low excites few atoms and produces a small set. Too
   high and the system is pushed toward states that violate the blockade.
 
 Neither knob has an obvious best value, and the best setting depends on the graph.
@@ -72,7 +72,7 @@ answer. In the figure above, the left panel is the approximation ratio across th
 swept grid, where brighter cells are better schedules, and the right panel is a
 single solved instance with the chosen atoms highlighted.
 
-## What this sample demonstrates
+## Features demonstrated
 
 - A non-rendering scientific workload on Deadline Cloud, with no container and
   no custom worker image.
@@ -87,11 +87,11 @@ single solved instance with the chosen atoms highlighted.
   exactly with a classical solver, so the reported approximation ratio is
   measured rather than assumed.
 
-Every simulation runs on the free local AHS simulator bundled with the Braket
-SDK. The job submits nothing to Amazon Braket, so it needs no Braket IAM
-permissions and incurs no quantum hardware charges.
+The sweep runs on the free local AHS simulator bundled with the Braket SDK. The
+job submits nothing to Amazon Braket. It runs with Deadline Cloud permissions
+alone, at zero quantum hardware cost.
 
-## Why the workload parallelizes well
+## Task independence
 
 Braket's own maximum independent set example tunes the annealing schedule with a
 Nelder-Mead optimizer, which is inherently sequential because each step depends
@@ -99,18 +99,17 @@ on the previous one. Replacing the optimizer with a grid search over schedules
 turns one serial loop into hundreds of independent simulations, which is what
 makes a fleet useful here.
 
-Note that Braket program sets, which pack up to 100 circuits into a single
+Note that Braket program sets, which pack up to 100 circuits into one
 quantum task, do not apply to Analog Hamiltonian Simulation. Fan-out across
-workers is the only way to parallelize this paradigm.
+workers is how this workload parallelizes.
 
 ## The physics, briefly
 
 Each graph vertex is a neutral atom in an optical trap. Atoms closer together
 than the Rydberg blockade radius cannot both be excited, so the geometry of the
 atom arrangement becomes the edge set of a unit-disk graph. Sweeping the global
-detuning from strongly negative to positive rewards excitations while the
-blockade forbids adjacent ones, so the system anneals toward a large independent
-set.
+detuning from strongly negative to positive rewards excitations, while adjacent
+excitations remain blocked. The system anneals toward a large independent set.
 
 Longer anneals track the ground state more closely, which is visible in the
 output as increasing approximation ratio along the anneal time axis.
@@ -125,8 +124,8 @@ rather than guaranteed. The sample runs only the local simulator. See
 
 ## Validation
 
-The sweep is only worth running if its numbers mean something, so
-`scripts/validate.py` establishes that in four independent layers:
+`scripts/validate.py` establishes that the sweep's numbers mean something, in
+four independent layers:
 
 ```bash
 python scripts/validate.py
@@ -150,8 +149,8 @@ cannot be compared against reference numbers point by point. Rather than rely on
 that, `verify_dynamics.py` reads the Analog Hamiltonian Simulation program the
 job actually submits, rebuilds the Rydberg Hamiltonian from first principles,
 integrates the Schrodinger equation with scipy, and compares the result against
-the Braket local simulator. Two independent implementations of the same physics
-agreeing is stronger evidence than matching a third party's parameters.
+the Braket local simulator. Agreement between independent implementations of the
+same physics is stronger evidence than matching a third party's parameters.
 
 Measured agreement at 40,000 shots, where multinomial shot noise is about 0.005:
 
@@ -173,33 +172,33 @@ independent of instance size.
 ## Prerequisites
 
 - A Deadline Cloud farm with a queue and an associated **Linux** fleet. A
-  service-managed fleet works without any extra setup. The workload is CPU only
-  and needs no GPU, so the default instance types are fine.
+  service-managed fleet works as created. The workload is CPU only, and default
+  instance types are fine.
 - A **Conda queue environment** on the queue. The default conda queue
   environment created by the Deadline Cloud console works as is. See
   [queue_environments](../../queue_environments) for alternatives.
 - The Deadline Cloud CLI: `pip install deadline`.
 - To run locally instead, `pip install openjd-cli amazon-braket-sdk networkx matplotlib`.
 
-No conda recipe is required. Both `amazon-braket-sdk` and
+You can skip writing a conda recipe. Both `amazon-braket-sdk` and
 `amazon-braket-default-simulator` are published on conda-forge.
 
 ## How it works
 
 | Step | What it does |
 |---|---|
-| `SweepSchedules` | One task per `(anneal time, final detuning, graph instance)` combination. Builds the instance, solves it exactly with networkx, runs the analog simulation, scores the shots, and writes one JSON file. |
+| `SweepSchedules` | One task per `(anneal time, final detuning, graph instance)` combination. Builds the instance and solves it exactly with networkx, then runs the analog simulation. Scores the shots and writes one JSON file. |
 | `AggregateResults` | Depends on `SweepSchedules`. Averages the approximation ratio across graph instances, renders the two-panel figure, and writes `summary.json`. |
 
 Task count is `AnnealPoints * DetuningPoints * GraphInstances`. The default grid
 of 6 by 6 by 4 produces 144 simulation tasks plus 1 aggregation task.
 
 Deadline Cloud downloads the sweep step's outputs as inputs to the aggregation
-step, so the fan-in needs no explicit Amazon S3 plumbing.
+step. Deadline Cloud handles that transfer itself.
 
 ## Run it
 
-Validate and run a single task locally first:
+Validate and run one task locally first:
 
 ```bash
 openjd check template.yaml
@@ -258,8 +257,9 @@ attachments hashes the bundle and uploads only what changed. Re-uploading the
 shared bundle is not required to iterate, because the copy on the queue exists
 for other people rather than for you.
 
-Adding a new file needs no template change either. `ScriptsDir` is declared
-`dataFlow: IN`, so the whole directory is synced to every worker.
+Adding a new file works the same way. `ScriptsDir` is declared `dataFlow: IN`, so
+the whole directory is synced to every worker, and the template keeps its
+existing contents.
 
 ### Loop 3: publish for the team
 
@@ -271,7 +271,7 @@ Overwrites the `.ojd` archive on the queue, after which teammates see the new
 version in `deadline bundle gui-submit --browse` under the Queue source. Sharing
 requires Deadline Cloud CLI 0.60 or later.
 
-### Choosing where a new knob belongs
+### Placing a new parameter
 
 | Need | Approach | Template edit |
 |---|---|---|
@@ -282,22 +282,21 @@ requires Deadline Cloud CLI 0.60 or later.
 
 ## Reusing the template for other work
 
-The step structure (validate, fan out over an index grid, aggregate) is
+The step structure (validate, expand over an index grid, aggregate) is
 workload agnostic. `SolveScript`, `AggregateScript`, and `ValidateScript` are job
 parameters, so pointing them at different files in `ScriptsDir` runs a different
-sweep through the same template and the same fan-out and fan-in wiring.
+sweep with the same template and the same fan-out and fan-in wiring.
 
 The sweep axes are integer indices rather than physical values, and each axis
 length is a job parameter. A script converts an index to whatever the workload
-needs, which is why changing the grid resolution changes the task count without
-any template edit.
+needs. Changing the grid resolution changes the task count without any template
+edit.
 
-Two limits are worth knowing before going further. Deadline Cloud caps job
-parameters at 50, and the submitter GUI is generated from the template, so a
-template generic enough for every workload ends up with generic labels and a
-worse GUI than a purpose-built one. For a family of related studies, prefer one
-template plus several `parameter_values.yaml` files, one per study, over a single
-universal template.
+Deadline Cloud caps job parameters at 50. The submitter GUI is also generated
+from the template, so a template generic enough for every workload ends up with
+generic labels and a worse GUI than a purpose-built one. For a family of related
+studies, prefer one template plus multiple `parameter_values.yaml` files, one per
+study, over one universal template.
 
 ## Parameters and outputs
 
@@ -307,7 +306,7 @@ Schedule bounds are set by `AnnealTimeMinMicroseconds`,
 `DetuningEndMaxMegarad`. Problem size is set by `LatticeWidth`,
 `LatticeHeight`, and `Dropout`.
 
-Outputs land in `ResultsDir`:
+Outputs are written to `ResultsDir`:
 
 - `point_a<NNN>_d<NNN>_s<NNN>.json`, one per sweep point, holding the
   approximation ratio, the probability of finding the optimum, the fraction of
@@ -327,10 +326,10 @@ space grows as 2^N. Measured on one core:
 | 12 | 5x3, 0.2 (default) | about 13 seconds |
 | 16 | 4x4, 0.0 | about 4 minutes |
 
-Two things behave less obviously than expected:
+Shots and `TimeSteps` behave unexpectedly:
 
 - **Shots are nearly free.** The simulator solves the dynamics once and then
-  draws all shots as a single multinomial sample, so 10,000 shots cost barely
+  draws all shots as one multinomial sample, so 10,000 shots cost barely
   more than 1,000. Do not try to lengthen tasks by raising `Shots`.
 - **`TimeSteps` stops mattering above roughly 10 atoms.** Below that the
   simulator uses a numpy solver whose cost is linear in `TimeSteps`. Above it,
@@ -343,9 +342,9 @@ simulator's configuration enumeration alone takes minutes.
 ## Reproducibility
 
 The local simulator has no seed argument, and its shot sampling draws from
-numpy's global legacy random state. Each task therefore seeds that state from
+numpy's global legacy random state. Each task seeds that state from
 its own task coordinates immediately before running, so a retried task
-reproduces its shots exactly. The recorded `shot_seed` field makes any single
+reproduces its shots exactly. The recorded `shot_seed` field makes any sweep
 point reproducible outside the job.
 
 ## Costs
@@ -367,8 +366,8 @@ steps.
 ## Cleanup
 
 Job outputs live in the queue's job attachments bucket. Delete the job from the
-monitor, or empty the bucket prefix, to remove them. The sample creates no other
-AWS resources.
+monitor, or empty the bucket prefix, to remove them. The sample leaves the rest
+of your account untouched.
 
 ## Troubleshooting
 
@@ -378,34 +377,34 @@ substeps`** means the adaptive solver ran out of substeps. The sample passes
 simulation call was modified.
 
 **Tasks marked `NOT_COMPATIBLE`** mean no associated fleet satisfies the step's
-host requirements. The steps ask for 2 vCPUs, 4096 MiB of memory, and a Linux
+host requirements. The steps declare 2 vCPUs, 4096 MiB of memory, and a Linux
 operating system.
 
 **`ModuleNotFoundError: No module named 'braket'`** means the Conda queue
 environment did not install the packages. Confirm the queue has a conda queue
 environment attached and that `CondaChannels` includes `conda-forge`.
 
-**An aggregation step that fails with no result files** usually means every
-sweep task failed. Check one sweep task's log first.
+**An aggregation step that fails with no result files** points to every sweep
+task failing. Check one sweep task's log first.
 
 ## Glossary
 
 | Term | Meaning |
 |---|---|
-| **Analog Hamiltonian Simulation (AHS)** | A quantum computing paradigm with no circuits or gates. You specify a continuous Hamiltonian, here a laser schedule applied to an array of atoms, and let the system evolve. Contrast with gate-based quantum computing. |
-| **Anneal time** | How long the schedule takes to run, in microseconds. Longer anneals track the ground state more closely and usually give better answers. The horizontal axis of the output map. |
+| **Analog Hamiltonian Simulation (AHS)** | A style of quantum computing that uses continuous control rather than circuits or gates. You specify a Hamiltonian: here, a laser schedule applied to an array of atoms. The system then evolves under it. Contrast with gate-based quantum computing. |
+| **Anneal time** | How long the schedule takes to run, in microseconds. Longer anneals track the ground state more closely and tend toward better answers. The horizontal axis of the output map. |
 | **Annealing** | Starting a system in an easy-to-prepare state and changing the controls slowly enough that it stays in its lowest energy state as the problem is introduced. Named after the metallurgical process. |
-| **Annealing schedule** | The full time-dependent recipe for the controls: how Rabi frequency and detuning vary from the start of the simulation to the end. This is what the sample sweeps. |
+| **Annealing schedule** | The full time-dependent recipe for the controls: how Rabi frequency and detuning vary from the start of the simulation to the end. The sample sweeps this schedule. |
 | **Approximation ratio** | Size of the independent set found divided by the true optimum from an exact classical solver. 1.0 means optimal. The color scale of the output map. |
 | **Blockade radius** | The distance within which two atoms cannot both be excited. Set by the Rabi frequency and the interaction strength. Atom pairs closer than this become the edges of the graph. |
 | **Detuning** | How far the laser frequency sits from the atomic transition, in rad/s. Negative detuning discourages excitation, positive detuning rewards it. Sweeping it from negative to positive is what drives the anneal. |
 | **Final detuning** | The detuning value reached at the end of the schedule. The vertical axis of the output map. |
 | **Ground state** | The lowest energy configuration of the system. The problem is set up so that the ground state corresponds to a maximum independent set. |
 | **Hamiltonian** | The mathematical description of a system's energy, which determines how its quantum state evolves over time. |
-| **Hilbert space** | The space of all possible quantum states. It grows as 2^N for N atoms, which is why exact simulation gets expensive quickly and why this sample caps instance size. |
+| **Hilbert space** | The space of all possible quantum states. It grows as 2^N for N atoms, so exact simulation gets expensive quickly and this sample caps instance size. |
 | **Independent set** | A set of graph vertices with no edge between any two of them. |
 | **Maximum independent set (MIS)** | The largest possible independent set in a graph. Finding it is NP-hard. |
-| **Neutral atom** | An uncharged atom, here rubidium, held in place by an optical trap. The physical carrier of information in this paradigm. |
+| **Neutral atom** | An uncharged atom, here rubidium 87, held in place by an optical trap. The physical carrier of information in an AHS device. |
 | **QuEra Aquila** | The neutral-atom AHS device available through Amazon Braket. This sample runs on a simulator, not on Aquila. |
 | **Rabi frequency** | How strongly the laser drives atoms between their ground and excited states, in rad/s. |
 | **Rydberg state** | A highly excited atomic state with a large electron orbital. Rydberg atoms interact strongly at distance, which produces the blockade. |
