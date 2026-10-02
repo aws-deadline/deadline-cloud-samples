@@ -1,0 +1,7 @@
+# The main build context only needs the Dockerfile and scripts/. The installers
+# (multi-GB, licensed) and the plugins directory are passed as named build
+# contexts by build.sh (--build-context installers=... plugins=...), so they are
+# never uploaded with, or copied from, this context.
+*
+!Dockerfile
+!scripts/

@@ -1,0 +1,5 @@
+# Vendor installers and customer plug-ins are never committed; see README.md.
+installers/*
+!installers/.gitkeep
+plugins/*
+!plugins/.gitkeep
