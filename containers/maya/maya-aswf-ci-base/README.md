@@ -303,10 +303,15 @@ Timing on the test fleet, which had a minimum size of 0 so that a worker started
 - Worker start after submitting a job: 47-107 s.
 - Queue environment enter with a fresh pull of the full image: 293-342 s (about 5-6 minutes for 9.1 GB). With the image already on the worker: 2-3 s.
 
+The resources defined in `cloudformation.yaml` (queue, queue environment, fleet with its host configuration script, and the association) were also deployed to a farm with the template's values and used for two jobs on a GPU worker:
+
+- The fleet pinned to `l40s` and `rtx-pro-server-6000` did not get on-demand capacity in us-west-2 within 20 minutes. After `l4` and `a10g` were added to the selections, a `g6.xlarge` (L4) worker started within a minute. If your fleet stays at zero workers with a target of one, widen `AcceleratorCapabilities.Selections` or switch the market type.
+- The host configuration script installed Docker and the NVIDIA Container Toolkit, the queue environment logged in to ECR with the queue role and pulled the 9.1 GB image in 3 min 54 s, and the container ran as the job user (`uid 1001 gid 1002` inside the container). `nvidia-smi` inside the container listed the L4, and Arnold reported `GPU 0: NVIDIA L4` at startup.
+- `Render -r sw` and `Render -r arnold` both rendered a frame and uploaded it through job attachments. With the image already on the worker the environment entered in 2 s.
+
 Not covered by these tests:
 
-- GPU rendering (V-Ray GPU and Redshift GPU).
-- Deploying `cloudformation.yaml` itself. The test queue environment ran the container as root, while the template runs it as the worker's job user.
+- GPU rendering with V-Ray GPU and Redshift GPU (the GPU was only confirmed visible to the container and to Arnold).
 - `--plugins-dir` with real content.
 - Maya versions other than 2027.
 
