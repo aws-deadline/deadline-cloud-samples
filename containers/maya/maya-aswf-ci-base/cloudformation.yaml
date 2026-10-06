@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Deploys a Deadline Cloud queue and fleet configured for running Autodesk Maya
+  renders inside a Docker container on GPU-enabled service-managed workers.
+
+Parameters:
+  FarmId:
+    Type: String
+    Description: Deadline Cloud farm ID
+    AllowedPattern: "farm-[0-9a-f]{32}"
+
+  ECRImageURI:
+    Type: String
+    Description: Full ECR image URI including tag (e.g. 123456789012.dkr.ecr.us-west-2.amazonaws.com/maya-aswf-ci-base:2027-arnold-vray-redshift)
+
+  FleetRoleArn:
+    Type: String
+    Description: IAM role ARN for fleet workers
+
+  QueueRoleArn:
+    Type: String
+    Description: IAM role ARN for the queue
+
+  JobAttachmentsBucket:
+    Type: String
+    Description: S3 bucket name for job attachments
+
+  MaxWorkerCount:
+    Type: Number
+    Default: 1
+    Description: Maximum number of workers in the fleet
+
+  MinWorkerCount:
+    Type: Number
+    Default: 0
+    Description: Minimum number of workers (standby)
+
+Resources:
+  Queue:
+    Type: AWS::Deadline::Queue
+    Properties:
+      FarmId: !Ref FarmId
+      DisplayName: Maya Container Queue
+      RoleArn: !Ref QueueRoleArn
+      JobAttachmentSettings:
+        S3BucketName: !Ref JobAttachmentsBucket
+        RootPrefix: job-attachments
+
+  QueueEnvironment:
+    Type: AWS::Deadline::QueueEnvironment
+    Properties:
+      FarmId: !Ref FarmId
+      QueueId: !GetAtt Queue.QueueId
+      Priority: 10
+      TemplateType: YAML
+      Template: !Sub |
+        specificationVersion: "environment-2023-09"
+        parameterDefinitions:
+          - name: ContainerImage
+            type: STRING
+            description: "ECR image URI for the container"
+            default: "${ECRImageURI}"
+        environment:
+          name: DockerContainer
+          script:
+            actions:
+              onEnter:
+                command: bash
+                args: ["{{Env.File.Enter}}"]
+              onExit:
+                command: bash
+                args: ["{{Env.File.Exit}}"]
+            embeddedFiles:
+              - name: Enter
+                filename: enter.sh
+                type: TEXT
+                data: |
+                  #!/usr/bin/env bash
+                  set -euo pipefail
+                  IMAGE="{{Param.ContainerImage}}"
+
+                  REGION=$(echo "$IMAGE" | cut -d. -f4)
+                  REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
+                  aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+
+                  docker pull "$IMAGE"
+
+                  GPU_FLAGS=""
+                  if nvidia-smi &>/dev/null; then
+                      GPU_FLAGS="--gpus all --runtime=nvidia"
+                  fi
+                  JOB_USER_GID=$(id -g job-user)
+                  DOCKER_CONTAINER_ID=$(docker container run --rm --detach \
+                      --network host \
+                      --user "$(id -u job-user):$JOB_USER_GID" \
+                      $GPU_FLAGS \
+                      --mount "type=bind,src={{Session.WorkingDirectory}},dst={{Session.WorkingDirectory}}" \
+                      --workdir "{{Session.WorkingDirectory}}" \
+                      "$IMAGE" \
+                      bash -c 'sleep infinity')
+                  echo "openjd_env: DOCKER_CONTAINER_ID=$DOCKER_CONTAINER_ID"
+
+                  # `docker exec` starts from a clean environment, so the license server
+                  # variables that Deadline Cloud usage-based licensing (or your own queue
+                  # environment) sets on the worker are forwarded explicitly. Only these
+                  # variables are forwarded, never the whole worker environment.
+                  LICENSE_ENV_FILE="{{Session.WorkingDirectory}}/.maya-container-license.env"
+                  : > "$LICENSE_ENV_FILE"
+                  for VAR in ADSKFLEX_LICENSE_FILE redshift_LICENSE VRAY_AUTH_CLIENT_SETTINGS \
+                             VRAY_AUTH_CLIENT_FILE_PATH FLEXLM_TIMEOUT g_licenseServerRLM \
+                             foundry_LICENSE SESI_LMHOST PIXAR_LICENSE_FILE; do
+                    VALUE=$(printenv "$VAR" || true)
+                    if [ -n "$VALUE" ]; then
+                      echo "$VAR=$VALUE" >> "$LICENSE_ENV_FILE"
+                    fi
+                  done
+                  echo "openjd_env: MAYA_CONTAINER_LICENSE_ENV_FILE=$LICENSE_ENV_FILE"
+
+                  WRAPPER_DIR="$HOME/.local/bin"
+                  mkdir -p "$WRAPPER_DIR"
+                  for CMD in maya-openjd MayaAdaptor Render maya mayapy kick vray redshiftCmdLine; do
+                    cat > "$WRAPPER_DIR/$CMD" << EOF
+                  #!/usr/bin/env bash
+                  ENV_FILE_OPT=""
+                  if [ -s "\$MAYA_CONTAINER_LICENSE_ENV_FILE" ]; then
+                    ENV_FILE_OPT="--env-file=\$MAYA_CONTAINER_LICENSE_ENV_FILE"
+                  fi
+                  echo "[container-wrapper] docker exec \$DOCKER_CONTAINER_ID /usr/local/bin/$CMD \$*"
+                  exec docker exec --user "\$(id -u):\$(id -g)" \$ENV_FILE_OPT "\$DOCKER_CONTAINER_ID" /usr/local/bin/$CMD "\$@"
+                  EOF
+                    chmod +x "$WRAPPER_DIR/$CMD"
+                  done
+                  echo "openjd_env: PATH=$WRAPPER_DIR:$PATH"
+
+              - name: Exit
+                filename: exit.sh
+                type: TEXT
+                data: |
+                  #!/usr/bin/env bash
+                  set -euo pipefail
+                  docker container stop -t 30 "$DOCKER_CONTAINER_ID"
+                  for CMD in maya-openjd MayaAdaptor Render maya mayapy kick vray redshiftCmdLine; do
+                    rm -f "$HOME/.local/bin/$CMD"
+                  done
+                  rm -f "{{Session.WorkingDirectory}}/.maya-container-license.env"
+
+  Fleet:
+    Type: AWS::Deadline::Fleet
+    Properties:
+      FarmId: !Ref FarmId
+      DisplayName: Maya Container Fleet
+      RoleArn: !Ref FleetRoleArn
+      MaxWorkerCount: !Ref MaxWorkerCount
+      MinWorkerCount: !Ref MinWorkerCount
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            CpuArchitectureType: x86_64
+            VCpuCount:
+              Min: 4
+            MemoryMiB:
+              Min: 16384
+            OsFamily: LINUX
+            RootEbsVolume:
+              SizeGiB: 100
+            AcceleratorCapabilities:
+              Selections:
+                - Name: l40s
+                - Name: rtx-pro-server-6000
+              Count:
+                Min: 1
+                Max: 1
+          InstanceMarketOptions:
+            Type: on-demand
+      HostConfiguration:
+        ScriptBody: |
+          #!/bin/bash
+          set -e
+          echo "[$(date)] Installing Docker and NVIDIA Container Toolkit..."
+          dnf install -y docker
+          systemctl enable docker
+          systemctl start docker
+          if id "job-user" &>/dev/null; then
+              usermod -aG docker job-user
+          fi
+          curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+          dnf install -y nvidia-container-toolkit
+          nvidia-ctk runtime configure --runtime=docker
+          if nvidia-smi &>/dev/null; then
+              mkdir -p /etc/cdi
+              nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+          fi
+          systemctl restart docker
+          echo "[$(date)] Done."
+        ScriptTimeoutSeconds: 600
+
+  QueueFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Properties:
+      FarmId: !Ref FarmId
+      QueueId: !GetAtt Queue.QueueId
+      FleetId: !GetAtt Fleet.FleetId
+
+Outputs:
+  QueueId:
+    Value: !GetAtt Queue.QueueId
+  FleetId:
+    Value: !GetAtt Fleet.FleetId
+  QueueEnvironmentId:
+    Value: !GetAtt QueueEnvironment.QueueEnvironmentId
