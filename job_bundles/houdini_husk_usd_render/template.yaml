@@ -1,11 +1,11 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Husk USD Render
 
 parameterDefinitions:
-# Render Parameters
 - name: USDSceneFile
-  type: PATH
-  default: "sample.usda"
+  type: path
+  default: sample.usda
   objectType: FILE
   dataFlow: IN
   userInterface:
@@ -21,14 +21,14 @@ parameterDefinitions:
     Choose the USD scene file you want to render. Use the 'Job Attachments' tab
     to add textures and other files that the job needs.
 - name: Frames
-  type: STRING
+  type: range_expr
+  default: "1"
   userInterface:
     control: LINE_EDIT
     label: Frames
     groupLabel: Render Parameters
-  default: "1"
 - name: OutputDir
-  type: PATH
+  type: path
   default: output/
   objectType: DIRECTORY
   dataFlow: OUT
@@ -38,52 +38,52 @@ parameterDefinitions:
     groupLabel: Render Parameters
   description: Choose the render output directory.
 - name: OutputPattern
-  type: STRING
+  type: string
+  default: "output_$F4"
   userInterface:
     control: LINE_EDIT
     label: Output File Pattern
     groupLabel: Render Parameters
-  default: "output_$F4"
   # Husk Documentation: https://www.sidefx.com/docs/houdini/ref/utils/husk.html#:~:text=Current%20frame%20number%20with%20fixed%20number%20of
   description: Enter the output filename pattern (without extension). Please see the Husk documentation for formatting
 - name: Format
-  type: STRING
+  type: string
+  default: exr
+  allowedValues: ["exr"]
   userInterface:
     control: DROPDOWN_LIST
     label: Output File Format
     groupLabel: Render Parameters
   description: Choose the file format for the output render.
-  default: exr
-  allowedValues: ["exr"]
 - name: ResolutionX
-  type: STRING
+  type: int
+  default: 1024
   userInterface:
-    control: LINE_EDIT
+    control: SPIN_BOX
     label: Resolution Width
     groupLabel: Render Parameters
-  default: "1024"
   description: >
     Enter the resolution width in pixels. The default is 1024.
 - name: ResolutionY
-  type: STRING
+  type: int
+  default: 768
   userInterface:
-    control: LINE_EDIT
+    control: SPIN_BOX
     label: Resolution Height
     groupLabel: Render Parameters
-  default: "768"
   description: >
     Enter the resolution height in pixels. The default is 768.
 - name: Renderer
-  type: STRING
+  type: string
+  default: BRAY_HdKarma
+  allowedValues: [BRAY_HdKarma, BRAY_HdKarmaXPU, HdVRayRendererPlugin, HdRedshiftRendererPlugin]
   userInterface:
     control: DROPDOWN_LIST
     label: Husk Render Delegate
     groupLabel: Render Parameters
   description: Choose the renderer you wish to use. BRAY_HdKarma uses the CPU while BRAY_HdKarmaXPU requires a GPU fleet. If you select BRAY_HdKarmaXPU your queue must be associated with a GPU fleet.
-  default: BRAY_HdKarma
-  allowedValues: [BRAY_HdKarma, BRAY_HdKarmaXPU, HdVRayRendererPlugin, HdRedshiftRendererPlugin]
 - name: CondaPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -91,30 +91,26 @@ parameterDefinitions:
   default: "houdini=20.5"
   description: >
     This parameter provides a default value Conda environment, specifying Houdini 20.5 to provide the husk executable.
+
 steps:
 - name: HuskRender
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: "{{Param.Frames}}"
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-      - name: Run
-        type: TEXT
-        data: |
-          set -xeuo pipefail
-          mkdir -p '{{Param.OutputDir}}'
-          # The 'husk' executable exists on the path when using a Deadline Cloud-provided Houdini conda package
-          husk -r {{Param.ResolutionX}} {{Param.ResolutionY}} \
-          -R {{Param.Renderer}} \
-          -f {{Task.Param.Frame}} \
-          '{{Param.USDSceneFile}}' \
-          -o '{{Param.OutputDir}}/{{Param.OutputPattern}}.{{Param.Format}}'
+      range: "{{ Param.Frames }}"
+  bash:
+    let:
+      - output_path = Param.OutputDir / (Param.OutputPattern + '.' + Param.Format)
+    script: |
+      set -xeuo pipefail
+      mkdir -p {{ repr_sh(Param.OutputDir) }}
+      # The 'husk' executable exists on the path when using a Deadline Cloud-provided Houdini conda package
+      husk -r {{ Param.ResolutionX }} {{ Param.ResolutionY }} \
+           -R {{ Param.Renderer }} \
+           -f {{ Task.Param.Frame }} \
+           {{ repr_sh(Param.USDSceneFile) }} \
+           -o {{ repr_sh(output_path) }}
   hostRequirements:
     # Add this requirement when rendering with the GPU to ensure the job is only scheduled on GPU-enabled fleets.
     # amounts:

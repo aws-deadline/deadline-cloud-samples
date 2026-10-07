@@ -1,4 +1,5 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 
 name: Self-Contained Template - 1 - Job Development Progression
 description: |
@@ -6,7 +7,7 @@ description: |
   workload you want to run and building it into a job bundle.
 
   In this style, all your script code is embedded into the job template yaml.
-  This means you can use the {{Param.InputCsvFile}} style of parameter value substitution
+  This means you can use the {{ Param.InputCsvFile }} style of parameter value substitution
   anywhere in your scripts.
 
   As you develop your job to have more features and to run better in parallel, you
@@ -41,62 +42,46 @@ parameterDefinitions:
 steps:
 
 - name: InitializeWithBash
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      data: |
-        # Configure the task to fail if any individual command fails.
-        set -euo pipefail
+  bash:
+    script: |
+      # Configure the task to fail if any individual command fails.
+      set -euo pipefail
 
-        # Initialize the workspace
-        echo 'Initializing the workspace directory {{Param.WorkspacePath}}'
-        mkdir -p '{{Param.WorkspacePath}}'
-        cd '{{Param.WorkspacePath}}'
+      echo "Initializing the workspace directory" {{ repr_sh(Param.WorkspacePath) }}
+      mkdir -p {{ repr_sh(Param.WorkspacePath) }}
+      cd {{ repr_sh(Param.WorkspacePath) }}
 
-        # Copy the input CSV files
-        echo 'Copying the input CSV file {{Param.InputCsvFile}} to csv/dataset.csv'
-        mkdir -p csv
-        cp '{{Param.InputCsvFile}}' csv/dataset.csv
+      echo "Copying the input CSV file" {{ repr_sh(Param.InputCsvFile) }} "to csv/dataset.csv"
+      mkdir -p csv
+      cp {{ repr_sh(Param.InputCsvFile) }} csv/dataset.csv
 
-        echo "Workspace initialization is complete"
+      echo "Workspace initialization is complete"
 
 - name: ProcessWithPython
   dependencies:
   - dependsOn: InitializeWithBash
-  script:
-    actions:
-      onRun:
-        command: python
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      data: |
-        import os
-        import polars as pl
+  python:
+    script: |
+      import os
+      import polars as pl
 
-        # Print tables with ASCII characters so they render in any log encoding
-        pl.Config.set_ascii_tables()
+      # Print tables with ASCII characters so they render in any log encoding
+      pl.Config.set_ascii_tables()
 
-        workspace_path = r"{{Param.WorkspacePath}}"
-        print(f"Processing the dataset in workspace {workspace_path}")
-        os.chdir(workspace_path)
-        os.makedirs("output", exist_ok=True)
+      workspace_path = {{ repr_py(Param.WorkspacePath) }}
+      print(f"Processing the dataset in workspace {workspace_path}")
+      os.chdir(workspace_path)
+      os.makedirs("output", exist_ok=True)
 
-        print("Summing the durations for each action type in csv/dataset.csv")
-        q = (
-            pl.scan_csv("csv/dataset.csv")
-            .group_by("Action Type")
-            .agg(pl.col("Duration (Seconds)").sum())
-        )
+      print("Summing the durations for each action type in csv/dataset.csv")
+      q = (
+          pl.scan_csv("csv/dataset.csv")
+          .group_by("Action Type")
+          .agg(pl.col("Duration (Seconds)").sum())
+      )
 
-        df = q.collect()
-        print(df)
+      df = q.collect()
+      print(df)
 
-        df.write_csv("output/time_per_action_type.csv")
-        print("Wrote the summary to output/time_per_action_type.csv")
+      df.write_csv("output/time_per_action_type.csv")
+      print("Wrote the summary to output/time_per_action_type.csv")

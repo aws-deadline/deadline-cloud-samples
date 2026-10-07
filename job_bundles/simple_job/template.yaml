@@ -1,18 +1,11 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Simple Job Bundle
 parameterDefinitions:
 - name: Message
-  type: STRING
+  type: string
   default: Welcome to AWS Deadline Cloud!
 steps:
 - name: WelcomeToAWSDeadlineCloud
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      data: |
-        echo '{{Param.Message}}'
+  bash:
+    script: echo {{ repr_sh(Param.Message) }}

@@ -1,28 +1,19 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: List Available Conda Packages
 
 parameterDefinitions:
 - name: CondaChannel
-  type: STRING
+  type: string
+  default: deadline-cloud
   userInterface:
     control: LINE_EDIT
     label: Conda Channel
-  description: "The conda channel to search for packages."
-  default: "deadline-cloud"
+  description: The conda channel to search for packages.
+
 steps:
 - name: ListPackages
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      runnable: true
-      data: |
-        #!/usr/bin/env bash
-
-        set -euxo pipefail
-
-        conda search -c '{{Param.CondaChannel}}' '*'
+  bash:
+    script: |
+      set -euxo pipefail
+      conda search -c {{ repr_sh(Param.CondaChannel) }} '*'

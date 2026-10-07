@@ -1,13 +1,15 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: V-Ray Render
 
 parameterDefinitions:
 
 # Render Parameters
 - name: VraySceneFile
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
+  minLength: 1
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: Vray Scene File
@@ -17,43 +19,42 @@ parameterDefinitions:
       patterns: ["*.vrscene"]
     - label: All Files
       patterns: ["*"]
-  minLength: 1
   description: >
     Choose the Vray scene file you want to render. Use the 'InputAssetDir' parameter on
     'Job Attachments' tab to add textures and other files that the job needs.
 - name: InputAssetDir
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: IN
+  default: ""
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Input Asset Directory
     groupLabel: Render Parameters
-  default: ""
   description: >
     Choose a directory with additional asset files that the job needs.
 - name: OutputDir
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
+  default: "./output"
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory
     groupLabel: Render Parameters
-  default: "./output"
   description: Choose the render output directory.
 - name: OutputFilename
-  type: STRING
+  type: string
+  default: "output.png"
   userInterface:
     control: LINE_EDIT
     label: Output File Name
     groupLabel: Render Parameters
-  default: "output.png"
   description: Enter the output filename (with extension of choice).
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -65,23 +66,16 @@ parameterDefinitions:
 
 steps:
 - name: RenderVray
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-        cancelation:
-          mode: NOTIFY_THEN_TERMINATE
-    embeddedFiles:
-      - name: Run
-        type: TEXT
-        data: |
-          # Configure the task to fail if any individual command fails.
-          set -xeuo pipefail
-          vray -sceneFile='{{Param.VraySceneFile}}' \
-               -imgFile='{{Param.OutputDir}}/{{Param.OutputFilename}}' \
-               -display=0 \
-               -progressUpdateFreq=30000
+  bash:
+    cancelation:
+      mode: NOTIFY_THEN_TERMINATE
+    script: |
+      # Configure the task to fail if any individual command fails.
+      set -xeuo pipefail
+      vray -sceneFile={{ repr_sh(Param.VraySceneFile) }} \
+           -imgFile={{ repr_sh(Param.OutputDir / Param.OutputFilename) }} \
+           -display=0 \
+           -progressUpdateFreq=30000
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

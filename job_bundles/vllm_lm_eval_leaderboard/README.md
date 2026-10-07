@@ -38,7 +38,7 @@ deadline config set defaults.queue_id <CUDAQueueId from stack outputs>
 This bundle has been verified end-to-end against the queue environment provisioned by `cuda_farm` with no modifications required.
 
 **Already have a farm?** You need:
-- An SMF fleet with NVIDIA GPUs, ≥32 GB RAM, ≥4 vCPU
+- An SMF fleet with NVIDIA GPUs, ≥32 GiB RAM, ≥4 vCPU. The `WorkerMemoryGiB` parameter sets the RAM each evaluation task requires.
 - A queue with a Conda queue environment attached that reads `CondaPackages` and `CondaChannels` job parameters (any of the templates in [`queue_environments/`](../../queue_environments) named `conda_queue_env_*.yaml`)
 
 A HuggingFace token is only needed for gated models (Llama, etc.).
@@ -97,7 +97,7 @@ parameterSpace:
 
 The default list is a small, ungated, fast-loading mix that fits comfortably on a single A10G/L4: two models from the same family at different sizes (Qwen2.5 0.5B vs 1.5B) so you can see scaling within a family, plus one from a different family (Pythia 1.4B) at a comparable size so you can see cross-family differences. It's a starting point. Swap in whatever models you want to compare.
 
-To add or remove models, edit the `range` list. Each entry becomes a task visible in the Monitor UI. Model IDs must be supported by vLLM (see the [vLLM supported models list](https://docs.vllm.ai/en/latest/models/supported_models.html)).
+To add or remove models, edit the `range` list. Each entry becomes a task visible in the Monitor UI. Model IDs must be supported by vLLM (see the [vLLM supported models list](https://docs.vllm.ai/en/latest/models/supported_models.html)). When you add larger models, raise the `WorkerMemoryGiB` parameter so tasks only run on workers with enough RAM to load them. If no fleet in the queue has workers with that much RAM, the EvalModels tasks show as `NOT_COMPATIBLE` instead of running.
 
 ## Choosing benchmarks
 

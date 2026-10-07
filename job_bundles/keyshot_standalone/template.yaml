@@ -1,4 +1,5 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: KeyShot Standalone
 description: |
   A simple job bundle that allows the user to select a KeyShot scene file, the
@@ -9,8 +10,7 @@ parameterDefinitions:
 
 # KeyShot Scene Settings
 - name: KeyShotFile
-  description: The KeyShot scene file to render.
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
   userInterface:
@@ -24,36 +24,37 @@ parameterDefinitions:
     - label: All Files
       patterns:
       - '*'
+  description: The KeyShot scene file to render.
 - name: Frames
-  description: The frames to render. E.g. 1-3,8,11-15
-  type: STRING
+  type: range_expr
+  minLength: 1
   userInterface:
     control: LINE_EDIT
     label: Frames
     groupLabel: KeyShot Scene Settings
-  minLength: 1
+  description: The frames to render. E.g. 1-3,8,11-15
 
 # KeyShot Output Settings
 - name: OutputName
-  description: The file name prefix to save out each frame with
-  type: STRING
+  type: string
+  default: KeyShotOutput
   userInterface:
     control: LINE_EDIT
     label: Output File Name
     groupLabel: KeyShot Output Settings
-  default: KeyShotOutput
+  description: The file name prefix to save out each frame with
 - name: OutputDirectoryPath
-  description: The render output directory
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory Path
     groupLabel: KeyShot Output Settings
+  description: The render output directory
 - name: OutputFormat
-  description: The render output format
-  type: STRING
+  type: string
+  default: PNG
   allowedValues:
     [
       "PNG",
@@ -65,15 +66,15 @@ parameterDefinitions:
       "PSD16",
       "PSD32"
     ]
-  default: PNG
   userInterface:
     control: DROPDOWN_LIST
     label: Output Format
     groupLabel: KeyShot Output Settings
+  description: The render output format
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -89,7 +90,7 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: "{{Param.Frames}}"
+      range: "{{ Param.Frames }}"
   script:
     actions:
       onRun:
@@ -98,31 +99,31 @@ steps:
         - -progress
         - -floating_feature
         - keyshot2
-        - '{{Param.KeyShotFile}}'
+        - '{{ Param.KeyShotFile }}'
         - -script
-        - '{{Task.File.KeyShotScript}}'
+        - '{{ Task.File.KeyShotScript }}'
     embeddedFiles:
       - name: KeyShotScript
         filename: KeyShotScript.py
         type: TEXT
         data: |
-          match "{{Param.OutputFormat}}":
+          match "{{ Param.OutputFormat }}":
             case "JPEG":
-              extension = ".jpg"
+              ext = ".jpg"
             case "EXR":
-              extension = ".exr"
+              ext = ".exr"
             case "TIFF8" | "TIFF32":
-              extension = ".tif"
+              ext = ".tif"
             case "PSD8" | "PSD16" | "PSD32":
-              extension = ".psd"
+              ext = ".psd"
             case _:
-              extension = ".png"
+              ext = ".png"
 
           opts = lux.getRenderOptions()
           opts.setAddToQueue(False)
-          lux.setAnimationFrame(int("{{Task.Param.Frame}}"))
-          output_path = os.path.join(r"{{Param.OutputDirectoryPath}}", "{{Param.OutputName}}.{{Task.Param.Frame}}" + extension)
-          output_format_code = lux.RENDER_OUTPUT_{{Param.OutputFormat}}
+          lux.setAnimationFrame({{ Task.Param.Frame }})
+          output_path = {{ repr_py(Param.OutputDirectoryPath / (Param.OutputName + '.' + string(Task.Param.Frame))) }} + ext
+          output_format_code = lux.RENDER_OUTPUT_{{ Param.OutputFormat }}
           print(f"Output Path: {output_path}")
           print(f"Output Format: {output_format_code}")
           lux.renderImage(path=output_path, opts=opts, format=output_format_code)

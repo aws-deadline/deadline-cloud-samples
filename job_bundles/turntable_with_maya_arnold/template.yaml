@@ -1,4 +1,5 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Turntable with Maya/Arnold
 description: |
   This job takes an OBJ geometry file as input, and outputs a video turntable render.
@@ -49,9 +50,8 @@ parameterDefinitions:
   allowedValues: [Y-UP-RIGHT-HANDED, Z-UP-RIGHT-HANDED]
 - name: CenterObject
   description: Center the object's bounding box on the turntable.
-  type: STRING
-  default: "TRUE"
-  allowedValues: ["TRUE", "FALSE"]
+  type: bool
+  default: true
   userInterface:
     control: CHECK_BOX
     label: Center the object on the turntable
@@ -59,12 +59,12 @@ parameterDefinitions:
 
 # Turntable Control
 - name: FrameRange
-  type: STRING
+  type: range_expr
   userInterface:
     control: LINE_EDIT
     label: Frame Range
     groupLabel: Turntable Control
-  default: 1-50
+  default: "1-50"
 - name: WhatToRotate
   type: STRING
   default: CAMERA
@@ -116,13 +116,12 @@ parameterDefinitions:
     groupLabel: Render Output
   default: 540
 - name: EnableAdaptiveSampling
-  type: STRING
+  type: bool
   userInterface:
     control: CHECK_BOX
     label: Enable adaptive sampling
     groupLabel: Render Output
-  default: "FALSE"
-  allowedValues: ["TRUE", "FALSE"]
+  default: false
 - name: AdaptiveMaxCameraAA
   type: INT
   userInterface:
@@ -224,10 +223,12 @@ jobEnvironments:
 steps:
 - name: PrepareSceneFile
   script:
+    let:
+      - scene_file = Param.WorkspacePath / (Param.SceneName + '_scene.mb')
     actions:
       onRun:
         command: mayapy
-        args: ["{{Task.File.PrepareMayaSceneFile}}"]
+        args: ["{{ Task.File.PrepareMayaSceneFile }}"]
     embeddedFiles:
     - name: PrepareMayaSceneFile
       filename: prepare_maya_scene_file.py
@@ -241,12 +242,11 @@ steps:
         from maya import cmds
         import maya.OpenMaya as om
 
-        os.makedirs(r"{{Param.WorkspacePath}}", exist_ok=True)
+        os.makedirs(r"{{ Param.WorkspacePath }}", exist_ok=True)
         maya.standalone.initialize()
 
-        frame_range = r"{{Param.FrameRange}}".split("-")
-        start_frame = int(frame_range[0])
-        end_frame = int(frame_range[1])
+        start_frame = {{ min(Param.FrameRange) }}
+        end_frame = {{ max(Param.FrameRange) }}
 
         # Print some info about the Maya runtime
         print()
@@ -256,7 +256,7 @@ steps:
         print()
 
         # Load the base turntable scene
-        cmds.file(r"{{Param.TurntableBaseScene}}", o=True, force=True)
+        cmds.file(r"{{ Param.TurntableBaseScene }}", o=True, force=True)
 
         # Set the render settings
         cmds.setAttr("defaultRenderGlobals.ren", "arnold", type="string")
@@ -267,15 +267,15 @@ steps:
         cmds.setAttr("defaultRenderGlobals.extensionPadding", 4)
 
         # Adjust adaptive sampling options
-        cmds.setAttr("defaultArnoldRenderOptions.enable_adaptive_sampling", "{{Param.EnableAdaptiveSampling}}" == "TRUE")
-        cmds.setAttr("defaultArnoldRenderOptions.AA_samples_max", {{Param.AdaptiveMaxCameraAA}})
+        cmds.setAttr("defaultArnoldRenderOptions.enable_adaptive_sampling", {{ repr_py(Param.EnableAdaptiveSampling) }})
+        cmds.setAttr("defaultArnoldRenderOptions.AA_samples_max", {{ Param.AdaptiveMaxCameraAA }})
 
-        input_geometry_file = r"{{Param.InputGeometryFile}}"
+        input_geometry_file = r"{{ Param.InputGeometryFile }}"
         if input_geometry_file != "":
             # Delete and replace the default subject
             cmds.delete("subject")
             cmds.file(input_geometry_file, i=True, groupReference=True, groupName="subject")
-            geometry_file_coord_sys = r"{{Param.GeometryFileCoordSystem}}"
+            geometry_file_coord_sys = r"{{ Param.GeometryFileCoordSystem }}"
             if geometry_file_coord_sys == "Y-UP-RIGHT-HANDED":
                 # This is Maya's default coordinate system
                 pass
@@ -293,7 +293,7 @@ steps:
         focal_length = cmds.camera("camera1", q=True, focalLength=True)
         vert_aperture = cmds.camera("camera1", q=True, verticalFilmAperture=True) * 25.4
         horiz_aperture = cmds.camera("camera1", q=True, horizontalFilmAperture=True) * 25.4
-        subject_distance = focal_length * max(bbox_vert / vert_aperture, bbox_horiz / horiz_aperture) / {{Param.CameraDistanceScale}}
+        subject_distance = focal_length * max(bbox_vert / vert_aperture, bbox_horiz / horiz_aperture) / {{ Param.CameraDistanceScale }}
 
         print(f"Camera horizontal aperture is {horiz_aperture}")
         print(f"Camera vertical aperture is {vert_aperture}")
@@ -303,7 +303,7 @@ steps:
         print(f"Subject bounds vertical length is {bbox_vert}")
         print(f"Setting camera/subject distance to {subject_distance}")
 
-        if "{{Param.CenterObject}}" == "TRUE" and input_geometry_file:
+        if {{ repr_py(Param.CenterObject) }} and input_geometry_file:
             subject_translate = (-0.5 * (bounds[0] + bounds[3]),
                       -bounds[1],
                       -0.5 * (bounds[2] + bounds[5]))
@@ -315,13 +315,13 @@ steps:
 
         # Move the camera to the starting position
         lookat_y = 0.5 * (bounds[1] + bounds[4])
-        cmds.move(0, {{Param.ViewSlope}} * subject_distance + lookat_y, subject_distance, "camera1", absolute=True)
+        cmds.move(0, {{ Param.ViewSlope }} * subject_distance + lookat_y, subject_distance, "camera1", absolute=True)
         # Adjust the camera to look at the center of the object's bounds at the rotation axis
         cmds.viewLookAt("camera1", position=(0.0, lookat_y, 0.0))
 
         # Create the rotation motion.
         cmds.spaceLocator(name="rotator")
-        what_to_rotate = r"{{Param.WhatToRotate}}"
+        what_to_rotate = r"{{ Param.WhatToRotate }}"
         if what_to_rotate == "CAMERA":
             cmds.parent("camera1", "rotator")
             rotation_multiplier = 1
@@ -330,7 +330,7 @@ steps:
             rotation_multiplier = -1
         else:
             raise ValueError(f"WhatToRotate must be CAMERA or SUBJECT, not {what_to_rotate}")
-        turntable_mode = r"{{Param.AnimationCurve}}"
+        turntable_mode = r"{{ Param.AnimationCurve }}"
         if turntable_mode == "EASE_IN_OUT":
             cmds.setKeyframe("rotator.ry", time=start_frame, outTangentType="flat", value=0)
             cmds.setKeyframe("rotator.ry", time=end_frame, inTangentType="flat", value=rotation_multiplier * 360)
@@ -341,7 +341,7 @@ steps:
             raise ValueError(f"AnimationCurve must be EASE_IN_OUT or LOOPABLE, not {turntable_mode}")
 
         # Save the Maya scene file
-        maya_scene_file = r"{{Param.WorkspacePath}}/{{Param.SceneName}}_scene.mb"
+        maya_scene_file = r"{{ scene_file }}"
         print(f"Saving Maya scene file: {maya_scene_file}")
         cmds.file(rename=maya_scene_file)
         cmds.file(save=True, type='mayaBinary')
@@ -354,13 +354,16 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: "{{Param.FrameRange}}"
+      range: "{{ Param.FrameRange }}"
   dependencies:
   - dependsOn: PrepareSceneFile
   stepEnvironments:
   - name: Maya
     description: Runs Maya in the background.
     script:
+      let:
+        - scene_file = Param.WorkspacePath / (Param.SceneName + '_scene.mb')
+        - output_path = Param.WorkspacePath / 'outputs'
       embeddedFiles:
       - name: initData
         filename: init-data.yaml
@@ -369,14 +372,14 @@ steps:
           renderer: arnold
           render_layer: masterLayer
           camera: camera1
-          scene_file: '{{Param.WorkspacePath}}/{{Param.SceneName}}_scene.mb'
-          project_path: '{{Param.WorkspacePath}}'
-          output_file_path: '{{Param.WorkspacePath}}/outputs'
+          scene_file: '{{ scene_file }}'
+          project_path: '{{ Param.WorkspacePath }}'
+          output_file_path: '{{ output_path }}'
           strict_error_checking: false
-          output_file_prefix: '{{Param.SceneName}}'
-          image_width: {{Param.ImageWidth}}
-          image_height: {{Param.ImageHeight}}
-          error_on_arnold_license_fail: {{Param.ErrorOnArnoldLicenseFail}}
+          output_file_prefix: '{{ Param.SceneName }}'
+          image_width: {{ Param.ImageWidth }}
+          image_height: {{ Param.ImageHeight }}
+          error_on_arnold_license_fail: {{ Param.ErrorOnArnoldLicenseFail }}
       actions:
         onEnter:
           command: maya-openjd
@@ -384,9 +387,9 @@ steps:
           - daemon
           - start
           - --path-mapping-rules
-          - file://{{Session.PathMappingRulesFile}}
+          - file://{{ Session.PathMappingRulesFile }}
           - --init-data
-          - file://{{Env.File.initData}}
+          - file://{{ Env.File.initData }}
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
         onExit:
@@ -402,7 +405,7 @@ steps:
       filename: run-data.yaml
       type: TEXT
       data: |
-        frame: {{Task.Param.Frame}}
+        frame: {{ Task.Param.Frame }}
     actions:
       onRun:
         command: MayaAdaptor
@@ -410,7 +413,7 @@ steps:
         - daemon
         - run
         - --run-data
-        - file://{{Task.File.runData}}
+        - file://{{ Task.File.runData }}
         cancelation:
           mode: NOTIFY_THEN_TERMINATE
         timeout: 600
@@ -419,11 +422,14 @@ steps:
   dependencies:
   - dependsOn: RenderSequence
   script:
+    let:
+      - output_path = Param.WorkspacePath / 'outputs'
+      - frame_pattern = output_path / (Param.SceneName + '.%04d.png')
     actions:
       onRun:
         command: bash
         args:
-          - "{{Task.File.Encode}}"
+          - "{{ Task.File.Encode }}"
     embeddedFiles:
     - name: Encode
       type: TEXT
@@ -433,24 +439,23 @@ steps:
 
         set -xeuo pipefail
 
-        FRAME_RANGE='{{Param.FrameRange}}'
-        START=${FRAME_RANGE%%-*}
-        END=${FRAME_RANGE##*-}
+        START={{ min(Param.FrameRange) }}
+        END={{ max(Param.FrameRange) }}
 
-        mkdir -p '{{Param.VideoOutputDir}}'
+        mkdir -p '{{ Param.VideoOutputDir }}'
 
         ffmpeg -r 24 \
             -start_number $START \
-            -i '{{Param.WorkspacePath}}/outputs/{{Param.SceneName}}.%04d.png' \
+            -i '{{ frame_pattern }}' \
             -frames:v $(($END - $START)) \
             -pix_fmt yuv420p \
             -vf "scale=in_color_matrix=bt709:out_color_matrix=bt709" \
             -c:v libx264 \
-            -preset {{Param.EncodingPreset}} \
-            -crf {{Param.ConstantRateFactor}} \
+            -preset {{ Param.EncodingPreset }} \
+            -crf {{ Param.ConstantRateFactor }} \
             -color_range tv \
             -colorspace bt709 \
             -color_primaries bt709 \
             -color_trc iec61966-2-1 \
             -movflags faststart \
-            '{{Param.VideoOutputDir}}/{{Param.SceneName}}.mp4'
+            '{{ Param.VideoOutputDir / (Param.SceneName + ".mp4") }}'

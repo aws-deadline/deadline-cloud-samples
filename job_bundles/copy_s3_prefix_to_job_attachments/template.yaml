@@ -1,6 +1,7 @@
 specificationVersion: 'jobtemplate-2023-09'
+extensions: [FEATURE_BUNDLE_1, EXPR]
 
-name: Copy {{Param.S3CopySource}} to Job Attachments
+name: Copy {{ Param.S3CopySource }} to Job Attachments
 description: |
   This job copies all the objects that have a particular prefix in the S3CopySource bucket
   prefix to the job attachments bucket of youar AWS Deadline Cloud queue. See README.md
@@ -71,12 +72,12 @@ steps:
       onRun:
         command: python
         args:
-        - '{{Param.JobScriptDir}}/collect_objects.py'
-        - '{{Param.WorkspacePath}}'
+        - '{{ Param.JobScriptDir }}/collect_objects.py'
+        - '{{ Param.WorkspacePath }}'
         - '--parallelism'
-        - '{{Param.Parallelism}}'
+        - '{{ Param.Parallelism }}'
         - '--copy-source'
-        - '{{Param.S3CopySource}}'
+        - '{{ Param.S3CopySource }}'
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
@@ -95,18 +96,18 @@ steps:
     taskParameterDefinitions:
     - name: Index
       type: INT
-      range: "1-{{Param.Parallelism}}"
+      range: "1-{{ Param.Parallelism }}"
   script:
     actions:
       onRun:
         command: python
         args:
-        - '{{Param.JobScriptDir}}/hash_objects.py'
-        - '{{Param.WorkspacePath}}'
+        - '{{ Param.JobScriptDir }}/hash_objects.py'
+        - '{{ Param.WorkspacePath }}'
         - '--index'
-        - '{{Task.Param.Index}}'
+        - '{{ Task.Param.Index }}'
         - '--copy-source'
-        - '{{Param.S3CopySource}}'
+        - '{{ Param.S3CopySource }}'
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
@@ -124,18 +125,18 @@ steps:
     taskParameterDefinitions:
     - name: Index
       type: INT
-      range: "1-{{Param.Parallelism}}"
+      range: "1-{{ Param.Parallelism }}"
   script:
     actions:
       onRun:
         command: python
         args:
-        - '{{Param.JobScriptDir}}/copy_objects.py'
-        - '{{Param.WorkspacePath}}'
+        - '{{ Param.JobScriptDir }}/copy_objects.py'
+        - '{{ Param.WorkspacePath }}'
         - '--index'
-        - '{{Task.Param.Index}}'
+        - '{{ Task.Param.Index }}'
         - '--copy-source'
-        - '{{Param.S3CopySource}}'
+        - '{{ Param.S3CopySource }}'
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
@@ -154,12 +155,12 @@ steps:
       onRun:
         command: python
         args:
-        - '{{Param.JobScriptDir}}/save_manifest.py'
-        - '{{Param.WorkspacePath}}'
+        - '{{ Param.JobScriptDir }}/save_manifest.py'
+        - '{{ Param.WorkspacePath }}'
         - '--parallelism'
-        - '{{Param.Parallelism}}'
+        - '{{ Param.Parallelism }}'
         - '--copy-source'
-        - '{{Param.S3CopySource}}'
+        - '{{ Param.S3CopySource }}'
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

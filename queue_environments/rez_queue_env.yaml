@@ -1,4 +1,5 @@
 specificationVersion: 'environment-2023-09'
+extensions: [WRAP_ACTIONS, EXPR, FEATURE_BUNDLE_1]
 parameterDefinitions:
   - name: RezPackages
     type: STRING
@@ -20,6 +21,22 @@ parameterDefinitions:
     userInterface:
       control: LINE_EDIT
       label: Rez Repositories
+  - name: RezParentVariables
+    type: STRING
+    description: >
+      A comma-separated list of environment variables, such as "PATH,PYTHONPATH",
+      for Rez to treat as parent variables when it applies the context to each
+      wrapped action. Rez then appends and prepends package values to these
+      variables instead of overwriting them, so changes that environments
+      entered after this one make to them reach the task. The default, PATH,
+      keeps tools that later environments add to PATH, such as a venv or a
+      Conda environment. Leave empty to use the Rez configuration of the
+      worker. See
+      https://rez.readthedocs.io/en/stable/configuring_rez.html#parent_variables
+    default: "PATH"
+    userInterface:
+      control: LINE_EDIT
+      label: Rez Parent Variables
 
 environment:
   name: Rez
@@ -27,7 +44,55 @@ environment:
     actions:
       onEnter:
         command: "bash"
-        args: ["{{Env.File.Enter}}"]
+        args: ["{{ Env.File.Enter }}", "{{ Session.WorkingDirectory }}/rez-context.rxt"]
+      # The wrap hooks run each task, and the enter and exit actions of every
+      # environment entered after this one, inside the resolved Rez context.
+      # Rez applies the whole context in the wrapped process, including aliases
+      # and shell functions that cannot be copied into the session as
+      # environment variables. The wrapped action arrives as argv, and the hook
+      # takes on its timeout and cancelation.
+      onWrapEnvEnter:
+        command: "python"
+        args:
+          - "{{ Env.File.Wrap }}"
+          - "{{ Param.RezPackages }}"
+          - "{{ Param.RezParentVariables }}"
+          - "{{ Session.WorkingDirectory }}/rez-context.rxt"
+          - "--"
+          - "{{ WrappedAction.Command }}"
+          - "{{ WrappedAction.Args }}"
+        timeout: "{{ WrappedAction.Timeout }}"
+        cancelation:
+          mode: "{{ WrappedAction.Cancelation.Mode }}"
+          notifyPeriodInSeconds: "{{ WrappedAction.Cancelation.NotifyPeriodInSeconds }}"
+      onWrapTaskRun:
+        command: "python"
+        args:
+          - "{{ Env.File.Wrap }}"
+          - "{{ Param.RezPackages }}"
+          - "{{ Param.RezParentVariables }}"
+          - "{{ Session.WorkingDirectory }}/rez-context.rxt"
+          - "--"
+          - "{{ WrappedAction.Command }}"
+          - "{{ WrappedAction.Args }}"
+        timeout: "{{ WrappedAction.Timeout }}"
+        cancelation:
+          mode: "{{ WrappedAction.Cancelation.Mode }}"
+          notifyPeriodInSeconds: "{{ WrappedAction.Cancelation.NotifyPeriodInSeconds }}"
+      onWrapEnvExit:
+        command: "python"
+        args:
+          - "{{ Env.File.Wrap }}"
+          - "{{ Param.RezPackages }}"
+          - "{{ Param.RezParentVariables }}"
+          - "{{ Session.WorkingDirectory }}/rez-context.rxt"
+          - "--"
+          - "{{ WrappedAction.Command }}"
+          - "{{ WrappedAction.Args }}"
+        timeout: "{{ WrappedAction.Timeout }}"
+        cancelation:
+          mode: "{{ WrappedAction.Cancelation.Mode }}"
+          notifyPeriodInSeconds: "{{ WrappedAction.Cancelation.NotifyPeriodInSeconds }}"
     embeddedFiles:
     - name: Enter
       filename: rez-queue-env-enter.sh
@@ -35,7 +100,13 @@ environment:
       data: |
         set -euo pipefail
 
-        if [ -z '{{Param.RezPackages}}' ]; then
+        # argv: <rez-context.rxt>
+        CONTEXT_FILE="$1"
+
+        REZ_PACKAGES={{ repr_sh(Param.RezPackages) }}
+        REZ_REPOSITORIES={{ repr_sh(Param.RezRepositories) }}
+
+        if [ -z "$REZ_PACKAGES" ]; then
             echo "Skipping Rez env as RezPackages parameter was empty."
             exit 0
         fi
@@ -44,9 +115,6 @@ environment:
         LINUX_REZ_REPOSITORY_PATH="/mnt/REZ_REPOSITORY"
         WINDOWS_REZ_REPOSITORY_PATH="R:/REZ_REPOSITORY"
         MACOS_REZ_REPOSITORY_PATH="/Volumes/REZ_REPOSITORY"
-
-        REZ_PACKAGES='{{Param.RezPackages}}'
-        REZ_REPOSITORIES='{{Param.RezRepositories}}'
 
         if [[ "$(uname -s)" == MINGW* ]]; then
             REZ_REPOSITORY_PATH="$WINDOWS_REZ_REPOSITORY_PATH"
@@ -62,50 +130,58 @@ environment:
         echo "Rez Package List:"
         echo "   $REZ_PACKAGES"
 
-        # Activate the Rez environment, capturing the environment variables for the session to use
-        python '{{Env.File.OpenJDVarsStart}}' .vars
-        rez env \
-            --paths "$REZ_REPOSITORIES" \
-            -c "python '{{Env.File.OpenJDVarsCapture}}' .vars" \
-            $REZ_PACKAGES
-    - name: OpenJDVarsStart
-      filename: openjd-vars-start.py
+        # Resolve the packages once and save the context to the session
+        # directory. The wrap hooks run every task in this saved context, so
+        # all tasks see the same environment without resolving again.
+        rez env --paths "$REZ_REPOSITORIES" $REZ_PACKAGES --output "$CONTEXT_FILE"
+        rez context "$CONTEXT_FILE"
+    - name: Wrap
+      filename: rez-queue-env-wrap.py
       type: TEXT
       data: |
-        import json
         import os
+        import platform
+        import subprocess
         import sys
 
-        # Exclude the env var "_" as it has special meaning to shells
-        before = dict(os.environ)
-        if "_" in before:
-            del before["_"]
+        # argv: <RezPackages> <RezParentVariables> <rez-context.rxt> -- <command> [args ...]
+        rez_packages, rez_parent_variables, context_file, separator, *wrapped = sys.argv[1:]
+        if separator != "--":
+            print(f"openjd_fail: Expected '--' before the wrapped command, got {separator!r}.")
+            sys.exit(1)
 
-        with open(sys.argv[1], "w", encoding="utf8") as f:
-            json.dump(before, f)
-    - name: OpenJDVarsCapture
-      filename: openjd-vars-capture.py
-      type: TEXT
-      data: |
-        import json
-        import os
-        import sys
+        # onEnter skips resolving when RezPackages is empty, so there is no
+        # context to run in. Run the wrapped action unchanged.
+        if rez_packages == "":
+            sys.exit(subprocess.run(wrapped).returncode)
 
-        # Get the snapshot from `openjd-vars-start.py`, and the current environment state.
-        with open(sys.argv[1], "r", encoding="utf8") as f:
-            before = json.load(f)
-        after = dict(os.environ)
-        # Exclude the env var "_" as it has special meaning to shells
-        if "_" in after:
-            del after["_"]
+        # Packages were requested, so onEnter saved a context here. If it is
+        # missing, fail rather than run the action outside the Rez context.
+        if not os.path.isfile(context_file):
+            print(f"openjd_fail: The saved Rez context {context_file} does not exist.")
+            sys.exit(1)
 
-        # Identify the modified and deleted environment variables
-        vars_to_put = {k: v for k, v in after.items() if v != before.get(k)}
-        vars_to_delete = {k for k in before if k not in after}
+        # Run the wrapped command inside the saved context. Rez passes the
+        # command and arguments after `--` to the shell as one command line in
+        # double quotes, so the shell expands `$VAR` and `$(...)` in them, the
+        # same as a command typed after `rez env --`. See the `-c`/`--`
+        # description in https://rez.readthedocs.io/en/stable/commands/rez-env.html
+        # and the `Shell.join` comment in
+        # https://github.com/AcademySoftwareFoundation/rez/blob/3.4.0/src/rez/shells.py#L315-L339
+        # Rez overwrites a variable the first time a package modifies it, and
+        # rebuilds PATH from the system paths, so it would discard changes
+        # that environments entered after this one made. Parent variables are
+        # appended and prepended to instead. Set this only for the Rez call
+        # so the worker's Rez configuration applies when it's empty.
+        if rez_parent_variables:
+            os.environ["REZ_PARENT_VARIABLES"] = rez_parent_variables
 
-        # Print the env var changes following the Open Job Description specification
-        for k, v in vars_to_put.items():
-            kv = json.dumps(f"{k}={v}", ensure_ascii=True)
-            print(f"openjd_env: {kv}")
-        for k in vars_to_delete:
-            print(f"openjd_unset_env: {k}")
+        rez_shell = "gitbash" if platform.system() == "Windows" else "bash"
+        command = ["rez", "env", "--input", context_file, "--shell", rez_shell, "--", *wrapped]
+
+        # On POSIX, replace this process so a cancelation signal reaches Rez,
+        # which passes it on to the wrapped process. Windows has no exec, so
+        # run Rez as a child and return its exit status.
+        if os.name == "posix":
+            os.execvp(command[0], command)
+        sys.exit(subprocess.run(command).returncode)
