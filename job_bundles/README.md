@@ -33,6 +33,7 @@ Nested collections provide their own complete indexes where applicable.
 | [GUI control showcase](gui_control_showcase/) | Every OpenJD job-parameter GUI control and UI metadata option | You are designing a bundle submission interface |
 | [Houdini Husk USD render](houdini_husk_usd_render/) | USD dependency discovery and rendering with Husk/Karma | You need a concise USD render job with asset introspection |
 | [Infinigen scene generation](infinigen_scene_gen/) | Procedural indoor and outdoor scene generation on GPU workers | You need synthetic photorealistic datasets |
+| [Isaac Sim Replicator synthetic data](isaacsim_replicator_sdg/) | Domain-randomized perception data from Isaac Sim Replicator, sharded across workers with deterministic seeding and a verified merge | You need labelled synthetic images to train a perception model |
 | [Job attachments input guide](job_attachments_devguide/) | Input path metadata and attached script files | You are learning how job attachment inputs are materialized |
 | [Job attachments output guide](job_attachments_devguide_output/) | Collecting declared job output files | You are learning how job attachment outputs are returned |
 | [Job development progression](job_dev_progression/) | A staged path from inline commands to a tested bundled Python package | You want to grow a maintainable job without starting complex |

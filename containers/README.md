@@ -10,6 +10,7 @@ This table covers the user-selectable container samples below `containers/`. Sup
 |---|---|---|
 | [AL2023 worker-equivalent image](al2023-deadline/) | Reproducing a point-in-time service-managed fleet package set on Amazon Linux 2023 | You need to test packages or software against worker-compatible system libraries |
 | [Blender application container](blender/blender-aswf-ci-base/) | Packaging Blender, the Deadline Cloud adaptor, and GPU support in an application image | You want to render Blender workloads from a purpose-built container |
+| [Isaac Sim / Isaac Lab SO-101 workshop image](isaacsim-so101-workshop/) | Packaging NVIDIA Isaac Sim 5.1.0, Isaac Lab and LeRobot for GPU simulation jobs | You want to run Isaac Sim workloads from a container you build and hold privately |
 | [Maya application container](maya/maya-aswf-ci-base/) | Packaging Autodesk Maya 2027, the Deadline Cloud adaptor, and optional Arnold, V-Ray and Redshift renderers from your own licensed installers | You want to render Maya workloads from a purpose-built container with the exact DCC and renderer builds you qualified |
 
 The worker-equivalent image is useful for local compatibility work and package builds. The Blender and Maya images are application-container examples and include their own deployment resources and instructions. The Maya sample also shows how to build an image from commercial installers that you supply yourself.
