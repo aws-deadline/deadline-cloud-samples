@@ -17,13 +17,14 @@
     "destroy": "cdk destroy"
   },
   "devDependencies": {
+    "@swc/core": "^1.16.13",
+    "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.4",
     "aws-cdk": "^2.1144.0",
     "jest": "^30.5.2",
-    "ts-jest": "^29.4.14",
-    "ts-node": "^10.9.2",
-    "typescript": "~6.0.3",
+    "tsx": "^4.23.15",
+    "typescript": "~7.0.2",
     "yaml": "^2.9.1"
   },
   "dependencies": {

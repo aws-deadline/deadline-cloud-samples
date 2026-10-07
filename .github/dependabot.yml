@@ -36,11 +36,6 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(deps):"
-    ignore:
-      # ts-jest declares a peer of typescript <7, so a TypeScript 7 bump fails
-      # `npm ci`. Drop this once ts-jest supports TypeScript 7.
-      - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
     groups:
       starter-farm:
         patterns:
