@@ -31,6 +31,7 @@ import random
 import sys
 import time
 from pathlib import Path
+from typing import NoReturn
 
 # Candidate experience files, most specific first. The image is
 # nvcr.io/nvidia/isaac-lab, which IS nvcr.io/nvidia/isaac-sim plus Isaac Lab, so
@@ -123,7 +124,7 @@ def configure_caches() -> None:
     print(f"[sdg] caches -> {cache}")
 
 
-def main() -> int:
+def main() -> NoReturn:
     args = parse_args()
     annotators = [a.strip() for a in args.annotators.split(",") if a.strip()]
     unknown = [a for a in annotators if a not in ANNOTATOR_CHOICES]
@@ -157,8 +158,10 @@ def main() -> int:
     if args.renderer == "PathTracing":
         launch_config["samples_per_pixel_per_frame"] = 64
 
-    # `experience` is a SimulationApp kwarg, not a launch_config key.
-    simulation_app = SimulationApp(launch_config, experience=experience)
+    # `experience` is a SimulationApp kwarg, not a launch_config key. The
+    # instance is bound to keep it referenced for the life of the task but is
+    # never closed; see the os._exit comment at the end of this function.
+    _simulation_app = SimulationApp(launch_config, experience=experience)  # noqa: F841
 
     # Omniverse imports MUST come after SimulationApp construction.
     import carb.settings  # noqa: E402
@@ -321,4 +324,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # main() never returns; it ends in os._exit().
+    main()

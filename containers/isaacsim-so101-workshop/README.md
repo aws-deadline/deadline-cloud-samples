@@ -7,16 +7,17 @@ job bundle.
 The image is **Isaac Lab 2.3.2 (Isaac Sim 5.1.0)** plus
 [LeRobot](https://github.com/huggingface/lerobot) at the pin the
 [Sim-to-Real-SO-101-Workshop](https://github.com/isaac-sim/Sim-to-Real-SO-101-Workshop)
-uses, plus the workshop's `sim_to_real_so101` Isaac Lab extension baked in.
+uses, plus the workshop's `sim_to_real_so101` Isaac Lab extension installed into
+the image.
 
-## Licensing — read this first
+## Licensing (read this first)
 
 This directory contains **only a recipe**. No NVIDIA artifact is vendored here.
 
 - The base image `nvcr.io/nvidia/isaac-lab:2.3.2` is pulled from NVIDIA's NGC
-  registry by **you**, under NVIDIA's licence terms. It is anonymously pullable —
-  no NGC account or API key is required — but you must set `ACCEPT_EULA=Y` and
-  `PRIVACY_CONSENT=Y` when running it (the Dockerfile bakes both in).
+  registry by **you**, under NVIDIA's license terms. It is anonymously pullable
+  (no NGC account or API key is required), but you must set `ACCEPT_EULA=Y` and
+  `PRIVACY_CONSENT=Y` when running it. The Dockerfile sets both.
 - The image you build contains Omniverse Kit. **Do not redistribute it.**
   Push it to a registry you control (your own Amazon ECR private repository) and
   keep it private.
@@ -30,8 +31,8 @@ cd containers/isaacsim-so101-workshop
 docker build -t isaacsim-so101-workshop:2.3.2 .
 ```
 
-The finished image is ~9 GB to pull and unpacks to ~29 GB. Budget disk
-accordingly — a small EBS root volume is the most common reason this fails.
+The finished image is ~9 GB to pull and unpacks to ~29 GB. Size the disk for
+that. A small EBS root volume is the most common reason the build fails.
 
 Override the pins if you need to:
 
@@ -47,7 +48,7 @@ docker build -t isaacsim-so101-workshop:2.3.2 \
 > your fleet first. Isaac Lab 3.x pins `isaacsim==6.0.1`, whose NVIDIA driver
 > floor is above the `grid:r580` (driver 580.x) generation currently offered by
 > Deadline Cloud service-managed fleets. Isaac Lab 2.3.2 declares support for
-> Isaac Sim 4.5.0 / 5.0.0 / 5.1.0, which is why the bundle targets 5.1.0.
+> Isaac Sim 4.5.0 / 5.0.0 / 5.1.0. The bundle targets 5.1.0.
 
 ## Push to your own Amazon ECR
 
@@ -74,10 +75,10 @@ deadline bundle submit job_bundles/isaacsim_replicator_sdg \
   -p "OutputDir=$(pwd)/output" --yes
 ```
 
-The job bundle itself names no image. On a service-managed fleet with the
-`docker` software add-on, the
+The job bundle itself does not reference an image. On a service-managed fleet
+with the `docker` software add-on, the
 [Docker queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/containers-queue-environment.html)
-carries the image URI in its `DockerImage` parameter and wraps each task into the
+takes the image URI in its `DockerImage` parameter and wraps each task into the
 container.
 
 The image pull runs under the **queue role**, so that role needs
@@ -110,9 +111,9 @@ docker run --rm --gpus all isaacsim-so101-workshop:2.3.2 \
 |---|---|---|
 | Workshop `source/` | bind-mounted from a developer checkout at run time | cloned into the image at a pinned commit |
 | LeRobot commit | `git checkout e670ac5daf9b76` (abbreviated) | full 40-char SHA |
-| Headless defaults | set per invocation | `HEADLESS=1`, `ENABLE_CAMERAS=1` baked in |
-| EULA vars | passed with `-e` on every `docker run` | baked in |
+| Headless defaults | set per invocation | `HEADLESS=1`, `ENABLE_CAMERAS=1` set in the image |
+| EULA vars | passed with `-e` on every `docker run` | set in the image |
 | X11 / `/dev` / udev mounts | required (teleop hardware, on-screen viewport) | not used; the farm path is headless and has no leader arm |
 
-Everything else — the `--no-deps` LeRobot install, the constraints pin, the
-ffmpeg shared build, the extra X libs, the entrypoint — is upstream's, unchanged.
+Everything else is upstream's, unchanged: the `--no-deps` LeRobot install, the
+constraints pin, the ffmpeg shared build, the extra X libs, and the entrypoint.

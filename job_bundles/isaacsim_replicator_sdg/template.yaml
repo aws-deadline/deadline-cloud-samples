@@ -28,8 +28,7 @@ description: |
   NVIDIA-authored asset, which is what makes it publishable. `SceneSource=workshop`
   opts into the Sim-to-Real-SO-101-Workshop USD assets baked into that image.
 
-  Companion to job_bundles/isaacsim_so101_sim_to_policy, which shares the same
-  container image.
+  The recipe for the container image is at containers/isaacsim-so101-workshop.
 
 parameterDefinitions:
 

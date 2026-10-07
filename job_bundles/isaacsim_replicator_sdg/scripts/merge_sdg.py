@@ -105,7 +105,6 @@ def main() -> int:
 
     shards, missing = load_shards(sdg_dir, args.expected_shards)
     total = sum(int(s.get("frames", 0)) for s in shards)
-    rgb_count = len(list((sdg_dir / "rgb").glob("rgb_*.png"))) if (sdg_dir / "rgb").is_dir() else 0
 
     print("")
     print("  shard   frames   seed      boot(s)  capture(s)  fps     cache")
