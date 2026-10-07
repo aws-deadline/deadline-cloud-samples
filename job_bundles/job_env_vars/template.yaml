@@ -1,4 +1,5 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Job sample with environment variables
 description: |
   A job template can set environment variables for the whole job or for a particular step
@@ -6,7 +7,7 @@ description: |
 
 parameterDefinitions:
 - name: ExampleParam
-  type: STRING
+  type: string
   default: An example parameter value
 
 jobEnvironments:
@@ -16,7 +17,7 @@ jobEnvironments:
     # When applications have options as environment variables, you can set them here.
     JOB_VERBOSITY: MEDIUM
     # You can use the value of job parameters when setting environment variables.
-    JOB_EXAMPLE_PARAM: "{{Param.ExampleParam}}"
+    JOB_EXAMPLE_PARAM: "{{ Param.ExampleParam }}"
     # Some more ideas.
     JOB_PROJECT_ID: project-12
     JOB_ENDPOINT_URL: https://internal-host-name/some/path
@@ -35,25 +36,17 @@ steps:
       # Replace a variable value defined at the job level.
       JOB_PROJECT_ID: step-project-12
 
-  script:
-    actions:
-      onRun:
-        command: bash
-        args:
-        - '{{Task.File.Run}}'
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      data: |
-        echo Running the task
-        echo ""
+  bash:
+    script: |
+      echo Running the task
+      echo ""
 
-        echo Environment variables starting with JOB_*:
-        set | grep ^JOB_
-        echo ""
+      echo Environment variables starting with JOB_*:
+      set | grep ^JOB_
+      echo ""
 
-        echo Environment variables starting with STEP_*:
-        set | grep ^STEP_
-        echo ""
+      echo Environment variables starting with STEP_*:
+      set | grep ^STEP_
+      echo ""
 
-        echo Done running the task
+      echo Done running the task

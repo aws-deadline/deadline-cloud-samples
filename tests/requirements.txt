@@ -3,7 +3,7 @@
 pytest>=9.1.1,<10
 PyYAML>=6.0.3,<7
 Jinja2>=3.1.6,<4
-openjd-cli>=0.7.7,<1
+openjd-cli>=0.8.0,<1
 cfn-lint>=1.57.1,<2
 # NOTE: rattler-build is a standalone binary (not on PyPI). CI installs it by
 # downloading the pinned release binary directly via curl and verifying its

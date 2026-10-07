@@ -1,4 +1,5 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Job sample with a new command in the PATH
 description: |
   A job template can define Open Job Description environments that create new command
@@ -12,7 +13,7 @@ jobEnvironments:
       onEnter:
         command: bash
         args:
-        - "{{Env.File.Enter}}"
+        - "{{ Env.File.Enter }}"
     embeddedFiles:
     - name: Enter
       type: TEXT
@@ -21,19 +22,20 @@ jobEnvironments:
         set -euo pipefail
 
         # Make a bin directory inside the session's working directory for providing new commands
-        mkdir -p '{{Session.WorkingDirectory}}/bin'
+        _bindir={{ repr_sh(Session.WorkingDirectory / 'bin') }}
+        mkdir -p "$_bindir"
 
         # If this bin directory is not already in the PATH, then add it
-        if ! [[ ":$PATH:" == *':{{Session.WorkingDirectory}}/bin:'* ]]; then
-          export "PATH={{Session.WorkingDirectory}}/bin:$PATH"
+        if ! [[ ":$PATH:" == *":$_bindir:"* ]]; then
+          export "PATH=$_bindir:$PATH"
 
           # This message to Open Job Description exports the new PATH value to the environment
           echo "openjd_env: PATH=$PATH"
         fi
 
         # Copy the SleepScript embedded file into the bin directory
-        cp '{{Env.File.SleepScript}}' '{{Session.WorkingDirectory}}/bin/random-sleep'
-        chmod u+x '{{Session.WorkingDirectory}}/bin/random-sleep'
+        cp {{ repr_sh(Env.File.SleepScript) }} "$_bindir/random-sleep"
+        chmod u+x "$_bindir/random-sleep"
     - name: SleepScript
       type: TEXT
       runnable: true
@@ -63,20 +65,12 @@ jobEnvironments:
 
 steps:
 - name: EnvWithCommand
-  script:
-    actions:
-      onRun:
-        command: bash
-        args:
-        - '{{Task.File.Run}}'
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      data: |
-        set -xeuo pipefail
+  bash:
+    script: |
+      set -xeuo pipefail
 
-        # Run the script installed into PATH by the job environment
-        random-sleep 12.5 27.5
+      # Run the script installed into PATH by the job environment
+      random-sleep 12.5 27.5
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

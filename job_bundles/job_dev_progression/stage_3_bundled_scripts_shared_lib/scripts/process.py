@@ -32,6 +32,7 @@ print(f"Selected {df.height} taskRun actions")
 
 print("Plotting a bar chart of the duration for each frame")
 mpl.pyplot.figure(figsize=(48, 4.8))
-sns.barplot(data=df, x="Frame (Task Param)", y="Duration (Seconds)")
+# Seaborn requires a pandas DataFrame; polars 2.0 removed the interchange protocol it used.
+sns.barplot(data=df.to_pandas(), x="Frame (Task Param)", y="Duration (Seconds)")
 mpl.pyplot.savefig("output/frame_time_barplot.png")
 print("Wrote the plot to output/frame_time_barplot.png")

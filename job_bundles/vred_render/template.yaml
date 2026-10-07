@@ -1,4 +1,5 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: VRED Renderer
 description: |
   This render job template depends on Autodesk VRED Core (or optionally VRED Pro) to perform rendering and supports
@@ -25,25 +26,23 @@ description: |
 
 parameterDefinitions:
   - name: SceneFile
-    type: PATH
+    type: path
     objectType: FILE
     dataFlow: IN
     userInterface:
       control: CHOOSE_INPUT_FILE
       label: VRED Scene File
       fileFilters:
-        - label: VRED Scene Files
-          patterns:
-            - '*.vpb'
-        - label: All Files
-          patterns:
-            - '*'
+      - label: VRED Scene Files
+        patterns: ['*.vpb']
+      - label: All Files
+        patterns: ['*']
     description: >
       Choose the VRED scene file that you want to render.
       Use the 'Job Attachments' tab of the submitter GUI to add
       other dependent files that the job needs.
   - name: OutputDir
-    type: PATH
+    type: path
     objectType: DIRECTORY
     dataFlow: OUT
     userInterface:
@@ -52,309 +51,246 @@ parameterDefinitions:
       groupLabel: Render Options
     description: The render output directory.
   - name: OutputFileNamePrefix
-    type: STRING
+    type: string
+    default: output
     userInterface:
       control: LINE_EDIT
       label: Output Filename Prefix
       groupLabel: Render Options
-    default: output
     description: The render output filename prefix (without extension).
   - name: OutputFormat
-    type: STRING
+    type: string
+    default: PNG
+    allowedValues: [BMP, DDS, DIB, EXR, HDR, JFIF, JPE, JPEG, JPG, NRRD, PBM, PGM, PNG, PNM, PPM, PSB, PSD, RLE, TIF, TIFF, VIF, ZIP]
     userInterface:
       control: DROPDOWN_LIST
       label: Output File Format
       groupLabel: Render Options
     description: The file format for rendered images.
-    default: PNG
-    allowedValues:
-      - BMP
-      - DDS
-      - DIB
-      - EXR
-      - HDR
-      - JFIF
-      - JPE
-      - JPEG
-      - JPG
-      - NRRD
-      - PBM
-      - PGM
-      - PNG
-      - PNM
-      - PPM
-      - PSB
-      - PSD
-      - RLE
-      - TIF
-      - TIFF
-      - VIF
-      - ZIP
   - name: View
-    type: STRING
+    type: string
+    default: ""
     userInterface:
       control: LINE_EDIT
       label: Render Viewpoint/Camera
       groupLabel: Render Options
-    default: ""
     description: The name of the viewpoint or camera from which to render.
   - name: ImageWidth
-    type: INT
+    type: int
+    default: 800
+    minValue: 1
     userInterface:
       control: SPIN_BOX
       label: Image Width (px)
       groupLabel: Render Options
-    minValue: 1
-    default: 800
     description: The rendered image width in pixels.
   - name: ImageHeight
-    type: INT
+    type: int
+    default: 600
+    minValue: 1
     userInterface:
       control: SPIN_BOX
       label: Image Height (px)
       groupLabel: Render Options
-    minValue: 1
-    default: 600
     description: The rendered image height in pixels.
   - name: DPI
-    type: INT
+    type: int
+    default: 72
+    minValue: 1
     userInterface:
       control: SPIN_BOX
       label: Resolution (px/inch)
       groupLabel: Render Options
-    minValue: 1
-    default: 72
-    description: The dots-per-inch (DPI) physical scaling factor (pixels per inch).
+    description: The dots-per-inch (DPI) physical scaling factor.
   - name: RenderQuality
-    type: STRING
+    type: string
+    default: 'Realistic High'
+    allowedValues: ['Analytic Low', 'Analytic High', 'Realistic Low', 'Realistic High', 'Raytracing', 'NPR']
     userInterface:
       control: DROPDOWN_LIST
       label: Render Quality
       groupLabel: Render Options
-    default: 'Realistic High'
-    allowedValues:
-      - 'Analytic Low'
-      - 'Analytic High'
-      - 'Realistic Low'
-      - 'Realistic High'
-      - 'Raytracing'
-      - 'NPR'
     description: The render quality level to apply.
   - name: DLSSQuality
-    type: STRING
+    type: string
+    default: 'Off'
+    allowedValues: ['Off', 'Performance', 'Balanced', 'Quality', 'Ultra Performance']
     userInterface:
       control: DROPDOWN_LIST
       label: DLSS Quality
       groupLabel: Render Options
-    default: 'Off'
-    allowedValues:
-      - 'Off'
-      - 'Performance'
-      - 'Balanced'
-      - 'Quality'
-      - 'Ultra Performance'
-    description: The Deep Learning Super Sampling (DLSS) quality level to apply.
+    description: The Deep Learning Super Sampling (DLSS) quality level.
   - name: SSQuality
-    type: STRING
+    type: string
+    default: 'Off'
+    allowedValues: ['Off', 'Low', 'Medium', 'High', 'Ultra High']
     userInterface:
       control: DROPDOWN_LIST
       label: SS Quality
       groupLabel: Render Options
-    default: 'Off'
-    allowedValues:
-      - 'Off'
-      - 'Low'
-      - 'Medium'
-      - 'High'
-      - 'Ultra High'
     description: >
       The Super Sampling quality level to apply; note: DLSS quality level takes precedence.
   - name: RenderAnimation
-    type: STRING
+    type: bool
+    default: true
     userInterface:
       control: CHECK_BOX
       label: Render Animation
       groupLabel: Render Options
-    default: 'true'
-    allowedValues:
-      - 'true'
-      - 'false'
     description: >
       If checked, allows specifying an animation type (which can also include a specific animation clip),
       corresponding frame range and frames per task.
   - name: GPURaytracing
-    type: STRING
+    type: bool
+    default: false
     userInterface:
       control: CHECK_BOX
       label: Use GPU Ray Tracing
       groupLabel: Render Options
-    default: 'false'
-    allowedValues:
-      - 'true'
-      - 'false'
     description: Attempts to apply GPU raytracing to the rendering process (if sufficient hardware is available).
   - name: AnimationType
-    type: STRING
+    type: string
+    default: 'Clip'
+    allowedValues: ['Clip', 'Timeline']
     userInterface:
       control: DROPDOWN_LIST
       label: Animation Type
       groupLabel: Render Options
-    default: 'Clip'
-    allowedValues:
-      - 'Clip'
-      - 'Timeline'
     description: The type of animation (Clip or Timeline).
   - name: AnimationClip
-    type: STRING
+    type: string
+    default: ""
     userInterface:
       control: LINE_EDIT
       label: Animation Clip
       groupLabel: Render Options
-    default: ""
     description: The name of the animation clip to render.
   - name: StartFrame
-    type: INT
+    type: int
+    default: 0
     userInterface:
       control: SPIN_BOX
       label: Start Frame
       groupLabel: Render Options
-    default: 0
     description: The first frame of a range to render.
   - name: EndFrame
-    type: INT
+    type: int
+    default: 20
     userInterface:
       control: SPIN_BOX
       label: End Frame
       groupLabel: Render Options
-    default: 20
     description: The last frame of a range to render.
   - name: FrameStep
-    type: INT
+    type: int
+    default: 1
     userInterface:
       control: SPIN_BOX
       label: Frame Step
       groupLabel: Render Options
-    default: 1
-    description: The frame step for the frame range (i.e. 2 for rendering every second frame).
+    description: The frame step for the frame range.
   - name: FramesPerTask
-    type: INT
+    type: int
+    default: 1
+    minValue: 1
     userInterface:
       control: SPIN_BOX
       label: Frames Per Task
       groupLabel: Render Options
-    minValue: 1
-    default: 1
-    description: The number of frames that will be rendered at a time for each task within a render job.
+    description: Number of frames rendered per task.
   - name: IncludeAlphaChannel
-    type: STRING
+    type: bool
+    default: false
     userInterface:
-      control: DROPDOWN_LIST
+      control: CHECK_BOX
       label: Include Alpha Channel
       groupLabel: Render Options
-    default: 'false'
-    allowedValues:
-      - 'true'
-      - 'false'
-    description: Enables export of images with an alpha channel.
+    description: Enable export of images with an alpha channel.
   - name: RegionRendering
-    type: STRING
+    type: bool
+    default: false
     userInterface:
       control: CHECK_BOX
       label: Enable Region Rendering
       groupLabel: Tiling Settings
-    default: 'false'
-    allowedValues:
-      - 'true'
-      - 'false'
     description: >
       When enabled, the output rendered image will be divided into multiple tiles (sub-regions)
       that are first rendered as separate tasks for a given frame. These tiles will then be
       assembled (combined) into one output image for a given frame (in a separate task).
   - name: NumXTiles
-    type: INT
+    type: int
+    default: 1
+    minValue: 1
     userInterface:
       control: SPIN_BOX
       label: Tiles in X
       groupLabel: Tiling Settings
-    minValue: 1
-    default: 1
     description: The number of tiles to horizontally divide the specified image size.
   - name: NumYTiles
-    type: INT
+    type: int
+    default: 1
+    minValue: 1
     userInterface:
       control: SPIN_BOX
       label: Tiles in Y
       groupLabel: Tiling Settings
-    minValue: 1
-    default: 1
     description: The number of tiles to vertically divide the specified image size.
   - name: OverrideRenderPass
-    type: STRING
+    type: bool
+    default: false
     userInterface:
-      control: DROPDOWN_LIST
+      control: CHECK_BOX
       label: Override Render Pass
       groupLabel: Render Options
-    default: 'false'
-    allowedValues:
-      - 'true'
-      - 'false'
     description: >
       Enables the exporting of render passes when rendering to a file. If enabled, then the render pass
       settings via the job properties will be used; otherwise the settings defined in the scene will be used.
   - name: PremultiplyAlpha
-    type: STRING
+    type: bool
+    default: false
     userInterface:
-      control: DROPDOWN_LIST
+      control: CHECK_BOX
       label: Premultiply Alpha
       groupLabel: Render Options
-    default: 'false'
-    allowedValues:
-      - 'true'
-      - 'false'
-    description: Enables premultiplied alpha.
+    description: Enable premultiplied alpha.
   - name: TonemapHDR
-    type: STRING
+    type: bool
+    default: false
     userInterface:
-      control: DROPDOWN_LIST
+      control: CHECK_BOX
       label: Tone map HDR
       groupLabel: Render Options
-    default: 'false'
-    allowedValues:
-      - 'true'
-      - 'false'
-    description: Enables tone mapping when rendering to a HDR image format.
+    description: Enable tone mapping for HDR image formats.
   - name: JobType
-    type: STRING
+    type: string
+    default: 'Render'
+    allowedValues: ['Render', 'Sequencer']
     userInterface:
       control: DROPDOWN_LIST
       label: Job Type
       groupLabel: Render Options
-    default: 'Render'
-    allowedValues:
-      - 'Render'
-      - 'Sequencer'
     description: Type of job to submit.
   - name: SequenceName
-    type: STRING
+    type: string
+    default: ""
     userInterface:
       control: LINE_EDIT
       label: Sequence Name
       groupLabel: Render Options
-    default: ""
     description: The name of the sequence to render; if empty, then all sequences will be rendered.
   - name: JobScriptDir
-    userInterface:
-      control: HIDDEN
-    type: PATH
+    type: path
     objectType: DIRECTORY
     dataFlow: IN
     default: scripts
-    description: Directory containing bundled scripts.
-  - name: CondaPackages
     userInterface:
       control: HIDDEN
-    type: STRING
+    description: Directory containing bundled scripts.
+  - name: CondaPackages
+    type: string
     default: 'vredcore=2026*'
+    userInterface:
+      control: HIDDEN
     description: >
       A list of conda packages to install. If a queue accepts this parameter, then it will create a conda virtual
       environment.
@@ -365,14 +301,14 @@ steps:
       taskParameterDefinitions:
         - name: StartFrameFromCurrentChunk
           type: INT
-          range: "{{Param.StartFrame}}-{{Param.EndFrame}}:{{Param.FramesPerTask}}"
+          range: "{{ Param.StartFrame }}-{{ Param.EndFrame }}:{{ Param.FramesPerTask }}"
         - name: TileNumberX
           type: INT
-          range: "1-{{Param.NumXTiles}}"
+          range: "1-{{ Param.NumXTiles }}"
         - name: TileNumberY
           type: INT
-          range: "1-{{Param.NumYTiles}}"
-    description: Invokes VRED Core, supplying it with render parameter data.
+          range: "1-{{ Param.NumYTiles }}"
+    description: Invokes VRED Core with render parameter data.
     script:
       embeddedFiles:
         - name: LoadRenderParameterValues
@@ -380,8 +316,6 @@ steps:
           type: TEXT
           data: |-
             from typing import Any, Dict
-
-            def str_to_bool(s:str)->bool: return s.lower() == 'true'
 
             def get_vred_render_parameters() -> Dict[str, Any]:
                 """
@@ -396,46 +330,46 @@ steps:
                 # Depending on implementation, a frame chunk ID or an actual starting frame number that
                 # corresponds to that ID could be provided.
                 #
-                start_frame = int({{Task.Param.StartFrameFromCurrentChunk}})
-                frames_per_task = int({{Param.FramesPerTask}})
-                end_frame = min(start_frame + frames_per_task - 1, int({{Param.EndFrame}}))
+                start_frame = {{ Task.Param.StartFrameFromCurrentChunk }}
+                frames_per_task = {{ Param.FramesPerTask }}
+                end_frame = min(start_frame + frames_per_task - 1, {{ Param.EndFrame }})
                 return {
-                    'AnimationClip': str('{{Param.AnimationClip}}'),
-                    'AnimationType': str('{{Param.AnimationType}}'),
-                    'DLSSQuality': str('{{Param.DLSSQuality}}'),
-                    'DPI': int({{Param.DPI}}),
-                    'EndFrame': int(end_frame),
-                    'FrameStep': int({{Param.FrameStep}}),
-                    'FramesPerTask': int(frames_per_task),
-                    'GPURaytracing': int(str_to_bool('{{Param.GPURaytracing}}')),
-                    'ImageHeight': int({{Param.ImageHeight}}),
-                    'ImageWidth': int({{Param.ImageWidth}}),
-                    'IncludeAlphaChannel': str_to_bool('{{Param.IncludeAlphaChannel}}'),
-                    'JobType': str('{{Param.JobType}}'),
-                    'NumXTiles': int({{Param.NumXTiles}}),
-                    'NumYTiles': int({{Param.NumYTiles}}),
-                    'OutputDir': str(r'{{Param.OutputDir}}'),
-                    'OutputFileNamePrefix': str('{{Param.OutputFileNamePrefix}}'),
-                    'OutputFormat': str('{{Param.OutputFormat}}'),
-                    'OverrideRenderPass': str_to_bool('{{Param.OverrideRenderPass}}'),
-                    'PathMappingRulesFile': str(r'{{Session.PathMappingRulesFile}}'),
-                    'PremultiplyAlpha': str_to_bool('{{Param.PremultiplyAlpha}}'),
-                    'RegionRendering': str_to_bool('{{Param.RegionRendering}}'),
-                    'RenderAnimation': str_to_bool('{{Param.RenderAnimation}}'),
-                    'RenderQuality': str('{{Param.RenderQuality}}'),
-                    'SceneFile': str(r'{{Param.SceneFile}}'),
-                    'SequenceName': str('{{Param.SequenceName}}'),
-                    'SSQuality': str('{{Param.SSQuality}}'),
-                    'StartFrame': int(start_frame),
-                    'TileNumberX': int({{Task.Param.TileNumberX}}),
-                    'TileNumberY': int({{Task.Param.TileNumberY}}),
-                    'TonemapHDR': str_to_bool('{{Param.TonemapHDR}}'),
-                    'View': str('{{Param.View}}'),
+                    'AnimationClip': {{ repr_py(Param.AnimationClip) }},
+                    'AnimationType': {{ repr_py(Param.AnimationType) }},
+                    'DLSSQuality': {{ repr_py(Param.DLSSQuality) }},
+                    'DPI': {{ Param.DPI }},
+                    'EndFrame': end_frame,
+                    'FrameStep': {{ Param.FrameStep }},
+                    'FramesPerTask': frames_per_task,
+                    'GPURaytracing': {{ repr_py(Param.GPURaytracing) }},
+                    'ImageHeight': {{ Param.ImageHeight }},
+                    'ImageWidth': {{ Param.ImageWidth }},
+                    'IncludeAlphaChannel': {{ repr_py(Param.IncludeAlphaChannel) }},
+                    'JobType': {{ repr_py(Param.JobType) }},
+                    'NumXTiles': {{ Param.NumXTiles }},
+                    'NumYTiles': {{ Param.NumYTiles }},
+                    'OutputDir': {{ repr_py(Param.OutputDir) }},
+                    'OutputFileNamePrefix': {{ repr_py(Param.OutputFileNamePrefix) }},
+                    'OutputFormat': {{ repr_py(Param.OutputFormat) }},
+                    'OverrideRenderPass': {{ repr_py(Param.OverrideRenderPass) }},
+                    'PathMappingRulesFile': {{ repr_py(Session.PathMappingRulesFile) }},
+                    'PremultiplyAlpha': {{ repr_py(Param.PremultiplyAlpha) }},
+                    'RegionRendering': {{ repr_py(Param.RegionRendering) }},
+                    'RenderAnimation': {{ repr_py(Param.RenderAnimation) }},
+                    'RenderQuality': {{ repr_py(Param.RenderQuality) }},
+                    'SceneFile': {{ repr_py(Param.SceneFile) }},
+                    'SequenceName': {{ repr_py(Param.SequenceName) }},
+                    'SSQuality': {{ repr_py(Param.SSQuality) }},
+                    'StartFrame': start_frame,
+                    'TileNumberX': {{ Task.Param.TileNumberX }},
+                    'TileNumberY': {{ Task.Param.TileNumberY }},
+                    'TonemapHDR': {{ repr_py(Param.TonemapHDR) }},
+                    'View': {{ repr_py(Param.View) }},
                 }
         - name: VREDInvocation
           filename: invoke-vred.py
           type: TEXT
-          runnable: True
+          runnable: true
           data: |-
             # Please set one of the following environment variables: "VREDCORE" or "VREDPRO".
             # Please ensure that it resolves to a VRED binary executable that is reachable.
@@ -470,6 +404,12 @@ steps:
             POST_PYTHON_PARAM = "-postpython"
             VRED_CORE_ENV_VAR = "VREDCORE"
             VRED_PRO_ENV_VAR = "VREDPRO"
+            RENDER_COMPLETE_MARKER_ENV_VAR = "DEADLINE_VRED_RENDER_COMPLETE_FILE"
+            RENDER_COMPLETE_MARKER_FILE = {{ repr_py(Session.WorkingDirectory / 'vred_render_complete') }}
+            ERROR_RENDER_NOT_COMPLETED = (
+                "VRED exited without completing the render. Check the log above for a license checkout error "
+                "or a failure to load the render script."
+            )
 
             # Invoke code found in VRED_PYTHON_BOOTSTRAP_CODE via CODE_PASSING_ENV_VAR without using import statements.
             # Remove all spaces to prevent VRED from assuming non-intended arguments.
@@ -483,14 +423,20 @@ steps:
             ).replace(
                 " ", ""
             )
-            # Inject render parameters into render script, loading both of them at startup, enforce universal exit
+            # Inject render parameters into render script, loading both of them at startup, enforce universal exit.
+            # The script paths use forward slashes, and are inserted after the replacements below so the
+            # escapes in their Python literals are kept.
             #
+            VRED_SCRIPT_PATHS = [
+                path.replace("\\", "/")
+                for path in [{{ repr_py(Param.JobScriptDir) }}, {{ repr_py(Task.File.LoadRenderParameterValues.parent) }}]
+            ]
             VRED_PYTHON_BOOTSTRAP_CODE = r"""
             import importlib;
             import os;
             import sys;
             from vrController import terminateVred, vrLogError;
-            sys.path.extend([r'{{Param.JobScriptDir}}', os.path.dirname(r'{{Task.File.LoadRenderParameterValues}}')]);
+            sys.path.extend(VRED_SCRIPT_PATHS);
             render_module_name='VRED_RenderScript_DeadlineCloud';
             render_param_module_name='load_render_parameter_values';
             render_module = importlib.util.find_spec(render_module_name) is not None and importlib.import_module(
@@ -506,6 +452,8 @@ steps:
                 "\n", ""
             ).replace(
                 "\\", "/"
+            ).replace(
+                "VRED_SCRIPT_PATHS", repr(VRED_SCRIPT_PATHS)
             )
 
 
@@ -537,6 +485,9 @@ steps:
                 os.environ[LICENSE_RELEASE_TIME_ENV_VAR] = LICENSE_RELEASE_TIME_SECONDS_LIMIT
                 os.environ[CODE_PASSING_ENV_VAR] = VRED_PYTHON_BOOTSTRAP_CODE
                 os.environ[FLEXLM_DIAGNOSTICS_ENV_VAR] = FLEXLM_DIAGNOSTICS_HIGH_VALUE
+                os.environ[RENDER_COMPLETE_MARKER_ENV_VAR] = RENDER_COMPLETE_MARKER_FILE
+                if os.path.exists(RENDER_COMPLETE_MARKER_FILE):
+                    os.remove(RENDER_COMPLETE_MARKER_FILE)
 
             def invoke_vred(vred_executable: str) -> None:
                 """
@@ -545,7 +496,9 @@ steps:
                 param: vred_executable: path to VRED binary
                 """
                 executable = f'"{vred_executable}"' if IS_WINDOWS else vred_executable
-                scene_file_path = r'"{{Param.SceneFile}}"' if IS_WINDOWS else r"{{Param.SceneFile}}"
+                scene_file_path = {{ repr_py(Param.SceneFile) }}
+                if IS_WINDOWS:
+                    scene_file_path = f'"{scene_file_path}"'
                 command_and_arg_list: list[str] = [
                     executable,
                     scene_file_path,
@@ -561,19 +514,23 @@ steps:
                     print(output)
                 except subprocess.CalledProcessError as error:
                     print(f"Command: [{invocation}] failed: \n{error.output}\n with return code {error.returncode}")
+                    sys.exit(error.returncode)
+                # VRED exits with code 0 when it can't check out a license or the render script doesn't run,
+                # so also require the marker file that the render script writes after rendering.
+                if not os.path.isfile(RENDER_COMPLETE_MARKER_FILE):
+                    print(f"openjd_fail: {ERROR_RENDER_NOT_COMPLETED}")
+                    sys.exit(1)
 
             setup_vred_environment()
             invoke_vred(get_vred_executable())
       actions:
         onRun:
           command: python
-          args: [ '{{Task.File.VREDInvocation}}' ]
+          args: ['{{ Task.File.VREDInvocation }}']
     hostRequirements:
       amounts:
         - name: amount.worker.gpu
           min: 1
       attributes:
         - name: attr.worker.os.family
-          anyOf:
-            - linux
-            - windows
+          anyOf: [linux, windows]

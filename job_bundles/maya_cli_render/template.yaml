@@ -1,4 +1,5 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Maya CLI Render
 description: |
   This job bundle renders a Maya software renderer scene with the Maya CLI `Render` command.
@@ -15,9 +16,10 @@ parameterDefinitions:
 
 # Render Parameters
 - name: MayaSceneFile
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
+  default: fallinggears.ma
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: Maya Scene File
@@ -32,58 +34,57 @@ parameterDefinitions:
 
     Use the 'Job Attachments' tab of the submitter GUI to add textures
     and other files that the job needs.
-  default: fallinggears.ma
 - name: Frames
-  type: STRING
+  type: range_expr
+  default: "1-60"
   userInterface:
     control: LINE_EDIT
     label: Frames
     groupLabel: Render Parameters
-  default: 1-60
 - name: CameraName
-  type: STRING
+  type: string
+  default: persp
   userInterface:
     control: LINE_EDIT
     label: Camera Name
     groupLabel: Render Parameters
-  default: persp
 - name: ImageWidth
-  type: INT
+  type: int
+  default: 960
   userInterface:
     control: SPIN_BOX
     label: Image Width
     groupLabel: Render Parameters
-  default: 960
 - name: ImageHeight
-  type: INT
+  type: int
+  default: 540
   userInterface:
     control: SPIN_BOX
     label: Image Height
     groupLabel: Render Parameters
-  default: 540
 - name: OutputDir
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
+  default: output
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory
     groupLabel: Render Parameters
   description: Choose the render output directory.
-  default: output
 - name: ProjectPath
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: IN
+  default: "."
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory
     groupLabel: Render Parameters
-  default: "."
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -98,35 +99,27 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: "{{Param.Frames}}"
-  script:
-    embeddedFiles:
-    - name: Render
-      filename: render.sh
-      type: TEXT
-      data: |
-        set -euo pipefail
+      range: "{{ Param.Frames }}"
+  bash:
+    cancelation:
+      mode: NOTIFY_THEN_TERMINATE
+    script: |
+      set -euo pipefail
 
-        cd '{{Param.ProjectPath}}'
+      cd {{ repr_sh(Param.ProjectPath) }}
 
-        set -x
-        Render -r sw \
-            -proj '{{Param.ProjectPath}}' \
-            -rd '{{Param.OutputDir}}' \
-            -s {{Task.Param.Frame}} \
-            -e {{Task.Param.Frame}} \
-            -pad 4 \
-            -fnc "name.#.ext" \
-            -cam '{{Param.CameraName}}' \
-            -x {{Param.ImageWidth}} \
-            -y {{Param.ImageHeight}} \
-            '{{Param.MayaSceneFile}}'
-    actions:
-      onRun:
-        command: bash
-        args: ["{{Task.File.Render}}"]
-        cancelation:
-          mode: NOTIFY_THEN_TERMINATE
+      set -x
+      Render -r sw \
+          -proj {{ repr_sh(Param.ProjectPath) }} \
+          -rd {{ repr_sh(Param.OutputDir) }} \
+          -s {{ Task.Param.Frame }} \
+          -e {{ Task.Param.Frame }} \
+          -pad 4 \
+          -fnc "name.#.ext" \
+          -cam {{ repr_sh(Param.CameraName) }} \
+          -x {{ Param.ImageWidth }} \
+          -y {{ Param.ImageHeight }} \
+          {{ repr_sh(Param.MayaSceneFile) }}
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

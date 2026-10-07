@@ -52,7 +52,7 @@ jobEnvironments:
     actions:
       onEnter:
         command: bash
-        args: ["{{Env.File.Enter}}"]
+        args: ["{{ Env.File.Enter }}"]
     embeddedFiles:
     - name: Enter
       type: TEXT
@@ -62,7 +62,7 @@ jobEnvironments:
 
         # Remove and then install the bundled progression_4_lib
         pip uninstall --yes progression_4_lib
-        pip install '{{Param.BundledPythonPackage}}'
+        pip install '{{ Param.BundledPythonPackage }}'
 
 steps:
 
@@ -71,7 +71,7 @@ steps:
     actions:
       onRun:
         command: prog4-initialize
-        args: ['{{Param.InputCsvFile}}', '{{Param.WorkspacePath}}', '--debug']
+        args: ['{{ Param.InputCsvFile }}', '{{ Param.WorkspacePath }}', '--debug']
 
 - name: Process
   dependencies:
@@ -80,4 +80,4 @@ steps:
     actions:
       onRun:
         command: prog4-process
-        args: ['{{Param.WorkspacePath}}']
+        args: ['{{ Param.WorkspacePath }}']

@@ -75,13 +75,15 @@ Sample data for a quick test uses hen egg-white lysozyme (PDB: 1AKI), the standa
 
 ## Usage
 
+Run these commands from the `gromacs_md` directory, after downloading `protein.pdb` there as described in [Sample Data](#sample-data):
+
 ```bash
-deadline bundle submit path/to/gromacs_md \
-  -p "InputPdb=sample_data/protein.pdb" \
-  -p "MdpMinimization=sample_data/mdp/minimization.mdp" \
-  -p "MdpNvt=sample_data/mdp/nvt.mdp" \
-  -p "MdpNpt=sample_data/mdp/npt.mdp" \
-  -p "MdpProduction=sample_data/mdp/production.mdp" \
+deadline bundle submit . \
+  -p "InputPdb=protein.pdb" \
+  -p "MdpMinimization=sample_inputs/mdp/minimization.mdp" \
+  -p "MdpNvt=sample_inputs/mdp/nvt.mdp" \
+  -p "MdpNpt=sample_inputs/mdp/npt.mdp" \
+  -p "MdpProduction=sample_inputs/mdp/production.mdp" \
   -p "OutputDir=output" \
   -p "ProductionSteps=500000" \
   -p "MaxReplicaIndex=0"
@@ -96,17 +98,24 @@ deadline bundle submit path/to/gromacs_md \
 | BoxDistance | Distance from solute to box edge (nm) | 1.0 |
 | ProductionSteps | MD steps (500000 = 1 ns at 2 fs) | 500000 |
 | MaxReplicaIndex | Last replica index (for parallel replicas) | 0 |
+| ShutdownGracePeriodSeconds | Time a canceled production MD task has to write a checkpoint before it is killed | 60 |
+
+When a production MD task is canceled or times out, the task asks `mdrun` to stop, and `mdrun` writes a checkpoint at its next neighbor search step. The task copies it to `replica_N/md.cpt` in the output directory, alongside `md.tpr` and the partial outputs, so the run can be continued from that directory with `gmx mdrun -deffnm md -cpi md.cpt`. If `mdrun` has not finished writing within the grace period, which is at most `ShutdownGracePeriodSeconds`, the task is killed and no new checkpoint is saved, so raise it for large systems.
+
+The checkpoint is only kept when the output directory is on shared storage. Job attachments upload a task's outputs only when the task succeeds, so a canceled task's `md.cpt` is not returned. The OpenJD discussion [Idea for RFC to add task checkpointing](https://github.com/OpenJobDescription/openjd-specifications/discussions/169) describes a potential feature where a job template tells the scheduler it can checkpoint, so an interrupted task could resume from its checkpoint.
+
+The production MD task also reports progress. Every 10 seconds it reads the latest step from `md.log`, which `mdrun` updates every `nstlog` steps (1% of the default run), and prints it as an `openjd_progress` percentage.
 
 ### Multi-Replica Example
 
 Run 10 independent simulations in parallel:
 ```bash
-deadline bundle submit path/to/gromacs_md \
+deadline bundle submit . \
   -p "InputPdb=protein.pdb" \
-  -p "MdpMinimization=mdp/minimization.mdp" \
-  -p "MdpNvt=mdp/nvt.mdp" \
-  -p "MdpNpt=mdp/npt.mdp" \
-  -p "MdpProduction=mdp/production.mdp" \
+  -p "MdpMinimization=sample_inputs/mdp/minimization.mdp" \
+  -p "MdpNvt=sample_inputs/mdp/nvt.mdp" \
+  -p "MdpNpt=sample_inputs/mdp/npt.mdp" \
+  -p "MdpProduction=sample_inputs/mdp/production.mdp" \
   -p "ProductionSteps=5000000" \
   -p "MaxReplicaIndex=9" \
   -p "JobName=lysozyme-10replicas"

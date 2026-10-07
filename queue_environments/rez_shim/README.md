@@ -2,7 +2,9 @@
 
 Applies a resolved Rez context to each task by wrapping its command, instead of copying environment variables out of the queue environment and replaying them.
 
-Choose this if your Rez packages configure software with anything other than plain environment variables. Studios commonly hit this when a package defines an `alias` for a launcher, relies on a shell function, or prepends to `PATH` expecting its own binary to shadow a system one. If your packages only set variables, the simpler [rez_queue_env.yaml](../rez_queue_env.yaml) works and needs no extra pieces.
+**No longer recommended.** [rez_queue_env.yaml](../rez_queue_env.yaml) now runs each task in the resolved context with Open Job Description wrap actions, which gives the same result without shims. This environment predates wrap actions and is kept for reference.
+
+It targets Rez packages that configure software with anything other than plain environment variables. Studios commonly hit this when a package defines an `alias` for a launcher, relies on a shell function, or prepends to `PATH` expecting its own binary to shadow a system one.
 
 ## Contents
 
@@ -14,9 +16,9 @@ Choose this if your Rez packages configure software with anything other than pla
 
 Only the first file belongs on a production queue. The other two exist to demonstrate and test it.
 
-## Why the simpler sample cannot cover these cases
+## Why copying environment variables cannot cover these cases
 
-The limitation is structural. A queue environment action runs in its own subprocess, so the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. To work within that, [rez_queue_env.yaml](../rez_queue_env.yaml) activates a context and then replays the difference between the environment before and after. Anything that is not a name-value pair does not survive that round trip.
+The limitation is structural. A queue environment action runs in its own subprocess, so without wrap actions the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. An environment that works within that activates a context and then replays the difference between the environment before and after. Anything that is not a name-value pair does not survive that round trip.
 
 A Rez `alias` is the clearest casualty. Rez implements it as an exported shell function, which Bash exports under a name like `BASH_FUNC_launch%%` with a multi-line value. The session runtime rejects that assignment outright:
 
@@ -143,12 +145,12 @@ PASS: package command shadows the system one
 All 3 environment fidelity checks passed.
 ```
 
-Running the same bundle under [rez_queue_env.yaml](../rez_queue_env.yaml) instead shows the runtime refusing the alias, which is the failure this environment avoids.
+An environment that copies variables with `openjd_env` instead shows the runtime refusing the alias, which is the failure this environment avoids.
 
 ## Tradeoffs
 
 * Only bare command names are intercepted. A template invoking an absolute path bypasses the shims.
-* Linux and macOS workers only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there with a message pointing at the alternative. Use [rez_queue_env.yaml](../rez_queue_env.yaml) for Windows fleets.
+* Linux and macOS workers only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there with a message pointing at the alternative. [rez_queue_env.yaml](../rez_queue_env.yaml) supports Windows workers.
 * Each task pays a context re-entry. Rez's resolve cache keeps this small, but it is not free.
 
 Cancelation does reach through a shim. Rez runs the tool in a shell of its own, so the process tree is `shim` → `rez env` → shell → tool rather than flat, but a `SIGTERM` sent to the top process propagates to the tool and no orphans are left behind. Verified on a Linux service-managed fleet worker: canceling the `CancelThroughShim` step below produced
@@ -160,9 +162,9 @@ demosleep: caught SIGTERM, exiting
 
 Applications that install their own signal handlers still get the chance to shut down cleanly. Give `cancelation` a `NOTIFY_THEN_TERMINATE` mode in your step if a tool needs a grace period.
 
-## A future specification change removes the need for this
+## Wrap actions replace this
 
-This environment is a workaround for a gap in the environment specification rather than a permanent design. [RFC0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/issues/132) proposes `onWrapTaskRun`, letting a queue environment wrap each task's command directly instead of exporting variables to it. Once the worker agent supports that hook, it replaces both the shim directory and the `PATH` manipulation, and the tradeoffs above go away. The RFC has reached final comments upstream.
+This environment was a workaround from before the `WRAP_ACTIONS` extension in [RFC 0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md). With that extension, a queue environment wraps each task's command directly instead of exporting variables to it, which removes the shim directory, the `PATH` manipulation, and the tradeoffs above. [rez_queue_env.yaml](../rez_queue_env.yaml) takes that approach.
 
 ## Cleanup
 

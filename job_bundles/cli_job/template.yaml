@@ -1,13 +1,14 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Bash CLI Job
 
 parameterDefinitions:
 - name: BashScript
-  type: STRING
+  type: string
   userInterface:
     control: MULTILINE_EDIT
     label: Bash Script
-  description: "Write your bash script code here."
+  description: Write your bash script code here.
   default: |
     echo "The directory contents attached to this job:"
     ls
@@ -15,7 +16,7 @@ parameterDefinitions:
     # Example workload to compute hashes of all the input
     find . -type f -exec md5sum {} \; > computed_hashes.txt
 - name: DataDir
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: INOUT
   userInterface:
@@ -28,26 +29,16 @@ parameterDefinitions:
 
 steps:
 - name: CliScript
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-    - name: Run
-      type: TEXT
-      runnable: true
-      data: |
-        #!/usr/bin/env bash
+  bash:
+    script: |
+      # Configure the script to fail if any individual command fails.
+      set -euo pipefail
 
-        # Configure the script to fail if any individual command fails.
-        set -euo pipefail
+      echo "Data Dir is" {{ repr_sh(Param.DataDir) }}
+      mkdir -p {{ repr_sh(Param.DataDir) }}
+      cd {{ repr_sh(Param.DataDir) }}
 
-        echo 'Data Dir is {{Param.DataDir}}'
-        mkdir -p '{{Param.DataDir}}'
-        cd '{{Param.DataDir}}'
+      # Echo each command before running it.
+      set -x
 
-        # Echo each command before running it.
-        set -x
-
-        {{Param.BashScript}}
+      {{ Param.BashScript }}
