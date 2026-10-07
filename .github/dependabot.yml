@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=https://json.schemastore.org/dependabot-2.0.json
+#
+# Dependabot opens one grouped PR per ecosystem per week, with all of that
+# ecosystem's bumps in it (majors included), rather than one PR per dependency.
+# Security updates are grouped the same way.
+#
+# Not covered, on purpose:
+# - Dockerfiles (containers/, job_bundles/*/docker/): base images are pinned to
+#   the DCC/ASWF versions each sample targets.
+# - conda_recipes/: recipe pins (e.g. pywin32 with hashes) track the packaged
+#   application, not the latest release.
+# - Sample Python packages under job_bundles/: their dependencies are unpinned
+#   or floor-only examples, so there is nothing to bump.
+version: 2
+updates:
+  # SHA-pinned actions in .github/workflows (required by the org's zizmor policy).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # The CDK starter farm app.
+  - package-ecosystem: "npm"
+    directory: "/cdk/farm_templates/starter_farm"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      starter-farm:
+        patterns:
+          - "*"
+      starter-farm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # The static-check suite's dependencies (tests/requirements.txt).
+  - package-ecosystem: "pip"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      tests:
+        patterns:
+          - "*"
+      tests-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
