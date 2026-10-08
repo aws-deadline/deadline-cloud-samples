@@ -100,7 +100,7 @@ deadline bundle submit . \
 | MaxReplicaIndex | Last replica index (for parallel replicas) | 0 |
 | ShutdownGracePeriodSeconds | Time a canceled production MD task has to write a checkpoint before it is killed | 60 |
 
-When a production MD task is canceled or times out, the task asks `mdrun` to stop, and `mdrun` writes a checkpoint at its next neighbor search step. The task copies it to `replica_N/md.cpt` in the output directory, alongside `md.tpr` and the partial outputs, so the run can be continued from that directory with `gmx mdrun -deffnm md -cpi md.cpt`. If `mdrun` has not finished writing within the grace period, which is at most `ShutdownGracePeriodSeconds`, the task is killed and no new checkpoint is saved, so raise it for large systems.
+When a production MD task is canceled or times out, the task asks `mdrun` to stop, and `mdrun` writes a checkpoint at its next neighbor search step. The task copies it to `replica_N/md.cpt` in the output directory, alongside `md.tpr` and the partial outputs, so the run can be continued from that directory with `gmx mdrun -deffnm md -cpi md.cpt`. If `mdrun` has not finished writing within the grace period, which is at most `ShutdownGracePeriodSeconds`, the task is killed before it saves a new checkpoint. Raise the grace period for large systems.
 
 The checkpoint is only kept when the output directory is on shared storage. Job attachments upload a task's outputs only when the task succeeds, so a canceled task's `md.cpt` is not returned. The OpenJD discussion [Idea for RFC to add task checkpointing](https://github.com/OpenJobDescription/openjd-specifications/discussions/169) describes a potential feature where a job template tells the scheduler it can checkpoint, so an interrupted task could resume from its checkpoint.
 
@@ -137,6 +137,6 @@ GROMACS is installed via the queue's Conda environment from conda-forge. No host
 ## Use Cases
 
 - **Drug binding studies**: simulate protein-ligand complexes to validate virtual screening hits
-- **Protein stability**: compare wild-type vs mutant dynamics (fan out across variants)
+- **Protein stability**: compare wild-type vs mutant dynamics (one task per variant)
 - **Free energy perturbation**: parallel lambda windows for binding affinity prediction
 - **Conformational sampling**: multiple replicas for enhanced sampling statistics
