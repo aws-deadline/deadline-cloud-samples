@@ -4,7 +4,7 @@ With [AWS CloudFormation](https://aws.amazon.com/cloudformation/), you can deplo
 
 ## Sample index
 
-This table covers all deployable leaf samples below `cloudformation/`. The subcategory READMEs provide the same samples grouped by purpose.
+This table lists the deployable leaf samples below `cloudformation/`. The subcategory READMEs provide the same samples grouped by purpose.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -14,6 +14,7 @@ This table covers all deployable leaf samples below `cloudformation/`. The subca
 | [SMF capacity manager](farm_templates/smf_capacity_manager/) | Balancing Wait and Save and Spot capacity with Lambda and EventBridge Scheduler | A hybrid fleet should maintain target capacity cost-effectively |
 | [Fleet standby scheduling](farm_templates/fleet_standby_scheduling/) | Time-based changes to a fleet's warm standby worker count | You want faster business-hours starts without full-time idle capacity |
 | [CMF fleet health check](farm_templates/cmf_templates/) | Lambda, EventBridge, CloudWatch alarms, and optional SNS for fleet health | A customer-managed autoscaling fleet needs continuous monitoring |
+| [macOS CMF with an EC2 Mac worker](farm_templates/cmf_templates/macos_cmf/) | A macOS customer-managed fleet, an EC2 Mac Dedicated Host, and worker agent bootstrap from user data | You need macOS render nodes and want the job user, group, and sudoers setup automated |
 | [Budget event notifications](notification_templates/budget_events_notification/) | Deadline budget events delivered through SNS and AWS Chatbot | You need email or Slack alerts when budget thresholds are reached |
 | [Job event Slack notifications](notification_templates/job_events_slack_lambda/) | EventBridge invoking Lambda to post completion and failure messages | Studio automation should react to Deadline Cloud job state changes |
 
