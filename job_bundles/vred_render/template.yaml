@@ -341,7 +341,7 @@ steps:
                     'EndFrame': end_frame,
                     'FrameStep': {{ Param.FrameStep }},
                     'FramesPerTask': frames_per_task,
-                    'GPURaytracing': {{ repr_py(Param.GPURaytracing) }},
+                    'GPURaytracing': {{ 1 if Param.GPURaytracing else 0 }},
                     'ImageHeight': {{ Param.ImageHeight }},
                     'ImageWidth': {{ Param.ImageWidth }},
                     'IncludeAlphaChannel': {{ repr_py(Param.IncludeAlphaChannel) }},
