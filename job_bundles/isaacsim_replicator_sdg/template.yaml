@@ -1,0 +1,362 @@
+specificationVersion: jobtemplate-2023-09
+# FEATURE_BUNDLE_1 is required to use a format string for an action `timeout`.
+# Without it the service rejects the template, and `openjd check` does NOT catch
+# this - it validates the schema but not the extension requirement.
+extensions:
+- FEATURE_BUNDLE_1
+name: Isaac Sim Replicator SDG
+description: |
+  Domain-randomized synthetic perception data from NVIDIA Isaac Sim Replicator,
+  fanned out over Deadline Cloud workers:
+
+    1 - Generate (xN shards)  ->  2 - Merge
+
+  Each Generate task renders its own deterministically-seeded slice of the
+  dataset and writes frames numbered from a global offset, so N shards fill one
+  flat dataset with no filename collisions and no renumbering pass. Merge
+  verifies every shard reported the frames it was asked for, concatenates the
+  per-frame bounding boxes into one COCO instances.json, and fails the job if
+  the dataset came up short.
+
+  This bundle contains NO docker commands and names NO container image. It is
+  designed for a queue with a Docker queue environment on a service-managed
+  fleet carrying the `docker` software add-on, which wraps each task's onRun
+  into the container for you. That also makes the template portable: it runs
+  unchanged under `openjd run` on any host that has Isaac Sim installed.
+
+  Default scene is built entirely from Replicator primitives and references no
+  NVIDIA-authored asset, which is what makes it publishable. `SceneSource=workshop`
+  opts into the Sim-to-Real-SO-101-Workshop USD assets baked into that image.
+
+  The recipe for the container image is at containers/isaacsim-so101-workshop.
+
+parameterDefinitions:
+
+# --------------------------------------------------------------- dataset -----
+- name: SdgFrames
+  type: INT
+  default: 256
+  minValue: 1
+  maxValue: 200000
+  description: >-
+    Total frames across all shards. Split evenly over SdgShards; any remainder
+    goes to the earlier shards, so the total is exact.
+  userInterface:
+    control: SPIN_BOX
+    label: Total frames
+    groupLabel: Dataset
+- name: SdgShards
+  type: INT
+  default: 4
+  minValue: 1
+  maxValue: 100
+  description: >-
+    Parallel Generate tasks. Each pays its own Kit boot (~35s warm, ~347s cold),
+    so very narrow shards spend most of their time booting. Aim for at least a
+    few dozen frames per shard.
+  userInterface:
+    control: SPIN_BOX
+    label: Shards
+    groupLabel: Dataset
+- name: SdgBaseSeed
+  type: INT
+  default: 30001
+  description: >-
+    Shard N uses SdgBaseSeed + (N-1)*1000. The stride keeps each shard's seed
+    neighbourhood disjoint whatever the frames-per-shard works out to. Same seed
+    reproduces the same scene CONFIGURATION; pixels are not bit-identical
+    because DLSS is temporal (set AntiAliasing=0 for a tighter A/B).
+  userInterface:
+    control: SPIN_BOX
+    label: Base seed
+    groupLabel: Dataset
+
+# ----------------------------------------------------------------- scene -----
+- name: SceneSource
+  type: STRING
+  default: primitives
+  allowedValues: [primitives, workshop]
+  description: >-
+    primitives: cubes/spheres/cones on a plane, randomized pose, colour and
+    lighting. References no NVIDIA asset.
+    workshop: the SO-101 arm and vial rack USD files from the workshop image,
+    with materials rebound to randomized OmniPBR. Skips lightbox-simple.usd,
+    which payloads NVIDIA's rsd455.usd camera geometry from S3.
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Scene source
+    groupLabel: Scene
+- name: SdgObjects
+  type: INT
+  default: 6
+  minValue: 1
+  maxValue: 50
+  description: Randomized foreground objects (primitives scene only).
+  userInterface:
+    control: SPIN_BOX
+    label: Objects
+    groupLabel: Scene
+
+# --------------------------------------------------------------- render ------
+- name: Width
+  type: INT
+  default: 640
+  minValue: 64
+  maxValue: 3840
+  userInterface: {control: SPIN_BOX, label: Width, groupLabel: Render}
+- name: Height
+  type: INT
+  default: 480
+  minValue: 64
+  maxValue: 2160
+  userInterface: {control: SPIN_BOX, label: Height, groupLabel: Render}
+- name: Renderer
+  type: STRING
+  default: RaytracedLighting
+  allowedValues: [RaytracedLighting, PathTracing]
+  description: >-
+    RaytracedLighting is the proven headless path. PathTracing is much slower
+    and unproven headless in NVIDIA's own docs - treat it as experimental.
+  userInterface: {control: DROPDOWN_LIST, label: Renderer, groupLabel: Render}
+- name: RtSubframes
+  type: INT
+  default: 8
+  minValue: 1
+  maxValue: 64
+  description: >-
+    Render subframes per capture. NVIDIA documents a floor of 2 when randomized
+    materials load late; higher values remove ghosting between randomizations
+    at linear cost.
+  userInterface: {control: SPIN_BOX, label: RT subframes, groupLabel: Render}
+- name: AntiAliasing
+  type: INT
+  default: 3
+  minValue: 0
+  maxValue: 4
+  description: "0 off, 1 TAA, 2 FXAA, 3 DLSS, 4 RTXAA."
+  userInterface: {control: SPIN_BOX, label: Anti-aliasing, groupLabel: Render}
+- name: Annotators
+  type: STRING
+  default: rgb,bounding_box_2d_tight,semantic_segmentation
+  description: >-
+    Comma-separated. Roughly 0.2-0.45 MB/frame at 640x480 with this default set.
+    Adding distance_to_camera costs ~1.2 MiB/frame and normals ~4.7 MiB/frame,
+    so leave those off unless you need them.
+  userInterface:
+    control: LINE_EDIT
+    label: Annotators
+    groupLabel: Render
+
+# ------------------------------------------------------------------ paths ----
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: INOUT
+  description: >-
+    Shared work dir. Generate writes sdg/<annotator>/ plus sdg/sdgNN.json;
+    Merge writes sdg/instances.json and sdg_summary.json. INOUT because every
+    shard's copy also carries its peers' uploads. Pass an absolute path.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output directory
+    groupLabel: Paths
+- name: ScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: >-
+    Bundled Python scripts - generate_sdg.py, sdg_scene.py, sdg_writer.py and
+    merge_sdg.py.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Script directory
+    groupLabel: Paths
+
+# ----------------------------------------------------------------- limits ----
+- name: StepTimeoutSeconds
+  type: INT
+  default: 1800
+  minValue: 60
+  maxValue: 43200
+  description: >-
+    Per-task wall clock. A cold worker spends ~347s on Kit boot before the first
+    frame, so do not set this tight.
+  userInterface:
+    control: SPIN_BOX
+    label: Step timeout (s)
+    groupLabel: Limits
+
+steps:
+
+# ============================================================== 1 - Generate =
+- name: 1 - Generate
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ShardIndex
+      type: INT
+      range: "1-{{Param.SdgShards}}"
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    # Isaac Sim's RTX renderer needs RT Cores. A100/H100 are unsupported even
+    # headless, so the fleet must offer g5/g6/g6e class accelerators.
+    - {name: amount.worker.gpu, min: 1}
+    - {name: amount.worker.vcpu, min: 8}
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+        timeout: "{{Param.StepTimeoutSeconds}}"
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        SHARD={{Task.Param.ShardIndex}}
+        TOTAL_FRAMES={{Param.SdgFrames}}
+        SHARDS={{Param.SdgShards}}
+        OUT='{{Param.OutputDir}}'
+        SCRIPT_DIR='{{Param.ScriptDir}}'
+        LABEL=$(printf 'sdg%02d' "$SHARD")
+
+        # Split frames exactly: the first (TOTAL % SHARDS) shards take one extra,
+        # so the shard totals always sum to SdgFrames.
+        BASE=$(( TOTAL_FRAMES / SHARDS ))
+        REM=$(( TOTAL_FRAMES % SHARDS ))
+        if [ "$SHARD" -le "$REM" ]; then
+            FRAMES=$(( BASE + 1 ))
+            OFFSET=$(( (SHARD - 1) * (BASE + 1) ))
+        else
+            FRAMES=$BASE
+            OFFSET=$(( REM * (BASE + 1) + (SHARD - 1 - REM) * BASE ))
+        fi
+        if [ "$FRAMES" -le 0 ]; then
+            echo "Shard ${SHARD} has no frames (SdgShards > SdgFrames); nothing to do."
+            printf '{"shard":"%s","frames":0,"frame_offset":%d,"seed":0}\n' \
+                "$LABEL" "$OFFSET" > "${OUT}/sdg/${LABEL}.json" 2>/dev/null || true
+            exit 0
+        fi
+        SEED=$(( {{Param.SdgBaseSeed}} + (SHARD - 1) * 1000 ))
+
+        mkdir -p "${OUT}/sdg" "${OUT}/logs"
+
+        echo "shard=${LABEL} frames=${FRAMES} offset=${OFFSET} seed=${SEED}"
+        echo "persistent mount: ${DEADLINE_PERSISTENT_MOUNT:-<unset>}"
+
+        # Isaac Sim must be driven through python.sh, which sets the PYTHONPATH
+        # the bare kit interpreter lacks. Under a Docker queue environment the
+        # image ENTRYPOINT never runs, so nothing else sets it up.
+        PY=""
+        for candidate in /isaac-sim/python.sh /workspace/isaaclab/_isaac_sim/python.sh; do
+            if [ -x "$candidate" ]; then PY="$candidate"; break; fi
+        done
+        if [ -z "$PY" ]; then
+            echo "openjd_fail: no Isaac Sim python.sh found" >&2
+            exit 1
+        fi
+        echo "interpreter: ${PY}"
+
+        # PYTHONPATH so generate_sdg.py can import its siblings.
+        export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
+
+        set +e
+        "$PY" "${SCRIPT_DIR}/generate_sdg.py" \
+            --output-dir "$OUT" \
+            --frames "$FRAMES" \
+            --frame-offset "$OFFSET" \
+            --seed "$SEED" \
+            --shard-label "$LABEL" \
+            --width {{Param.Width}} \
+            --height {{Param.Height}} \
+            --renderer '{{Param.Renderer}}' \
+            --rt-subframes {{Param.RtSubframes}} \
+            --anti-aliasing {{Param.AntiAliasing}} \
+            --annotators '{{Param.Annotators}}' \
+            --scene-source '{{Param.SceneSource}}' \
+            --objects {{Param.SdgObjects}} \
+            2>&1 | tee "${OUT}/logs/${LABEL}.log"
+        rc=${PIPESTATUS[0]}
+        set -e
+        echo "$rc" > "${OUT}/logs/_inner_exit_${LABEL}"
+        if [ "$rc" -ne 0 ]; then
+            echo "openjd_fail: generate_sdg.py exited ${rc} (see logs/${LABEL}.log)" >&2
+            exit "$rc"
+        fi
+
+        # DO NOT trust rc alone. Isaac Sim's python.sh does not propagate the
+        # Python exit code: a script that dies with an uncaught exception still
+        # returns 0, so a crashed shard reports SUCCEEDED and only a downstream
+        # step notices. Assert the expected artifacts instead.
+        SUMMARY="${OUT}/sdg/${LABEL}.json"
+        if [ ! -s "$SUMMARY" ]; then
+            echo "openjd_fail: ${LABEL} exited 0 but wrote no ${SUMMARY};" \
+                 "python.sh swallowed a failure - see logs/${LABEL}.log" >&2
+            exit 1
+        fi
+        REPORTED=$(sed -n 's/.*"frames"[[:space:]]*:[[:space:]]*\([0-9]\{1,\}\).*/\1/p' "$SUMMARY" | head -1)
+        if [ "${REPORTED:-0}" -ne "$FRAMES" ]; then
+            echo "openjd_fail: ${LABEL} reported ${REPORTED:-none} frames, expected ${FRAMES}" >&2
+            exit 1
+        fi
+
+        # Count files on disk, not the self-reported number. An earlier version
+        # trusted the loop counter and passed a shard that produced zero images.
+        # BasicWriter writes flat into the shard dir, so rgb_*.png not rgb/*.png.
+        WRITTEN=$(find "${OUT}/sdg/${LABEL}" -maxdepth 1 -name "rgb_*.png" 2>/dev/null | wc -l | tr -d ' ')
+        if [ "${WRITTEN:-0}" -ne "$FRAMES" ]; then
+            echo "openjd_fail: ${LABEL} wrote ${WRITTEN:-0} rgb files, expected ${FRAMES}." \
+                 "Replicator reported no error - check logs/${LABEL}.log for writer warnings" >&2
+            find "${OUT}/sdg/${LABEL}" -type f 2>/dev/null | head -20 >&2
+            exit 1
+        fi
+        echo "shard ${LABEL} complete: ${WRITTEN} rgb files on disk"
+
+# ================================================================= 2 - Merge =
+- name: 2 - Merge
+  dependencies:
+  - dependsOn: 1 - Generate
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+        timeout: "{{Param.StepTimeoutSeconds}}"
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        OUT='{{Param.OutputDir}}'
+        SCRIPT_DIR='{{Param.ScriptDir}}'
+
+        # Needs no GPU and no Isaac Sim: stdlib only, Python 3.9 compatible. It
+        # still executes inside the container, because a Docker queue environment
+        # wraps every task on the queue with no per-step opt-out.
+        PY=""
+        for candidate in python3 /usr/bin/python3 /isaac-sim/kit/python/bin/python3; do
+            if command -v "$candidate" >/dev/null 2>&1; then PY="$candidate"; break; fi
+        done
+        if [ -z "$PY" ]; then
+            echo "openjd_fail: no python3 found" >&2
+            exit 1
+        fi
+        echo "interpreter: $("$PY" -c 'import sys; print(sys.executable, sys.version.split()[0])')"
+
+        "$PY" "${SCRIPT_DIR}/merge_sdg.py" \
+            --output-dir "$OUT" \
+            --expected-frames {{Param.SdgFrames}} \
+            --expected-shards {{Param.SdgShards}} \
+            --width {{Param.Width}} \
+            --height {{Param.Height}}
