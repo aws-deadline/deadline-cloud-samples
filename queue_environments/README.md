@@ -16,6 +16,7 @@ This table covers every immediate user-selectable queue environment or collectio
 | [Rez environment](rez_queue_env.yaml) | Resolving packages from a shared Rez repository | Your studio already distributes software with Rez |
 | [Rez shim environment](rez_shim/) | Wrapping each task in a resolved Rez context through `PATH` shims | Rez software needs shell functions, aliases, or ordered `PATH` edits |
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
+| [Docker container environment](docker_queue_env.yaml) | Running every task inside a container pulled from your own Amazon ECR | A service-managed fleet declares the `docker` software add-on and your software ships as an image |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
 | [Short path mapping junctions](windows_path_limit_junction_fix.yaml) | Junctioning job attachment directories to short paths and republishing path mapping rules through them | A Windows application fails on long input paths despite long path support |
 

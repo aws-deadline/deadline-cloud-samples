@@ -46,6 +46,30 @@ openjd run template.yaml --step "1 - Generate" \
 
 ## Prerequisites
 
+**The fast path: deploy the farm, build the image, submit.**
+
+```bash
+# 1. A farm, queue, GPU fleet with the Docker add-on, and the Docker queue
+#    environment, in one stack.
+cd ../../cloudformation/farm_templates/isaacsim_farm
+aws cloudformation deploy \
+    --template-file deadline-cloud-isaacsim-farm-template.yaml \
+    --stack-name deadline-cloud-isaacsim-farm \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameter-overrides JobAttachmentsBucketName=YOUR_BUCKET
+
+# 2. The container image, into your own Amazon ECR.
+cd ../../../containers/isaacsim-replicator   # see its README for the NGC login
+```
+
+Read [the farm template's README](../../cloudformation/farm_templates/isaacsim_farm/README.md)
+first for one thing that will otherwise stop you: **the default service quota
+for GPUs on service-managed fleets is zero**, for both Spot and On-Demand. A new
+account cannot start a GPU worker until an increase is approved, and approval is
+not immediate.
+
+If you would rather assemble it yourself, the requirements are:
+
 1. **A Linux x86_64 GPU service-managed fleet with the Docker add-on.**
 
    ```json
@@ -67,7 +91,12 @@ openjd run template.yaml --step "1 - Generate" \
    that "GPUs without RT Cores (A100, H100) are not supported", including in
    headless mode. Use g5, g6 or g6e class instances.
 
-   Raise the root volume: the container image unpacks to roughly 29 GB.
+   Raise the root volume: the container image unpacks to roughly 29 GB, and
+   Docker keeps images on the root volume regardless of any persistent storage.
+
+   `aws deadline get-fleet` may report `softwareAddOns` as `null` even when it is
+   set, because the AWS CLI's bundled botocore drops fields its model does not
+   know. Confirm with a current boto3 rather than the CLI.
 
    > **Do not attach the
    > [`docker_nvidia_container_toolkit`](../../host_configuration_scripts/docker_nvidia_container_toolkit/)
@@ -77,28 +106,29 @@ openjd run template.yaml --step "1 - Generate" \
    > does neither, and it configures the NVIDIA Container Toolkit itself. The two
    > conflict.
 
-2. **A Docker queue environment on the queue**, with its `DockerImage` parameter
-   pointing at your ECR image. The image pull runs under the **queue role**, so
-   that role needs ECR read permission
-   (`arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly` covers it).
+2. **A [Docker queue environment](../../queue_environments/docker_queue_env.yaml)
+   on the queue**, with its `DockerImage` parameter pointing at your ECR image.
+   The image pull runs under the **queue role**, so that role needs ECR read
+   permission (`AmazonEC2ContainerRegistryReadOnly` covers it; the farm template
+   scopes it to one repository instead).
 
-   Keep the ECR repository in the **same account and region as the fleet**: the
-   default queue environment derives the ECR region from the worker's own
-   availability zone rather than from the image URI.
+   The copy in this repository parses the ECR region from the registry host. The
+   environment the console creates derives it from the worker's availability zone
+   instead, so with that one the repository must live in the same Region as the
+   fleet.
 
-3. **Build the container image and push it to a registry you control.**
+3. **A container image in a registry you control.** Build
+   [`containers/isaacsim-replicator`](../../containers/isaacsim-replicator/) for
+   the `primitives` and `usd` scene sources, which is a short Dockerfile over
+   NVIDIA's NGC base image. `SceneSource=workshop` instead needs
+   [`containers/isaacsim-so101-workshop`](../../containers/isaacsim-so101-workshop/),
+   because it loads USD files that ship inside that image.
 
-   ```bash
-   cd ../../containers/isaacsim-so101-workshop
-   docker build -t isaacsim-so101-workshop:2.3.2 .
-   ```
-
-   > **This bundle does not, and cannot, provide a working default image.** The built
-   > image contains Omniverse Kit, which may not be redistributed, so there is no
-   > public URI to point at. The base image `nvcr.io/nvidia/isaac-lab:2.3.2` is
-   > anonymously pullable from NVIDIA, so building it yourself is a one-command
-   > prerequisite rather than a licensing negotiation. Keep the built image
-   > private.
+   > **This bundle does not, and cannot, provide a working default image.** The
+   > built image contains Omniverse Kit, which may not be redistributed, so there
+   > is no public URI to point at. The base image is pullable from NVIDIA with a
+   > free NGC account, so building it yourself is a short prerequisite rather
+   > than a licensing negotiation. Keep the built image private.
 
 4. **The Deadline Cloud CLI** configured (`deadline config show`).
 
