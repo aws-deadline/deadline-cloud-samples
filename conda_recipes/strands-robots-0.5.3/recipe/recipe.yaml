@@ -1,0 +1,104 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+#
+# Packages Strands Robots with its MuJoCo simulation and LeRobot training
+# dependencies, so that a job can run the mujoco_sim_to_policy sample without
+# installing anything at runtime. Everything the package needs that conda-forge
+# provides is a run requirement. The two PyPI-only packages, strands-robots and
+# mink, are installed into the package with "pip install --no-deps", and the
+# so100 robot model from MuJoCo Menagerie is cloned into the package, so jobs
+# need no network access to GitHub or PyPI.
+
+context:
+  version: "0.5.3"
+  mink_version: "1.3.0"
+  # The MuJoCo Menagerie commit that robot_descriptions 1.23.0 pins. The robot
+  # description module checks out this commit, so the bundled clone must match.
+  menagerie_git_rev: "bf756430b615819654b640f321c71ba5c3ebeef8"
+  # The ImageNet weights torchvision loads for resnet18, the vision backbone the
+  # LeRobot ACT policy builds by default.
+  resnet18_weights: "resnet18-f37072fd.pth"
+
+package:
+  name: strands-robots
+  version: ${{ version }}
+
+source:
+  - url: https://files.pythonhosted.org/packages/9c/5f/c768993d842e12cf634292608076bda53de64e0afe6379e5f57642feb4b2/strands_robots-0.5.3-py3-none-any.whl
+    sha256: cdf92924a5397acee19a18d2baf46202bde46d400256a47fa3f2a956b5c4617b
+    file_name: strands_robots-0.5.3-py3-none-any.whl
+  - url: https://download.pytorch.org/models/${{ resnet18_weights }}
+    sha256: f37072fd47e89c5e827621c5baffa7500819f7896bbacec160b1a16c560e07ec
+    file_name: ${{ resnet18_weights }}
+
+build:
+  number: 0
+  script:
+    env:
+      MINK_VERSION: ${{ mink_version }}
+      MENAGERIE_GIT_REV: ${{ menagerie_git_rev }}
+      RESNET18_WEIGHTS: ${{ resnet18_weights }}
+    content:
+      - bash $RECIPE_DIR/build.sh
+
+requirements:
+  build:
+    - git
+  host:
+    - python 3.12.*
+    - pip
+  run:
+    - python 3.12.*
+    # CUDA PyTorch on the platform the jobs run on. Left to the solver
+    # elsewhere so the recipe still builds on a developer machine.
+    - if: linux
+      then:
+        - pytorch-gpu >=2.7,<2.12.0
+    # GitPython, which robot_descriptions uses to open the bundled clone,
+    # needs a git executable at import time.
+    - git
+    # strands-robots core
+    - numpy >=1.21.0,<3.0.0
+    - py-opencv >=4.5.0,<5.0.0
+    - pillow >=12.3.0,<13.0.0
+    - strands-agents >=1.57.2,<2.0.0
+    # strands-robots[sim-mujoco]
+    - mujoco-python >=3.10.0,<4.0.0
+    - imageio >=2.28.0,<3.0.0
+    - imageio-ffmpeg >=0.4.0,<1.0.0
+    - ffmpeg
+    - qpsolvers >=4.12.0
+    - daqp
+    - typing_extensions
+    - robot_descriptions >=1.23.0,<2.0.0
+    # strands-robots[lerobot]. The feetech extra drives real servos and is
+    # left out, since this package targets simulation.
+    - lerobot >=0.6.1,<0.7.0
+    - psutil >=6.0.0,<8.0.0
+    # lerobot[training]. lerobot-train refuses to start without accelerate,
+    # and imports wandb even when the job passes --wandb.enable=false.
+    - accelerate >=1.14.0,<2.0.0
+    - wandb >=0.24.0,<0.28.0
+    # lerobot[dataset]
+    - datasets >=4.8.0,<5.0.0
+    - pandas >=2.0.0,<3.0.0
+    - pyarrow >=21.0.0,<30.0.0
+    # lerobot's av-dep extra pins av >=15,<16. Later av releases drop the
+    # av.option module that lerobot's video encoder reads codec options from,
+    # so leaving this unpinned solves to a version that fails on import.
+    - av >=15.0.0,<16.0.0
+    - torchcodec <0.12.0
+    - jsonlines
+
+tests:
+  - script:
+      - python -c "import strands_robots, mink, mujoco, lerobot, accelerate, wandb"
+      - python -c "import torch, os; p = os.path.join(os.environ['TORCH_HOME'], 'hub', 'checkpoints', '${{ resnet18_weights }}'); assert os.path.isfile(p), p"
+      - python -c "import robot_descriptions.so_arm100_mj_description as d, os; assert os.path.isfile(d.MJCF_PATH), d.MJCF_PATH"
+      - lerobot-train --help
+
+about:
+  homepage: https://strands-labs.github.io/robots/
+  license: Apache-2.0
+  summary: Strands Robots with MuJoCo simulation, LeRobot, and the so100 robot model.
+  repository: https://github.com/strands-labs/robots

@@ -17,7 +17,7 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 55 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 56 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -71,6 +71,7 @@ This table covers all 55 immediate user-selectable recipe directories in `conda_
 | [Nuke 17.0](nuke-17.0/) | Packaging Nuke 17 with Plugin Sync activation | Your compositing jobs require Nuke 17 or changing plugins |
 | [Nuke DENoise](nuke-denoise/) | Packaging the DENoise plugin for Nuke | Nuke jobs need the DENoise node on workers |
 | [OpenJD adaptor runtime](openjd-adaptor-runtime/) | Packaging the shared runtime used by DCC adaptors | You are building adaptor packages such as Maya or Cinema 4D |
+| [Strands Robots 0.5.3](strands-robots-0.5.3/) | Packaging Strands Robots with MuJoCo, LeRobot and the so100 model | You run MuJoCo robotics simulation or policy training jobs |
 | [Unreal Engine](unreal-engine/) | Packaging Unreal Engine, including custom source builds | Unreal workloads need an engine package on workers |
 | [Unreal Engine OpenJD adaptor](unreal-engine-openjd/) | Packaging the Unreal integration adaptor | Unreal jobs need OpenJD session integration |
 | [V-Ray standalone](vray/) | Packaging the standalone V-Ray renderer | Jobs render `.vrscene` files without a DCC |
