@@ -80,8 +80,12 @@ def parse_args() -> argparse.Namespace:
                         "so use 0 if you need a tighter frame-to-frame A/B.")
     p.add_argument("--annotators", default="rgb,bounding_box_2d_tight,semantic_segmentation",
                    help="Comma-separated. See ANNOTATOR_CHOICES.")
+    # Keep in step with SceneSource's allowedValues in template.yaml. A value
+    # the template permits and argparse rejects fails the task at startup with
+    # an argparse usage dump, which is a confusing way to learn the two lists
+    # drifted. test_scene_source_choices_match_template guards the pair.
     p.add_argument("--scene-source", default="primitives",
-                   choices=("primitives", "workshop"))
+                   choices=("primitives", "workshop", "usd"))
     p.add_argument("--scene-usd", default="",
                    help="Stage to reference in. Required for --scene-source usd.")
     p.add_argument("--scene-usd-class", default="asset",
