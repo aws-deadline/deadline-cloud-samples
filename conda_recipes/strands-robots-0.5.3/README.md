@@ -1,9 +1,9 @@
-# Strands Robots conda package recipe
+# `strands-robots` conda package recipe
 
 ## Package contents
 
 This directory holds a [rattler-build](http://rattler.build/) recipe for
-[Strands Robots](https://strands-labs.github.io/robots/) with the MuJoCo
+[`strands-robots`](https://strands-labs.github.io/robots/) with the MuJoCo
 simulation and [LeRobot](https://github.com/huggingface/lerobot) training
 dependencies the [`mujoco_sim_to_policy`](../../job_bundles/mujoco_sim_to_policy/)
 job bundle needs. Jobs run entirely inside the package, so no step installs
@@ -11,7 +11,7 @@ software or downloads a model while it runs.
 
 The package you build from this recipe will include the following:
 
-1. [Strands Robots 0.5.3](https://pypi.org/project/strands-robots/), with the
+1. [`strands-robots` 0.5.3](https://pypi.org/project/strands-robots/), with the
    dependencies of its `sim-mujoco` and `lerobot` extras.
 2. [mink 1.3.0](https://pypi.org/project/mink/), the inverse-kinematics library
    the MuJoCo simulation uses.
@@ -39,7 +39,7 @@ run requirement and is resolved by the solver.
   options from. An unpinned solve picks a version that fails on import.
 * **`accelerate` and `wandb`**, from LeRobot's `training` extra. `lerobot-train`
   refuses to start without `accelerate`, and imports `wandb` even when the job
-  passes `--wandb.enable=false`. Neither arrives through the Strands Robots
+  passes `--wandb.enable=false`. Neither arrives through the `strands-robots`
   extras.
 * **`pytorch-gpu`**, applied on Linux only. Jobs get CUDA PyTorch, and the
   recipe still builds on a developer machine.
@@ -96,7 +96,7 @@ default: "s3://amzn-s3-demo-bucket/Conda/Default conda-forge deadline-cloud"
 
 ## Licensing
 
-[Strands Robots](https://github.com/strands-labs/robots) is distributed under
+[`strands-robots`](https://github.com/strands-labs/robots) is distributed under
 the Apache-2.0 license, [mink](https://github.com/kevinzakka/mink) under
 Apache-2.0, and the
 [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) models
