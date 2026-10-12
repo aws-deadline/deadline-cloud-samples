@@ -134,6 +134,7 @@ Resources:
       FarmId: !GetAtt farm.FarmId
       QueueId: !GetAtt queue.QueueId
       Priority: 10
+      TemplateType: YAML
       # A literal block, deliberately not !Sub. The enter and wrap scripts use
       # 19 shell ${VAR} references, which !Sub would try to interpolate and fail
       # on. DockerImage is therefore left to its own default and supplied per
@@ -460,9 +461,7 @@ Resources:
     Type: AWS::Deadline::Fleet
     Properties:
       DisplayName: !Ref FleetName
-      Description: >-
-        Linux x86_64 GPU workers with the Docker software add-on, for running
-        Isaac Sim from a container image in your own Amazon ECR.
+      Description: Linux x86_64 GPU workers with the Docker add-on, for containerized Isaac Sim.
       FarmId: !GetAtt farm.FarmId
       RoleArn: !GetAtt fleetRole.Arn
       MinWorkerCount: 0

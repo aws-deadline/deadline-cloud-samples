@@ -7,7 +7,7 @@ This CloudFormation template deploys an AWS Deadline Cloud farm for running
 GPU service-managed fleet. It is the fastest route from an empty account to
 running the [`isaacsim_replicator_sdg` job bundle](../../../job_bundles/isaacsim_replicator_sdg/README.md).
 
-Like [cuda_farm](../cuda_farm/README.md), this is an example of specializing the
+Like [cuda_farm](../cuda_farm/README.md), this template specializes the
 [starter_farm sample](../starter_farm/README.md). The differences are:
 
 * One Linux GPU fleet, with the **Docker software add-on** so workers have a
@@ -20,9 +20,9 @@ Like [cuda_farm](../cuda_farm/README.md), this is an example of specializing the
 * No Conda queue environment. Isaac Sim arrives in the container image, not as
   a Conda package.
 
-## How the container pieces fit
+## Container runtime and queue environment
 
-Two things are needed and the stack creates both:
+The stack creates both pieces that a containerized job needs:
 
 * The fleet declares `softwareAddOns: [{ name: docker }]`, which installs
   rootless Docker at `/opt/deadline/docker-rootless`.
@@ -58,7 +58,7 @@ The embedded template is not wrapped in `!Sub`, because its scripts use 19 shell
 ### Raise your GPU quota first
 
 The default quota for GPUs on service-managed fleets is **zero**, for both Spot
-and On-Demand. A new account cannot start a single GPU worker until an increase
+and On-Demand. A new account cannot start one GPU worker until an increase
 is approved, and approval is not instant. Request it before you need it.
 
 In the [Service Quotas console](https://console.aws.amazon.com/servicequotas/home)
@@ -70,16 +70,15 @@ use:
 | Spot G Instance GPUs per region | `L-2CCF07BF` |
 | OnDemand G instance GPUs per region | `L-5D6BA491` |
 
-Two things about how the quota is consumed:
+The quota counts a fleet at its **worst case**: `MaxWorkerCount` multiplied by
+the maximum GPUs per instance, summed across every service-managed fleet in the
+Region, **whether or not any worker is running**. A fleet with
+`MaxWorkerCount: 8` holds 8 GPUs of quota while idle.
 
-* It counts a fleet at its **worst case** — `MaxWorkerCount` multiplied by the
-  maximum GPUs per instance — summed across every service-managed fleet in the
-  Region, **whether or not any worker is running**. A fleet with
-  `MaxWorkerCount: 8` holds 8 GPUs of quota while idle.
-* Spot and On-Demand are **separate** quotas. Exhausting one leaves the other
-  untouched, which is a useful fallback when Spot capacity is scarce.
+Spot and On-Demand are **separate** quotas. Exhausting one leaves the other
+untouched, which is a useful fallback when Spot capacity is scarce.
 
-So request at least `MaxWorkerCount` GPUs for the market type you choose, plus
+Request at least `MaxWorkerCount` GPUs for the market type you choose, plus
 whatever your existing fleets already hold.
 
 ## Setup instructions
@@ -101,7 +100,7 @@ in your Region, and `MaxWorkerCount` to match your approved quota.
 
 Follow [containers/isaacsim-replicator](../../../containers/isaacsim-replicator/README.md).
 It is a short Dockerfile over NVIDIA's NGC base image. Note the resulting image
-URI; you need it in the next step.
+URI. The next step needs it.
 
 The `EcrRepositoryName` parameter scopes the queue role's pull permission, so
 use the same repository name in both places. Deploy again with a new value if
@@ -128,12 +127,12 @@ seconds.
 aws cloudformation delete-stack --stack-name deadline-cloud-isaacsim-farm
 ```
 
-The ECR repository, its images, and the job attachments bucket survive the
-stack.
+Deleting the stack leaves the ECR repository, its images, and the job
+attachments bucket in place.
 
 ## Troubleshooting
 
-**The job sits in READY and no worker appears.** Check the fleet's
+**The job stays in READY and no worker appears.** Check the fleet's
 `autoScalingStatus`. `GROWING` with `workerCount: 0` means Deadline Cloud wants
 a worker and EC2 will not give it one: either your GPU quota is exhausted (see
 above) or Spot capacity is scarce. Spot starvation for a GPU fleet can last tens
@@ -141,12 +140,12 @@ of minutes; redeploy with `InstanceMarketType=on-demand` to use the separate
 On-Demand quota.
 
 **Every session fails in the queue environment's enter action.** Confirm the
-fleet reports the `docker` software add-on, and that the queue role can reach
-the repository named in `EcrRepositoryName`. An image URI that does not exist,
+fleet reports the `docker` software add-on, and that the queue role grants pull
+access to the repository named in `EcrRepositoryName`. An image URI that does not exist,
 or a tag that was never pushed, fails here rather than at task run.
 
 **Tasks fail immediately with a Python or Kit error.** The Docker queue
 environment never runs the image's `ENTRYPOINT`, so environment variables the
-base image's entrypoint would normally set — `EXP_PATH`, `CARB_APP_PATH` — are
+base image's entrypoint would normally set (`EXP_PATH`, `CARB_APP_PATH`) are
 not present. Job scripts must not depend on them. The SDG bundle passes its Kit
 experience file explicitly for this reason.

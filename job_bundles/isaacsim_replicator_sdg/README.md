@@ -46,7 +46,7 @@ openjd run template.yaml --step "1 - Generate" \
 
 ## Prerequisites
 
-**The fast path: deploy the farm, build the image, submit.**
+**Deploy the farm, build the image, then submit.**
 
 ```bash
 # 1. A farm, queue, GPU fleet with the Docker add-on, and the Docker queue
@@ -122,7 +122,7 @@ If you would rather assemble it yourself, the requirements are:
    the `primitives` and `usd` scene sources, which is a short Dockerfile over
    NVIDIA's NGC base image. `SceneSource=workshop` instead needs
    [`containers/isaacsim-so101-workshop`](../../containers/isaacsim-so101-workshop/),
-   because it loads USD files that ship inside that image.
+   because it loads USD files included in that image.
 
    > **This bundle does not, and cannot, provide a working default image.** The
    > built image contains Omniverse Kit, which may not be redistributed, so there
@@ -151,7 +151,7 @@ deadline bundle submit . \
 | `SceneSource` | `primitives` | `primitives`, `workshop`, or `usd`. See [Scenes](#scenes). |
 | `SceneUsd` | _(empty)_ | Required when `SceneSource=usd`. Your stage, delivered by job attachments. See [Supplying your own stage](#supplying-your-own-stage). |
 | `SceneUsdClass` | `asset` | Semantic class applied to `SceneUsd` when the stage declares none. Ignored when it does. |
-| `SceneUsdSha256` | _(empty)_ | Optional. SHA-256 of the stage the submitter exported; Generate refuses to render anything else. Empty skips the check. |
+| `SceneUsdSha256` | _(empty)_ | Optional. SHA-256 of the stage the submitter exported. Generate refuses to render anything else. Empty skips the check. |
 | `SdgObjects` | `6` | Randomized foreground objects (primitives scene). |
 | `Width` / `Height` | `640` / `480` | Render resolution. |
 | `Renderer` | `RaytracedLighting` | `PathTracing` is available but much slower and unproven headless in NVIDIA's own docs. Treat as experimental. |
@@ -179,8 +179,8 @@ MDLs that the vial and robot normally use.
 **`usd`** renders a stage you supply through `SceneUsd`, delivered by job
 attachments. The stage is *referenced into* the Replicator scene rather than
 opened as the stage, so this sample's camera orbit and lighting randomization
-still apply and your stage keeps its own materials. Pose is randomized; nothing
-is recolored, because it is your asset.
+still apply, and the materials defined in your stage are left alone. Pose is
+randomized, and the sample does not recolor your asset.
 
 > **SDG annotations come from semantic labels, not geometry.** If you build your
 > own scene, a visually perfect stage that never calls
@@ -207,7 +207,7 @@ assert not unresolved, unresolved
 
 They are not the same file. Unsaved edits sit in a dirty root layer, and Kit
 routes much of its interaction into the **session layer**, which is never saved
-with the stage at all — so even a saved stage can differ from the viewport.
+with the stage at all, so even a saved stage can differ from the viewport.
 Export a flattened snapshot of the composed stage instead of sending the path
 the user opened:
 
@@ -224,7 +224,7 @@ digest = hashlib.sha256(snapshot.read_bytes()).hexdigest()
 
 `Flatten()` captures both an unsaved attribute edit and a session-layer-only
 transform, verified. Pass the digest as `SceneUsdSha256` and Generate recomputes
-it on the worker, refusing to render anything else — so the job proves it
+it on the worker and refuses to render anything else. The job then proves it
 rendered your scene rather than assuming it.
 
 > Do not try to detect staleness by reopening the file path. USD's layer cache
@@ -233,10 +233,10 @@ rendered your scene rather than assuming it.
 
 The hash covers the stage description only. Textures, MDL and referenced layers
 legitimately resolve to different paths on a worker, and anything under
-`ISAACSIM_ASSET_ROOT` is meant to resolve locally rather than travel with the
+`ISAACSIM_ASSET_ROOT` is meant to resolve locally rather than be copied with the
 job; missing dependencies are caught by the reference check below instead.
 
-#### Two failure modes
+#### Failure modes
 
 Both are refused rather than rendered through:
 
@@ -247,7 +247,7 @@ Both are refused rather than rendered through:
   authored relative to the wrong directory resolves on your workstation and
   dangles on the worker. The Generate step runs `ComputeAllDependencies` and
   exits with the missing paths named before the first frame.
-* **`omniverse://` paths never resolve on a worker.** There is no Nucleus.
+* **`omniverse://` paths never resolve on a worker,** because no Nucleus is present.
   Either localize those layers at submit time (`UsdUtils.LocalizeAsset` or
   `UsdUtils.CreateNewUsdzPackage`) or keep the assets under the image's
   configured `ISAACSIM_ASSET_ROOT` and reference them from there. That variable

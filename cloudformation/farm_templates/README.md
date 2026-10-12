@@ -4,7 +4,7 @@ These deployable CloudFormation samples create farms or add fleet infrastructure
 
 ## Sample index
 
-This table covers every immediate deployable sample directory in `farm_templates/`.
+This table lists the deployable sample directories in `farm_templates/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
