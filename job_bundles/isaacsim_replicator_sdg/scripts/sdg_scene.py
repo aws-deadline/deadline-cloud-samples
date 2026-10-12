@@ -24,6 +24,7 @@ Two sources:
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 WORKSHOP_USD_DIR = Path(
@@ -162,6 +163,72 @@ def _assert_references_resolve(scene_usd: Path) -> None:
         )
 
 
+def stage_sha256(scene_usd: Path) -> str:
+    """SHA-256 of the stage file's bytes.
+
+    Shared with the submitter: whatever produces ``SceneUsdSha256`` must use this
+    same definition, which is why it is a module-level public function rather
+    than inlined into the check below.
+    """
+    digest = hashlib.sha256()
+    with open(scene_usd, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _assert_stage_hash(scene_usd: Path, expected: str) -> None:
+    """Prove the worker is rendering the stage the submitter meant to send.
+
+    Job attachments already guarantees the bytes survive the round trip -- its
+    content-addressed store would not resolve a corrupted file. What this adds is
+    *provenance*, and it exists because of how a submitter has to capture an open
+    stage.
+
+    The file on disk is not what the user is looking at. Unsaved edits sit in a
+    dirty root layer, and Kit routes a great deal of interaction into the session
+    layer, which is never saved with the stage at all. So a submitter must export
+    a flattened snapshot of the composed stage rather than sending the path of the
+    file the user opened. ``Usd.Stage.Flatten`` captures both (verified: an
+    unsaved size edit and a session-layer-only transform both survive the
+    flatten). This check is what makes that export verifiable instead of merely
+    intended -- the submitter records the hash of what it exported, and the worker
+    refuses anything else.
+
+    SCOPE, stated precisely: this covers the stage description only. It does not
+    hash the external closure -- textures, MDL, referenced layers -- because those
+    legitimately resolve to different paths on a worker than on a workstation, and
+    assets under ISAACSIM_ASSET_ROOT are *meant* to resolve locally rather than
+    travel with the job. Absent dependencies are caught by
+    :func:`_assert_references_resolve` instead.
+
+    Optional by design: an empty expected value skips the check, so hand-built
+    submissions and the primitives and workshop sources are unaffected.
+    """
+    if not expected:
+        return
+
+    expected = expected.strip().lower()
+    if len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
+        raise SystemExit(
+            f"scene-usd-sha256 is not a SHA-256 hex digest: {expected!r}. "
+            "Expected 64 hex characters, or an empty value to skip the check."
+        )
+
+    actual = stage_sha256(scene_usd)
+    if actual != expected:
+        raise SystemExit(
+            f"scene-usd hash mismatch for {scene_usd.name}.\n"
+            f"  expected {expected}\n"
+            f"  actual   {actual}\n"
+            "The worker is not rendering the stage the submitter exported. Most "
+            "likely the stage was edited or re-exported after the hash was taken, "
+            "so resubmit from the current scene. Refusing rather than rendering a "
+            "dataset that misrepresents its own provenance."
+        )
+    print(f"[sdg] stage hash verified: {actual[:16]}...")
+
+
 def _has_semantics(scene_usd: Path) -> bool:
     """True when the stage already labels geometry for Replicator's annotators."""
     try:
@@ -181,7 +248,7 @@ def _has_semantics(scene_usd: Path) -> bool:
     return False
 
 
-def _usd_scene(rep, scene_usd: str, semantic_class: str):
+def _usd_scene(rep, scene_usd: str, semantic_class: str, expected_sha256: str = ""):
     """Reference a submitted stage into the Replicator scene.
 
     Referenced rather than opened. Opening it as *the* stage would mean
@@ -204,6 +271,7 @@ def _usd_scene(rep, scene_usd: str, semantic_class: str):
             "check that it was declared in asset_references.yaml."
         )
 
+    _assert_stage_hash(path, expected_sha256)
     _assert_references_resolve(path)
 
     if _has_semantics(path):
@@ -235,6 +303,7 @@ def build_scene(
     object_count: int,
     scene_usd: str = "",
     scene_usd_class: str = "asset",
+    scene_usd_sha256: str = "",
 ):
     """Build the scene and return the camera to attach a render product to."""
     if scene_source == "primitives":
@@ -242,7 +311,7 @@ def build_scene(
     elif scene_source == "workshop":
         _workshop_scene(rep, object_count)
     elif scene_source == "usd":
-        _usd_scene(rep, scene_usd, scene_usd_class)
+        _usd_scene(rep, scene_usd, scene_usd_class, scene_usd_sha256)
     else:
         raise SystemExit(f"Unknown scene source: {scene_source}")
 

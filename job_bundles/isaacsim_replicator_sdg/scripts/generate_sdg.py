@@ -86,6 +86,9 @@ def parse_args() -> argparse.Namespace:
                    help="Stage to reference in. Required for --scene-source usd.")
     p.add_argument("--scene-usd-class", default="asset",
                    help="Semantic class applied when the stage carries none.")
+    p.add_argument("--scene-usd-sha256", default="",
+                   help="SHA-256 of the stage the submitter exported. Empty skips "
+                        "the check.")
     p.add_argument("--objects", type=int, default=6,
                    help="Randomized foreground objects in the primitives scene.")
     p.add_argument("--experience", default=None,
@@ -198,6 +201,7 @@ def main() -> NoReturn:
     camera = build_scene(
         rep, args.scene_source, args.objects,
         scene_usd=args.scene_usd, scene_usd_class=args.scene_usd_class,
+        scene_usd_sha256=args.scene_usd_sha256,
     )
 
     render_product = rep.create.render_product(camera, (args.width, args.height),

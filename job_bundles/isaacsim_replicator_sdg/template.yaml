@@ -117,6 +117,32 @@ parameterDefinitions:
     fileFilters:
     - label: USD stages
       patterns: ["*.usd", "*.usda", "*.usdc", "*.usdz"]
+- name: SceneUsdSha256
+  type: STRING
+  default: ""
+  description: >-
+    Optional. SHA-256 of the stage the submitter exported. When set, Generate
+    recomputes it and refuses to render anything else.
+
+    This exists because capturing an open stage is not the same as submitting
+    the file the user opened. Unsaved edits sit in a dirty root layer, and Kit
+    routes much of its interaction into the session layer, which is never saved
+    with the stage. A submitter therefore has to export a flattened snapshot of
+    the composed stage (Usd.Stage.Flatten captures both) -- and this parameter is
+    what makes that export verifiable rather than merely intended.
+
+    Scope: the stage description only. It does not hash textures, MDL or
+    referenced layers, because those legitimately resolve to different paths on a
+    worker, and anything under ISAACSIM_ASSET_ROOT is meant to resolve locally
+    rather than travel with the job. Missing dependencies are caught by the
+    reference check instead.
+
+    Leave empty to skip. Hand-written submissions and the primitives and
+    workshop sources are unaffected.
+  userInterface:
+    control: LINE_EDIT
+    label: Scene USD SHA-256
+    groupLabel: Scene
 - name: SceneUsdClass
   type: STRING
   default: asset
@@ -326,6 +352,7 @@ steps:
             --objects {{Param.SdgObjects}} \
             --scene-usd '{{Param.SceneUsd}}' \
             --scene-usd-class '{{Param.SceneUsdClass}}' \
+            --scene-usd-sha256 '{{Param.SceneUsdSha256}}' \
             2>&1 | tee "${OUT}/logs/${LABEL}.log"
         rc=${PIPESTATUS[0]}
         set -e

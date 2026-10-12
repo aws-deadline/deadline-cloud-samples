@@ -121,6 +121,7 @@ deadline bundle submit . \
 | `SceneSource` | `primitives` | `primitives`, `workshop`, or `usd`. See [Scenes](#scenes). |
 | `SceneUsd` | _(empty)_ | Required when `SceneSource=usd`. Your stage, delivered by job attachments. See [Supplying your own stage](#supplying-your-own-stage). |
 | `SceneUsdClass` | `asset` | Semantic class applied to `SceneUsd` when the stage declares none. Ignored when it does. |
+| `SceneUsdSha256` | _(empty)_ | Optional. SHA-256 of the stage the submitter exported; Generate refuses to render anything else. Empty skips the check. |
 | `SdgObjects` | `6` | Randomized foreground objects (primitives scene). |
 | `Width` / `Height` | `640` / `480` | Render resolution. |
 | `Renderer` | `RaytracedLighting` | `PathTracing` is available but much slower and unproven headless in NVIDIA's own docs. Treat as experimental. |
@@ -172,8 +173,42 @@ layers, assets, unresolved = UsdUtils.ComputeAllDependencies("scene.usda")
 assert not unresolved, unresolved
 ```
 
-Two failure modes to know about, both of which this sample now refuses rather
-than rendering through:
+#### Submit what is on screen, not what is on disk
+
+They are not the same file. Unsaved edits sit in a dirty root layer, and Kit
+routes much of its interaction into the **session layer**, which is never saved
+with the stage at all — so even a saved stage can differ from the viewport.
+Export a flattened snapshot of the composed stage instead of sending the path
+the user opened:
+
+```python
+import omni.usd, hashlib, tempfile, pathlib
+
+stage = omni.usd.get_context().get_stage()
+snapshot = pathlib.Path(tempfile.mkdtemp()) / "scene.usda"
+stage.Flatten().Export(str(snapshot))        # folds in unsaved + session edits
+
+digest = hashlib.sha256(snapshot.read_bytes()).hexdigest()
+# submit with SceneUsd=<snapshot>  SceneUsdSha256=<digest>
+```
+
+`Flatten()` captures both an unsaved attribute edit and a session-layer-only
+transform, verified. Pass the digest as `SceneUsdSha256` and Generate recomputes
+it on the worker, refusing to render anything else — so the job proves it
+rendered your scene rather than assuming it.
+
+> Do not try to detect staleness by reopening the file path. USD's layer cache
+> returns the live, dirty layer for a path already open in the process, so the
+> comparison silently succeeds. Check `layer.dirty`, or export to a fresh path.
+
+The hash covers the stage description only. Textures, MDL and referenced layers
+legitimately resolve to different paths on a worker, and anything under
+`ISAACSIM_ASSET_ROOT` is meant to resolve locally rather than travel with the
+job; missing dependencies are caught by the reference check below instead.
+
+#### Two failure modes
+
+Both are refused rather than rendered through:
 
 * **A stage with dangling references opens, renders, and reports success.** The
   referencing prims exist locally whether or not their targets resolve, so a
