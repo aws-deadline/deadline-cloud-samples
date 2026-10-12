@@ -75,16 +75,60 @@ parameterDefinitions:
 - name: SceneSource
   type: STRING
   default: primitives
-  allowedValues: [primitives, workshop]
+  allowedValues: [primitives, workshop, usd]
   description: >-
     primitives: cubes/spheres/cones on a plane, randomized pose, colour and
     lighting. References no NVIDIA asset.
     workshop: the SO-101 arm and vial rack USD files from the workshop image,
     with materials rebound to randomized OmniPBR. Skips lightbox-simple.usd,
     which payloads NVIDIA's rsd455.usd camera geometry from S3.
+    usd: your own stage, supplied through SceneUsd and delivered by job
+    attachments. Use this to render a scene you authored on your workstation.
   userInterface:
     control: DROPDOWN_LIST
     label: Scene source
+    groupLabel: Scene
+- name: SceneUsd
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ""
+  description: >-
+    Required when SceneSource is usd, ignored otherwise. The stage is referenced
+    into the Replicator scene rather than opened as the stage, so this sample's
+    camera and lighting randomization still apply.
+
+    Every layer and texture the stage depends on must arrive with it. Job
+    attachments only uploads what the submitter declared, so generate
+    asset_references.yaml from the dependency closure (UsdUtils has
+    ComputeAllDependencies for exactly this) rather than listing files by hand.
+    A stage whose references do not resolve still opens and still renders -- it
+    just renders nothing -- so the Generate step refuses to start when any
+    reference dangles instead of producing an empty dataset that looks like a
+    success.
+
+    Paths of the form omniverse:// will not resolve on a worker: there is no
+    Nucleus. Either localize those layers at submit time, or leave assets under
+    the image's configured ISAACSIM_ASSET_ROOT and reference them from there.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Scene USD
+    groupLabel: Scene
+    fileFilters:
+    - label: USD stages
+      patterns: ["*.usd", "*.usda", "*.usdc", "*.usdz"]
+- name: SceneUsdClass
+  type: STRING
+  default: asset
+  minLength: 1
+  description: >-
+    Semantic class applied to the referenced stage when it carries no semantics
+    of its own. Replicator's bounding-box and segmentation annotators emit
+    nothing for unlabelled geometry, so an unlabelled stage would yield RGB
+    frames with empty labels. Stages that already declare semantics keep them.
+  userInterface:
+    control: LINE_EDIT
+    label: Scene USD semantic class
     groupLabel: Scene
 - name: SdgObjects
   type: INT
@@ -280,6 +324,8 @@ steps:
             --annotators '{{Param.Annotators}}' \
             --scene-source '{{Param.SceneSource}}' \
             --objects {{Param.SdgObjects}} \
+            --scene-usd '{{Param.SceneUsd}}' \
+            --scene-usd-class '{{Param.SceneUsdClass}}' \
             2>&1 | tee "${OUT}/logs/${LABEL}.log"
         rc=${PIPESTATUS[0]}
         set -e

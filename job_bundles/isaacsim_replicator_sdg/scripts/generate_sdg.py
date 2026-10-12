@@ -82,6 +82,10 @@ def parse_args() -> argparse.Namespace:
                    help="Comma-separated. See ANNOTATOR_CHOICES.")
     p.add_argument("--scene-source", default="primitives",
                    choices=("primitives", "workshop"))
+    p.add_argument("--scene-usd", default="",
+                   help="Stage to reference in. Required for --scene-source usd.")
+    p.add_argument("--scene-usd-class", default="asset",
+                   help="Semantic class applied when the stage carries none.")
     p.add_argument("--objects", type=int, default=6,
                    help="Randomized foreground objects in the primitives scene.")
     p.add_argument("--experience", default=None,
@@ -191,7 +195,10 @@ def main() -> NoReturn:
     rep.orchestrator.set_capture_on_play(False)
 
     from sdg_scene import build_scene  # noqa: E402  (bundled alongside this file)
-    camera = build_scene(rep, args.scene_source, args.objects)
+    camera = build_scene(
+        rep, args.scene_source, args.objects,
+        scene_usd=args.scene_usd, scene_usd_class=args.scene_usd_class,
+    )
 
     render_product = rep.create.render_product(camera, (args.width, args.height),
                                                name=args.shard_label)

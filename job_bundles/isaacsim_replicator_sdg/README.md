@@ -118,7 +118,9 @@ deadline bundle submit . \
 | `SdgFrames` | `256` | Total frames across all shards. Split exactly. The first `SdgFrames % SdgShards` shards take one extra. |
 | `SdgShards` | `4` | Parallel Generate tasks. Each one repeats the Kit boot. A 4-frame shard spends most of its wall clock booting. |
 | `SdgBaseSeed` | `30001` | Shard N uses `SdgBaseSeed + (N-1)*1000`. |
-| `SceneSource` | `primitives` | `primitives` or `workshop`. See [Scenes](#scenes). |
+| `SceneSource` | `primitives` | `primitives`, `workshop`, or `usd`. See [Scenes](#scenes). |
+| `SceneUsd` | _(empty)_ | Required when `SceneSource=usd`. Your stage, delivered by job attachments. See [Supplying your own stage](#supplying-your-own-stage). |
+| `SceneUsdClass` | `asset` | Semantic class applied to `SceneUsd` when the stage declares none. Ignored when it does. |
 | `SdgObjects` | `6` | Randomized foreground objects (primitives scene). |
 | `Width` / `Height` | `640` / `480` | Render resolution. |
 | `Renderer` | `RaytracedLighting` | `PathTracing` is available but much slower and unproven headless in NVIDIA's own docs. Treat as experimental. |
@@ -143,10 +145,50 @@ pointing at NVIDIA's `rsd455.usd` RealSense camera geometry on S3, and it rebind
 materials to randomized OmniPBR rather than inheriting the NVIDIA `vMaterials`
 MDLs that the vial and robot normally use.
 
+**`usd`** renders a stage you supply through `SceneUsd`, delivered by job
+attachments. The stage is *referenced into* the Replicator scene rather than
+opened as the stage, so this sample's camera orbit and lighting randomization
+still apply and your stage keeps its own materials. Pose is randomized; nothing
+is recolored, because it is your asset.
+
 > **SDG annotations come from semantic labels, not geometry.** If you build your
 > own scene, a visually perfect stage that never calls
 > `isaacsim.core.utils.semantics.add_labels()` does not produce bounding boxes,
 > leaves an empty segmentation mask, and still reports success.
+>
+> For `SceneSource=usd` the sample checks for you: a stage that already declares
+> semantics keeps them, and one that does not is labelled with `SceneUsdClass`
+> so the annotators emit something rather than nothing.
+
+### Supplying your own stage
+
+Every layer and texture the stage depends on has to arrive with it. Job
+attachments uploads only what the submitter declared, so build
+`asset_references.yaml` from the dependency closure rather than by hand:
+
+```python
+from pxr import UsdUtils
+layers, assets, unresolved = UsdUtils.ComputeAllDependencies("scene.usda")
+assert not unresolved, unresolved
+```
+
+Two failure modes to know about, both of which this sample now refuses rather
+than rendering through:
+
+* **A stage with dangling references opens, renders, and reports success.** The
+  referencing prims exist locally whether or not their targets resolve, so a
+  prim count passes and the dataset comes out empty. Job attachments makes this
+  easy to hit because it relocates every file it uploads, so a reference
+  authored relative to the wrong directory resolves on your workstation and
+  dangles on the worker. The Generate step runs `ComputeAllDependencies` and
+  exits with the missing paths named before the first frame.
+* **`omniverse://` paths never resolve on a worker.** There is no Nucleus.
+  Either localize those layers at submit time (`UsdUtils.LocalizeAsset` or
+  `UsdUtils.CreateNewUsdzPackage`) or keep the assets under the image's
+  configured `ISAACSIM_ASSET_ROOT` and reference them from there. That variable
+  takes the highest precedence of Isaac Sim's five asset-root layers and accepts
+  an HTTPS root or a local directory, so an asset pack unpacked onto a fleet
+  persistent volume works without redistributing anything.
 
 ## Output
 
