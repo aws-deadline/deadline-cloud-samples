@@ -21,7 +21,7 @@ This table covers all 55 immediate user-selectable recipe directories in `conda_
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
-| [After Effects 25.1](aftereffects-25.1/) | Packaging Adobe After Effects for Windows workers | You need the base After Effects 25 application |
+| [After Effects 25.1](aftereffects-25.1/) | Packaging Adobe After Effects with Plugin Sync for Windows | Your jobs require After Effects 25 or frequently updated plugins |
 | [After Effects plugin bundle](aftereffects-plugin-bundle/) | Bundling multiple supplied After Effects plugins | You want one versioned package for a studio plugin set |
 | [After Effects Saber](aftereffects-saber/) | Installing the Saber plugin into an After Effects package | You need a small single-plugin recipe example |
 | [AutoDock Vina 1.2.5](autodock-vina-1.2.5/) | Building the AutoDock Vina molecular docking application | You run virtual-screening or docking jobs |
