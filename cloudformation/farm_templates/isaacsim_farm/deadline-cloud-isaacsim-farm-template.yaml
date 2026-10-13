@@ -141,6 +141,33 @@ Resources:
       # job: `deadline bundle submit . -p DockerImage=<uri>`. Set a default on
       # the queue environment afterwards if you would rather not repeat it.
       Template: |
+        ### START_QUEUE_ENV from queue_environments/docker_queue_env.yaml
+        # Docker container queue environment for AWS Deadline Cloud.
+        #
+        # Runs every task inside a container pulled from your own Amazon ECR, on a
+        # service-managed fleet whose instanceCapabilities declare:
+        #
+        #     softwareAddOns: [{ name: docker }]
+        #
+        # That add-on is what installs rootless Docker at /opt/deadline/docker-rootless.
+        # The enter action below starts the daemon itself rather than assuming one is
+        # running, which is why no host configuration script is needed.
+        #
+        # VERIFIED on a Linux GPU service-managed fleet with the docker add-on and NO
+        # host configuration script: the enter action started the daemon, authenticated
+        # to ECR, pulled a 9 GB image and ran Isaac Sim to completion.
+        #
+        # This matches the environment the Deadline Cloud console creates for you (any
+        # customer can read their own with `aws deadline get-queue-environment`), with
+        # one fix: the ECR region is parsed from the registry host rather than derived
+        # from the worker's availability zone. Those differ whenever the image lives in
+        # another Region, and the login then fails.
+        #
+        # A note on debugging it: `openjd check` validates this file, but it cannot
+        # catch a brace collision between a shell snippet and OpenJD's own `{{ }}`
+        # interpolation -- the service rejects that at CreateQueueEnvironment with
+        # "Could not decode environment template", and a `{{ ... }}` sequence inside a
+        # COMMENT is enough to trigger it.
         specificationVersion: "environment-2023-09"
         extensions:
           - WRAP_ACTIONS
@@ -333,6 +360,7 @@ Resources:
                   # Orderly manager shutdown before the agent's cleanup SIGTERMs it
                   systemctl --user exit 2>/dev/null
                   exit 0
+        ### END_QUEUE_ENV
 
   queueIAMRole:
     Type: AWS::IAM::Role
