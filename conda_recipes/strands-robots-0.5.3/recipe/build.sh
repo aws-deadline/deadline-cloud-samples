@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-## Turn off "pip install" customizations from the conda build environment.
+## Install the two packages that are not on conda-forge.
 #
-# The two packages installed here are not on conda-forge, so pip has to fetch
-# mink from PyPI. --no-deps keeps every other dependency coming from conda-forge
-# through the recipe's run requirements.
-unset PIP_NO_INDEX
-
-python -m pip install --no-deps --no-build-isolation "$SRC_DIR"/strands_robots-*.whl
-python -m pip install --no-deps --only-binary=:all: "mink==$MINK_VERSION"
+# Both wheels are recipe sources, downloaded and SHA256-checked by rattler-build,
+# so pip installs them from $SRC_DIR without reaching an index. --no-deps keeps
+# every other dependency coming from conda-forge through the recipe's run
+# requirements.
+python -m pip install --no-deps --no-index --no-build-isolation \
+    "$SRC_DIR"/strands_robots-*.whl \
+    "$SRC_DIR"/mink-*.whl
 
 ## Bundle the so100 robot model.
 #

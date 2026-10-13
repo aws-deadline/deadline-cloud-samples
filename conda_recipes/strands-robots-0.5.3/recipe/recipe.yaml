@@ -5,7 +5,7 @@
 # dependencies, so that a job can run the mujoco_sim_to_policy sample without
 # installing anything at runtime. Everything the package needs that conda-forge
 # provides is a run requirement. The two PyPI-only packages, strands-robots and
-# mink, are installed into the package with "pip install --no-deps", and the
+# mink, are SHA256-pinned wheel sources installed with "pip install --no-deps", and the
 # so100 robot model from MuJoCo Menagerie is cloned into the package, so jobs
 # need no network access to GitHub or PyPI.
 
@@ -13,7 +13,9 @@ context:
   version: "0.5.3"
   mink_version: "1.3.0"
   # The MuJoCo Menagerie commit that robot_descriptions 1.23.0 pins. The robot
-  # description module checks out this commit, so the bundled clone must match.
+  # description module checks out the commit its own version pins, so the bundled
+  # clone must match it. Change this together with the robot_descriptions pin in
+  # the run requirements.
   menagerie_git_rev: "bf756430b615819654b640f321c71ba5c3ebeef8"
   # The ImageNet weights torchvision loads for resnet18, the vision backbone the
   # LeRobot ACT policy builds by default.
@@ -30,12 +32,23 @@ source:
   - url: https://download.pytorch.org/models/${{ resnet18_weights }}
     sha256: f37072fd47e89c5e827621c5baffa7500819f7896bbacec160b1a16c560e07ec
     file_name: ${{ resnet18_weights }}
+  # mink ships compiled wheels, so each platform takes its own wheel, with the
+  # SHA256 PyPI publishes for it.
+  - if: linux
+    then:
+      url: https://files.pythonhosted.org/packages/a1/b9/308b82a8a5cc4d3c593bc68d43dfa0d797ea22ee8e9d6f1244c06044753c/mink-1.3.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+      sha256: 5c31a4e3a43eb7d544d7803a2af36ca703d8b933189251d3f37cc2117b23e1ff
+      file_name: mink-${{ mink_version }}-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+  - if: osx and arm64
+    then:
+      url: https://files.pythonhosted.org/packages/05/6a/cc5cbd86389b129e29f62407e2d2f117848ae2725b7899c3029f498e65f3/mink-1.3.0-cp312-cp312-macosx_11_0_arm64.whl
+      sha256: ab7ab077bcc78de7fca1f21bd1bc55afe81c7b77546a771e8007887b630150f2
+      file_name: mink-${{ mink_version }}-cp312-cp312-macosx_11_0_arm64.whl
 
 build:
   number: 0
   script:
     env:
-      MINK_VERSION: ${{ mink_version }}
       MENAGERIE_GIT_REV: ${{ menagerie_git_rev }}
       RESNET18_WEIGHTS: ${{ resnet18_weights }}
     content:
@@ -70,7 +83,10 @@ requirements:
     - qpsolvers >=4.12.0
     - daqp
     - typing_extensions
-    - robot_descriptions >=1.23.0,<2.0.0
+    # Pinned exactly: each robot_descriptions release pins its own Menagerie
+    # commit, and a version whose commit differs from menagerie_git_rev would
+    # fetch from GitHub at job time instead of using the bundled clone.
+    - robot_descriptions ==1.23.0
     # strands-robots[lerobot]. The feetech extra drives real servos and is
     # left out, since this package targets simulation.
     - lerobot >=0.6.1,<0.7.0

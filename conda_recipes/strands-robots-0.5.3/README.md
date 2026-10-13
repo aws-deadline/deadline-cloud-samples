@@ -28,9 +28,11 @@ on every worker: a `git clone` of Menagerie, and a `torch.hub` download from
 `download.pytorch.org`. With both bundled, a job doesn't need access to GitHub, PyPI
 or `download.pytorch.org`.
 
-`strands-robots` and `mink` are not on conda-forge. The build installs those
-two from PyPI with `pip install --no-deps`. Every other dependency is a conda
-run requirement and is resolved by the solver.
+`strands-robots` and `mink` are not on conda-forge. The recipe downloads their
+PyPI wheels as sources pinned by SHA256, and the build installs them with
+`pip install --no-deps --no-index`. `mink` publishes a compiled wheel for each
+platform, and the recipe lists one wheel per platform. Every other dependency is
+a conda run requirement and is resolved by the solver.
 
 ## Version pins
 
