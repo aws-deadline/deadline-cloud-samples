@@ -58,8 +58,18 @@ The embedded template is not wrapped in `!Sub`, because its scripts use 19 shell
 ### Raise your GPU quota first
 
 The default quota for GPUs on service-managed fleets is **zero**, for both Spot
-and On-Demand. A new account cannot start one GPU worker until an increase
-is approved, and approval is not instant. Request it before you need it.
+and On-Demand. **The quota is checked when the fleet is created, not when it
+scales out,** so in a new account this stack fails to deploy until an increase
+is approved. Approval is not instant, so request it before you need it.
+
+The rejection includes the arithmetic, which is useful for sizing:
+
+```
+ServiceQuotaExceededException: The requested fleet increases the
+spot-g-instance-gpu resource usage from 8 to 58, which exceeds the max quota of
+10.0. The resource usage of the requested fleet is 50, from maxWorkerCount (50)
+* acceleratorCapabilities.count.max (1).
+```
 
 In the [Service Quotas console](https://console.aws.amazon.com/servicequotas/home)
 choose **AWS Deadline Cloud** and request an increase for whichever you plan to
@@ -134,10 +144,11 @@ attachments bucket in place.
 
 **The job stays in READY and no worker appears.** Check the fleet's
 `autoScalingStatus`. `GROWING` with `workerCount: 0` means Deadline Cloud wants
-a worker and EC2 will not give it one: either your GPU quota is exhausted (see
-above) or Spot capacity is scarce. Spot starvation for a GPU fleet can last tens
-of minutes; redeploy with `InstanceMarketType=on-demand` to use the separate
-On-Demand quota.
+a worker and EC2 will not give it one. That symptom means Spot capacity
+scarcity, not a quota problem: a quota problem stops the fleet from being created
+at all, so a queued job would never exist. Spot starvation for a GPU fleet can
+last tens of minutes. Redeploy with `InstanceMarketType=on-demand`, which uses a
+separate quota and a separate capacity pool.
 
 **Every session fails in the queue environment's enter action.** Confirm the
 fleet reports the `docker` software add-on, and that the queue role grants pull

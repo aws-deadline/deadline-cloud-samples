@@ -64,9 +64,9 @@ cd ../../../containers/isaacsim-replicator   # see its README for the NGC login
 
 Read [the farm template's README](../../cloudformation/farm_templates/isaacsim_farm/README.md)
 first for one thing that will otherwise stop you: **the default service quota
-for GPUs on service-managed fleets is zero**, for both Spot and On-Demand. A new
-account cannot start a GPU worker until an increase is approved, and approval is
-not immediate.
+for GPUs on service-managed fleets is zero**, for both Spot and On-Demand. The
+quota is checked when a fleet is created, so in a new account fleet creation
+fails until an increase is approved, and approval is not immediate.
 
 If you would rather assemble it yourself, the requirements are:
 
