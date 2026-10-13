@@ -6,14 +6,15 @@ This package build recipe creates a conda package that bundles together all the 
 you provide in an input folder. Note that if your plugins require network licenses, you will have to
 handle that separately.
 
-### How the Plugin Bundle Works
+### Plugin bundle behavior
 
-This recipe takes all the `.aex` plugin files you place in the `archive_files/aftereffects-plugin-bundle/win-64/` directory and packages them into a single conda package. When this package is installed in a conda environment (like on SMF or CMF render nodes), it automatically copies all the `.aex` files into the `%PREFIX%\aftereffects\Plug-ins` directory where After Effects expects to find them.
+This recipe takes all the `.aex` plugin files you place in the `archive_files/aftereffects-plugin-bundle/win-64/` directory and packages them into one conda package. When this package is installed in a conda environment (like on SMF or CMF render nodes), it installs all the `.aex` files into the `%PREFIX%\aftereffects\Plug-ins` directory where After Effects expects to find them.
 
 You collect your plugin files locally (typically from `C:\Program Files\Adobe\Adobe After Effects <version>\Support Files\Plug-ins`), then the conda build process bundles them together. When the package is installed on render farm nodes alongside the After Effects conda package, all your custom plugins become immediately available without any manual setup on each machine.
 
-To understand how After Effects plugins work in a conda package, see the instructions for plugin
-packages in the [After Effects recipe README](../aftereffects-25.1/README.md).
+The [Saber recipe](../aftereffects-saber/) shows a single-plugin version of the same approach. To
+deliver plugins that change often without building a package, see
+[Plugin Sync](../aftereffects-25.1/README.md#plugin-sync) in the After Effects recipe.
 
 ## Building the package for Windows
 

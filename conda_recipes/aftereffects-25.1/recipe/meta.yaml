@@ -13,7 +13,7 @@ source:
   folder: aftereffects
 
 build:
-  number: 0
+  number: 1
   # These build options for repackaging an application
   # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
   binary_relocation: False

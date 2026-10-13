@@ -1,19 +1,28 @@
-# Saber plug-in conda build recipe for After Effects
+# Saber Plugin Conda Recipe for After Effects
 
 ## About
-This recipe installs the Saber.aex plug-in file to the After Effects (AE) plugin directory located under the Plug-ins folder of After Effects SMF. To write conda recipes to add more plug-ins to your AE Deadline Cloud setup, use this recipe as a template to guide your development.
+This recipe installs the `Saber.aex` plugin file into the `Plug-ins` directory of the After Effects (AE)
+Conda package. Use it as a template for recipes that add other plugins to your After Effects setup on
+Deadline Cloud.
 
-## Plugin Solution for After Effects
-When adding plug-ins to After Effects on Windows SMF, we provide a supported environment variable called `$AE_LOCATION`. Within that location, you can add your plugins to `$AE_LOCATION/Plug-ins` so that the After Effects rendering executable can find the plugins. The plugins added to this folder must have extension `.aex` to work on Windows SMF.
+For plugins that change often, you can deliver them without building a package. See
+[Plugin Sync](../aftereffects-25.1/README.md#plugin-sync) in the After Effects recipe.
 
-## Creating an archive file for Windows of Saber
-Follow these instructions to install AE 25 on a freshly created EC2 instance as Administrator, then install the AE Saber plug-in, then create an archive file of the Saber plugin and use it with the conda build recipe. If you have a Windows workstation, you can also do step 3 and 5 without starting an EC2 instance.
+## Plugin solution for After Effects
+The After Effects package sets the `AE_LOCATION` environment variable to its installation directory.
+After Effects loads plugins from `$AE_LOCATION/Plug-ins`, so plugin recipes install their files there.
+Plugins for Windows workers must have the `.aex` extension.
+
+## Create a Windows archive of Saber
+Follow these instructions to install After Effects 25 on a new EC2 instance as Administrator, install
+the Saber plugin, and create an archive of the plugin for the recipe. If you have a Windows workstation
+with After Effects installed, you can do steps 3, 4, 6, and 7 without starting an EC2 instance.
 
 1. Launch a fresh Windows Server 2022 instance.
    1. From the AWS EC2 management console, select the option to Launch instance.
    2. Enter instance name "Create Windows AE archive".
    3. Select "Microsoft Windows Server 2022 Base" for the AMI.
-   4. Select an instance type with enough vCPUs and RAM. A c5.4xlarge has 8 vCPUs and 16 GiB RAM.
+   4. Select an instance type with enough vCPUs and RAM. A c5.4xlarge has 16 vCPUs and 32 GiB RAM.
    5. Select "Proceed without a key pair" for the "Key pair (login)" option.
    6. Make sure that "Allow RDP traffic" is unchecked. We will use SSM port forwarding to avoid sending RDP
       protocol traffic directly over the internet.
@@ -38,14 +47,15 @@ Follow these instructions to install AE 25 on a freshly created EC2 instance as 
    1. Download Adobe Creative Cloud after logging into your Adobe account.
    2. Download Adobe AE 25 from Creative Cloud App.
    3. The AE installer will launch. Proceed to install as normal with the components you want included.
-4. Install Saber plug-in
-   1. Download Saber plug-in from here: https://www.videocopilot.net/blog/2016/03/new-plug-in-saber-now-available-100-free
+4. Install the Saber plugin.
+   1. Download the [Saber plugin](https://www.videocopilot.net/blog/2016/03/new-plug-in-saber-now-available-100-free) and install it.
    2. Log in with a powershell window again, either from the EC2 management console session manager or reconnecting to RDP.
    3. Run the following commands to create the archive.
       1. `Compress-Archive -Path 'C:\Program Files\Adobe\Adobe After Effects 2025\Support Files\Plug-ins\VideoCopilot\Saber.aex' -DestinationPath Saber_1_0_40_Windows_installation.zip`
       2. `(Get-FileHash -Path "Saber_1_0_40_Windows_installation.zip" -Algorithm SHA256).Hash.ToLower()`
    4. Record the file sha256 hash, and upload the archive to your private S3 bucket. You can use a PowerShell command like
       `Write-S3Object -BucketName MY_BUCKET_NAME -Key Saber_1_0_40_Windows_installation.zip -File Saber_1_0_40_Windows_installation.zip`.
-4. From the AWS EC2 management console, select the instance you used and terminate it.
-5. Download the zip file to the `conda_recipes/archive_files` directory in your git clone of the [deadline-cloud-samples](https://github.com/aws-deadline/deadline-cloud-samples) repository for submitting package build jobs, and update the Windows source artifact hash in the saber conda build recipe meta.yaml.
-6. Follow the instructions [here](https://github.com/aws-deadline/deadline-cloud-samples/blob/mainline/conda_recipes/README.md) to build the conda recipe into your custom conda channel.
+5. From the AWS EC2 management console, select the instance you used and terminate it.
+6. Download the zip file to the `conda_recipes/archive_files` directory of your clone of this repository. Replace the Windows `sha256` value in
+   [`recipe/meta.yaml`](recipe/meta.yaml) with the SHA256 you recorded.
+7. Follow the [Conda recipe overview](../README.md) to build the recipe into your Conda channel.
