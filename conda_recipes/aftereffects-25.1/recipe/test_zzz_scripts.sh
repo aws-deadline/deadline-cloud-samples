@@ -171,6 +171,17 @@ test_activate_replaces_stale_plugins() {
     teardown
 }
 
+test_activate_removes_stale_plugins_when_s3_empty() {
+    setup
+    create_aws_stub_empty
+    mkdir -p "$PLUGIN_DIR"
+    touch "$PLUGIN_DIR/Stale.aex"
+    source "$ACTIVATE_SCRIPT" 2>/dev/null
+
+    check "Activate removes plugins from an earlier session when the S3 prefix is empty" [ ! -d "$PLUGIN_DIR" ]
+    teardown
+}
+
 test_activate_windows_style_location() {
     setup
     create_aws_stub_with_plugins
@@ -186,7 +197,7 @@ test_deactivate_cleanup() {
     setup
     create_aws_stub_with_plugins
     source "$ACTIVATE_SCRIPT" 2>/dev/null
-    # The After Effects variables hook unsets AE_LOCATION before this hook runs.
+    # Deactivate must not depend on AE_LOCATION, so remove it for this test.
     unset AE_LOCATION
     source "$DEACTIVATE_SCRIPT" 2>/dev/null
 
@@ -245,6 +256,7 @@ test_activate_empty_prefix
 test_activate_no_plugins
 test_activate_failed_copy
 test_activate_replaces_stale_plugins
+test_activate_removes_stale_plugins_when_s3_empty
 test_activate_windows_style_location
 test_deactivate_cleanup
 test_deactivate_without_activate

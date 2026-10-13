@@ -33,9 +33,11 @@ _SP_DCC_SRC="s3://${DEADLINE_JA_S3_BUCKET}/${_SP_PREFIX}plugins/windows/aftereff
 _SP_AE_LOCATION="${AE_LOCATION//\\//}"
 _SP_PLUGIN_DIR="${_SP_AE_LOCATION%/}/Plug-ins/deadline-plugin-sync"
 
+# Remove any directory left behind by an earlier session in this environment,
+# such as one whose deactivate hook could not remove a locked plugin.
+rm -rf "$_SP_PLUGIN_DIR" 2>/dev/null
+
 if "$_SP_AWS" s3 ls "$_SP_DCC_SRC" >/dev/null 2>&1; then
-    # Replace any directory left behind by an earlier session in this environment.
-    rm -rf "$_SP_PLUGIN_DIR"
     mkdir -p "$_SP_PLUGIN_DIR"
     export _AE_PLUGIN_SYNC_DIR="$_SP_PLUGIN_DIR"
     echo "Plugin Sync: Downloading After Effects plugins from $_SP_DCC_SRC" >&2

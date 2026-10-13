@@ -2,8 +2,8 @@
 # Remove the plugins that the Plugin Sync activate hook copied into the
 # After Effects installation.
 #
-# The activate hook records the directory in _AE_PLUGIN_SYNC_DIR because the
-# After Effects variables hook unsets AE_LOCATION before this hook runs.
+# The activate hook records the directory in _AE_PLUGIN_SYNC_DIR so this hook
+# removes exactly what activation created, even if AE_LOCATION has changed.
 
 if [ -n "${_AE_PLUGIN_SYNC_DIR:-}" ] && [ -d "$_AE_PLUGIN_SYNC_DIR" ]; then
     # Only remove the directory that the activate hook owns.
