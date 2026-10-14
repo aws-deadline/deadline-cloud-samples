@@ -1,0 +1,10 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - OctaneRender_Studio+_2026.4_for_Maya_v25.20.run
+    sourceDownloadInstructions: 'Download the OctaneRender_Studio+_2026.4_for_Maya_v25.20.run Linux installer for Maya from your OTOY account.'
+    buildTool: rattler-build
+jobParameters:
+- name: CondaChannels
+  value: conda-forge
