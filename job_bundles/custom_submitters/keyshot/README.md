@@ -144,7 +144,8 @@ property overrides such as `deadline:priority` require 0.60.4 or later. Check th
 
 ## Run the unit tests
 
-The tests replace the `lux` module with a mock, so they run without KeyShot:
+The tests replace the `lux` module with a mock, so they run without KeyShot. Repository CI runs them on
+every pull request:
 
 ```console
 pip install pytest pytest-asyncio
