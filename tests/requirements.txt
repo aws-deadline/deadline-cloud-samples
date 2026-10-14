@@ -1,6 +1,8 @@
 # Dependencies for the static validation test suite (tests/).
 # Pinned loosely; CI caches the resolved install (see the static_checks workflow).
 pytest>=9.1.1,<10
+# Used by the KeyShot custom submitter's unit tests.
+pytest-asyncio>=1.0.0,<2
 PyYAML>=6.0.3,<7
 Jinja2>=3.1.6,<4
 openjd-cli>=0.8.0,<1

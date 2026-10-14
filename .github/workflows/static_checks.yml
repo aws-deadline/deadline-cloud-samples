@@ -80,3 +80,7 @@ jobs:
       - name: Run static checks
         working-directory: tests
         run: python -m pytest -v
+
+      - name: Run KeyShot submitter unit tests
+        working-directory: job_bundles/custom_submitters/keyshot
+        run: python -m pytest -v test/unit
