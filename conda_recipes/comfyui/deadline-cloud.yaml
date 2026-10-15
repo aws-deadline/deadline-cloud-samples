@@ -1,0 +1,14 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    # Indexing the package in the S3 channel runs out of memory on 16 GiB workers.
+    additionalHostRequirements:
+      amounts:
+        - name: amount.worker.memory
+          min: 24576
+    sourceArchiveFilename: ComfyUI-0.38.0.tar.gz
+    sourceDownloadInstructions: 'Run "curl -L -o archive_files/ComfyUI-0.38.0.tar.gz https://github.com/Comfy-Org/ComfyUI/archive/refs/tags/v0.38.0.tar.gz"'
+    buildTool: rattler-build
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge

@@ -69,6 +69,19 @@ if [ "$REUSE_ENV" == "0" ]; then
     done
 fi
 
+# rattler-build 0.71.0+ exceeds vm.max_map_count when it publishes packages larger than a few hundred MB
+# to an S3 channel on service-managed fleets. Pin below 0.71, and recreate cached envs outside that range.
+RATTLER_BUILD_SPEC="rattler-build>=0.48.1,<0.71"
+if conda env list | grep -q "^$ENV_NAME "; then
+    RB_VERSION=$(conda run -n "$ENV_NAME" rattler-build --version 2>/dev/null | awk '{print $2}')
+    if ! python -c "import sys; v = tuple(int(x) for x in '$RB_VERSION'.split('.')[:2]); sys.exit(0 if (0, 48) <= v < (0, 71) else 1)" 2>/dev/null; then
+        echo "The existing $ENV_NAME environment has rattler-build ${RB_VERSION:-unknown}, outside $RATTLER_BUILD_SPEC. Recreating it."
+        for ENVS_DIR in $(conda info --json | python -c "import json, sys; v = json.load(sys.stdin); print('\n'.join(v['envs_dirs']))"); do
+            rm -rf "$ENVS_DIR/$ENV_NAME"
+        done
+    fi
+fi
+
 if conda env list | grep -q "^$ENV_NAME "; then
     echo "Reusing the existing named Conda environment $ENV_NAME."
 
@@ -82,7 +95,7 @@ else
 
     conda create --yes --quiet -n "$ENV_NAME" \
         --override-channels -c conda-forge \
-        python=3.13 conda conda-build "rattler-build>=0.48.1" "rattler-index>=0.26" boto3 pyyaml
+        python=3.13 conda conda-build "$RATTLER_BUILD_SPEC" "rattler-index>=0.26" boto3 pyyaml
 
     # Activate the Conda environment, capturing the environment variables for the session to use
     python "$(dirname "$0")/openjd-vars-start.py" .vars

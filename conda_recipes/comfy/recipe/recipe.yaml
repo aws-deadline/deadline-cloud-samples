@@ -1,0 +1,68 @@
+context:
+  version: "0.38.0"
+  comfy_cli_version: "1.22.0"
+  cuda_version: "13.0"
+
+package:
+  name: comfy
+  version: ${{ version }}
+
+build:
+  number: 0
+  script:
+    env:
+      COMFYUI_VERSION: ${{ version }}
+      COMFY_CLI_VERSION: ${{ comfy_cli_version }}
+      CUDA_VERSION: ${{ cuda_version }}
+    content:
+      - if: unix
+        then:
+          - bash $RECIPE_DIR/build.sh
+  # Keep the pip-installed binary wheels (torch, nvidia-*, av) working as built.
+  prefix_detection:
+    ignore_binary_files: true
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  # The pip-installed wheels are cp312.
+  host:
+    - python 3.12.*
+    - pip
+    - git
+  run:
+    - python 3.12.*
+    # comfy-cli uses GitPython, which needs a git executable.
+    - git
+    # Needed at runtime, but pip skips them because they're already in the host env.
+    - packaging >=20.9
+    - setuptools
+
+tests:
+  - script:
+      - COMFY_NO_TELEMETRY=1 comfy --skip-prompt --help
+      - python "$COMFYUI_LOCATION/main.py" -h
+      - python -c "import torch, torchvision, comfyui_frontend_package, comfy_kitchen, av"
+      # comfy-cli picks the torch version; it must be a CUDA 13 build.
+      - python -c "import torch; print(torch.__version__); assert torch.version.cuda and torch.version.cuda.startswith('13.'), torch.version.cuda"
+      - test ! -d "$CONDA_PREFIX/opt/comfyui/.venv"
+      - test -f "$CONDA_PREFIX/opt/comfyui/pip-freeze.txt"
+      - test "$COMFYUI_LOCATION" = "$CONDA_PREFIX/opt/comfyui"
+      - test "$PYTHONUNBUFFERED" = 1
+      - test "$COMFY_NO_TELEMETRY" = 1
+  - script:
+      - bash test_comfy_cli.sh
+    files:
+      recipe:
+        - test_comfy_cli.sh
+        - test_workflow_api.json
+
+about:
+  homepage: https://github.com/Comfy-Org/ComfyUI
+  # ComfyUI's license. comfy-cli and the bundled wheels have their own; see the README.
+  license: GPL-3.0-only
+  summary: >
+    ComfyUI installed by comfy-cli, the official ComfyUI command line tool, with PyTorch CUDA
+    wheels for Linux GPU workers. Includes the comfy command.

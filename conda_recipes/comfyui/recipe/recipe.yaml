@@ -1,0 +1,71 @@
+context:
+  version: "0.38.0"
+
+  # ComfyUI's requirements.txt leaves torch unpinned. cu130 needs NVIDIA driver r580 or newer.
+  torch_version: "2.14.1"
+  torchvision_version: "0.29.1"
+  torch_cuda_index: "cu130"
+
+package:
+  name: comfyui
+  version: ${{ version }}
+
+source:
+  - if: linux
+    then:
+      url: https://github.com/Comfy-Org/ComfyUI/archive/refs/tags/v${{ version }}.tar.gz
+      # sha256 of the GitHub tag archive; ComfyUI publishes no checksum file.
+      sha256: 185a3e55b9d7e06a89064a3b0cc9644295ee033e81fbcec8d0d475ae5590a136
+      target_directory: comfyui
+
+build:
+  number: 0
+  script:
+    env:
+      TORCH_VERSION: ${{ torch_version }}
+      TORCHVISION_VERSION: ${{ torchvision_version }}
+      TORCH_CUDA_INDEX: ${{ torch_cuda_index }}
+    content:
+      - if: unix
+        then:
+          - bash $RECIPE_DIR/build.sh
+  # Keep the pip-installed binary wheels (torch, nvidia-*, av) working as built.
+  prefix_detection:
+    ignore_binary_files: true
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  # The pip-installed wheels are cp312.
+  host:
+    - python 3.12.*
+    - pip
+  run:
+    - python 3.12.*
+    # Needed at runtime, but pip skips them because they're already in the host env.
+    - packaging >=20.9
+    - setuptools >=77.0.3
+
+tests:
+  - script:
+      - comfyui -h
+      - python -c "import torch, torchvision, comfyui_frontend_package, comfy_kitchen, av"
+      # Catches a later pip step replacing the CUDA torch build.
+      - python -c "import torch; assert torch.__version__ == '${{ torch_version }}+${{ torch_cuda_index }}', torch.__version__"
+      - comfyui --cpu --quick-test-for-ci --base-directory "$(mktemp -d)"
+      - test -f "$CONDA_PREFIX/opt/comfyui/pip-freeze.txt"
+      - test "$COMFYUI_LOCATION" = "$CONDA_PREFIX/opt/comfyui"
+      - test "$PYTHONUNBUFFERED" = 1
+      - 'd=$(mktemp -d) && COMFYUI_OUTPUT_DIRECTORY="$d/out" comfyui --cpu --quick-test-for-ci --base-directory "$d/base" 2>&1 | grep -F "Setting output directory to: $d/out"'
+
+about:
+  homepage: https://github.com/Comfy-Org/ComfyUI
+  # ComfyUI's license. Bundled wheels have their own; see the README.
+  license: GPL-3.0-only
+  license_file: comfyui/LICENSE
+  summary: >
+    ComfyUI is a powerful and modular diffusion model GUI, API and backend with a
+    graph/nodes interface. This package bundles ComfyUI with PyTorch CUDA wheels for
+    Linux GPU workers.
