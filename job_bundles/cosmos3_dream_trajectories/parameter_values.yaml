@@ -1,0 +1,96 @@
+# Defaults sized for a first run that proves the pipeline rather than one that
+# produces a useful dataset.
+#
+# Two clips means two tasks per fanned-out step, which is enough to show the
+# fan-out without paying for it twice over. Frame count, fps and action chunk
+# size follow the inverse-dynamics example on the Cosmos3-Nano model card. The
+# constraint there is NumFrames = ActionChunkSize + 1 rather than these exact
+# numbers; 33 and 32 also work and generate faster.
+#
+# Budget for a cold start. The queue environment's container image plus about
+# 35 GB of Cosmos3-Nano weights have to arrive before the server answers, and
+# that download dominates everything else. Sessions landing on a worker that is
+# already running reuse the cache; the first job after a fleet scales to zero
+# gets a fresh volume and pays the download again.
+#
+# The serving image is a queue environment parameter, not a job parameter, and
+# that environment accepts ECR registries only:
+#
+#   -p DockerImage=ACCOUNT.dkr.ecr.REGION.amazonaws.com/cosmos3/vllm-omni:cosmos3
+#
+# ClipDir has no default on purpose. Generate one first:
+#
+#   python3 scripts/make_example_clips.py --output-dir example_clips --clips 2
+#
+# That writes the agibot scene, which is the script's default. Agibot is one of
+# the embodiments Cosmos 3's inverse dynamics covers, so ActionMode defaults to
+# inverse_dynamics with DomainName agibotworld and RawActionDim 29, and all three
+# steps run.
+#
+# For an SO-101 arm, generate `--scene so101` and submit with ActionMode=none.
+# Cosmos 3's inverse dynamics does not cover SO-101, so the job delivers
+# synthetic videos, which is DreamGen's stage-2 artifact and the input an
+# embodiment-specific IDM consumes.
+#
+# For an end-to-end run including action extraction, use the AV scene instead:
+#
+#   python3 scripts/make_example_clips.py --output-dir av_clips --scene av --clips 2
+#   ... -p ActionMode=inverse_dynamics -p DomainName=av -p RawActionDim=9
+#
+# Pass the DIRECTORY, not the manifest file. Job attachments uploads exactly what
+# was declared, so declaring clips.json alone uploads clips.json alone and leaves
+# every conditioning image on the workstation.
+#
+# Scaling up: clips are independent, so wall clock divides by the fleet's worker
+# count, bounded by how fast a service-managed fleet scales out from zero. Both
+# GPU steps hold a whole GPU per task, so a single-accelerator fleet runs one
+# clip at a time per worker.
+parameterValues:
+- name: ClipCount
+  value: 2
+- name: ModelId
+  value: nvidia/Cosmos3-Nano
+- name: OffloadMode
+  value: auto
+- name: GpuMemoryFloorMiB
+  value: 40000
+- name: VideoSize
+  value: ""
+- name: NumFrames
+  value: 61
+- name: Fps
+  value: 10
+- name: GenerationSteps
+  value: 30
+- name: GuidanceScale
+  value: 6.0
+- name: FlowShift
+  value: 10.0
+- name: BaseSeed
+  value: 1111
+- name: ActionMode
+  value: inverse_dynamics
+- name: DomainName
+  value: agibotworld
+- name: ViewPoint
+  value: ego_view
+- name: RawActionDim
+  value: 29
+- name: ActionChunkSize
+  value: 60
+- name: ActionImageSize
+  value: 480
+- name: ActionSteps
+  value: 30
+- name: ActionGuidanceScale
+  value: 1.0
+- name: ActionPrompt
+  value: You are a dual-arm robot manipulation planning system.
+- name: VideoKey
+  value: observation.images.main
+- name: ServerBootTimeoutSeconds
+  value: 2700
+- name: StepTimeoutSeconds
+  value: 5400
+- name: RequestTimeoutSeconds
+  value: 3600

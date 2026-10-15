@@ -1,0 +1,741 @@
+specificationVersion: jobtemplate-2023-09
+# FEATURE_BUNDLE_1 is required to use a format string for an action `timeout`.
+# Without it the service rejects the template, and `openjd check` does NOT catch
+# this - it validates the schema but not the extension requirement.
+#
+# REDACTED_ENV_VARS lets the optional Hugging Face token reach the steps without
+# the value appearing in session logs.
+extensions:
+- FEATURE_BUNDLE_1
+- REDACTED_ENV_VARS
+name: Cosmos 3 Dream Trajectories
+description: |
+  Synthetic robot trajectories from NVIDIA Cosmos 3, fanned out over Deadline
+  Cloud workers:
+
+    1 - Dream (xN clips)  ->  2 - Extract actions (xN)  ->  3 - Merge
+
+  Step 1 turns one conditioning image plus a language prompt into a synthetic
+  video. Step 2 runs inverse dynamics over each video to recover the action
+  trajectory that would produce it. Step 3 assembles the per-clip actions into a
+  LeRobot-layout dataset and fails the job if the dataset came up short.
+
+  The two halves are deliberately separate steps. Generating video and
+  recovering actions from video are different models' worth of work in the
+  DreamGen pipeline, they fail for different reasons, and keeping them apart
+  means step 2 can be re-run alone - over real footage as readily as over
+  generated footage.
+
+  Both GPU steps share one vLLM-Omni server, started by a step environment and
+  reused by every task in the session. Loading a 16B checkpoint takes minutes,
+  so a per-task server would spend nearly all its time booting.
+
+  Cosmos 3 is released under OpenMDW 1.1, which carries no field-of-use or
+  commercial restriction and imposes nothing on the outputs. The weights are not
+  gated on Hugging Face. Serving it through vLLM-Omni is NOT token-free though:
+  the server loads nvidia/Cosmos-1.0-Guardrail at startup, which is gated and
+  under the NVIDIA Open Model License. Accept its terms and pass a token through
+  the queue environment's HfTokenSecretArn parameter.
+
+  This bundle contains NO docker commands and names NO container image. It is
+  designed for a queue carrying a Docker queue environment, which wraps every
+  action into one long-lived container for the session. Because all of a
+  session's actions are exec'ed into that same container, they share a network
+  namespace, which is what lets a server started in a step environment's onEnter
+  be reached on localhost by every task. See
+  queue_environments/docker_queue_env.yaml.
+
+  That also makes the template portable: it runs unchanged under `openjd run` on
+  any host that has vLLM-Omni installed.
+
+parameterDefinitions:
+
+# ---------------------------------------------------------------- clips ------
+- name: ClipDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  description: >-
+    Directory holding the clip manifest and every conditioning image it
+    references. The whole tree is uploaded.
+
+    This is a DIRECTORY rather than a FILE on purpose. Job attachments uploads
+    exactly what the submitter declared, and the images named inside the
+    manifest's JSON are invisible to the submitter. Declaring only the manifest
+    therefore uploads only the manifest, and every task fails on a missing
+    image. Declaring the directory makes the manifest and its images travel
+    together.
+
+    Use scripts/make_example_clips.py to produce a correctly shaped directory.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Clip directory
+    groupLabel: Clips
+- name: ClipManifestName
+  type: STRING
+  default: clips.json
+  minLength: 1
+  description: >-
+    Manifest filename within ClipDir. It is a JSON file with a top-level "clips"
+    array; each entry needs "image" and "prompt", and may set "name" and
+    "negative_prompt". Relative image paths resolve against ClipDir.
+  userInterface:
+    control: LINE_EDIT
+    label: Manifest filename
+    groupLabel: Clips
+- name: ClipCount
+  type: INT
+  default: 1
+  minValue: 1
+  maxValue: 2000
+  description: >-
+    Number of clips, which is also the task count of both fanned-out steps. It
+    must equal the manifest's array length: a parameter space is fixed at submit
+    time, so a mismatch would silently drop clips or index past the end. Step 1
+    checks and fails with the number it found.
+  userInterface:
+    control: SPIN_BOX
+    label: Clip count
+    groupLabel: Clips
+
+# ---------------------------------------------------------------- model ------
+- name: ModelId
+  type: STRING
+  default: nvidia/Cosmos3-Nano
+  minLength: 1
+  description: >-
+    Hugging Face model id to serve. Cosmos3-Nano is 16B parameters and about
+    35 GB to download. Cosmos3-Super is larger and wants more than one GPU, so
+    it needs a fleet whose accelerator count exceeds 1.
+
+    The serving image is not set here: it is the queue environment's DockerImage
+    parameter, and it must provide `vllm serve --omni`. Action generation is only
+    available through vLLM-Omni; SGLang's Cosmos 3 support explicitly excludes
+    it, and the Diffusers pipeline is generation only.
+  userInterface:
+    control: LINE_EDIT
+    label: Model id
+    groupLabel: Model
+- name: OffloadMode
+  type: STRING
+  default: auto
+  allowedValues: [auto, always, never]
+  description: >-
+    Whether to pass --enable-layerwise-offload. Cosmos3-Nano's transformer
+    weights are roughly 30 GB in BF16, so a 48 GB L40S holds the model while a
+    24 GB A10G or L4 does not.
+
+    Service-managed fleets publish no GPU-memory capability and no
+    accelerator-name attribute, so hostRequirements cannot pin the GPU model.
+    auto reads the installed GPU on the worker and turns offload on below
+    GpuMemoryFloorMiB. never fails the session instead, which is what you want
+    when you have narrowed the fleet to one accelerator and would rather hear
+    about a mis-scheduled task than silently run slowly.
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Offload mode
+    groupLabel: Model
+- name: GpuMemoryFloorMiB
+  type: INT
+  default: 40000
+  minValue: 1024
+  maxValue: 1000000
+  description: >-
+    GPU memory below which OffloadMode=auto enables offload. The default sits
+    between a 24 GB L4/A10G and a 48 GB L40S.
+  userInterface:
+    control: SPIN_BOX
+    label: GPU memory floor (MiB)
+    groupLabel: Model
+# The Hugging Face token is NOT a job parameter. A token IS required, because
+# serving Cosmos 3 pulls the gated nvidia/Cosmos-1.0-Guardrail, but a job or
+# step environment runs INSIDE the container the Docker queue environment
+# creates, and an application image generally has no AWS CLI. Only the queue
+# environment's own onEnter runs on the host with credentials, so the secret is
+# its parameter:
+#   -p HfTokenSecretArn=arn:aws:secretsmanager:...
+# It publishes a redacted HF_TOKEN to every action in the session.
+
+# ----------------------------------------------------------- generation ------
+# There is deliberately NO parameter to disable guardrails. Serving Cosmos 3
+# through vLLM-Omni loads nvidia/Cosmos-1.0-Guardrail, which is gated and under
+# the NVIDIA Open Model License, and that license terminates its grant for
+# circumventing a model's safety guardrails. Both steps therefore pass
+# guardrails=true unconditionally.
+- name: VideoSize
+  type: STRING
+  default: ""
+  description: >-
+    WxH for the generated clip, for example 1280x720. Leave empty to let the
+    server choose, which returns the conditioning image's own resolution.
+  userInterface:
+    control: LINE_EDIT
+    label: Video size
+    groupLabel: Generation
+- name: NumFrames
+  type: INT
+  default: 61
+  minValue: 9
+  maxValue: 400
+  description: >-
+    Frames per clip. The model card states that video generation supports 5 to
+    400 frames, with 189 as the model's own default, so 400 is the ceiling here.
+
+    The sample defaults to 61 because the model card's inverse-dynamics example
+    uses 61 frames at 10 fps with a 60-step action chunk, one action step per
+    frame transition. At 10 fps that is 6.1 seconds, which is short for a
+    complete manipulation task. Raise this for a longer clip, keeping
+    ActionChunkSize at NumFrames - 1.
+
+    Longer clips need more GPU memory for activations. Beyond roughly 60 frames
+    at 848x480 a 48 GB accelerator needs OffloadMode=always, which moves the
+    weights to host memory and therefore needs a worker with enough RAM. See
+    the WorkerMemoryMiB parameter.
+  userInterface:
+    control: SPIN_BOX
+    label: Frames
+    groupLabel: Generation
+- name: Fps
+  type: INT
+  default: 10
+  minValue: 1
+  maxValue: 60
+  userInterface: {control: SPIN_BOX, label: FPS, groupLabel: Generation}
+- name: GenerationSteps
+  type: INT
+  default: 30
+  minValue: 1
+  maxValue: 100
+  description: Denoising steps for step 1. Cost is close to linear in this.
+  userInterface: {control: SPIN_BOX, label: Generation steps, groupLabel: Generation}
+- name: GuidanceScale
+  type: FLOAT
+  default: 6.0
+  minValue: 0.0
+  maxValue: 20.0
+  description: >-
+    Classifier-free guidance for step 1. The model card uses 6.0 for
+    image-to-video and 1.0 for the action modes, which is why step 2 has its
+    own.
+  userInterface: {control: SPIN_BOX, label: Guidance scale, groupLabel: Generation}
+- name: FlowShift
+  type: FLOAT
+  default: 10.0
+  minValue: 0.0
+  maxValue: 20.0
+  userInterface: {control: SPIN_BOX, label: Flow shift, groupLabel: Generation}
+- name: BaseSeed
+  type: INT
+  default: 1111
+  description: >-
+    Clip N uses BaseSeed + (N-1), so each clip differs and the whole set
+    reproduces.
+  userInterface: {control: SPIN_BOX, label: Base seed, groupLabel: Generation}
+
+# --------------------------------------------------------------- action ------
+- name: ActionMode
+  type: STRING
+  default: inverse_dynamics
+  allowedValues: [none, inverse_dynamics]
+  description: >-
+    Whether step 2 recovers action trajectories with Cosmos 3's inverse
+    dynamics.
+
+    inverse_dynamics: step 2 runs and the job produces a trainable dataset. This
+    is the default, paired with the agibot scene from make_example_clips.py,
+    because Agibot is one of the embodiments Cosmos 3's inverse dynamics covers.
+    Set DomainName, ViewPoint and RawActionDim to match your footage.
+
+    none: step 2 skips its work and the job delivers synthetic videos only. Use
+    this for an embodiment Cosmos 3 does NOT cover, such as SO-101. The
+    documented set is general camera motion, autonomous vehicle, egocentric
+    motion, single and dual Franka Panda, Agibot, UR, Google robot, WidowX 250
+    and UMI. Requesting actions for footage outside that set returns a
+    trajectory in some other embodiment's action space: plausible-looking
+    numbers the robot in the video cannot execute.
+
+    The videos are still a useful artifact on their own. They are the output of
+    DreamGen's stage 2, and the next step is an IDM trained on your embodiment,
+    such as GR00T-Dreams' seonghyeonye/IDM_so100 (Apache-2.0).
+
+    Note that step 2 still starts its model server when ActionMode is none,
+    which costs about a minute of GPU time against a warm weight cache.
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Action mode
+    groupLabel: Action
+- name: DomainName
+  type: STRING
+  default: agibotworld
+  minLength: 1
+  description: >-
+    Embodiment domain for inverse dynamics. Only two values are attested in the
+    model card's own examples: `av` for autonomous vehicle and `agibotworld` for
+    the Agibot humanoid. Other embodiments are documented by dimensionality
+    rather than by domain string, so their domain names are unverified; the
+    server's rejection message is the authoritative list and step 2 prints it
+    verbatim.
+  userInterface:
+    control: LINE_EDIT
+    label: Domain name
+    groupLabel: Action
+- name: ViewPoint
+  type: STRING
+  default: ego_view
+  minLength: 1
+  description: >-
+    Camera viewpoint tag. The model card uses `ego_view` for inverse dynamics
+    and `concat_view` for a multi-camera forward-dynamics rollout.
+  userInterface:
+    control: LINE_EDIT
+    label: View point
+    groupLabel: Action
+- name: RawActionDim
+  type: INT
+  default: 29
+  minValue: 1
+  maxValue: 128
+  description: >-
+    Action dimensionality, a property of the embodiment rather than a free
+    choice. The model card lists general camera motion 9, autonomous vehicle 9,
+    egocentric motion 57, single Franka Panda with RobotiQ gripper 10, dual
+    Franka Panda 20, Agibot 29, UR 10, Google robot 10, WidowX 250 10, UMI 9.
+
+    Step 2 compares this against the shape the server returns and fails on a
+    mismatch, because a wrong value here produces a plausible-looking dataset
+    that no policy can consume.
+  userInterface:
+    control: SPIN_BOX
+    label: Raw action dim
+    groupLabel: Action
+- name: ActionChunkSize
+  type: INT
+  default: 60
+  minValue: 1
+  maxValue: 256
+  description: >-
+    Action steps to predict per clip. Pair it with NumFrames: the model card's
+    example predicts 60 steps from 61 frames.
+  userInterface:
+    control: SPIN_BOX
+    label: Action chunk size
+    groupLabel: Action
+- name: ActionImageSize
+  type: INT
+  default: 480
+  allowedValues: [256, 480, 704, 720]
+  description: >-
+    Internal resize for the action path. Only these four values are accepted:
+    the server rejects anything else with
+      Unknown Cosmos3 action resolution=N; expected one of
+      ['256', '480', '704', '720']
+    and it does so per request, after the video has already been generated, so a
+    wrong value costs a full generation before it surfaces. It is independent of
+    VideoSize: matching this to a smaller video is what produced that error.
+  userInterface: {control: DROPDOWN_LIST, label: Action image size, groupLabel: Action}
+- name: ActionSteps
+  type: INT
+  default: 30
+  minValue: 1
+  maxValue: 100
+  description: Denoising steps for step 2.
+  userInterface: {control: SPIN_BOX, label: Action steps, groupLabel: Action}
+- name: ActionGuidanceScale
+  type: FLOAT
+  default: 1.0
+  minValue: 0.0
+  maxValue: 20.0
+  description: The model card uses 1.0 for both action modes.
+  userInterface: {control: SPIN_BOX, label: Action guidance, groupLabel: Action}
+- name: ActionPrompt
+  type: STRING
+  default: You are a dual-arm robot manipulation planning system.
+  minLength: 1
+  description: >-
+    System-style prompt sent with the inverse-dynamics request. Match it to
+    DomainName. The model card pairs "You are an autonomous vehicle planning
+    system." with `av`.
+  userInterface:
+    control: LINE_EDIT
+    label: Action prompt
+    groupLabel: Action
+- name: VideoKey
+  type: STRING
+  default: observation.images.main
+  minLength: 1
+  description: LeRobot feature key the generated videos are filed under.
+  userInterface: {control: LINE_EDIT, label: Video key, groupLabel: Action}
+
+# ---------------------------------------------------------------- paths ------
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: INOUT
+  description: >-
+    Shared work dir. Step 1 writes dreams/, step 2 writes actions/, step 3
+    writes lerobot/ and dream_summary.json. INOUT because each task's copy also
+    carries its peers' uploads. Pass an absolute path.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output directory
+    groupLabel: Paths
+- name: ScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: >-
+    Bundled scripts: serve_cosmos3.sh, cosmos3_client.py, generate_dream.py,
+    assert_clip_summary.py, extract_actions.py and merge_dataset.py.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Script directory
+    groupLabel: Paths
+
+# --------------------------------------------------------------- limits ------
+- name: ServerBootTimeoutSeconds
+  type: INT
+  default: 2700
+  minValue: 300
+  maxValue: 14400
+  description: >-
+    How long a step environment waits for the server to report healthy. The
+    first session on a worker also downloads about 35 GB of weights, so the cold
+    case is far slower than the warm one. The model card's own invocation passes
+    --init-timeout 1800 for the load alone.
+  userInterface:
+    control: SPIN_BOX
+    label: Server boot timeout (s)
+    groupLabel: Limits
+- name: WorkerMemoryMiB
+  type: INT
+  default: 131072
+  minValue: 16384
+  maxValue: 2097152
+  description: >-
+    Host RAM the GPU steps require, which is coupled to OffloadMode and is not a
+    free choice.
+
+    OffloadMode auto/always keeps the ~35 GB checkpoint in HOST memory and
+    streams it to the GPU, so it needs roughly 128 GiB. A 64 GiB worker satisfies
+    a smaller requirement and then OOM-kills the diffusion worker several minutes
+    into startup, reporting only a broken pipe.
+
+    With OffloadMode=never the weights stay on the GPU, so 65536 is enough and
+    the fleet can use a much smaller and more available instance. For g6e, 131072
+    forces 4xlarge or larger while 65536 allows 2xlarge; GPU capacity for the
+    larger sizes is often scarcer, so this is a scheduling lever as much as a
+    memory one.
+  userInterface:
+    control: SPIN_BOX
+    label: Worker memory (MiB)
+    groupLabel: Limits
+- name: StepTimeoutSeconds
+  type: INT
+  default: 5400
+  minValue: 60
+  maxValue: 43200
+  description: Per-task wall clock for the GPU steps.
+  userInterface:
+    control: SPIN_BOX
+    label: Step timeout (s)
+    groupLabel: Limits
+- name: RequestTimeoutSeconds
+  type: INT
+  default: 3600
+  minValue: 60
+  maxValue: 43200
+  description: >-
+    Per-request ceiling inside a task. Keep it below StepTimeoutSeconds so a
+    hung request fails with this sample's message rather than being killed.
+  userInterface:
+    control: SPIN_BOX
+    label: Request timeout (s)
+    groupLabel: Limits
+
+steps:
+
+# ================================================================= 1 - Dream =
+- name: 1 - Dream
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ClipIndex
+      type: INT
+      range: "1-{{Param.ClipCount}}"
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    # One GPU per task, which on a single-accelerator fleet also serializes the
+    # tasks so they do not contend for the one server's device memory.
+    - {name: amount.worker.gpu, min: 1}
+    - {name: amount.worker.vcpu, min: 8}
+    # Tracks OffloadMode: see the WorkerMemoryMiB parameter. The scheduler must
+    # not offer a worker too small to hold the offloaded checkpoint, and
+    # serve_cosmos3.sh checks the same thing on the worker for the cases
+    # hostRequirements cannot cover.
+    - {name: amount.worker.memory, min: "{{Param.WorkerMemoryMiB}}"}
+  stepEnvironments:
+  - name: Cosmos3Server
+    description: >-
+      Starts the vLLM-Omni server once and shares it with every task in the
+      session, then tears it down and prints its log tail on exit.
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args:
+          - "{{Param.ScriptDir}}/serve_cosmos3.sh"
+          - start
+          - "{{Param.ModelId}}"
+          - "{{Param.ServerBootTimeoutSeconds}}"
+          - "{{Param.OffloadMode}}"
+          - "{{Param.GpuMemoryFloorMiB}}"
+          - "{{Session.WorkingDirectory}}/cosmos3-logs"
+          - "{{Session.WorkingDirectory}}"
+          timeout: "{{Param.ServerBootTimeoutSeconds}}"
+        onExit:
+          command: bash
+          args:
+          - "{{Param.ScriptDir}}/serve_cosmos3.sh"
+          - stop
+          - "{{Session.WorkingDirectory}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+        timeout: "{{Param.StepTimeoutSeconds}}"
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        CLIP={{Task.Param.ClipIndex}}
+        OUT='{{Param.OutputDir}}'
+        SCRIPT_DIR='{{Param.ScriptDir}}'
+        SEED=$(( {{Param.BaseSeed}} + CLIP - 1 ))
+
+        mkdir -p "$OUT/dreams" "$OUT/logs"
+        LOG="$OUT/logs/dream_$(printf '%04d' "$CLIP").log"
+
+        export PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}"
+
+        set +e
+        python3 "$SCRIPT_DIR/generate_dream.py" \
+            --manifest "{{Param.ClipDir}}/{{Param.ClipManifestName}}" \
+            --output-dir "$OUT" \
+            --clip-index "$CLIP" \
+            --expected-clips {{Param.ClipCount}} \
+            --size '{{Param.VideoSize}}' \
+            --num-frames {{Param.NumFrames}} \
+            --fps {{Param.Fps}} \
+            --num-inference-steps {{Param.GenerationSteps}} \
+            --guidance-scale {{Param.GuidanceScale}} \
+            --flow-shift {{Param.FlowShift}} \
+            --seed "$SEED" \
+            --guardrails true \
+            --request-timeout {{Param.RequestTimeoutSeconds}} \
+            2>&1 | tee "$LOG"
+        rc=${PIPESTATUS[0]}
+        set -e
+        if [ "$rc" -ne 0 ]; then
+            echo "openjd_fail: generate_dream.py exited $rc (see $LOG)" >&2
+            exit "$rc"
+        fi
+
+        # Assert on the artifact as well as the exit code, and assert on THIS
+        # task's artifact. dreams/ is shared: it already holds peer clips'
+        # summaries synced in as inputs, so counting *.json would pass even
+        # when this task wrote nothing. Match on the clip_index the summary
+        # records instead. The summary is the contract steps 2 and 3 read.
+        if ! python3 "$SCRIPT_DIR/assert_clip_summary.py" "$CLIP" "$OUT/dreams"; then
+            echo "openjd_fail: clip $CLIP exited 0 but wrote no summary for itself under $OUT/dreams" >&2
+            exit 1
+        fi
+        echo "clip $CLIP complete"
+
+# ====================================================== 2 - Extract actions =
+- name: 2 - Extract actions
+  dependencies:
+  - dependsOn: 1 - Dream
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ClipIndex
+      type: INT
+      range: "1-{{Param.ClipCount}}"
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    - {name: amount.worker.gpu, min: 1}
+    - {name: amount.worker.vcpu, min: 8}
+    # Tracks OffloadMode: see the WorkerMemoryMiB parameter. The scheduler must
+    # not offer a worker too small to hold the offloaded checkpoint, and
+    # serve_cosmos3.sh checks the same thing on the worker for the cases
+    # hostRequirements cannot cover.
+    - {name: amount.worker.memory, min: "{{Param.WorkerMemoryMiB}}"}
+  stepEnvironments:
+  - name: Cosmos3Server
+    description: >-
+      A second server, because this is a second step and therefore a second
+      session. With no persistent HF_HOME published by the queue environment,
+      this boot re-downloads the checkpoint rather than reusing step 1's.
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args:
+          - "{{Param.ScriptDir}}/serve_cosmos3.sh"
+          - start
+          - "{{Param.ModelId}}"
+          - "{{Param.ServerBootTimeoutSeconds}}"
+          - "{{Param.OffloadMode}}"
+          - "{{Param.GpuMemoryFloorMiB}}"
+          - "{{Session.WorkingDirectory}}/cosmos3-logs"
+          - "{{Session.WorkingDirectory}}"
+          timeout: "{{Param.ServerBootTimeoutSeconds}}"
+        onExit:
+          command: bash
+          args:
+          - "{{Param.ScriptDir}}/serve_cosmos3.sh"
+          - stop
+          - "{{Session.WorkingDirectory}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - "{{Task.File.Run}}"
+        - "{{Param.ActionPrompt}}"
+        - "{{Param.DomainName}}"
+        - "{{Param.ViewPoint}}"
+        timeout: "{{Param.StepTimeoutSeconds}}"
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        CLIP={{Task.Param.ClipIndex}}
+        OUT='{{Param.OutputDir}}'
+        SCRIPT_DIR='{{Param.ScriptDir}}'
+        SEED=$(( {{Param.BaseSeed}} + CLIP - 1 ))
+
+        mkdir -p "$OUT/actions" "$OUT/logs"
+        LOG="$OUT/logs/actions_$(printf '%04d' "$CLIP").log"
+
+        # Free-form text arrives as argv, not interpolated into the script. An
+        # apostrophe in ActionPrompt would otherwise close the single quote and
+        # fail with a shell syntax error, minutes into the step.
+        COSMOS3_ACTION_PROMPT="$1"
+        COSMOS3_DOMAIN_NAME="$2"
+        COSMOS3_VIEW_POINT="$3"
+
+        # Cosmos 3's inverse dynamics covers a fixed embodiment set that does not
+        # include SO-101, so this step is skippable rather than mandatory.
+        #
+        # The marker file is for a human reading the output directory. The merge
+        # step does not read it: it takes ActionMode directly and switches to a
+        # video-only dataset, so the two agree through the parameter rather than
+        # through this file.
+        if [ '{{Param.ActionMode}}' = 'none' ]; then
+            echo "ActionMode=none: skipping inverse dynamics for clip $CLIP."
+            echo "The generated video is the deliverable; recover actions with an"
+            echo "IDM trained on your embodiment."
+            printf '{"skipped":true,"reason":"ActionMode=none"}\n' \
+                > "$OUT/actions/_skipped_$(printf '%04d' "$CLIP").json"
+            exit 0
+        fi
+
+        export PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}"
+
+        set +e
+        # These four reach the script through the environment, not through the
+        # command line. They are free-form text, and an apostrophe in
+        # ActionPrompt ("You're a planner.") would close the single quote early,
+        # failing with a shell syntax error after a model load that takes
+        # minutes. Env vars carry arbitrary text safely.
+        python3 "$SCRIPT_DIR/extract_actions.py" \
+            --output-dir "$OUT" \
+            --clip-index "$CLIP" \
+            --expected-clips {{Param.ClipCount}} \
+            --prompt "$COSMOS3_ACTION_PROMPT" \
+            --domain-name "$COSMOS3_DOMAIN_NAME" \
+            --view-point "$COSMOS3_VIEW_POINT" \
+            --action-chunk-size {{Param.ActionChunkSize}} \
+            --raw-action-dim {{Param.RawActionDim}} \
+            --image-size {{Param.ActionImageSize}} \
+            --num-frames {{Param.NumFrames}} \
+            --fps {{Param.Fps}} \
+            --num-inference-steps {{Param.ActionSteps}} \
+            --guidance-scale {{Param.ActionGuidanceScale}} \
+            --flow-shift {{Param.FlowShift}} \
+            --seed "$SEED" \
+            --guardrails true \
+            --request-timeout {{Param.RequestTimeoutSeconds}} \
+            2>&1 | tee "$LOG"
+        rc=${PIPESTATUS[0]}
+        set -e
+        if [ "$rc" -ne 0 ]; then
+            echo "openjd_fail: extract_actions.py exited $rc (see $LOG)" >&2
+            exit "$rc"
+        fi
+        echo "clip $CLIP actions complete"
+
+# ================================================================= 3 - Merge =
+- name: 3 - Merge
+  # Both producers are listed, even though step 2 already depends on step 1.
+  #
+  # A dependency is not only ordering here: the worker runs a second job
+  # attachments download, "Job Attachments Download for Step", that fetches the
+  # outputs of the steps this one depends on. That download is DIRECT
+  # dependencies only, not the transitive closure. Listing step 2 alone put
+  # actions/ in the session and left dreams/ absent, because step 2 read the
+  # videos as inputs and never modified them, so they were not among its own
+  # uploads. Verified on a real run: the step download was 6 files / 13.5 KB,
+  # with no sign of the 300 KB clips.
+  dependencies:
+  - dependsOn: 1 - Dream
+  - dependsOn: 2 - Extract actions
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - "{{Task.File.Run}}"
+        - "{{Param.VideoKey}}"
+        timeout: "{{Param.StepTimeoutSeconds}}"
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      runnable: true
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        OUT='{{Param.OutputDir}}'
+        SCRIPT_DIR='{{Param.ScriptDir}}'
+        COSMOS3_VIDEO_KEY="$1"
+
+        # Needs no GPU and no server: standard library only, Python 3.9
+        # compatible, with an optional pyarrow for parquet output. It still
+        # executes inside the container, because a Docker queue environment
+        # wraps every action on the queue with no per-step opt-out.
+        python3 -c 'import sys; print("interpreter:", sys.executable, sys.version.split()[0])'
+
+        python3 "$SCRIPT_DIR/merge_dataset.py" \
+            --output-dir "$OUT" \
+            --expected-clips {{Param.ClipCount}} \
+            --raw-action-dim {{Param.RawActionDim}} \
+            --fps {{Param.Fps}} \
+            --video-key "$COSMOS3_VIDEO_KEY" \
+            --action-mode '{{Param.ActionMode}}'

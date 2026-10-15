@@ -1,0 +1,318 @@
+specificationVersion: "environment-2023-09"
+# Run every action on the queue inside one long-lived container, with GPU access,
+# a 16 GB /dev/shm, and an optional model cache on the fleet's persistent volume.
+#
+# This targets a service-managed fleet carrying the `docker` software add-on,
+# which installs ROOTLESS Docker. It is the console-generated Docker queue
+# environment plus three additions, each marked below. No privileged host
+# configuration script is needed.
+#
+# onEnter and onExit run on the HOST. Every other action is `docker container
+# exec`ed into the one container onEnter started, sharing its filesystem,
+# process and network namespace, so a server a step environment starts is
+# reachable on localhost from every task in the session. Two consequences: a job
+# or step environment has no AWS CLI unless the image ships one, and the image's
+# ENTRYPOINT never runs.
+#
+# GPU access uses CDI, which is what the add-on supports. The service generates
+# /etc/cdi/nvidia.yaml at boot and enables the daemon's cdi feature; it does not
+# register the rootful `nvidia` runtime, whose prestart hook needs a CAP_MKNOD a
+# rootless daemon lacks. Gating on `docker info | grep nvidia` rather than on the
+# spec file is the trap: the gate is false, no GPU flags are passed at all, and
+# the container runs CPU-only without complaint.
+extensions:
+  - WRAP_ACTIONS
+  - EXPR
+  - REDACTED_ENV_VARS
+parameterDefinitions:
+  - name: DockerImage
+    type: STRING
+    description: >
+      The ECR container image URI to pull and use for jobs.
+      Format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+
+      ECR only. Mirror a public image into ECR first.
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: Container Image URI
+  - name: HfTokenSecretArn
+    type: STRING
+    description: >
+      Optional Secrets Manager secret (ARN or name) holding a Hugging Face
+      token, published to every action as a redacted HF_TOKEN.
+
+      This is a queue environment parameter rather than a job parameter because
+      every other action runs inside the container, which generally has no AWS
+      CLI. Only this onEnter runs on the host, where the CLI and the queue
+      role's credentials exist.
+
+      The queue role needs secretsmanager:GetSecretValue on the secret.
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: HF token secret
+  - name: ModelCacheSubdir
+    type: STRING
+    description: >
+      Subdirectory of the fleet's persistent volume to use as the Hugging Face
+      cache, bind-mounted into the container at the same path and exported as
+      HF_HOME. Leave empty to skip, which makes every session re-download its
+      weights.
+
+      Requires a fleet with persistentVolumeConfiguration whose mountPath
+      matches PersistentVolumeMountPath below.
+    default: "model-cache"
+    userInterface:
+      control: LINE_EDIT
+      label: Model cache subdirectory
+  - name: PersistentVolumeMountPath
+    type: STRING
+    description: The fleet's persistentVolumeConfiguration mountPath.
+    default: "/mnt/deadline-persistent"
+    userInterface:
+      control: LINE_EDIT
+      label: Persistent volume mount path
+  - name: ImageCacheCleanupAfterHours
+    type: INT
+    description: Cached container images not used within this many hours are removed at session exit.
+    default: 96
+    userInterface:
+      control: SPIN_BOX
+      label: Cleanup Unused Images After (Hours)
+environment:
+  name: DockerContainer
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ["{{Env.File.Enter}}"]
+      onWrapEnvEnter:
+        command: bash
+        args:
+          - "{{Env.File.Wrap}}"
+          - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+          - "--"
+          - "{{WrappedAction.Command}}"
+          - "{{WrappedAction.Args}}"
+      onWrapTaskRun:
+        command: bash
+        args:
+          - "{{Env.File.Wrap}}"
+          - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+          - "--"
+          - "{{WrappedAction.Command}}"
+          - "{{WrappedAction.Args}}"
+      onWrapEnvExit:
+        command: bash
+        args:
+          - "{{Env.File.Wrap}}"
+          - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+          - "--"
+          - "{{WrappedAction.Command}}"
+          - "{{WrappedAction.Args}}"
+      onExit:
+        command: bash
+        args: ["{{Env.File.Exit}}"]
+    embeddedFiles:
+      - name: Enter
+        type: TEXT
+        runnable: true
+        data: |
+          #!/usr/bin/env bash
+          set -uo pipefail
+          PREFIX=/opt/deadline/docker-rootless
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/docker.sock"
+          SOCK="${XDG_RUNTIME_DIR}/docker.sock"
+          ready() { [ -S "$SOCK" ] && "$PREFIX/bin/docker" info >/dev/null 2>&1; }
+
+          # There is no system-wide daemon on an add-on fleet. The add-on installs
+          # the binaries; this environment owns the daemon's lifecycle.
+          mkdir -p "${HOME}/.config/systemd/user"
+          cat > "${HOME}/.config/systemd/user/docker.service" <<UNITFILE
+          [Unit]
+          Description=Rootless Docker for Deadline job-user
+          StartLimitIntervalSec=0
+
+          [Service]
+          Environment=PATH=${PREFIX}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/sbin:/usr/bin:/bin
+          ExecStartPre=-/usr/bin/rm -f %t/docker.sock
+          ExecStart=${PREFIX}/bin/dockerd-rootless.sh
+          Restart=no
+          TimeoutStartSec=90
+          TimeoutStopSec=15
+          KillMode=control-group
+          Delegate=yes
+          Type=notify
+          NotifyAccess=all
+          UNITFILE
+
+          for i in $(seq 1 120); do
+            case "$(systemctl --user is-system-running 2>/dev/null)" in
+              running|degraded)
+                systemctl --user daemon-reload 2>/dev/null
+                if ! ready; then  # onExit is skipped if the worker dies mid-session; clear what it left
+                  systemctl --user reset-failed docker.service 2>/dev/null
+                  pkill -9 -u "$(id -u)" -x rootlesskit 2>/dev/null
+                  rm -f "$SOCK"
+                fi
+                systemctl --user start docker.service 2>/dev/null && break
+                ;;
+            esac
+            sleep 1
+          done
+
+          for i in $(seq 1 90); do ready && break; sleep 1; done
+          if ! ready; then
+            systemctl --user status docker.service --no-pager 2>&1 | head -5
+            echo "openjd_fail: rootless docker daemon not available"
+            exit 1
+          fi
+
+          REGION=$(ec2-metadata --availability-zone | awk '{print $2}' | sed 's/[a-z]$//')
+          REGISTRY=$(echo {{ repr_sh(Param.DockerImage) }} | cut -d'/' -f1)
+          case "$REGISTRY" in
+            *.dkr.ecr.*.amazonaws.com) ;;
+            "") echo "openjd_fail: DockerImage is empty; set it on the queue environment"; exit 1 ;;
+            *) echo "openjd_fail: not an ECR registry: ${REGISTRY}"; exit 1 ;;
+          esac
+          export DOCKER_CONFIG="${XDG_RUNTIME_DIR}/deadline-docker-config"; rm -f "${HOME}/.docker/config.json"
+          if ! aws ecr get-login-password --region "${REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"; then
+            echo "openjd_fail: ECR login failed for ${REGISTRY} in ${REGION}"
+            exit 1
+          fi
+
+          if ! docker pull {{ repr_sh(Param.DockerImage) }}; then
+            echo 'openjd_fail: could not pull' {{ repr_sh(Param.DockerImage) }}
+            exit 1
+          fi
+
+          # docker exec starts a clean env: forward the known license vars only, never the
+          # whole host env (AWS creds).
+          LICENSE_ENV_FILE="{{Session.WorkingDirectory}}/.docker-license.env"
+          : > "$LICENSE_ENV_FILE"
+          for var in ADSKFLEX_LICENSE_FILE foundry_LICENSE LUXION_LICENSE_FILE PIXAR_LICENSE_FILE \
+                     g_licenseServerRLM redshift_LICENSE SESI_LMHOST VRAY_AUTH_CLIENT_SETTINGS \
+                     VRAY_AUTH_CLIENT_FILE_PATH FLEXLM_TIMEOUT; do
+            [ -n "${!var:-}" ] && echo "${var}=${!var}" >> "$LICENSE_ENV_FILE"
+          done
+          echo "openjd_env: DOCKER_LICENSE_ENV_FILE=${LICENSE_ENV_FILE}"
+
+          # ADDITION 1 of 3: read the Hugging Face token here, on the host.
+          #
+          # Secrets Manager is regional and the CLI targets the configured region
+          # even when handed an ARN naming another, so parse the region out. A
+          # token saved through a console field often arrives wrapped in literal
+          # double quotes, which reach the Authorization header verbatim and make
+          # the API answer "Invalid username or password" rather than anything
+          # about quoting, so strip them and require the hf_ prefix.
+          HF_SECRET={{ repr_sh(Param.HfTokenSecretArn) }}
+          if [ -n "$HF_SECRET" ]; then
+            SECRET_REGION=""
+            case "$HF_SECRET" in
+              arn:aws:secretsmanager:*) SECRET_REGION=$(printf '%s' "$HF_SECRET" | cut -d: -f4) ;;
+            esac
+            if [ -n "$SECRET_REGION" ]; then set -- --region "$SECRET_REGION"; else set --; fi
+            if ! HF_RAW=$(aws secretsmanager get-secret-value "$@" --secret-id "$HF_SECRET" \
+                  --query SecretString --output text); then
+              echo "openjd_fail: could not read $HF_SECRET; the queue role needs secretsmanager:GetSecretValue on it"
+              exit 1
+            fi
+            HF_TOKEN_VALUE=$(printf '%s' "$HF_RAW" | tr -d '"'"'"'[:space:]')
+            case "$HF_TOKEN_VALUE" in
+              hf_*) ;;
+              *) echo "openjd_fail: secret does not look like a Hugging Face token (no hf_ prefix after stripping quotes)"; exit 1 ;;
+            esac
+            # Length only. REDACTED_ENV_VARS keeps the value out of the log.
+            echo "Hugging Face token read: ${#HF_TOKEN_VALUE} characters."
+            echo "openjd_redacted_env: HF_TOKEN=${HF_TOKEN_VALUE}"
+          fi
+
+          # ADDITION 2 of 3: a model cache on the persistent volume. Without
+          # it every session re-downloads its weights. Bound at an identical path
+          # so paths written in the container resolve on the host.
+          CACHE_ARGS=()
+          CACHE_SUBDIR={{ repr_sh(Param.ModelCacheSubdir) }}
+          PV_PATH={{ repr_sh(Param.PersistentVolumeMountPath) }}
+          if [ -n "$CACHE_SUBDIR" ]; then
+            if [ -d "$PV_PATH" ]; then
+              CACHE_DIR="${PV_PATH}/${CACHE_SUBDIR}"
+              if mkdir -p "$CACHE_DIR" 2>/dev/null && [ -w "$CACHE_DIR" ]; then
+                CACHE_ARGS=(--mount "type=bind,src=${CACHE_DIR},dst=${CACHE_DIR}" -e "HF_HOME=${CACHE_DIR}")
+                echo "model cache: ${CACHE_DIR} ($(df -h --output=avail "$CACHE_DIR" | tail -1 | tr -d ' ') free)"
+              else
+                echo "WARNING: ${CACHE_DIR} is not writable; weights will re-download every session."
+              fi
+            else
+              echo "WARNING: no persistent volume at ${PV_PATH}; weights will re-download"
+              echo "         every session. Set ModelCacheSubdir empty to silence this."
+            fi
+          fi
+
+          # Gate on the CDI spec, not on a registered runtime. See the header.
+          GPU_ARGS=()
+          [ -f /etc/cdi/nvidia.yaml ] && GPU_ARGS=(--gpus all)
+
+          # ADDITION 3 of 3: --shm-size 16g. The 64 MB default kills frameworks
+          # that pass tensors between worker processes through shared memory, and
+          # it does so at teardown, AFTER the work succeeded: a Cosmos diffusion
+          # worker rendered and decoded a clip, then died with "leaked
+          # shared_memory objects" and failed the request.
+          if ! DOCKER_CONTAINER_ID=$(docker container run --rm --detach "${GPU_ARGS[@]}" \
+              "${CACHE_ARGS[@]}" \
+              --shm-size 16g \
+              --entrypoint /bin/sh \
+              --mount {{ repr_sh("type=bind,src=" + Session.WorkingDirectory + ",dst=" + Session.WorkingDirectory) }} \
+              --workdir {{ repr_sh(Session.WorkingDirectory) }} \
+              {{ repr_sh(Param.DockerImage) }} \
+              -c 'trap exit TERM; while :; do sleep 1 & wait $!; done'); then
+            echo "openjd_fail: could not start the session container"
+            exit 1
+          fi
+          echo "openjd_env: DOCKER_CONTAINER_ID=${DOCKER_CONTAINER_ID}"
+          echo "openjd_env: DOCKER_HOST=${DOCKER_HOST}"
+          exit 0
+      - name: Wrap
+        type: TEXT
+        runnable: true
+        data: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          # --user 0:0, not the host uid. A rootless userns maps container root to
+          # the host's job-user, so files written into the bind-mounted session
+          # directory are owned by job-user and job attachments can upload them.
+          # Container root also exists in every image, so getpass.getuser() and
+          # anything defaulting to ~ keep working.
+          exec_cmd=(docker container exec --user 0:0)
+          if [ -s "${DOCKER_LICENSE_ENV_FILE:-}" ]; then
+            exec_cmd+=(--env-file "$DOCKER_LICENSE_ENV_FILE")
+          fi
+          while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
+            exec_cmd+=("$1")
+            shift
+          done
+          shift
+          exec "${exec_cmd[@]}" "$DOCKER_CONTAINER_ID" "$@"
+      - name: Exit
+        type: TEXT
+        runnable: true
+        data: |
+          #!/usr/bin/env bash
+          set -uo pipefail
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          [ -n "${DOCKER_CONTAINER_ID:-}" ] && docker container stop -t 30 "$DOCKER_CONTAINER_ID" 2>/dev/null
+          # Markers record last use: `docker image inspect` reports the build date,
+          # not the last pull, so an unused-image policy needs them.
+          MARKERS="${HOME}/.local/share/deadline-docker/last-used"; mkdir -p "$MARKERS"
+          id=$(docker image ls -q --no-trunc {{ repr_sh(Param.DockerImage) }} 2>/dev/null | head -1); [ -n "$id" ] && touch "$MARKERS/$id"
+          CUTOFF=$(( $(date +%s) - {{Param.ImageCacheCleanupAfterHours}} * 3600 ))
+          for id in $(docker image ls -q --no-trunc 2>/dev/null | sort -u); do
+            [ -f "$MARKERS/$id" ] || { touch "$MARKERS/$id"; continue; }
+            [ "$(stat -c %Y "$MARKERS/$id")" -lt "$CUTOFF" ] && docker image rm -f "$id" >/dev/null 2>&1 && rm -f "$MARKERS/$id"
+          done
+          systemctl --user stop docker.service 2>/dev/null
+          rm -rf "${XDG_RUNTIME_DIR}/deadline-docker-config"
+          # Orderly manager shutdown before the agent's cleanup SIGTERMs it
+          systemctl --user exit 2>/dev/null
+          exit 0
