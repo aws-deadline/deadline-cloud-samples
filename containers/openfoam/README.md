@@ -72,7 +72,7 @@ aws ecr describe-images --region "${REGION}" --repository-name "${REPOSITORY}" \
 ## Submit the job
 
 Submit the bundle from this directory, and pass the image you pushed.
-Without `-p DockerImage`, the job runs in the queue environment's default image instead.
+Always pass `DockerImage`. The steps need your OpenFOAM image, not the queue's default.
 
 ```bash
 cd ..
