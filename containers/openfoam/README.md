@@ -100,10 +100,19 @@ output/
 └── summary.txt                             OpenFOAM version, and the end time and run time of each case
 ```
 
+The centreline graph shows the lid dragging the top layer at 1 m/s, and a return flow of about 0.2 m/s near mid-height.
+The profiles stay close, and the Re 100 case departs furthest from the others.
+
+![Horizontal velocity on the vertical centreline for the three cases](.readme_images/centreline.png)
+
+Each velocity plot shows one main vortex. As the Reynolds number rises, its centre moves in the direction the lid travels.
+
+![Velocity magnitude and flow direction at Re 100](.readme_images/nu-0.001-velocity.png)
+
 ## How it works
 
 Each action in the job template runs through a hook in the queue environment.
-The table shows the order for one session.
+A `Solve` session runs the `Mesh` and `Solve` rows below, and the `Plot` step gets a session of its own.
 
 | Job action | Queue environment action | Where it runs | Work |
 |---|---|---|---|
@@ -129,7 +138,7 @@ Read more about the moving parts:
 
 ## Cost and cleanup
 
-Workers bill while they run, and the fleet scales up for each job.
+Workers bill while they run, and the fleet starts workers when jobs are waiting.
 The image costs ECR storage, and job attachments and output cost S3 storage.
 
 Delete the image repository when you finish.
@@ -148,6 +157,16 @@ aws ecr delete-repository --region "${REGION}" --repository-name openfoam-ubuntu
 | `mesh spans N planes in z` | The tutorial is 3D. The plots handle 2D cases only. |
 
 Session logs are in the Deadline Cloud monitor, or run `deadline job logs --job-id <job-id>`.
+
+## Tested with
+
+| Item | Value |
+|---|---|
+| Image | OpenFOAM v2512, Ubuntu 24.04 and matplotlib 3.10.7. 1.74 GB on disk, 546 MB compressed in ECR. |
+| Fleet | Linux x86_64 service-managed fleet, 16 vCPU, 32-64 GiB, CPU only, spot, Docker add-on |
+| Deadline Cloud CLI | 0.60.7 |
+| Result | 4 of 4 tasks succeeded in 4 sessions on 3 workers, 94 seconds from job start to finish |
+| Timing | Image pull 28-42 seconds per new worker. Each `Solve` task took 5-8 seconds and `Plot` took 5 seconds. |
 
 ## Related resources
 
