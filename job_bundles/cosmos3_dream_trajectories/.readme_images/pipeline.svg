@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="470" viewBox="0 0 880 470"
+     font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <style>
+    .box   { fill: #ffffff; stroke: #57606a; stroke-width: 1.5; rx: 6; }
+    .gpu   { fill: #ddf4ff; stroke: #0969da; stroke-width: 1.5; }
+    .cpu   { fill: #f6f8fa; stroke: #57606a; stroke-width: 1.5; }
+    .art   { fill: #fff8c5; stroke: #9a6700; stroke-width: 1.2; }
+    .title { font-size: 15px; font-weight: 600; fill: #1f2328; }
+    .label { font-size: 12.5px; fill: #1f2328; }
+    .mono  { font-size: 11.5px; fill: #1f2328; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .note  { font-size: 11px; fill: #656d76; }
+    .arrow { stroke: #57606a; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+    .tag   { font-size: 11px; font-weight: 600; fill: #0969da; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <!-- inputs -->
+  <rect class="box art" x="20" y="24" width="190" height="78"/>
+  <text class="title" x="34" y="48">ClipDir</text>
+  <text class="mono"  x="34" y="68">clips.json</text>
+  <text class="mono"  x="34" y="86">frames/*.png</text>
+  <text class="note"  x="20" y="118">One conditioning image and</text>
+  <text class="note"  x="20" y="133">one prompt per clip.</text>
+
+  <path class="arrow" d="M 212 63 L 268 63"/>
+
+  <!-- step 1 -->
+  <rect class="box gpu" x="272" y="20" width="268" height="86"/>
+  <text class="title" x="288" y="44">1 &#183; Dream</text>
+  <text class="tag"   x="452" y="44">N tasks, 1 GPU</text>
+  <text class="label" x="288" y="65">Image plus prompt to video</text>
+  <text class="mono"  x="288" y="84">POST /v1/videos/sync</text>
+  <text class="mono"  x="288" y="100">-&gt; dreams/NAME.mp4</text>
+
+  <path class="arrow" d="M 406 108 L 406 146"/>
+  <text class="note" x="416" y="132">videos</text>
+
+  <!-- step 2 -->
+  <rect class="box gpu" x="272" y="150" width="268" height="86"/>
+  <text class="title" x="288" y="174">2 &#183; Extract actions</text>
+  <text class="tag"   x="452" y="174">N tasks, 1 GPU</text>
+  <text class="label" x="288" y="195">Inverse dynamics, video to actions</text>
+  <text class="mono"  x="288" y="214">POST /v1/videos (async)</text>
+  <text class="mono"  x="288" y="230">-&gt; actions/NAME.json</text>
+
+  <path class="arrow" d="M 406 238 L 406 276"/>
+  <text class="note" x="416" y="262">actions</text>
+
+  <!-- step 1 also feeds step 3 directly -->
+  <path class="arrow" d="M 272 63 C 180 63 180 300 268 300"/>
+  <text class="note" x="92" y="196">videos again:</text>
+  <text class="note" x="92" y="211">step 3 depends on</text>
+  <text class="note" x="92" y="226">BOTH producers, or</text>
+  <text class="note" x="92" y="241">they never arrive</text>
+
+  <!-- step 3 -->
+  <rect class="box cpu" x="272" y="280" width="268" height="74"/>
+  <text class="title" x="288" y="304">3 &#183; Merge</text>
+  <text class="tag"   x="466" y="304">1 task, no GPU</text>
+  <text class="label" x="288" y="325">Assemble and verify the dataset</text>
+  <text class="mono"  x="288" y="344">-&gt; lerobot/, dream_summary.json</text>
+
+  <path class="arrow" d="M 544 317 L 600 317"/>
+
+  <!-- output -->
+  <rect class="box art" x="604" y="272" width="250" height="90"/>
+  <text class="title" x="618" y="296">LeRobot dataset</text>
+  <text class="mono"  x="618" y="316">meta/ data/ videos/</text>
+  <text class="note"  x="618" y="336">Tasks carry a &lt;DREAM&gt; prefix so</text>
+  <text class="note"  x="618" y="351">synthetic episodes stay separable.</text>
+
+  <!-- shared server -->
+  <rect x="580" y="20" width="274" height="216" rx="6" fill="#f6f8fa" stroke="#8250df"
+        stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="title" x="596" y="44" fill="#8250df">One server per session</text>
+  <text class="label" x="596" y="68">Both GPU steps start</text>
+  <text class="mono"  x="596" y="86">vllm serve --omni</text>
+  <text class="label" x="596" y="105">in a step environment and</text>
+  <text class="label" x="596" y="123">share it across the session's</text>
+  <text class="label" x="596" y="141">tasks on 127.0.0.1:8000.</text>
+  <text class="note"  x="596" y="166">Loading a 16B checkpoint takes</text>
+  <text class="note"  x="596" y="181">minutes, so a per-task server</text>
+  <text class="note"  x="596" y="196">would spend its life booting.</text>
+  <text class="note"  x="596" y="221">Each session is its own container.</text>
+
+  <path class="arrow" d="M 540 63 L 576 63" stroke="#8250df" stroke-dasharray="4 3"/>
+  <path class="arrow" d="M 540 193 L 576 193" stroke="#8250df" stroke-dasharray="4 3"/>
+
+  <!-- footer -->
+  <text class="note" x="20" y="400">Every clip is independent, so the work fans out one clip per task with no cross-node collective.</text>
+  <text class="note" x="20" y="420">Blue steps hold a whole GPU. The merge step needs none, and is what decides whether the job succeeded.</text>
+  <text class="note" x="20" y="446">ActionMode=none skips step 2 and delivers videos only, which is the path for an embodiment Cosmos 3's</text>
+  <text class="note" x="20" y="461">inverse dynamics does not cover, such as SO-101.</text>
+</svg>

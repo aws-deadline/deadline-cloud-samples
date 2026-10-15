@@ -1,0 +1,498 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  An AWS Deadline Cloud farm for GPU container workloads that download large model weights.
+  Deploys a farm, a queue, a Linux GPU fleet carrying the Docker software add-on and a
+  persistent EBS volume for a model cache, and the queue-fleet association. Sized by default
+  for an L40S (48 GiB) so a checkpoint of roughly 35 GB stays resident.
+
+  Does NOT create the Docker queue environment, because that template lives in this
+  repository and is versioned there. The CreateQueueEnvironmentCommand output gives you the
+  one command that adds it.
+
+  GPU capacity is NOT available by default. See the README for the two service quotas you
+  almost certainly need to raise first.
+
+  See the README.md included with the CloudFormation template to learn more.
+
+Parameters:
+  JobAttachmentsBucketName:
+    Type: String
+    Description: An existing S3 bucket to use for job attachments.
+    MinLength: 1
+
+  ModelTokenSecretArn:
+    Type: String
+    Description: >
+      Optional. ARN of a Secrets Manager secret holding a model-registry token, such as a
+      Hugging Face token. The queue role is granted secretsmanager:GetSecretValue on this
+      one secret, which is what the Docker queue environment's onEnter needs to read it on
+      the host. Leave empty to grant nothing.
+    Default: ""
+
+  # Deadline Cloud farm and queue
+  FarmName:
+    Type: String
+    Description: The name of the farm.
+    Default: "GPU Container Farm"
+    MinLength: 1
+  FarmDescription:
+    Type: String
+    Description: The description of the farm.
+    Default: "Deadline Cloud farm deployed from the gpu_docker_persistent_farm sample CloudFormation template."
+  QueueName:
+    Type: String
+    Description: The name of the queue.
+    Default: "GPU Container Queue"
+    MinLength: 1
+  QueueDescription:
+    Type: String
+    Description: The description of the queue.
+    Default: "The Deadline Cloud queue for GPU container jobs."
+
+  # Fleet
+  FleetName:
+    Type: String
+    Description: The name of the Linux GPU fleet.
+    Default: "GPU Container Fleet"
+    MinLength: 1
+  AcceleratorName:
+    Type: String
+    Description: >
+      The GPU chip to require. l40s has 48 GiB and holds a 16B-parameter model resident;
+      a10g and l4 have 24 GiB and need the workload to offload layers.
+    Default: l40s
+    AllowedValues:
+      - t4
+      - a10g
+      - l4
+      - l40s
+      - rtx-pro-server-6000
+  InstanceMarketType:
+    Type: String
+    Description: >
+      Whether to use on-demand or spot instances. Spot is cheaper and uses a separate service
+      quota; GPU Spot capacity for a given chip can be unavailable in a Region for long
+      stretches, so on-demand is the default here.
+    Default: on-demand
+    AllowedValues:
+      - on-demand
+      - spot
+  MaxWorkerCount:
+    Type: Number
+    Description: >
+      Maximum worker hosts. GPU service quota is consumed at worst case, as
+      MaxWorkerCount times GPUs per instance summed across every service-managed fleet in
+      the Region, whether or not anything is running.
+    Default: 2
+    MinValue: 1
+  MinWorkerCount:
+    Type: Number
+    Description: >
+      Minimum worker hosts. Keep this at 0 so an idle farm costs nothing; a non-zero value
+      holds GPU instances continuously.
+    Default: 0
+    MinValue: 0
+  MinVcpu:
+    Type: Number
+    Description: Minimum vCPUs per instance.
+    Default: 8
+  MaxVcpu:
+    Type: Number
+    Description: Maximum vCPUs per instance.
+    Default: 48
+  MinRamMiB:
+    Type: Number
+    Description: >
+      Minimum MiB RAM per instance. The default is deliberately large: a workload that
+      offloads model layers to host memory needs RAM proportional to the checkpoint, not to
+      the GPU. A 35 GB checkpoint offloaded on a 64 GiB instance OOM-kills the worker
+      minutes into startup and reports only a broken pipe. For g6e, 131072 makes 4xlarge
+      the smallest instance the fleet can pick.
+    Default: 131072
+
+  # Root EBS volume
+  RootEbsVolumeSizeGiB:
+    Type: Number
+    Description: >
+      Root EBS volume size GiB. A multi-gigabyte container image and the rootless Docker
+      image store both land here, so this is larger than the service default.
+    Default: 300
+    MinValue: 1
+  RootEbsVolumeIops:
+    Type: Number
+    Description: Root EBS volume IOPS.
+    Default: 3000
+  RootEbsVolumeThroughputMiB:
+    Type: Number
+    Description: Root EBS volume throughput MiB.
+    Default: 125
+
+  # Persistent EBS volume, which is what makes the model cache possible
+  PersistentVolumeMountPath:
+    Type: String
+    Description: >
+      Where the persistent volume is mounted on the worker. The Docker queue environment's
+      PersistentVolumeMountPath parameter must match this exactly.
+    Default: /mnt/deadline-persistent
+    MinLength: 1
+  PersistentVolumeSizeGiB:
+    Type: Number
+    Description: >
+      Persistent volume size GiB. Budget for every model a queue caches, not just one:
+      a single large checkpoint is roughly 35 GB.
+    Default: 250
+    MinValue: 1
+    MaxValue: 65536
+  PersistentVolumeIops:
+    Type: Number
+    Description: Persistent volume IOPS.
+    Default: 3000
+    MinValue: 100
+    MaxValue: 80000
+  PersistentVolumeThroughputMiB:
+    Type: Number
+    Description: Persistent volume throughput MiB.
+    Default: 125
+  PersistentVolumeLastUsedTtlHours:
+    Type: Number
+    Description: >
+      How many hours a persistent volume may go unused before it is deleted, taking the
+      cache with it. The service default is 12, so an idle overnight loses the cache and the
+      next job re-downloads its weights.
+    Default: 168
+    MinValue: 1
+    MaxValue: 8760
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Required Parameters"
+        Parameters:
+          - JobAttachmentsBucketName
+          - ModelTokenSecretArn
+
+      - Label:
+          default: "Farm and Queue"
+        Parameters:
+          - FarmName
+          - FarmDescription
+          - QueueName
+          - QueueDescription
+
+      - Label:
+          default: "GPU Fleet"
+        Parameters:
+          - FleetName
+          - AcceleratorName
+          - InstanceMarketType
+          - MinWorkerCount
+          - MaxWorkerCount
+          - MinVcpu
+          - MaxVcpu
+          - MinRamMiB
+
+      - Label:
+          default: "Root EBS Volume"
+        Parameters:
+          - RootEbsVolumeSizeGiB
+          - RootEbsVolumeIops
+          - RootEbsVolumeThroughputMiB
+
+      - Label:
+          default: "Persistent EBS Volume (model cache)"
+        Parameters:
+          - PersistentVolumeMountPath
+          - PersistentVolumeSizeGiB
+          - PersistentVolumeLastUsedTtlHours
+          - PersistentVolumeIops
+          - PersistentVolumeThroughputMiB
+
+    ParameterLabels:
+      JobAttachmentsBucketName:
+        default: "Existing S3 Bucket For Job Attachments"
+      ModelTokenSecretArn:
+        default: "Model Registry Token Secret ARN (optional)"
+      FarmName:
+        default: "Farm Name"
+      FarmDescription:
+        default: "Farm Description"
+      QueueName:
+        default: "Queue Name"
+      QueueDescription:
+        default: "Queue Description"
+      FleetName:
+        default: "Fleet Name"
+      AcceleratorName:
+        default: "GPU Chip"
+      InstanceMarketType:
+        default: "Instance Purchase Type"
+      MinWorkerCount:
+        default: "Minimum Workers"
+      MaxWorkerCount:
+        default: "Maximum Workers"
+      MinVcpu:
+        default: "Minimum vCPUs"
+      MaxVcpu:
+        default: "Maximum vCPUs"
+      MinRamMiB:
+        default: "Minimum RAM (MiB)"
+      RootEbsVolumeSizeGiB:
+        default: "Root Volume Size (GiB)"
+      RootEbsVolumeIops:
+        default: "Root Volume IOPS"
+      RootEbsVolumeThroughputMiB:
+        default: "Root Volume Throughput (MiB)"
+      PersistentVolumeMountPath:
+        default: "Persistent Volume Mount Path"
+      PersistentVolumeSizeGiB:
+        default: "Persistent Volume Size (GiB)"
+      PersistentVolumeIops:
+        default: "Persistent Volume IOPS"
+      PersistentVolumeThroughputMiB:
+        default: "Persistent Volume Throughput (MiB)"
+      PersistentVolumeLastUsedTtlHours:
+        default: "Persistent Volume Unused TTL (Hours)"
+
+Conditions:
+  HasModelTokenSecret: !Not [!Equals [!Ref ModelTokenSecretArn, ""]]
+
+Resources:
+
+  farm:
+    Type: AWS::Deadline::Farm
+    Properties:
+      DisplayName: !Ref FarmName
+      Description: !Ref FarmDescription
+
+  queue:
+    Type: AWS::Deadline::Queue
+    Properties:
+      DisplayName: !Ref QueueName
+      Description: !Ref QueueDescription
+      FarmId: !GetAtt farm.FarmId
+      JobAttachmentSettings:
+        S3BucketName: !Ref JobAttachmentsBucketName
+        RootPrefix: DeadlineCloud
+      RoleArn: !GetAtt queueIAMRole.Arn
+      # jobRunAsUser is deliberately unset, so actions run as the worker-agent user.
+      # That is the user the Docker add-on prepares a rootless daemon for; a queue that
+      # overrides it to a different user cannot reach the Docker socket.
+
+  queueIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "GpuContainerQueue-${FarmId}"
+        - FarmId: !GetAtt farm.FarmId
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'deadline.${AWS::URLSuffix}'
+                - !Sub 'credentials.deadline.${AWS::URLSuffix}'
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
+              ArnEquals:
+                aws:SourceArn: !Ref farm
+      Policies:
+        - PolicyName: QueuePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: JobAttachmentsReadWrite
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Effect: Allow
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${JobAttachmentsBucketName}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${JobAttachmentsBucketName}/DeadlineCloud/*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceAccount: !Sub '${AWS::AccountId}'
+              - Sid: JobLogsReadOnly
+                Action:
+                  - logs:GetLogEvents
+                Effect: Allow
+                Resource: !Sub
+                  - "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/deadline/${FarmId}/*"
+                  - FarmId: !GetAtt farm.FarmId
+              # The Docker queue environment's onEnter authenticates to ECR on the host with
+              # these. Without them the session fails at `docker login`, before any task runs.
+              - Sid: EcrPullForSessionContainer
+                Action:
+                  - ecr:GetAuthorizationToken
+                Effect: Allow
+                Resource: "*"
+              - Sid: EcrPullImage
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Effect: Allow
+                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/*"
+              # Read by the queue environment's onEnter, on the host, because the
+              # container it starts generally has no AWS CLI. Scoped to the one secret.
+              - !If
+                - HasModelTokenSecret
+                - Sid: ModelRegistryTokenReadOnly
+                  Action:
+                    - secretsmanager:GetSecretValue
+                  Effect: Allow
+                  Resource: !Ref ModelTokenSecretArn
+                - !Ref AWS::NoValue
+              - Sid: DeadlineServiceManagedFleetSoftwareAccess
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Effect: Allow
+                Resource:
+                  - "*"
+                Condition:
+                  ArnLike:
+                    s3:DataAccessPointArn: "arn:aws:s3:*:*:accesspoint/deadline-software-*"
+                  StringEquals:
+                    s3:AccessPointNetworkOrigin: VPC
+
+  fleet:
+    Type: AWS::Deadline::Fleet
+    Properties:
+      DisplayName: !Ref FleetName
+      FarmId: !GetAtt farm.FarmId
+      RoleArn: !GetAtt fleetRole.Arn
+      MinWorkerCount: !Ref MinWorkerCount
+      MaxWorkerCount: !Ref MaxWorkerCount
+      Configuration:
+        ServiceManagedEc2:
+          InstanceCapabilities:
+            # Installs rootless Docker on every worker. There is no system-wide daemon:
+            # the add-on provides the binaries and the queue environment starts the
+            # daemon per session. It also installs the NVIDIA Container Toolkit and
+            # generates /etc/cdi/nvidia.yaml, which is how a container gets the GPU.
+            SoftwareAddOns:
+              - Name: docker
+            AcceleratorCapabilities:
+              Count:
+                Min: 1
+                Max: 1
+              Selections:
+                - Name: !Ref AcceleratorName
+                  Runtime: latest
+            VCpuCount:
+              Min: !Ref MinVcpu
+              Max: !Ref MaxVcpu
+            MemoryMiB:
+              Min: !Ref MinRamMiB
+            RootEbsVolume:
+              SizeGiB: !Ref RootEbsVolumeSizeGiB
+              Iops: !Ref RootEbsVolumeIops
+              ThroughputMiB: !Ref RootEbsVolumeThroughputMiB
+            OsFamily: LINUX
+            CpuArchitectureType: x86_64
+          # Survives worker replacement, so a cached checkpoint is downloaded once per
+          # fleet rather than once per session. Rootless Docker also keeps its image
+          # store under the job user's home, which this volume re-homes, so the
+          # container image cache survives replacement too.
+          PersistentVolumeConfiguration:
+            MountPath: !Ref PersistentVolumeMountPath
+            SizeGiB: !Ref PersistentVolumeSizeGiB
+            Iops: !Ref PersistentVolumeIops
+            ThroughputMiB: !Ref PersistentVolumeThroughputMiB
+            LastUsedTtlHours: !Ref PersistentVolumeLastUsedTtlHours
+          InstanceMarketOptions:
+            Type: !Ref InstanceMarketType
+
+  fleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "GpuContainerFleet-${FarmId}"
+        - FarmId: !GetAtt farm.FarmId
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub "credentials.deadline.${AWS::URLSuffix}"
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
+              ArnEquals:
+                aws:SourceArn: !Ref farm
+      Policies:
+        - PolicyName: FleetWorkerLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                Resource:
+                  - !Sub
+                    - arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${FarmId}/*
+                    - FarmId: !GetAtt farm.FarmId
+                Condition:
+                  ForAnyValue:StringEquals:
+                    aws:CalledVia:
+                      - !Sub "deadline.${AWS::URLSuffix}"
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                  - logs:GetLogEvents
+                Resource:
+                  - !Sub
+                    - arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${FarmId}/*
+                    - FarmId: !GetAtt farm.FarmId
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSDeadlineCloud-FleetWorker'
+
+  queueFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Properties:
+      FarmId: !GetAtt farm.FarmId
+      QueueId: !GetAtt queue.QueueId
+      FleetId: !GetAtt fleet.FleetId
+
+Outputs:
+  FarmId:
+    Description: The farm id.
+    Value: !GetAtt farm.FarmId
+  QueueId:
+    Description: The queue id.
+    Value: !GetAtt queue.QueueId
+  FleetId:
+    Description: The fleet id.
+    Value: !GetAtt fleet.FleetId
+  QueueRoleArn:
+    Description: >
+      The queue role. Grant it secretsmanager:GetSecretValue on any secret the Docker
+      queue environment reads, such as a Hugging Face token.
+    Value: !GetAtt queueIAMRole.Arn
+  PersistentVolumeMountPath:
+    Description: >
+      Pass this as the Docker queue environment's PersistentVolumeMountPath parameter. The
+      two must match, or the model cache silently falls back to a per-session directory.
+    Value: !Ref PersistentVolumeMountPath
+  CreateQueueEnvironmentCommand:
+    Description: >
+      Adds the repository's Docker queue environment to this queue. Run it from the
+      repository root. Afterwards set that environment's DockerImage parameter to your
+      ECR image URI and HfTokenSecretArn to your token secret, either in the console or
+      with update-queue-environment.
+    Value: !Sub
+      - >-
+        aws deadline create-queue-environment --farm-id ${FarmId} --queue-id ${QueueId}
+        --priority 1 --template-type YAML
+        --template file://queue_environments/docker_queue_env.yaml
+      - FarmId: !GetAtt farm.FarmId
+        QueueId: !GetAtt queue.QueueId
