@@ -41,6 +41,13 @@ docker run --rm "${REPOSITORY}:${IMAGE_TAG}" \
     moonray -in /source/testdata/rectangle.rdla -auto_affinity off -out /tmp/rectangle.exr
 ```
 
+Create the repository once, if you have not already.
+
+```console
+aws ecr create-repository --region "${REGION}" --repository-name "${REPOSITORY}" \
+    --image-scanning-configuration scanOnPush=true
+```
+
 Log in to Amazon ECR, then tag and push the image.
 
 ```console
@@ -85,7 +92,7 @@ deadline job download-output --farm-id <farm-id> --queue-id <queue-id> --job-id 
 
 | Parameter | Default | Description |
 |---|---|---|
-| `DockerImage` | None | ECR URI of the MoonRay image. Without it, the job runs the queue's default image. |
+| `DockerImage` | None | ECR URI of the MoonRay image you pushed. Always pass it. The job needs your MoonRay image, not the queue's default. |
 | `SceneDir` | `./scenes/veach-mis` | Folder with `scene.rdlb`, `scene.rdla`, and textures. Job attachments upload it. |
 | `OutputDir` | `./output` | Folder for the rendered EXR. Job attachments return it. |
 | `ExecMode` | `scalar` | MoonRay CPU execution mode, `scalar` or `vectorized`. |
