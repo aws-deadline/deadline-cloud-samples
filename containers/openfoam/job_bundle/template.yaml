@@ -1,0 +1,97 @@
+specificationVersion: jobtemplate-2023-09
+name: OpenFOAM cavity sweep
+description: Solves the OpenFOAM lid-driven cavity at three Reynolds numbers and plots the results.
+
+parameterDefinitions:
+# The queue environment reads this value to choose the image every action runs in.
+- name: DockerImage
+  type: STRING
+  description: Container image URI, read by the queue's Docker environment.
+  userInterface:
+    control: LINE_EDIT
+    label: Container image URI
+- name: Tutorial
+  type: STRING
+  default: incompressible/icoFoam/cavity/cavity
+  description: Tutorial case to clone, relative to $FOAM_TUTORIALS in the image.
+  userInterface:
+    control: LINE_EDIT
+    label: Tutorial
+- name: Solver
+  type: STRING
+  default: icoFoam
+  description: OpenFOAM solver to run. It must match the tutorial.
+  userInterface:
+    control: LINE_EDIT
+    label: Solver
+# Ten seconds lets every case reach a steady flow. The tutorial's 0.5 s is too short at Re 50 and 100.
+- name: EndTime
+  type: FLOAT
+  default: 10
+  minValue: 0.005
+  description: Simulated seconds to run, replacing the tutorial's endTime.
+  userInterface:
+    control: SPIN_BOX
+    label: End time (s)
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  description: Where the solved cases, plots and summary are written.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output directory
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: The shell scripts that ship with this job bundle.
+  userInterface:
+    control: HIDDEN
+
+steps:
+- name: Solve
+  parameterSpace:
+    # The cavity lid is 0.1 m wide and moves at 1 m/s, so these are Reynolds numbers 10, 50 and 100.
+    taskParameterDefinitions:
+    - name: Viscosity
+      type: FLOAT
+      range: ["0.01", "0.002", "0.001"]
+  # Meshes once per session, so tasks that share a worker reuse the mesh.
+  stepEnvironments:
+  - name: Mesh
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args:
+          - "{{Param.ScriptsDir}}/mesh.sh"
+          - "{{Param.Tutorial}}"
+          - "{{Session.WorkingDirectory}}/base"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - "{{Param.ScriptsDir}}/solve.sh"
+        - "{{Session.WorkingDirectory}}/base"
+        - "{{Param.OutputDir}}"
+        - "{{Task.Param.Viscosity}}"
+        - "{{Param.EndTime}}"
+        - "{{Param.Solver}}"
+
+# Runs after every Solve task, so it sees all three cases.
+- name: Plot
+  dependencies:
+  - dependsOn: Solve
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - "{{Param.ScriptsDir}}/plot.sh"
+        - "{{Param.OutputDir}}"
+        - "{{Param.Tutorial}}"
+        - "{{Param.Solver}}"
