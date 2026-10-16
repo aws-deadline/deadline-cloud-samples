@@ -140,6 +140,11 @@ environment:
           REGION=$(echo "$REGISTRY" | cut -d'.' -f4)
           case "$REGISTRY" in
             *.dkr.ecr.*.amazonaws.com) ;;
+            # Name the unset parameter. Falling through to the generic branch
+            # reports "not an ECR registry: " with a blank name, which gives no
+            # hint that a parameter needs setting -- and it does so only after a
+            # worker has scaled out and started a session.
+            "") echo "openjd_fail: DockerImage is empty; set it on the queue environment or pass -p DockerImage=<uri>"; exit 1 ;;
             *) echo "openjd_fail: not an ECR registry: ${REGISTRY}"; exit 1 ;;
           esac
           export DOCKER_CONFIG="${XDG_RUNTIME_DIR}/deadline-docker-config"; rm -f "${HOME}/.docker/config.json"

@@ -134,8 +134,13 @@ If you would rather assemble it yourself, the requirements are:
 
 ## Submit
 
-One worked example per scene source. Each assumes `deadline config` is
-pointed at a queue whose Docker queue environment has `DockerImage` set.
+One worked example per scene source. Each assumes `deadline config` is pointed
+at a queue that has the Docker queue environment.
+
+**`DockerImage` has no default, so pass it on every submission** as below, or
+set a default once with `aws deadline update-queue-environment`. Omitting it
+fails in the queue environment's enter action, after a worker has already
+started the session.
 
 **A first run, to prove the farm works.** Two frames, one shard, no NVIDIA
 asset involved:
@@ -143,6 +148,7 @@ asset involved:
 ```bash
 deadline bundle submit . \
     -p OutputDir=./out \
+    -p DockerImage=<ACCOUNT>.dkr.ecr.<REGION>.amazonaws.com/isaacsim-replicator:5.1.0 \
     -p SdgFrames=2 -p SdgShards=1 -p SdgObjects=1
 ```
 
@@ -154,6 +160,7 @@ deadline bundle submit . \
     -p OutputDir=./out \
     -p SdgFrames=10000 -p SdgShards=20 -p SdgObjects=12 \
     -p Width=1280 -p Height=720 \
+    -p DockerImage=<ACCOUNT>.dkr.ecr.<REGION>.amazonaws.com/isaacsim-replicator:5.1.0 \
     -p Annotators=rgb,bounding_box_2d_tight,semantic_segmentation,distance_to_camera
 ```
 
@@ -175,6 +182,7 @@ deadline bundle submit . \
     -p SceneSource=usd \
     -p SceneUsd=/tmp/.../scene.usda \
     -p SceneUsdSha256=<the digest printed above> \
+    -p DockerImage=<ACCOUNT>.dkr.ecr.<REGION>.amazonaws.com/isaacsim-replicator:5.1.0 \
     -p SceneUsdClass=forklift
 ```
 
