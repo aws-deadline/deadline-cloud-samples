@@ -134,11 +134,58 @@ If you would rather assemble it yourself, the requirements are:
 
 ## Submit
 
+One worked example per scene source. Each assumes `deadline config` is
+pointed at a queue whose Docker queue environment has `DockerImage` set.
+
+**A first run, to prove the farm works.** Two frames, one shard, no NVIDIA
+asset involved:
+
 ```bash
 deadline bundle submit . \
-    -p OutputDir=/path/to/output \
-    -p SdgFrames=256 \
-    -p SdgShards=4
+    -p OutputDir=./out \
+    -p SdgFrames=2 -p SdgShards=1 -p SdgObjects=1
+```
+
+**A real dataset.** 10,000 frames of randomized primitives across 20 shards,
+with depth added:
+
+```bash
+deadline bundle submit . \
+    -p OutputDir=./out \
+    -p SdgFrames=10000 -p SdgShards=20 -p SdgObjects=12 \
+    -p Width=1280 -p Height=720 \
+    -p Annotators=rgb,bounding_box_2d_tight,semantic_segmentation,distance_to_camera
+```
+
+**Your own scene.** Export a flattened snapshot of the stage open in Isaac Sim,
+hash it, and submit both:
+
+```bash
+python - <<'EOF'
+import omni.usd, hashlib, pathlib, tempfile
+stage = omni.usd.get_context().get_stage()
+out = pathlib.Path(tempfile.mkdtemp()) / "scene.usda"
+stage.Flatten().Export(str(out))                    # folds in unsaved + session edits
+print(out, hashlib.sha256(out.read_bytes()).hexdigest())
+EOF
+
+deadline bundle submit . \
+    -p OutputDir=./out \
+    -p SdgFrames=200 -p SdgShards=4 \
+    -p SceneSource=usd \
+    -p SceneUsd=/tmp/.../scene.usda \
+    -p SceneUsdSha256=<the digest printed above> \
+    -p SceneUsdClass=forklift
+```
+
+Generate recomputes that digest on the worker and refuses to render anything
+else, so the dataset's provenance is checked rather than assumed. See
+[Supplying your own stage](#supplying-your-own-stage).
+
+Then fetch the results:
+
+```bash
+deadline job download-output --job-id <JOB_ID>
 ```
 
 ## Parameters
@@ -284,35 +331,101 @@ Per-frame size with the default annotator set is roughly **0.2-0.45 MB at
 640x480**. `distance_to_camera` adds about 1.2 MiB/frame and `normals` about
 4.7 MiB/frame, so both are off by default.
 
+### Annotations
+
+An RGB frame on its own is not training data. Each frame comes with the
+annotations that make it usable, keyed by the semantic classes in the scene.
+From a `SceneSource=usd` run of one unlabelled stage, where
+`SceneUsdClass=asset` supplied the class:
+
+```json
+// bounding_box_2d_tight_labels_000000.json
+{"0": {"class": "asset"}}
+
+// semantic_segmentation_labels_000000.json
+{"(0, 0, 0, 0)":     {"class": "BACKGROUND"},
+ "(0, 0, 0, 255)":   {"class": "UNLABELLED"},
+ "(93, 220, 11, 255)": {"class": "asset"}}
+```
+
+The segmentation PNG uses those RGBA values as its palette, and the
+`bounding_box_2d_tight_*.npy` array indexes the same ids. `*_prim_paths_*.json`
+maps each id back to the USD prim it came from, so a bad label is traceable to
+the prim that produced it.
+
+That dependency is also the failure mode to watch for: **a stage with no
+semantics renders perfectly and labels nothing.** You get RGB frames, an empty segmentation mask,
+and a job that reports success. The `usd` source guards against it by labelling
+an unlabelled stage with `SceneUsdClass`; a scene you build yourself must call
+`isaacsim.core.utils.semantics.add_labels()`.
+
+### Verifying a run
+
+`sdg_summary.json` is written by Merge and is the one file to check:
+
+```json
+{
+  "expected_frames": 2, "frames_collated": 2,
+  "expected_shards": 1, "shards_reported": 1, "shards_missing": [],
+  "files_per_prefix": {
+    "rgb": 2, "semantic_segmentation": 2, "semantic_segmentation_labels": 2,
+    "bounding_box_2d_tight": 2, "bounding_box_2d_tight_labels": 2,
+    "bounding_box_2d_tight_prim_paths": 2
+  },
+  "cold_shards": 0, "warm_shards": 1
+}
+```
+
+Merge fails the job when `frames_collated` is below `expected_frames`, or when
+any annotator prefix is missing frames. A short dataset is a failure, not a
+warning, because an incomplete dataset that reports success is worse than no
+dataset.
+
 ### Reproducibility
 
 The same seed reproduces the same **scene configuration**. It does not reproduce
 bit-identical pixels: DLSS is temporal and accumulates history across subframes.
 Set `AntiAliasing=0` if you need a tighter frame-to-frame comparison.
 
-## Measured
+## What dominates the wall clock
 
-8 frames across 2 shards, `g6.2xlarge` (L4), driver 580.178.04, **cold** (no
-shader cache and no cached image):
+Measured on a `g6.2xlarge` (L4) across 8 frames and 2 shards. Stated as ratios
+rather than absolute timings, because the absolute figures are Omniverse Kit
+measurements and publishing those may need NVIDIA's written permission depending
+on which licence governs your container.
 
-| | |
+| Phase | Share of a small cold job |
 |---|---|
-| Container image pull (9 GB compressed) | ~150 s |
-| Omniverse Kit boot, cold shader cache | 120-190 s |
-| Capture, 640x480, `RtSubframes=8` | ~0.67 frames/s |
-| Whole job, 2 shards + merge | ~500 s |
+| Container image pull (9 GB compressed) | roughly a third |
+| Omniverse Kit boot, cold shader cache | roughly a third |
+| Capture | the remainder |
 
-Kit boot dominates a small job. Narrow shards are poor value. A warm Omniverse
-shader cache cuts that boot time by roughly an order of magnitude (separately
-measured at **35 s warm** against **347 s cold** for the same image). Expect the
-boot line to fall sharply once a persistent volume is available. See
-[Known limitations](#known-limitations).
+**Kit boot dominates a small job, so narrow shards are poor value.** A warm
+shader cache cuts boot time by roughly an order of magnitude, which is the
+largest lever available and the reason a fleet persistent volume matters more
+than any render setting. A cold first run spends minutes on startup before the
+first frame. Later runs on a warm worker start in seconds.
 
-Scaling: frames scale linearly and shards divide wall clock down to the fleet's
-`maxWorkerCount`, though a service-managed fleet scales out from zero at
+To see the split for your own fleet, read `sdg/sdgNN.json`, which each Generate
+task writes:
+
+```json
+{
+  "shard": "sdg01", "frames": 2, "files_written": 2,
+  "kit_boot_seconds": 23.8, "capture_seconds": 166.1,
+  "shader_cache": "warm", "scene_source": "usd"
+}
+```
+
+`shader_cache` reports `warm` or `cold`, so a run that was unexpectedly slow is
+self-diagnosing.
+
+**Scaling.** Frames scale linearly, and shards divide wall clock down to the
+fleet's `maxWorkerCount`. A service-managed fleet scales out from zero at
 `scaleOutWorkersPerMinute` (default 10/min), so an 8-shard job realistically
-reaches about 5x rather than 8x: the last shard starts minutes after the first. For 10k frames:
-`SdgFrames=10000 SdgShards=20`, roughly 500 frames per shard and 2-5 GB of output.
+reaches about 5x rather than 8x: the last shard starts minutes after the first.
+For 10k frames use `SdgFrames=10000 SdgShards=20`, roughly 500 frames per shard
+and 2-5 GB of output.
 
 ## Known limitations
 

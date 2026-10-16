@@ -126,10 +126,9 @@ cd ../../../job_bundles/isaacsim_replicator_sdg
 deadline bundle submit . -p DockerImage=<ECR_IMAGE_URI>
 ```
 
-A first run on a cold worker spends roughly two and a half minutes pulling the
-image and around six minutes compiling the Kit shader cache before the first
-frame, so budget about ten minutes. Later runs on a warm worker start in
-seconds.
+A first run on a cold worker spends most of its time pulling the 9 GB image and
+compiling the Omniverse Kit shader cache before the first frame, so expect
+minutes of startup. Later runs on a warm worker start in seconds.
 
 ## Clean up
 
