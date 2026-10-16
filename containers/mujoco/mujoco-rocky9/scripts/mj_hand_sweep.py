@@ -200,7 +200,7 @@ def main():
     p.add_argument("--width", type=int, default=480)
     p.add_argument("--height", type=int, default=360)
     p.add_argument("--out-dir", required=True,
-                   help="Directory for frames/, preview.gif and metrics.json.")
+                   help="Directory for frames/, clip.mp4 and metrics.json (and preview.gif with --gif).")
     p.add_argument("--label", default="run",
                    help="Name for this sweep point, used in filenames.")
     p.add_argument("--azimuth", type=float, default=DEFAULT_AZIMUTH)
