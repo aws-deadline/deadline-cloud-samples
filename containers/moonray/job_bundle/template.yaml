@@ -1,0 +1,67 @@
+# Renders one MoonRay scene. The queue environment runs this step inside the
+# image named by DockerImage, so the template only calls moonray.
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
+name: MoonRay Render
+description: Renders one MoonRay scene folder to an OpenEXR image.
+parameterDefinitions:
+- name: DockerImage
+  type: STRING
+  userInterface:
+    control: LINE_EDIT
+    label: Container Image URI
+  description: >
+    ECR URI of the MoonRay image, such as
+    <account-id>.dkr.ecr.<region>.amazonaws.com/moonray-rocky9:<tag>.
+    The queue environment pulls it and runs each action in it.
+- name: SceneDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: ./scenes/veach-mis
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Scene Folder
+  description: Folder with scene.rdlb, scene.rdla, and any textures the scene loads.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Folder
+  description: Where the rendered EXR is written. Job attachments return it.
+- name: ExecMode
+  type: STRING
+  default: scalar
+  allowedValues: [scalar, vectorized]
+  userInterface:
+    control: DROPDOWN_LIST
+    label: Execution Mode
+  description: MoonRay CPU execution mode. The image has no GPU (XPU) support.
+- name: ResolutionDivisor
+  type: FLOAT
+  default: 1.0
+  minValue: 1.0
+  userInterface:
+    control: SPIN_BOX
+    label: Resolution Divisor
+  description: Divides the scene's image size. 1 renders full size; 4 renders a quick preview.
+steps:
+- name: Render
+  bash:
+    let:
+    - out_exr = Param.OutputDir / (Param.SceneDir.name + '.exr')
+    script: |
+      set -xeuo pipefail
+      mkdir -p {{ repr_sh(Param.OutputDir) }}
+      # Example scenes load ./textures, so run from the scene folder.
+      cd {{ repr_sh(Param.SceneDir) }}
+      # -auto_affinity off: containers lack CAP_SYS_NICE, which NUMA binding needs.
+      moonray -in scene.rdlb -in scene.rdla \
+        -auto_affinity off \
+        -exec_mode {{ repr_sh(Param.ExecMode) }} \
+        -res {{ Param.ResolutionDivisor }} \
+        -out {{ repr_sh(out_exr) }}
+      test -s {{ repr_sh(out_exr) }}
