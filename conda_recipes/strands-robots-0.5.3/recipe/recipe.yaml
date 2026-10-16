@@ -1,0 +1,120 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+#
+# Packages Strands Robots with its MuJoCo simulation and LeRobot training
+# dependencies, so that a job can run the mujoco_sim_to_policy sample without
+# installing anything at runtime. Everything the package needs that conda-forge
+# provides is a run requirement. The two PyPI-only packages, strands-robots and
+# mink, are SHA256-pinned wheel sources installed with "pip install --no-deps", and the
+# so100 robot model from MuJoCo Menagerie is cloned into the package, so jobs
+# need no network access to GitHub or PyPI.
+
+context:
+  version: "0.5.3"
+  mink_version: "1.3.0"
+  # The MuJoCo Menagerie commit that robot_descriptions 1.23.0 pins. The robot
+  # description module checks out the commit its own version pins, so the bundled
+  # clone must match it. Change this together with the robot_descriptions pin in
+  # the run requirements.
+  menagerie_git_rev: "bf756430b615819654b640f321c71ba5c3ebeef8"
+  # The ImageNet weights torchvision loads for resnet18, the vision backbone the
+  # LeRobot ACT policy builds by default.
+  resnet18_weights: "resnet18-f37072fd.pth"
+
+package:
+  name: strands-robots
+  version: ${{ version }}
+
+source:
+  - url: https://files.pythonhosted.org/packages/9c/5f/c768993d842e12cf634292608076bda53de64e0afe6379e5f57642feb4b2/strands_robots-0.5.3-py3-none-any.whl
+    sha256: cdf92924a5397acee19a18d2baf46202bde46d400256a47fa3f2a956b5c4617b
+    file_name: strands_robots-0.5.3-py3-none-any.whl
+  - url: https://download.pytorch.org/models/${{ resnet18_weights }}
+    sha256: f37072fd47e89c5e827621c5baffa7500819f7896bbacec160b1a16c560e07ec
+    file_name: ${{ resnet18_weights }}
+  # mink ships compiled wheels, so each platform takes its own wheel, with the
+  # SHA256 PyPI publishes for it.
+  - if: linux
+    then:
+      url: https://files.pythonhosted.org/packages/a1/b9/308b82a8a5cc4d3c593bc68d43dfa0d797ea22ee8e9d6f1244c06044753c/mink-1.3.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+      sha256: 5c31a4e3a43eb7d544d7803a2af36ca703d8b933189251d3f37cc2117b23e1ff
+      file_name: mink-${{ mink_version }}-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+  - if: osx and arm64
+    then:
+      url: https://files.pythonhosted.org/packages/05/6a/cc5cbd86389b129e29f62407e2d2f117848ae2725b7899c3029f498e65f3/mink-1.3.0-cp312-cp312-macosx_11_0_arm64.whl
+      sha256: ab7ab077bcc78de7fca1f21bd1bc55afe81c7b77546a771e8007887b630150f2
+      file_name: mink-${{ mink_version }}-cp312-cp312-macosx_11_0_arm64.whl
+
+build:
+  number: 0
+  script:
+    env:
+      MENAGERIE_GIT_REV: ${{ menagerie_git_rev }}
+      RESNET18_WEIGHTS: ${{ resnet18_weights }}
+    content:
+      - bash $RECIPE_DIR/build.sh
+
+requirements:
+  build:
+    - git
+  host:
+    - python 3.12.*
+    - pip
+  run:
+    - python 3.12.*
+    # CUDA PyTorch on the platform the jobs run on. Left to the solver
+    # elsewhere so the recipe still builds on a developer machine.
+    - if: linux
+      then:
+        - pytorch-gpu >=2.7,<2.12.0
+    # GitPython, which robot_descriptions uses to open the bundled clone,
+    # needs a git executable at import time.
+    - git
+    # strands-robots core
+    - numpy >=1.21.0,<3.0.0
+    - py-opencv >=4.5.0,<5.0.0
+    - pillow >=12.3.0,<13.0.0
+    - strands-agents >=1.57.2,<2.0.0
+    # strands-robots[sim-mujoco]
+    - mujoco-python >=3.10.0,<4.0.0
+    - imageio >=2.28.0,<3.0.0
+    - imageio-ffmpeg >=0.4.0,<1.0.0
+    - ffmpeg
+    - qpsolvers >=4.12.0
+    - daqp
+    - typing_extensions
+    # Pinned exactly: each robot_descriptions release pins its own Menagerie
+    # commit, and a version whose commit differs from menagerie_git_rev would
+    # fetch from GitHub at job time instead of using the bundled clone.
+    - robot_descriptions ==1.23.0
+    # strands-robots[lerobot]. The feetech extra drives real servos and is
+    # left out, since this package targets simulation.
+    - lerobot >=0.6.1,<0.7.0
+    - psutil >=6.0.0,<8.0.0
+    # lerobot[training]. lerobot-train refuses to start without accelerate,
+    # and imports wandb even when the job passes --wandb.enable=false.
+    - accelerate >=1.14.0,<2.0.0
+    - wandb >=0.24.0,<0.28.0
+    # lerobot[dataset]
+    - datasets >=4.8.0,<5.0.0
+    - pandas >=2.0.0,<3.0.0
+    - pyarrow >=21.0.0,<30.0.0
+    # lerobot's av-dep extra pins av >=15,<16. Later av releases drop the
+    # av.option module that lerobot's video encoder reads codec options from,
+    # so leaving this unpinned solves to a version that fails on import.
+    - av >=15.0.0,<16.0.0
+    - torchcodec <0.12.0
+    - jsonlines
+
+tests:
+  - script:
+      - python -c "import strands_robots, mink, mujoco, lerobot, accelerate, wandb"
+      - python -c "import torch, os; p = os.path.join(os.environ['TORCH_HOME'], 'hub', 'checkpoints', '${{ resnet18_weights }}'); assert os.path.isfile(p), p"
+      - python -c "import robot_descriptions.so_arm100_mj_description as d, os; assert os.path.isfile(d.MJCF_PATH), d.MJCF_PATH"
+      - lerobot-train --help
+
+about:
+  homepage: https://strands-labs.github.io/robots/
+  license: Apache-2.0
+  summary: Strands Robots with MuJoCo simulation, LeRobot, and the so100 robot model.
+  repository: https://github.com/strands-labs/robots

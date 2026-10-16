@@ -23,11 +23,7 @@ parameterValues:
     value: 0.22,0,0.1
   - name: CameraPlacements
     value: '{"top": {"position": [0.25, 0.0, 0.6], "target": [0.25, 0.0, 0.0]}, "wrist": {"position": [0.15, 0.0, 0.18], "target": [0.3, 0.0, 0.03]}}'
-  - name: StrandsPackageSpec
-    value: strands-robots[sim-mujoco,lerobot] @ git+https://github.com/strands-labs/robots.git@main
   - name: CondaPackages
-    value: python=3.12 pip git ffmpeg
-  - name: CondaChannels
-    value: conda-forge
+    value: strands-robots=0.5.3
   - name: OutputDir
     value: output
