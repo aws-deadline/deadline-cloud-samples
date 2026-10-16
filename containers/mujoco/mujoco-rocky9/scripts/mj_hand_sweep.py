@@ -215,6 +215,10 @@ def main():
                    help="Also write preview.gif. Off by default; the MP4 supersedes it.")
     args = p.parse_args()
 
+    # Resolve before build_model changes into the model's directory, so a relative
+    # --out-dir lands under the caller's working directory.
+    out_dir = pathlib.Path(args.out_dir).resolve()
+
     model, applied = build_model(args.model, args.damping_scale, args.stiffness_scale,
                                  args.friction_scale)
     data = mujoco.MjData(model)
@@ -222,7 +226,6 @@ def main():
     steps = int(round(args.duration / model.opt.timestep))
     frame_every = max(1, int(round(1.0 / (args.fps * model.opt.timestep))))
 
-    out_dir = pathlib.Path(args.out_dir)
     frames_dir = out_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
 

@@ -86,6 +86,16 @@ px = r.render();\
 sys.exit(0 if px.sum() > 0 else 'offscreen render produced an empty frame')" \
     && echo "build-time render check passed"
 
+# Fail the build if a relative --out-dir doesn't land under the working directory.
+# mj-hand-sweep changes into the model's directory to compile it.
+RUN cd /tmp \
+    && mj-hand-sweep --model /models/mujoco_menagerie/shadow_hand/scene_right_ball.xml \
+        --duration 0.1 --fps 10 --width 64 --height 48 --no-video \
+        --label out-dir-check --out-dir out-dir-check \
+    && test -s /tmp/out-dir-check/metrics.json \
+    && rm -rf /tmp/out-dir-check \
+    && echo "build-time out-dir check passed"
+
 WORKDIR /models
 
 # No ENTRYPOINT. Deadline Cloud runs each job command as an argv inside a running
