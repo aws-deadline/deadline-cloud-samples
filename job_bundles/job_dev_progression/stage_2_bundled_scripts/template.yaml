@@ -8,7 +8,7 @@ description: |
 
   In this style, all your script code is in a subdirectory of the job bundle
   that is connected to an input PATH job parameter. This means you can no longer
-  use the "{{Param.InputCsvFile}}" style of job parameter value substitution in your
+  use the "{{ Param.InputCsvFile }}" style of job parameter value substitution in your
   scripts. You will instead use command line arguments to pass them from
   the job template to your scripts.
 
@@ -56,7 +56,7 @@ steps:
     actions:
       onRun:
         command: bash
-        args: ['{{Param.JobScriptDir}}/initialize.sh', '{{Param.InputCsvFile}}', '{{Param.WorkspacePath}}']
+        args: ['{{ Param.JobScriptDir }}/initialize.sh', '{{ Param.InputCsvFile }}', '{{ Param.WorkspacePath }}']
 
 - name: ProcessWithPython
   dependencies:
@@ -65,4 +65,4 @@ steps:
     actions:
       onRun:
         command: python
-        args: ['{{Param.JobScriptDir}}/process.py', '{{Param.WorkspacePath}}']
+        args: ['{{ Param.JobScriptDir }}/process.py', '{{ Param.WorkspacePath }}']

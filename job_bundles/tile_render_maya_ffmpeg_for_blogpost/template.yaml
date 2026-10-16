@@ -1,4 +1,5 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Maya Tiled Render
 description: |
   This job uses Maya, Arnold for Maya and ffmpeg to do tile rendering and assembly.
@@ -44,7 +45,7 @@ parameterDefinitions:
       - '*'
   description: The Maya scene file to render.
 - name: Frames
-  type: STRING
+  type: range_expr
   userInterface:
     control: LINE_EDIT
     label: Frames
@@ -182,17 +183,17 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: '{{Param.Frames}}'
+      range: '{{ Param.Frames }}'
     - name: Camera
       type: STRING
       range:
       - RenderCam
     - name: TileNumberX
       type: INT
-      range: '1-{{Param.NumXTiles}}'
+      range: '1-{{ Param.NumXTiles }}'
     - name: TileNumberY
       type: INT
-      range: '1-{{Param.NumYTiles}}'
+      range: '1-{{ Param.NumYTiles }}'
   stepEnvironments:
   - name: Maya
     description: Runs Maya in the background.
@@ -203,16 +204,16 @@ steps:
         type: TEXT
         data: |
           renderer: arnold
-          render_layer: '{{Param.RenderLayer}}'
-          scene_file: '{{Param.MayaSceneFile}}'
-          project_path: '{{Param.ProjectPath}}'
-          output_file_path: '{{Param.OutputFilePath}}'
-          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
-          strict_error_checking: {{Param.StrictErrorChecking}}
-          output_file_prefix: '{{Param.OutputFilePrefix}}'
-          image_width: {{Param.ImageWidth}}
-          image_height: {{Param.ImageHeight}}
-          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+          render_layer: '{{ Param.RenderLayer }}'
+          scene_file: '{{ Param.MayaSceneFile }}'
+          project_path: '{{ Param.ProjectPath }}'
+          output_file_path: '{{ Param.OutputFilePath }}'
+          render_setup_include_lights: {{ Param.RenderSetupIncludeLights }}
+          strict_error_checking: {{ Param.StrictErrorChecking }}
+          output_file_prefix: '{{ Param.OutputFilePrefix }}'
+          image_width: {{ Param.ImageWidth }}
+          image_height: {{ Param.ImageHeight }}
+          error_on_arnold_license_fail: {{ Param.ArnoldErrorOnLicenseFailure }}
       actions:
         onEnter:
           command: maya-openjd
@@ -220,11 +221,11 @@ steps:
           - daemon
           - start
           - --path-mapping-rules
-          - file://{{Session.PathMappingRulesFile}}
+          - file://{{ Session.PathMappingRulesFile }}
           - --connection-file
-          - '{{Session.WorkingDirectory}}/connection.json'
+          - '{{ Session.WorkingDirectory }}/connection.json'
           - --init-data
-          - file://{{Env.File.initData}}
+          - file://{{ Env.File.initData }}
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
         onExit:
@@ -242,13 +243,13 @@ steps:
       filename: run-data.yaml
       type: TEXT
       data: |
-        frame: {{Task.Param.Frame}}
-        camera: '{{Task.Param.Camera}}'
-        numXTiles: {{Param.NumXTiles}}
-        numYTiles: {{Param.NumYTiles}}
-        tileNumX: {{Task.Param.TileNumberX}}
-        tileNumY: {{Task.Param.TileNumberY}}
-        output_file_prefix: '{{Param.OutputFilePrefix}}'
+        frame: {{ Task.Param.Frame }}
+        camera: '{{ Task.Param.Camera }}'
+        numXTiles: {{ Param.NumXTiles }}
+        numYTiles: {{ Param.NumYTiles }}
+        tileNumX: {{ Task.Param.TileNumberX }}
+        tileNumY: {{ Task.Param.TileNumberY }}
+        output_file_prefix: '{{ Param.OutputFilePrefix }}'
     actions:
       onRun:
         command: maya-openjd
@@ -268,7 +269,7 @@ steps:
     actions:
       onRun:
         command: bash
-        args: [ "{{Task.File.Encode}}"]
+        args: [ "{{ Task.File.Encode }}"]
     embeddedFiles:
     - name: Encode
       type: TEXT
@@ -286,19 +287,19 @@ steps:
         # Output tiles are pngs. Swap png with the desired file ext in the script as needed.
 
         has_subdirs=true
-        FRAMES={{Param.Frames}}
+        FRAMES={{ Param.Frames }}
         startFrame=${FRAMES%-*}
         endFrame=${FRAMES#*-}
         
         # If there are sub-directories in the output path, iterate over each item in the output file path directory and call ffmpeg for the sub-directory
-        for item in "{{Param.OutputFilePath}}"/*; do
+        for item in "{{ Param.OutputFilePath }}"/*; do
           # Check if the item is a directory
           if [ -d "$item" ]; then
             if [[ "$startFrame" == "$endFrame" ]]; then
-              ffmpeg -y -pattern_type glob -i "/$item/*.png" -filter_complex tile={{Param.NumXTiles}}x{{Param.NumYTiles}}  "/$item/output.png"
+              ffmpeg -y -pattern_type glob -i "/$item/*.png" -filter_complex tile={{ Param.NumXTiles }}x{{ Param.NumYTiles }}  "/$item/output.png"
             else
               for frame in $(seq "$startFrame" "$endFrame"); do
-                ffmpeg -y -pattern_type glob -i "/$item/*$frame.png" -filter_complex tile={{Param.NumXTiles}}x{{Param.NumYTiles}}  "/$item/output.$frame.png"
+                ffmpeg -y -pattern_type glob -i "/$item/*$frame.png" -filter_complex tile={{ Param.NumXTiles }}x{{ Param.NumYTiles }}  "/$item/output.$frame.png"
               done
             fi
           else
@@ -309,10 +310,10 @@ steps:
 
         if [ "$has_subdirs" = false ]; then
           if [[ "$startFrame" == "$endFrame" ]]; then
-              ffmpeg -y -pattern_type glob -i "{{Param.OutputFilePath}}/*.png" -filter_complex tile={{Param.NumXTiles}}x{{Param.NumYTiles}}  "{{Param.OutputFilePath}}/output.png"
+              ffmpeg -y -pattern_type glob -i "{{ Param.OutputFilePath }}/*.png" -filter_complex tile={{ Param.NumXTiles }}x{{ Param.NumYTiles }}  "{{ Param.OutputFilePath }}/output.png"
           else
             for frame in $(seq "$startFrame" "$endFrame"); do
-              ffmpeg -y -pattern_type glob -i "{{Param.OutputFilePath}}/*$frame.png" -filter_complex tile={{Param.NumXTiles}}x{{Param.NumYTiles}}  "{{Param.OutputFilePath}}/output.$frame.png"
+              ffmpeg -y -pattern_type glob -i "{{ Param.OutputFilePath }}/*$frame.png" -filter_complex tile={{ Param.NumXTiles }}x{{ Param.NumYTiles }}  "{{ Param.OutputFilePath }}/output.$frame.png"
             done
           fi
         fi
@@ -323,7 +324,7 @@ jobEnvironments:
   script:
     actions:
       onEnter:
-        command: '{{Env.File.Enter}}'
+        command: '{{ Env.File.Enter }}'
     embeddedFiles:
     - name: Enter
       filename: override-adaptor-enter.sh
@@ -335,24 +336,24 @@ jobEnvironments:
         set -euo pipefail
 
         echo "The adaptor wheels that are attached to the job:"
-        ls '{{Param.OverrideAdaptorWheels}}'
+        ls '{{ Param.OverrideAdaptorWheels }}'
         echo ""
 
         # Create a venv and activate it in this environment
-        echo "Creating Python venv for the {{Param.OverrideAdaptorName}} command"
-        /usr/local/bin/python3 -m venv '{{Session.WorkingDirectory}}/venv'
-        {{Env.File.InitialVars}}
-        . '{{Session.WorkingDirectory}}/venv/bin/activate'
-        {{Env.File.CaptureVars}}
+        echo "Creating Python venv for the {{ Param.OverrideAdaptorName }} command"
+        /usr/local/bin/python3 -m venv '{{ Session.WorkingDirectory }}/venv'
+        {{ Env.File.InitialVars }}
+        . '{{ Session.WorkingDirectory }}/venv/bin/activate'
+        {{ Env.File.CaptureVars }}
         echo ""
 
         echo "Installing adaptor into the venv"
-        pip install '{{Param.OverrideAdaptorWheels}}'/openjd*.whl
-        pip install '{{Param.OverrideAdaptorWheels}}'/deadline*.whl
+        pip install '{{ Param.OverrideAdaptorWheels }}'/openjd*.whl
+        pip install '{{ Param.OverrideAdaptorWheels }}'/deadline*.whl
         echo ""
 
-        if [ ! -f '{{Session.WorkingDirectory}}/venv/bin/{{Param.OverrideAdaptorName}}' ]; then
-          echo "The Override Adaptor {{Param.OverrideAdaptorName}} was not installed as expected."
+        if [ ! -f '{{ Session.WorkingDirectory }}/venv/bin/{{ Param.OverrideAdaptorName }}' ]; then
+          echo "The Override Adaptor {{ Param.OverrideAdaptorName }} was not installed as expected."
           exit 1
         fi
     - name: InitialVars
@@ -362,7 +363,7 @@ jobEnvironments:
       data: |
         #!/usr/bin/env python3
         import os, json
-        envfile = "{{Session.WorkingDirectory}}/.envInitial"
+        envfile = "{{ Session.WorkingDirectory }}/.envInitial"
         with open(envfile, "w", encoding="utf8") as f:
             json.dump(dict(os.environ), f)
     - name: CaptureVars
@@ -372,7 +373,7 @@ jobEnvironments:
       data: |
         #!/usr/bin/env python3
         import os, json, sys
-        envfile = "{{Session.WorkingDirectory}}/.envInitial"
+        envfile = "{{ Session.WorkingDirectory }}/.envInitial"
         if os.path.isfile(envfile):
             with open(envfile, "r", encoding="utf8") as f:
                 before = json.load(f)

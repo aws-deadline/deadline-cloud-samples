@@ -4,7 +4,7 @@ Queue environments follow the [Open Job Description environment template specifi
 
 ## Sample index
 
-This table lists the user-selectable queue environments and collections in `queue_environments/`. Nested collections provide their own complete indexes.
+This table lists each user-selectable queue environment or collection directly in `queue_environments/`. Nested collections provide their own complete indexes.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -13,8 +13,8 @@ This table lists the user-selectable queue environments and collections in `queu
 | [Py-rattler Conda environment](conda_queue_env_pyrattler.yaml) | Solving and activating packages with the `py-rattler` library | You want faster solving and can accept its compatibility differences |
 | [Cached Conda environment](conda_queue_env_improved_caching.yaml) | Reusing hash-named environments with service-managed fleet commands | Repeated package sets should avoid relinking on every job |
 | [Cached inline Conda environment](conda_queue_env_inline_improved_caching.yaml) | Portable named-environment reuse and expiration logic | Customer-managed fleets need reusable Conda environments |
-| [Rez environment](rez_queue_env.yaml) | Resolving packages from a shared Rez repository | Your studio already distributes software with Rez |
-| [Rez shim environment](rez_shim/) | Wrapping each task in a resolved Rez context through `PATH` shims | Rez software needs shell functions, aliases, or ordered `PATH` edits |
+| [Rez environment](rez_queue_env.yaml) | Running each task in a resolved Rez context through Open Job Description wrap actions | Your studio already distributes software with Rez |
+| [Rez shim environment](rez_shim/) | Wrapping each task in a resolved Rez context through `PATH` shims | No longer recommended. Use the [Rez environment](rez_queue_env.yaml), which wraps tasks with wrap actions |
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
 | [Docker container environment](docker_queue_env.yaml) | Running every task inside a container pulled from your own Amazon ECR | A service-managed fleet declares the `docker` software add-on and your software is packaged as an image |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
@@ -131,11 +131,15 @@ The cached inline sample implements the same idea with Conda environments identi
 
 The Rez sample resolves software from a shared package repository. Use it with customer-managed fleets that can access that repository.
 
+`onEnter` resolves the requested packages once and saves the context to the session directory. The environment then uses the [`WRAP_ACTIONS` extension](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md) to run every task, and the enter and exit actions of environments entered after it, inside that context with `rez env --input`. Rez applies the whole context in the task's own process. The task gets plain environment variables and also any `alias`, shell function, or `PATH` prepend that shadows a system binary. Job templates call tools by bare name and don't need changes.
+
+Each wrapped action takes on the timeout and cancelation of the action it wraps. The wrapped command runs as `rez env --input <context> -- <command> <args>`, which passes it to the shell as one command line. The shell expands `$VAR` and `$(...)` in its arguments and removes one level of backslash escaping, the same as for a command typed after [`rez env --`](https://rez.readthedocs.io/en/stable/commands/rez-env.html). A `render.$F4.exr` argument becomes `render..exr`, and `\\server\share` becomes `\server\share`. Workers need Rez, `python`, and `bash` (Git Bash on Windows) on `PATH`, and read access to the package repository.
+
+Because the context is applied again for each wrapped action, Rez's default overwrite behavior applies to environments entered after this one, including job environments. Rez overwrites a variable the first time a package modifies it and rebuilds `PATH` from the system paths, so without configuration a later environment's changes to `PATH`, or to any variable a resolved package modifies, don't reach the task. The `RezParentVariables` parameter, a comma-separated list that defaults to `PATH`, controls this. The wrap hooks pass it to Rez as [`parent_variables`](https://rez.readthedocs.io/en/stable/configuring_rez.html#parent_variables), so packages append and prepend to those variables instead. Add variables such as `PYTHONPATH` to keep later changes to them too, or set it empty to use the worker's Rez configuration. Packages that call `setenv` still overwrite. With parent variables, the context also includes software from the worker's environment, which Rez's default excludes.
+
 ### Rez shim environment
 
-Choose the [Rez shim environment](rez_shim/) if your Rez packages configure software with anything other than plain environment variables, such as an `alias` for a launcher, a shell function, or a `PATH` prepend that must shadow a system binary. Those cannot cross out of a queue environment as `openjd_env` name-value pairs. The sample above loses them. The shim environment instead wraps each task's command in the resolved context.
-
-It comes with test scaffolding and a verification job, so it lives in its own directory with a [dedicated README](rez_shim/README.md) covering deployment, tradeoffs, and the upstream RFC that will supersede it.
+The [Rez shim environment](rez_shim/) is no longer recommended. It predates wrap actions and gets the same result by writing a `PATH` shim for each tool the resolved packages provide, with each shim re-entering the saved context. Use the Rez environment above instead. The shim environment's [README](rez_shim/README.md) covers its deployment and tradeoffs.
 
 ### Pip environment
 

@@ -57,7 +57,7 @@ jobEnvironments:
   variables:
     # Put the shared library code in the PYTHONPATH so that `import <module>` works
     # to import modules from the directory.
-    PYTHONPATH: "{{Param.JobScriptDir}}/shared"
+    PYTHONPATH: "{{ Param.JobScriptDir }}/shared"
 
 steps:
 
@@ -66,7 +66,7 @@ steps:
     actions:
       onRun:
         command: python
-        args: ['{{Param.JobScriptDir}}/initialize.py', '{{Param.InputCsvFile}}', '{{Param.WorkspacePath}}', "--debug"]
+        args: ['{{ Param.JobScriptDir }}/initialize.py', '{{ Param.InputCsvFile }}', '{{ Param.WorkspacePath }}', "--debug"]
 
 - name: ProcessWithPython
   dependencies:
@@ -75,4 +75,4 @@ steps:
     actions:
       onRun:
         command: python
-        args: ['{{Param.JobScriptDir}}/process.py', '{{Param.WorkspacePath}}']
+        args: ['{{ Param.JobScriptDir }}/process.py', '{{ Param.WorkspacePath }}']

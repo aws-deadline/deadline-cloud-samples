@@ -1,4 +1,5 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Nuke Render
 description: |
   This job bundle renders Nuke scripts using Nuke's headless rendering mode.
@@ -13,9 +14,11 @@ parameterDefinitions:
 
 # Render Parameters
 - name: NukeScript
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
+  minLength: 1
+  default: "./scene/motionblur3d_10.nk"
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: Nuke Script File
@@ -25,43 +28,41 @@ parameterDefinitions:
       patterns: ["*.nk"]
     - label: All Files
       patterns: ["*"]
-  minLength: 1
-  default: "./scene/motionblur3d_10.nk"
   description: >
     Choose the Nuke script file you want to render. Use the 'Job Attachments' tab
     to add additional assets that the job needs.
 - name: Frames
-  type: STRING
+  type: range_expr
+  default: "1"
   userInterface:
     control: LINE_EDIT
     label: Frames
     groupLabel: Render Parameters
-  default: "1"
   description: Frame range to render (e.g., "1-10" or "1,5,10").
 - name: ProjectPath
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: INOUT
+  default: "./scene"
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Project Directory
     groupLabel: Render Parameters
-  default: "./scene"
   description: Choose the project working directory containing the Nuke script and assets.
 - name: OutputDir
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
+  default: "./scene/nuke_output"
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory
     groupLabel: Render Parameters
-  default: "./scene/nuke_output"
   description: Choose the render output directory.
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -71,7 +72,7 @@ parameterDefinitions:
     Conda packages to install for the render.
     Example: "nuke=16.* nuke-openjd" or "nuke nuke-openjd"
 - name: RezPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -87,31 +88,24 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: "{{Param.Frames}}"
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Render}}']
-        cancelation:
-          mode: NOTIFY_THEN_TERMINATE
-    embeddedFiles:
-    - name: Render
-      type: TEXT
-      data: |
-        # Configure the task to fail if any individual command fails.
-        set -xeuo pipefail
+      range: "{{ Param.Frames }}"
+  bash:
+    cancelation:
+      mode: NOTIFY_THEN_TERMINATE
+    script: |
+      # Configure the task to fail if any individual command fails.
+      set -xeuo pipefail
 
-        echo "Nuke script is {{Param.NukeScript}}"
-        cd '{{Param.ProjectPath}}'
+      echo "Nuke script is" {{ repr_sh(Param.NukeScript) }}
+      cd {{ repr_sh(Param.ProjectPath) }}
 
-        # Create output directory if it doesn't exist
-        mkdir -p '{{Param.OutputDir}}'
+      # Create output directory if it doesn't exist
+      mkdir -p {{ repr_sh(Param.OutputDir) }}
 
-        # Render the frame using Nuke
-        nuke -F {{Task.Param.Frame}} \
-             --sro -V 2 \
-             -x '{{Param.NukeScript}}'
+      # Render the frame using Nuke
+      nuke -F {{ Task.Param.Frame }} \
+           --sro -V 2 \
+           -x {{ repr_sh(Param.NukeScript) }}
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

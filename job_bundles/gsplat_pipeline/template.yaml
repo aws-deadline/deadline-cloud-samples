@@ -1,4 +1,5 @@
 specificationVersion: 'jobtemplate-2023-09'
+extensions: [FEATURE_BUNDLE_1, EXPR]
 
 name: Gaussian Splatting pipeline (FFmpeg -> COLMAP/GLOMAP -> NeRF Studio)
 description: |
@@ -173,7 +174,7 @@ jobEnvironments:
   script:
     actions:
       onEnter:
-        command: "{{Env.File.Enter}}"
+        command: "{{ Env.File.Enter }}"
     embeddedFiles:
     - name: Enter
       type: TEXT
@@ -184,17 +185,17 @@ jobEnvironments:
 
         # Normalize all scripts to unix line endings, set the execute bit,
         # and add the scripts dir to $PATH.
-        for FILE in '{{Param.JobScriptDir}}'/*.sh; do
+        for FILE in '{{ Param.JobScriptDir }}'/*.sh; do
             cat $FILE | tr -d '\r' > $FILE.tr
             mv -f $FILE.tr $FILE
             chmod u+x $FILE
         done
-        echo "openjd_env: PATH={{Param.JobScriptDir}}:$PATH"
+        echo "openjd_env: PATH={{ Param.JobScriptDir }}:$PATH"
 
         # Initialize the workspace directory
-        WORKSPACE_DIR='{{Param.WorkspaceDir}}'
+        WORKSPACE_DIR='{{ Param.WorkspaceDir }}'
         if [ -z "$WORKSPACE_DIR" ]; then
-            WORKSPACE_DIR=$(mktemp -d -p '{{Session.WorkingDirectory}}' workspace_XXXXX)
+            WORKSPACE_DIR=$(mktemp -d -p '{{ Session.WorkingDirectory }}' workspace_XXXXX)
         fi
         mkdir -p "$WORKSPACE_DIR"
         echo "openjd_env: WORKSPACE_DIR=$WORKSPACE_DIR"
@@ -206,7 +207,7 @@ steps:
     actions:
       onRun:
         command: bash
-        args: ['{{Task.File.Run}}']
+        args: ['{{ Task.File.Run }}']
     embeddedFiles:
       - name: Run
         filename: gaussian_splatting_pipeline.sh
@@ -218,9 +219,9 @@ steps:
 
           # 1. Extract video frames
           extract_video_frames.sh \
-                  '{{Param.InputVideoFile}}' \
-                  {{Param.ApproxImageCount}} \
-                  {{Param.ImageDownscaleFactor}} \
+                  '{{ Param.InputVideoFile }}' \
+                  {{ Param.ApproxImageCount }} \
+                  {{ Param.ImageDownscaleFactor }} \
                   ./source_images
 
           # 2. Solve Structure-from-Motion, saving the pinhole model and undistorted images
@@ -231,21 +232,21 @@ steps:
                   ./images
 
           # 3. Train Gaussian Splatting, saving the .ply output
-          if [ '{{Param.GaussianSplattingTrainer}}' == "NERFSTUDIO" ]; then
+          if [ '{{ Param.GaussianSplattingTrainer }}' == "NERFSTUDIO" ]; then
               train_nerfstudio_splatfacto.sh \
                       ./sparse \
                       ./images \
-                      '{{Param.MaxNumIterations}}' \
-                      '{{Param.OutputPlyFile}}' \
-                      {{Param.NerfStudioOptions}}
-          elif [ '{{Param.GaussianSplattingTrainer}}' == "GSPLAT_SIMPLE_TRAINER" ]; then
+                      '{{ Param.MaxNumIterations }}' \
+                      '{{ Param.OutputPlyFile }}' \
+                      {{ Param.NerfStudioOptions }}
+          elif [ '{{ Param.GaussianSplattingTrainer }}' == "GSPLAT_SIMPLE_TRAINER" ]; then
               train_gsplat_simple_trainer.sh \
                       . \
-                      '{{Param.MaxNumIterations}}' \
-                      '{{Param.OutputPlyFile}}' \
-                      {{Param.GSplatSimpleTrainerOptions}}
+                      '{{ Param.MaxNumIterations }}' \
+                      '{{ Param.OutputPlyFile }}' \
+                      {{ Param.GSplatSimpleTrainerOptions }}
           else
-              echo 'ERROR: Unrecognized Gaussian Splatting method {{Param.GaussianSplattingTrainer}}'
+              echo 'ERROR: Unrecognized Gaussian Splatting method {{ Param.GaussianSplattingTrainer }}'
               exit 1
           fi
 

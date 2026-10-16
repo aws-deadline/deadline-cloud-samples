@@ -1,4 +1,5 @@
 specificationVersion: 'jobtemplate-2023-09'
+extensions: [FEATURE_BUNDLE_1]
 name: "GROMACS-MD-{{Param.JobName}}"
 description: |
   GROMACS molecular dynamics simulation pipeline for AWS Deadline Cloud.
@@ -150,6 +151,20 @@ parameterDefinitions:
       control: SPIN_BOX
       label: "Max Replica Index"
       groupLabel: "Parallelism"
+
+  - name: ShutdownGracePeriodSeconds
+    type: INT
+    default: 60
+    minValue: 1
+    maxValue: 600
+    description: >
+      When a production MD task is canceled, how long mdrun has to write a
+      checkpoint before it is killed. mdrun stops at its next neighbor search
+      step and writes the checkpoint, so large systems need longer.
+    userInterface:
+      control: SPIN_BOX
+      label: "Shutdown Grace Period (s)"
+      groupLabel: "Simulation Parameters"
 
   - name: CondaPackages
     type: STRING
@@ -450,11 +465,67 @@ steps:
             # Preprocess
             gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr -maxwarn 1
 
-            # Run production MD
-            gmx mdrun -deffnm md -ntmpi 1 -ntomp $(nproc)
+            # Run production MD in the background so a cancel request reaches
+            # it. On SIGTERM, mdrun stops at its next neighbor search step and
+            # writes a checkpoint, which the copy below keeps. The task's
+            # notifyPeriodInSeconds sets how long mdrun has to do this.
+            MDRUN_PID=""
+            CANCELED=0
+            trap 'echo "Cancel requested: waiting for mdrun to write a checkpoint"; CANCELED=1; [ -n "$MDRUN_PID" ] && kill -TERM "$MDRUN_PID" 2>/dev/null || true' TERM
+            gmx mdrun -deffnm md -ntmpi 1 -ntomp $(nproc) &
+            MDRUN_PID=$!
+            # A cancel that arrives before mdrun starts has nothing to checkpoint.
+            if [ "$CANCELED" -eq 1 ]; then
+                kill -TERM "$MDRUN_PID" 2>/dev/null || true
+            fi
 
-            # Copy results
+            # Report progress from md.log, where mdrun writes a "Step Time"
+            # header followed by the current step every nstlog steps. The loop
+            # ends by itself after mdrun exits, so it never outlives the task.
+            (
+                LAST=""
+                while kill -0 "$MDRUN_PID" 2>/dev/null; do
+                    sleep 10
+                    STEP=$(awk '$1 == "Step" && $2 == "Time" { getline; s = $1 } END { if (s != "") print s }' md.log 2>/dev/null || true)
+                    if [ -n "$STEP" ] && [ "$STEP" != "$LAST" ]; then
+                        LAST=$STEP
+                        awk -v s="$STEP" -v n="{{Param.ProductionSteps}}" 'BEGIN { printf "openjd_progress: %.1f\n", 100 * s / n }'
+                    fi
+                done
+            ) &
+            PROGRESS_PID=$!
+
+            set +e
+            wait "$MDRUN_PID"
+            MDRUN_STATUS=$?
+            # A trapped signal interrupts `wait` before mdrun has exited.
+            while kill -0 "$MDRUN_PID" 2>/dev/null; do
+                wait "$MDRUN_PID"
+                MDRUN_STATUS=$?
+            done
+            # A trapped signal can also interrupt this wait, so repeat it.
+            while kill -0 "$PROGRESS_PID" 2>/dev/null; do
+                wait "$PROGRESS_PID"
+            done
+            set -e
+
+            # Copy results, including the checkpoint when the run was canceled.
+            # Job attachments only upload the outputs of tasks that succeed, so
+            # a canceled task's checkpoint is only kept with shared storage. See
+            # https://github.com/OpenJobDescription/openjd-specifications/discussions/169
+            # for a potential way for a template to tell the scheduler it can
+            # checkpoint, so a checkpointed task could be resumed.
             cp md.tpr md.xtc md.edr md.log md.gro md.cpt "${OUTDIR}/" 2>/dev/null || true
+
+            # mdrun exits 0 after stopping on a signal, so check for a cancel too.
+            if [ "$CANCELED" -eq 1 ]; then
+                echo "Production MD canceled; saved the checkpoint to ${OUTDIR}/md.cpt"
+                exit 143
+            fi
+            if [ "$MDRUN_STATUS" -ne 0 ]; then
+                echo "mdrun exited with status ${MDRUN_STATUS}"
+                exit "$MDRUN_STATUS"
+            fi
 
             echo "Production MD complete for replica ${REPLICA}"
             echo "  Trajectory: ${OUTDIR}/md.xtc"
@@ -465,7 +536,7 @@ steps:
           timeout: 86400
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
-            notifyPeriodInSeconds: 60
+            notifyPeriodInSeconds: "{{Param.ShutdownGracePeriodSeconds}}"
 
   - name: Analysis
     description: "Post-simulation analysis: energy, RMSD, RMSF, radius of gyration"

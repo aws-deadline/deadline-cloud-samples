@@ -1,13 +1,15 @@
-specificationVersion: 'jobtemplate-2023-09'
+specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Redshift Renderer for Cinema 4D 2025
 
 parameterDefinitions:
 
 # Scene Parameters
 - name: SceneFile
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
+  default: "SimpleCubec4d.rs"
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: Redshift Scene File
@@ -17,45 +19,44 @@ parameterDefinitions:
       patterns: ["*.rs"]
     - label: All Files
       patterns: ["*"]
-  default: "SimpleCubec4d.rs"
   description: >
     Choose the Redshift scene file you want to render.
 
 # Output Parameters
 - name: OutputDir
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
+  default: "./output"
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output Directory
     groupLabel: Output Parameters
-  default: "./output"
   description: Choose the render output directory.
 
 
 # Render Settings
 - name: Width
-  type: INT
+  type: int
+  default: 1920
   userInterface:
     control: SPIN_BOX
     label: Width
     groupLabel: Render Settings
-  default: 1920
   description: Width of the rendered image in pixels.
 
 - name: Height
-  type: INT
+  type: int
+  default: 1080
   userInterface:
     control: SPIN_BOX
     label: Height
     groupLabel: Render Settings
-  default: 1080
   description: Height of the rendered image in pixels.
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
+  type: string
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
@@ -74,50 +75,41 @@ steps:
     amounts:
       - name: amount.worker.gpu
         min: 1
-  script:
-    actions:
-      onRun:
-        command: bash
-        args: ['{{Task.File.Run}}']
-    embeddedFiles:
-      - name: Run
-        type: TEXT
-        filename: run.sh
-        data: |
-          #!/bin/bash
-          set -euo pipefail
+  bash:
+    script: |
+      set -euo pipefail
 
-          # Disable MinGW path conversion on Windows
-          export MSYS_NO_PATHCONV=1
+      # Disable MinGW path conversion on Windows
+      export MSYS_NO_PATHCONV=1
 
-          echo "Starting Redshift render using redshiftCmdLine..."
+      echo "Starting Redshift render using redshiftCmdLine..."
 
-          # Create output directory if it doesn't exist
-          mkdir -p '{{Param.OutputDir}}'
+      # Create output directory if it doesn't exist
+      mkdir -p {{ repr_sh(Param.OutputDir) }}
 
-          # Check if scene file exists
-          if [[ ! -f '{{Param.SceneFile}}' ]]; then
-            echo "openjd_fail: Scene file not found: {{Param.SceneFile}}"
-            exit 1
-          fi
+      # Check if scene file exists
+      if [[ ! -f {{ repr_sh(Param.SceneFile) }} ]]; then
+        echo "openjd_fail: Scene file not found:" {{ repr_sh(Param.SceneFile) }}
+        exit 1
+      fi
 
-          C4D_LOCATION="${CONDA_PREFIX}/cinema4d"
-          REDSHIFT_EXE="${CONDA_PREFIX}/cinema4d/RedshiftData/bin/redshiftCmdLine.exe"
+      C4D_LOCATION="${CONDA_PREFIX}/cinema4d"
+      REDSHIFT_EXE="${CONDA_PREFIX}/cinema4d/RedshiftData/bin/redshiftCmdLine.exe"
 
-          # Set Cinema 4D and Redshift environment variables
-          export REDSHIFT_COREDATAPATH="${C4D_LOCATION}/RedshiftData"
-          export REDSHIFT_LOCALDATAPATH="${C4D_LOCATION}/RedshiftData"
+      # Set Cinema 4D and Redshift environment variables
+      export REDSHIFT_COREDATAPATH="${C4D_LOCATION}/RedshiftData"
+      export REDSHIFT_LOCALDATAPATH="${C4D_LOCATION}/RedshiftData"
 
-          # Check if redshiftCmdLine executable exists
-          if [[ ! -f "$REDSHIFT_EXE" ]]; then
-            echo "openjd_fail: redshiftCmdLine executable not found at: $REDSHIFT_EXE"
-            echo "Please verify the installed conda packages includes Redshift"
-            exit 1
-          fi
+      # Check if redshiftCmdLine executable exists
+      if [[ ! -f "$REDSHIFT_EXE" ]]; then
+        echo "openjd_fail: redshiftCmdLine executable not found at: $REDSHIFT_EXE"
+        echo "Please verify the installed conda packages includes Redshift"
+        exit 1
+      fi
 
-          # Use redshiftCmdLine to render the scene
-          echo "Running redshiftCmdLine with scene: {{Param.SceneFile}}"
+      # Use redshiftCmdLine to render the scene
+      echo "Running redshiftCmdLine with scene:" {{ repr_sh(Param.SceneFile) }}
 
-          "$REDSHIFT_EXE" '{{Param.SceneFile}}' -ores {{Param.Width}}x{{Param.Height}} -oip '{{Param.OutputDir}}'
+      "$REDSHIFT_EXE" {{ repr_sh(Param.SceneFile) }} -ores {{ Param.Width }}x{{ Param.Height }} -oip {{ repr_sh(Param.OutputDir) }}
 
-          exit 0
+      exit 0

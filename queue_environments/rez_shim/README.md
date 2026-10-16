@@ -1,8 +1,10 @@
 # Rez shim queue environment
 
-Applies a resolved Rez context to each task by wrapping its command, instead of copying environment variables out of the queue environment and replaying them.
+Applies a resolved Rez context to each task through per-tool shim scripts that run each tool inside that context.
 
-Choose this if your Rez packages configure software with anything other than plain environment variables. Studios commonly hit this when a package defines an `alias` for a launcher, relies on a shell function, or prepends to `PATH` expecting its own binary to shadow a system one. If your packages only set variables, the simpler [rez_queue_env.yaml](../rez_queue_env.yaml) works and needs no extra pieces.
+**No longer recommended.** [rez_queue_env.yaml](../rez_queue_env.yaml) now runs each task in the resolved context with Open Job Description wrap actions, which gives the same result without shims. This environment predates wrap actions and is kept for reference.
+
+It targets Rez packages that configure software with anything other than plain environment variables. Studios commonly hit this when a package defines an `alias` for a launcher, relies on a shell function, or prepends to `PATH` expecting its own binary to shadow a system one.
 
 ## Contents
 
@@ -14,9 +16,9 @@ Choose this if your Rez packages configure software with anything other than pla
 
 Only the first file belongs on a production queue. The other two exist to demonstrate and test it.
 
-## Why the simpler sample cannot cover these cases
+## Why copying environment variables cannot cover these cases
 
-The limitation is structural. A queue environment action runs in its own subprocess, so the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. To work within that, [rez_queue_env.yaml](../rez_queue_env.yaml) activates a context and then replays the difference between the environment before and after. Anything that is not a name-value pair does not survive that round trip.
+The limitation is structural. A queue environment action runs in its own subprocess, so without wrap actions the only way it can affect later actions is by printing `openjd_env: NAME=value` directives. An environment that works within that activates a context and then replays the difference between the environment before and after. That round trip drops anything that is not a name-value pair.
 
 A Rez `alias` is the clearest casualty. Rez implements it as an exported shell function, which Bash exports under a name like `BASH_FUNC_launch%%` with a multi-line value. The session runtime rejects that assignment outright:
 
@@ -27,7 +29,7 @@ openjd_env: "BASH_FUNC_demoalias%%=() {  demorender --via-alias \"$@\"\n}"
 
 The alias is gone before any task runs.
 
-## How the shim environment works
+## Shim mechanism
 
 `onEnter` resolves the requested packages once and saves the context to a `.rxt` file in the session directory. It then asks Rez which executables those packages provide and writes one small shim per tool, prepending the shim directory to `PATH`:
 
@@ -36,13 +38,13 @@ The alias is gone before any task runs.
 exec rez env --input "$REZ_CONTEXT_FILE" --shell bash -- "/abs/path/to/tool" "$@"
 ```
 
-Job templates keep calling tools by bare name, such as `command: mayapy`, so each call re-enters the saved context in its own shell and Rez applies the full context inside the task's own process. Job bundles need no changes.
+Job templates keep calling tools by bare name, such as `command: mayapy`, so each call re-enters the saved context in its own shell and Rez applies the full context inside the task's own process. Job bundles don't need changes.
 
 Tool names come from `rez context -t` on the saved context, so no list of executables is hard-coded. Set `RezExtraTools` for commands a package provides without declaring them in its `tools` list.
 
-Each tool is resolved to an absolute path with `command -v` inside the context when its shim is written, rather than being re-resolved by name at task time. The reason is a recursion risk. By default Rez rebuilds `PATH` from the context and drops the shim directory, so a bare name is safe. On a farm whose Rez config lists `PATH` in `parent_variables`, though, the shim directory stays ahead of the package's own `bin`, and a bare name would find the shim again and fork until the worker ran out of processes. Resolving once up front removes that risk whatever the Rez configuration.
+When the environment writes a tool's shim, it resolves the tool to an absolute path with `command -v` inside the context, and the shim calls that path at task time. The reason is a recursion risk. By default Rez rebuilds `PATH` from the context and drops the shim directory, so a bare name is safe. On a farm whose Rez config lists `PATH` in `parent_variables`, though, the shim directory stays ahead of the package's own `bin`, and a bare name would find the shim again and fork until the worker ran out of processes. Resolving once up front removes that risk whatever the Rez configuration.
 
-A tool that resolves back into the shim directory, or that the context cannot resolve at all, gets no shim. The environment reports it at startup and tasks fall back to whatever the worker provides.
+The environment skips the shim for a tool that resolves back into the shim directory or that the context cannot resolve. The environment reports it at startup and tasks fall back to whatever the worker provides.
 
 ## Parameters
 
@@ -60,7 +62,7 @@ The demo setup environment and job add these:
 |---|---|---|
 | `RezDemoRepository` | `/tmp/rez-demo-repository` | Where to build the demo package. Pass the same value as `RezRepositories` |
 | `ToolName` | `demorender` | The command the first demo step invokes by bare name |
-| `CancelSleepSeconds` | `600` | How long `CancelThroughShim` sleeps, giving you time to cancel the job |
+| `CancelSleepSeconds` | `600` | How long `CancelThroughShim` sleeps while you cancel the job |
 
 ## Deploy on a farm
 
@@ -75,13 +77,13 @@ aws deadline create-queue-environment \
    --template file://queue_environments/rez_shim/rez_queue_env_shim.yaml
 ```
 
-Give it a higher priority number than any other environment that edits `PATH`, such as a Conda environment, because the last writer wins.
+Give it a higher priority number than any other environment that edits `PATH`, such as a Conda environment, because the environment entered last makes the final change to `PATH`.
 
-Workers need Rez installed and read access to the package repository. Neither is provided by service-managed fleet images by default.
+Workers need Rez installed and read access to the package repository. Service-managed fleet images don't include either by default.
 
 ## Try it without a farm
 
-The demo setup environment installs Rez and builds a `demotool` package into the session, so the shim environment runs unmodified against it. Apply both environments in order:
+[`rez_demo_setup_queue_env.yaml`](rez_demo_setup_queue_env.yaml) installs Rez and builds a `demotool` package into the session. The shim environment then runs against it unmodified. Apply both environments in order:
 
 ```console
 openjd run queue_environments/rez_shim/demo_job_bundle/template.yaml \
@@ -106,7 +108,7 @@ deadline bundle submit queue_environments/rez_shim/demo_job_bundle \
 
 The demo needs a fleet of Linux or macOS workers with `python3` and network access to PyPI. A production farm provides Rez on the worker image and does not need the setup environment at all.
 
-## What the demo verifies
+## Demo checks
 
 `RunRezTool` calls `demorender` by bare name, so the shim is what runs. `VerifyEnvironment` then runs three checks and fails the task if any regress:
 
@@ -116,7 +118,7 @@ The demo needs a fleet of Linux or macOS workers with `python3` and network acce
 | 2 | A Rez `alias`, which becomes an exported shell function | Lost, rejected by the runtime |
 | 3 | A `PATH` prepend where the package provides its own `sort` | Depends on environment order rather than the resolved context |
 
-Every check reads its result from a tool called by bare name, so each one depends on the shim mechanism end to end rather than on the saved context alone. Deleting the `PATH` injection from the environment fails all three, which is how the checks were confirmed to test what they claim.
+All three checks read their results from a tool called by bare name. That tests the shim mechanism end to end, not only the saved context. Deleting the `PATH` injection from the environment fails all three, which is how the checks were confirmed to test what they claim.
 
 A third step, `CancelThroughShim`, is a manual check rather than an automatic one. It sleeps inside a shimmed tool for `CancelSleepSeconds` so you can cancel the job and watch the signal arrive. The tool reports the signal it caught before exiting. Cancel it from the monitor or with:
 
@@ -143,13 +145,13 @@ PASS: package command shadows the system one
 All 3 environment fidelity checks passed.
 ```
 
-Running the same bundle under [rez_queue_env.yaml](../rez_queue_env.yaml) instead shows the runtime refusing the alias, which is the failure this environment avoids.
+An environment that copies variables with `openjd_env` instead shows the runtime refusing the alias, which is the failure this environment avoids.
 
 ## Tradeoffs
 
 * Only bare command names are intercepted. A template invoking an absolute path bypasses the shims.
-* Linux and macOS workers only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows, so the environment fails immediately there with a message pointing at the alternative. Use [rez_queue_env.yaml](../rez_queue_env.yaml) for Windows fleets.
-* Each task pays a context re-entry. Rez's resolve cache keeps this small, but it is not free.
+* Linux and macOS workers only. The shims are POSIX shell scripts that depend on a shebang line, which does not work on Windows. On Windows the environment fails immediately with a message pointing at the alternative. [rez_queue_env.yaml](../rez_queue_env.yaml) supports Windows workers.
+* Each task pays a context re-entry. Rez's resolve cache reduces this cost but doesn't remove it.
 
 Cancelation does reach through a shim. Rez runs the tool in a shell of its own, so the process tree is `shim` → `rez env` → shell → tool rather than flat, but a `SIGTERM` sent to the top process propagates to the tool and no orphans are left behind. Verified on a Linux service-managed fleet worker: canceling the `CancelThroughShim` step below produced
 
@@ -160,9 +162,9 @@ demosleep: caught SIGTERM, exiting
 
 Applications that install their own signal handlers still get the chance to shut down cleanly. Give `cancelation` a `NOTIFY_THEN_TERMINATE` mode in your step if a tool needs a grace period.
 
-## A future specification change removes the need for this
+## Wrap actions replace this
 
-This environment is a workaround for a gap in the environment specification rather than a permanent design. [RFC0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/issues/132) proposes `onWrapTaskRun`, letting a queue environment wrap each task's command directly instead of exporting variables to it. Once the worker agent supports that hook, it replaces both the shim directory and the `PATH` manipulation, and the tradeoffs above go away. The RFC has reached final comments upstream.
+This environment was a workaround from before the `WRAP_ACTIONS` extension in [RFC 0008: Environment Wrap Actions](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md). With that extension, a queue environment wraps each task's command directly instead of exporting variables to it, which removes the shim directory, the `PATH` manipulation, and the tradeoffs above. [rez_queue_env.yaml](../rez_queue_env.yaml) takes that approach.
 
 ## Cleanup
 

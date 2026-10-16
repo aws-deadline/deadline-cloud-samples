@@ -1,4 +1,5 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Job sample with a daemon process
 description: |
   A job template can define and consume environments that run background
@@ -14,15 +15,15 @@ description: |
 
 parameterDefinitions:
 - name: Frames
+  type: range_expr
+  default: "1-50"
   description: The range of frames to process as separate tasks.
-  type: STRING
-  default: 1-50
 - name: FailureRate
-  description: The probability that a task should fail.
-  type: FLOAT
+  type: float
   default: 0.1
   minValue: 0
   maxValue: 1
+  description: The probability that a task should fail.
 
 steps:
 - name: EnvWithDaemonProcess
@@ -30,7 +31,7 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: "{{Param.Frames}}"
+      range: "{{ Param.Frames }}"
 
   stepEnvironments:
   - name: DaemonProcess
@@ -40,11 +41,11 @@ steps:
         onEnter:
           command: bash
           args:
-          - "{{Env.File.Enter}}"
+          - "{{ Env.File.Enter }}"
         onExit:
           command: bash
           args:
-          - "{{Env.File.Exit}}"
+          - "{{ Env.File.Exit }}"
       embeddedFiles:
       - name: Enter
         filename: enter-daemon-process-env.sh
@@ -53,11 +54,11 @@ steps:
           #!/bin/env bash
           set -euo pipefail
 
-          DAEMON_LOG='{{Session.WorkingDirectory}}/daemon.log'
+          DAEMON_LOG='{{ Session.WorkingDirectory }}/daemon.log'
           echo "openjd_env: DAEMON_LOG=$DAEMON_LOG"
-          nohup python {{Env.File.DaemonScript}} > $DAEMON_LOG 2>&1 &
+          nohup python {{ Env.File.DaemonScript }} > $DAEMON_LOG 2>&1 &
           echo "openjd_env: DAEMON_PID=$!"
-          echo "openjd_env: DAEMON_BASH_HELPER_SCRIPT={{Env.File.DaemonHelperFunctions}}"
+          echo "openjd_env: DAEMON_BASH_HELPER_SCRIPT={{ Env.File.DaemonHelperFunctions }}"
 
           echo 0 > 'daemon_log_cursor.txt'
       - name: Exit
@@ -103,7 +104,7 @@ steps:
           random.seed()
 
           # File paths for communicating with the tasks
-          workdir = Path(r'{{Session.WorkingDirectory}}')
+          workdir = Path(r'{{ Session.WorkingDirectory }}')
           details_file = workdir / 'task_details.json'
           task_result_partial_file = workdir / 'task_result.json.partial'
           task_result_file = workdir / 'task_result.json'
@@ -119,7 +120,7 @@ steps:
           def process_task(task_details):
               print(f"Processing frame number {task_details['frame']}")
               random_value = random.random()
-              failure_rate = {{Param.FailureRate}}
+              failure_rate = {{ Param.FailureRate }}
               result = "SUCCESS" if (random_value > failure_rate) else "FAILURE"
               return {
                   "result": result,
@@ -218,7 +219,7 @@ steps:
         timeout: 60
         command: bash
         args:
-        - '{{Task.File.Run}}'
+        - '{{ Task.File.Run }}'
     embeddedFiles:
     - name: Run
       filename: run-task.sh
@@ -236,7 +237,7 @@ steps:
 
         print_daemon_log "Previous output from daemon"
 
-        send_task_to_daemon "{\"pid\": $$, \"frame\": {{Task.Param.Frame}} }"
+        send_task_to_daemon "{\"pid\": $$, \"frame\": {{ Task.Param.Frame }} }"
         wait_for_daemon_task_result
 
         echo Received task result:

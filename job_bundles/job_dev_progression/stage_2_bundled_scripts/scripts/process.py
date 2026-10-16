@@ -20,6 +20,7 @@ df = pl.scan_csv("csv/dataset.csv").collect()
 print(f"Loaded csv/dataset.csv with {df.height} rows")
 
 print("Plotting a histogram of the durations for each action type")
-sns.histplot(data=df, x="Duration (Seconds)", hue="Action Type", bins=20)
+# Seaborn requires a pandas DataFrame; polars 2.0 removed the interchange protocol it used.
+sns.histplot(data=df.to_pandas(), x="Duration (Seconds)", hue="Action Type", bins=20)
 mpl.pyplot.savefig("output/action_duration_histograms.png")
 print("Wrote the plot to output/action_duration_histograms.png")

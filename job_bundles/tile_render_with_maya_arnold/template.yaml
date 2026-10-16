@@ -1,4 +1,5 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: Maya/Arnold Tiled Render
 description: |
   This job uses Maya, Arnold for Maya and ffmpeg to do tile rendering and assembly.
@@ -21,9 +22,10 @@ parameterDefinitions:
 
 # Render Parameters
 - name: MayaSceneFile
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
+  default: sample_turntable_scene.ma
   userInterface:
     control: CHOOSE_INPUT_FILE
     label: Maya Scene File
@@ -37,142 +39,132 @@ parameterDefinitions:
       patterns:
       - '*'
   description: The Maya scene file to render.
-  default: sample_turntable_scene.ma
 - name: Frames
-  type: STRING
+  type: range_expr
+  default: '1-16'
+  minLength: 1
   userInterface:
     control: LINE_EDIT
     label: Frames
     groupLabel: Maya Settings
   description: The frames to render. E.g. 1-3,8,11-15
-  default: '1-16'
-  minLength: 1
 - name: RenderLayer
-  type: STRING
+  type: string
+  default: 'masterLayer'
   userInterface:
     control: LINE_EDIT
     label: Render Layer
     groupLabel: Maya Settings
   description: The name of the layer to render.
-  default: 'masterLayer'
 - name: Camera
-  type: STRING
+  type: string
+  default: persp
   userInterface:
     control: LINE_EDIT
     groupLabel: Maya Settings
   description: The camera to render.
-  default: persp
 - name: OutputFilePrefix
-  type: STRING
+  type: string
+  default: output
   userInterface:
     control: LINE_EDIT
     label: Output File Prefix
     groupLabel: Maya Settings
   description: The prefix for the output render files.
-  default: output
 - name: ProjectPath
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: NONE
+  default: .
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Project Path
     groupLabel: Maya Settings
   description: The Maya project path.
-  default: .
 - name: OutputFilePath
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
+  default: output
   userInterface:
     control: CHOOSE_DIRECTORY
     label: Output File Path
     groupLabel: Maya Settings
   description: The render output path.
-  default: output
 - name: RenderSetupIncludeLights
-  type: STRING
+  type: bool
+  default: true
   userInterface:
     control: CHECK_BOX
     label: Include All Lights
     groupLabel: Maya Settings
   description: Include all lights in the render.
-  default: 'true'
-  allowedValues:
-  - 'true'
-  - 'false'
 - name: StrictErrorChecking
-  type: STRING
+  type: bool
+  default: false
   userInterface:
     control: CHECK_BOX
     label: Strict Error Checking
     groupLabel: Maya Settings
   description: Fail when errors occur.
-  default: 'false'
-  allowedValues:
-  - 'true'
-  - 'false'
 - name: ImageWidth
-  type: INT
+  type: int
+  default: 3840
+  minValue: 1
   userInterface:
     control: SPIN_BOX
     label: Image Width
     groupLabel: Maya Settings
-  minValue: 1
   description: The image width of the output.
-  default: 3840
 - name: ImageHeight
-  type: INT
+  type: int
+  default: 2160
+  minValue: 1
   userInterface:
     control: SPIN_BOX
     label: Image Height
     groupLabel: Maya Settings
-  minValue: 1
   description: The image height of the output.
-  default: 2160
 
 # Tile Render Parameters
 - name: NumXTiles
-  type: INT
+  type: int
+  default: 3
+  minValue: 1
   userInterface:
     control: SPIN_BOX
     label: Tiles across width
     groupLabel: Tile Rendering Settings
-  minValue: 1
   description: The number of tiles across the x axis.
-  default: 3
 - name: NumYTiles
-  type: INT
+  type: int
+  default: 2
+  minValue: 1
   userInterface:
     control: SPIN_BOX
     label: Tiles across height
     groupLabel: Tile Rendering Settings
-  minValue: 1
   description: The number of tiles across the y axis.
-  default: 2
 
 # Arnold Renderer Settings
 - name: ArnoldErrorOnLicenseFailure
-  type: STRING
+  type: bool
+  default: true
   userInterface:
     control: CHECK_BOX
     label: Error on License Failure
     groupLabel: Arnold Renderer Settings
   description: Whether to produce an error when there is an Arnold license failure.
-  default: 'true'
-  allowedValues:
-  - 'true'
-  - 'false'
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
-  description: Choose which Conda packages to install for the render. Requires a conda queue environment to process the value.
+  type: string
   default: maya=2025 maya-mtoa maya-openjd=0.15 ffmpeg
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
     control: HIDDEN
+  description: Choose which Conda packages to install for the render. Requires a conda queue environment to process the value.
 
 steps:
 - name: Render Tile Regions
@@ -180,13 +172,13 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: '{{Param.Frames}}'
+      range: '{{ Param.Frames }}'
     - name: TileNumberX
       type: INT
-      range: '1-{{Param.NumXTiles}}'
+      range: '1-{{ Param.NumXTiles }}'
     - name: TileNumberY
       type: INT
-      range: '1-{{Param.NumYTiles}}'
+      range: '1-{{ Param.NumYTiles }}'
   stepEnvironments:
   - name: Maya
     description: Runs Maya in the background.
@@ -197,16 +189,16 @@ steps:
         type: TEXT
         data: |
           renderer: arnold
-          render_layer: '{{Param.RenderLayer}}'
-          camera: '{{Param.Camera}}'
-          scene_file: '{{Param.MayaSceneFile}}'
-          project_path: '{{Param.ProjectPath}}'
-          output_file_path: '{{Param.OutputFilePath}}'
-          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
-          strict_error_checking: {{Param.StrictErrorChecking}}
-          image_width: {{Param.ImageWidth}}
-          image_height: {{Param.ImageHeight}}
-          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+          render_layer: '{{ Param.RenderLayer }}'
+          camera: '{{ Param.Camera }}'
+          scene_file: '{{ Param.MayaSceneFile }}'
+          project_path: '{{ Param.ProjectPath }}'
+          output_file_path: '{{ Param.OutputFilePath }}'
+          render_setup_include_lights: {{ repr_json(Param.RenderSetupIncludeLights) }}
+          strict_error_checking: {{ repr_json(Param.StrictErrorChecking) }}
+          image_width: {{ Param.ImageWidth }}
+          image_height: {{ Param.ImageHeight }}
+          error_on_arnold_license_fail: {{ repr_json(Param.ArnoldErrorOnLicenseFailure) }}
       actions:
         onEnter:
           command: maya-openjd
@@ -214,9 +206,9 @@ steps:
           - daemon
           - start
           - --path-mapping-rules
-          - file://{{Session.PathMappingRulesFile}}
+          - file://{{ Session.PathMappingRulesFile }}
           - --init-data
-          - file://{{Env.File.initData}}
+          - file://{{ Env.File.initData }}
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
         onExit:
@@ -235,13 +227,13 @@ steps:
         import subprocess
 
         # Tile num uses 1 based indexing. First tile (top left) is x=1, y=1
-        tileNumX = {{Task.Param.TileNumberX}}
-        tileNumY = {{Task.Param.TileNumberY}}
-        numXTiles = {{Param.NumXTiles}}
-        numYTiles = {{Param.NumYTiles}}
+        tileNumX = {{ Task.Param.TileNumberX }}
+        tileNumY = {{ Task.Param.TileNumberY }}
+        numXTiles = {{ Param.NumXTiles }}
+        numYTiles = {{ Param.NumYTiles }}
 
-        deltaX, widthRemainder = divmod({{Param.ImageWidth}}, numXTiles)
-        deltaY, heightRemainder = divmod({{Param.ImageHeight}}, numYTiles)
+        deltaX, widthRemainder = divmod({{ Param.ImageWidth }}, numXTiles)
+        deltaY, heightRemainder = divmod({{ Param.ImageHeight }}, numYTiles)
 
         # Calculate the bounds for the tile. Two adjacent tiles could have
         # "minX=0, maxX=63, minY=0, maxY=63" and then "minX=64, maxX=127, minY=0, maxY=63"
@@ -256,10 +248,10 @@ steps:
         if tileNumY == numYTiles:
             maxY += heightRemainder
 
-        prefix = r"{{Param.OutputFilePrefix}}"
+        prefix = {{ repr_py(Param.OutputFilePrefix) }}
 
         with open("run-data.yaml", "w") as fh:
-            fh.write("frame: {{Task.Param.Frame}}\n")
+            fh.write("frame: {{ Task.Param.Frame }}\n")
             fh.write(f"region_min_x: {minX}\n")
             fh.write(f"region_max_x: {maxX}\n")
             fh.write(f"region_min_y: {minY}\n")
@@ -272,7 +264,7 @@ steps:
     actions:
       onRun:
         command: python
-        args: ["{{Task.File.RenderTile}}"]
+        args: ["{{ Task.File.RenderTile }}"]
         cancelation:
           mode: NOTIFY_THEN_TERMINATE
   hostRequirements:
@@ -294,7 +286,7 @@ steps:
     #    - dependsOn: Render Tile Regions
     #      taskParameters:
     #      - name: Frame
-    #        range: "{{Task.Param.Frame}}"
+    #        range: "{{ Task.Param.Frame }}"
     #      - name: TileNumberX
     #        range: "*"
     #      - name: TileNumberY
@@ -303,33 +295,33 @@ steps:
     taskParameterDefinitions:
     - name: Frame
       type: INT
-      range: '{{Param.Frames}}'
+      range: '{{ Param.Frames }}'
   script:
+    let:
+      - tile_pattern = (Param.OutputFilePath / (Param.OutputFilePrefix + '_tile_*.####.png')).with_number(Task.Param.Frame)
+      - output_file = (Param.OutputFilePath / (Param.OutputFilePrefix + '.####.png')).with_number(Task.Param.Frame)
+    embeddedFiles:
+      - name: AssembleScript
+        type: TEXT
+        runnable: true
+        data: |
+          #!/bin/bash
+          set -xeuo pipefail
+
+          # ASSUMPTIONS:
+          # Output folder contains the rendered tiles directly.
+          # The name.#.ext Maya "Frame/Animation ext" render setting is used.
+          # Frame padding of 4
+          # Output tiles are pngs. Swap png with the desired file ext in the script as needed.
+
+          ffmpeg -y \
+              -pattern_type glob \
+              -i {{ repr_sh(tile_pattern) }} \
+              -filter_complex tile={{ Param.NumXTiles }}x{{ Param.NumYTiles }} \
+              {{ repr_sh(output_file) }}
     actions:
       onRun:
-        command: bash
-        args: [ "{{Task.File.AssembleTiles}}"]
-    embeddedFiles:
-    - name: AssembleTiles
-      type: TEXT
-      data: |
-        #!/bin/env bash
-
-        set -xeuo pipefail
-
-        # ASSUMPTIONS:
-        # Output folder contains the rendered tiles directly.
-        # The name.#.ext Maya "Frame/Animation ext" render setting is used.
-        # Frame padding of 4
-        # Output tiles are pngs. Swap png with the desired file ext in the script as needed.
-
-        FRAME=$(printf %04d {{Task.Param.Frame}})
-
-        ffmpeg -y \
-            -pattern_type glob \
-            -i "{{Param.OutputFilePath}}/{{Param.OutputFilePrefix}}_tile_*.$FRAME.png" \
-            -filter_complex tile={{Param.NumXTiles}}x{{Param.NumYTiles}} \
-            "{{Param.OutputFilePath}}/{{Param.OutputFilePrefix}}.$FRAME.png"
+        command: "{{ Task.File.AssembleScript }}"
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

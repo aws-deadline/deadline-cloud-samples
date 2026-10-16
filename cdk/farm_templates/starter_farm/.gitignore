@@ -7,7 +7,7 @@ cdk.context.json
 # Node
 node_modules/
 
-# Compiled TypeScript output (the app runs from .ts via ts-node)
+# Compiled TypeScript output (the app runs from .ts via tsx)
 *.js
 *.d.ts
 !jest.config.js

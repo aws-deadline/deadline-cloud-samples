@@ -27,7 +27,7 @@ Before building this package, ensure you have:
 
 4. **Keyshot account** for downloading Keyshot installer
 
-5. **KeyShot license** for rendering operations. Available through Deadline Cloud Usage-Based Licensing
+5. **KeyShot license** for rendering operations
 
 ## Application-Specific Information
 
@@ -95,6 +95,7 @@ keyshot-2025/
 
 - **KeyShot Documentation**: https://www.keyshot.com/resources/
 - **KeyShot Scripting**: https://manual.keyshot.com/manual/scripting-2/
+- **KeyShot submitter sample**: [job_bundles/custom_submitters/keyshot](../../job_bundles/custom_submitters/keyshot/) submits jobs that use this package
 - **AWS Deadline Cloud Developer Guide**: https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/
 - **Conda Build Documentation**: https://docs.conda.io/projects/conda-build/
 - **KeyShot Network Rendering**: https://www.keyshot.com/network-rendering/

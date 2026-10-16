@@ -63,13 +63,13 @@ steps:
 - hostRequirements:
     attributes:
     - anyOf:
-      - '{{Param.FleetAttributeValue}}'
-      name: '{{Param.FleetAttributeName}}'
+      - '{{ Param.FleetAttributeValue }}'
+      name: '{{ Param.FleetAttributeName }}'
   name: beauty_rose
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      range: '{{Param.Frames}}'
+      range: '{{ Param.Frames }}'
       type: INT
     - name: Camera
       range:
@@ -89,9 +89,9 @@ steps:
           mode: NOTIFY_THEN_TERMINATE
         command: MayaAdaptor
     embeddedFiles:
-    - data: 'frame: {{Task.Param.Frame}}
+    - data: 'frame: {{ Task.Param.Frame }}
 
-        camera: ''{{Task.Param.Camera}}''
+        camera: ''{{ Task.Param.Camera }}''
 
         '
       filename: run-data.yaml
@@ -107,11 +107,11 @@ steps:
           - daemon
           - start
           - --path-mapping-rules
-          - file://{{Session.PathMappingRulesFile}}
+          - file://{{ Session.PathMappingRulesFile }}
           - --connection-file
-          - '{{Session.WorkingDirectory}}/connection.json'
+          - '{{ Session.WorkingDirectory }}/connection.json'
           - --init-data
-          - file://{{Env.File.initData}}
+          - file://{{ Env.File.initData }}
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
           command: MayaAdaptor
@@ -129,23 +129,23 @@ steps:
 
           render_layer: beauty_rose
 
-          scene_file: {{Param.MayaSceneFile}}
+          scene_file: {{ Param.MayaSceneFile }}
 
-          project_path: {{Param.ProjectPath}}
+          project_path: {{ Param.ProjectPath }}
 
-          output_file_path: {{Param.OutputFilePath}}
+          output_file_path: {{ Param.OutputFilePath }}
 
-          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+          render_setup_include_lights: {{ Param.RenderSetupIncludeLights }}
 
-          strict_error_checking: {{Param.StrictErrorChecking}}
+          strict_error_checking: {{ Param.StrictErrorChecking }}
 
-          output_file_prefix: {{Param.OutputFilePrefix}}
+          output_file_prefix: {{ Param.OutputFilePrefix }}
 
-          image_width: {{Param.ImageWidth}}
+          image_width: {{ Param.ImageWidth }}
 
-          image_height: {{Param.ImageHeight}}
+          image_height: {{ Param.ImageHeight }}
 
-          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+          error_on_arnold_license_fail: {{ Param.ArnoldErrorOnLicenseFailure }}
 
           '
         filename: init-data.yaml
@@ -154,13 +154,13 @@ steps:
 - hostRequirements:
     attributes:
     - anyOf:
-      - '{{Param.FleetAttributeValue}}'
-      name: '{{Param.FleetAttributeName}}'
+      - '{{ Param.FleetAttributeValue }}'
+      name: '{{ Param.FleetAttributeName }}'
   name: beauty_set
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      range: '{{Param.Frames}}'
+      range: '{{ Param.Frames }}'
       type: INT
     - name: Camera
       range:
@@ -180,9 +180,9 @@ steps:
           mode: NOTIFY_THEN_TERMINATE
         command: MayaAdaptor
     embeddedFiles:
-    - data: 'frame: {{Task.Param.Frame}}
+    - data: 'frame: {{ Task.Param.Frame }}
 
-        camera: ''{{Task.Param.Camera}}''
+        camera: ''{{ Task.Param.Camera }}''
 
         '
       filename: run-data.yaml
@@ -198,11 +198,11 @@ steps:
           - daemon
           - start
           - --path-mapping-rules
-          - file://{{Session.PathMappingRulesFile}}
+          - file://{{ Session.PathMappingRulesFile }}
           - --connection-file
-          - '{{Session.WorkingDirectory}}/connection.json'
+          - '{{ Session.WorkingDirectory }}/connection.json'
           - --init-data
-          - file://{{Env.File.initData}}
+          - file://{{ Env.File.initData }}
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
           command: MayaAdaptor
@@ -220,23 +220,23 @@ steps:
 
           render_layer: beauty_set
 
-          scene_file: {{Param.MayaSceneFile}}
+          scene_file: {{ Param.MayaSceneFile }}
 
-          project_path: {{Param.ProjectPath}}
+          project_path: {{ Param.ProjectPath }}
 
-          output_file_path: {{Param.OutputFilePath}}
+          output_file_path: {{ Param.OutputFilePath }}
 
-          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+          render_setup_include_lights: {{ Param.RenderSetupIncludeLights }}
 
-          strict_error_checking: {{Param.StrictErrorChecking}}
+          strict_error_checking: {{ Param.StrictErrorChecking }}
 
-          output_file_prefix: {{Param.OutputFilePrefix}}
+          output_file_prefix: {{ Param.OutputFilePrefix }}
 
-          image_width: {{Param.ImageWidth}}
+          image_width: {{ Param.ImageWidth }}
 
-          image_height: {{Param.ImageHeight}}
+          image_height: {{ Param.ImageHeight }}
 
-          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+          error_on_arnold_license_fail: {{ Param.ArnoldErrorOnLicenseFailure }}
 
           '
         filename: init-data.yaml
@@ -245,13 +245,13 @@ steps:
 - hostRequirements:
     attributes:
     - anyOf:
-      - '{{Param.FleetAttributeValue}}'
-      name: '{{Param.FleetAttributeName}}'
+      - '{{ Param.FleetAttributeValue }}'
+      name: '{{ Param.FleetAttributeName }}'
   name: beauty_volume
   parameterSpace:
     taskParameterDefinitions:
     - name: Frame
-      range: '{{Param.Frames}}'
+      range: '{{ Param.Frames }}'
       type: INT
     - name: Camera
       range:
@@ -271,9 +271,9 @@ steps:
           mode: NOTIFY_THEN_TERMINATE
         command: MayaAdaptor
     embeddedFiles:
-    - data: 'frame: {{Task.Param.Frame}}
+    - data: 'frame: {{ Task.Param.Frame }}
 
-        camera: ''{{Task.Param.Camera}}''
+        camera: ''{{ Task.Param.Camera }}''
 
         '
       filename: run-data.yaml
@@ -289,11 +289,11 @@ steps:
           - daemon
           - start
           - --path-mapping-rules
-          - file://{{Session.PathMappingRulesFile}}
+          - file://{{ Session.PathMappingRulesFile }}
           - --connection-file
-          - '{{Session.WorkingDirectory}}/connection.json'
+          - '{{ Session.WorkingDirectory }}/connection.json'
           - --init-data
-          - file://{{Env.File.initData}}
+          - file://{{ Env.File.initData }}
           cancelation:
             mode: NOTIFY_THEN_TERMINATE
           command: MayaAdaptor
@@ -311,23 +311,23 @@ steps:
 
           render_layer: beauty_volume
 
-          scene_file: {{Param.MayaSceneFile}}
+          scene_file: {{ Param.MayaSceneFile }}
 
-          project_path: {{Param.ProjectPath}}
+          project_path: {{ Param.ProjectPath }}
 
-          output_file_path: {{Param.OutputFilePath}}
+          output_file_path: {{ Param.OutputFilePath }}
 
-          render_setup_include_lights: {{Param.RenderSetupIncludeLights}}
+          render_setup_include_lights: {{ Param.RenderSetupIncludeLights }}
 
-          strict_error_checking: {{Param.StrictErrorChecking}}
+          strict_error_checking: {{ Param.StrictErrorChecking }}
 
-          output_file_prefix: {{Param.OutputFilePrefix}}
+          output_file_prefix: {{ Param.OutputFilePrefix }}
 
-          image_width: {{Param.ImageWidth}}
+          image_width: {{ Param.ImageWidth }}
 
-          image_height: {{Param.ImageHeight}}
+          image_height: {{ Param.ImageHeight }}
 
-          error_on_arnold_license_fail: {{Param.ArnoldErrorOnLicenseFailure}}
+          error_on_arnold_license_fail: {{ Param.ArnoldErrorOnLicenseFailure }}
 
           '
         filename: init-data.yaml

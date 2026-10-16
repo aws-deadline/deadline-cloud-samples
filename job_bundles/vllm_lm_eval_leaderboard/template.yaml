@@ -1,4 +1,5 @@
 specificationVersion: 'jobtemplate-2023-09'
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: vLLM Leaderboard Matrix Evaluation
 description: |
   Evaluates multiple LLMs on a set of benchmarks in a single Deadline Cloud job.
@@ -80,6 +81,19 @@ parameterDefinitions:
     label: HuggingFace Token
     groupLabel: Model Settings
 
+- name: WorkerMemoryGiB
+  type: INT
+  default: 32
+  minValue: 8
+  description: >
+    Minimum system memory, in GiB, a worker needs to evaluate a model. vLLM loads
+    the model weights through system memory, so raise this when you add larger
+    models to the ModelName list. The default fits the models listed here.
+  userInterface:
+    control: SPIN_BOX
+    label: Worker Memory (GiB)
+    groupLabel: Server Settings
+
 - name: JobScriptDir
   description: Directory containing bundled scripts.
   type: PATH
@@ -147,7 +161,8 @@ steps:
     - {name: attr.worker.os.family, anyOf: [linux]}
     amounts:
     - {name: amount.worker.gpu, min: 1}
-    - {name: amount.worker.memory, min: 32768}
+    # amount.worker.memory is in MiB.
+    - {name: amount.worker.memory, min: "{{ Param.WorkerMemoryGiB * 1024 }}"}
 
 - name: Aggregate
   dependencies:

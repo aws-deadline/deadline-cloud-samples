@@ -200,6 +200,7 @@ class DeadlineCloudRenderer:
     RUNNING_ALL_SEQUENCES_STARTING = "Starting to run all sequences"
     RUNNING_SEQUENCE_STARTING = "Starting to run the following sequence:"
     STARTING_RENDER_PROCESS = "Starting render process."
+    RENDER_COMPLETE_MARKER_ENV_VAR = "DEADLINE_VRED_RENDER_COMPLETE_FILE"
     SUPER_SAMPLING_ASSIGNED = "Supersampling quality level set to:"
     VALIDATING_RENDER_SETTINGS = "Validating render settings"
     VIEWPOINT_FOUND = "Found viewpoint in view list:"
@@ -526,6 +527,12 @@ class DeadlineCloudRenderer:
             self.logger.info(self.STARTING_RENDER_PROCESS)
             self.logger.info(f"{self.RENDERING_TO_FILE} {getRenderFilename()}")
             startRenderToFile(True)
+            # Tell the job template that rendering completed. VRED exits with code 0 even when it
+            # can't check out a license and never runs this script, so the template checks for this file.
+            marker_file = os.environ.get(self.RENDER_COMPLETE_MARKER_ENV_VAR)
+            if marker_file:
+                with open(marker_file, "w", encoding="utf-8") as f:
+                    f.write("done\n")
             # Important to close VRED for further frame rendering to proceed and to release license
             if self.WANT_VRED_TERMINATION:
                 terminateVred()

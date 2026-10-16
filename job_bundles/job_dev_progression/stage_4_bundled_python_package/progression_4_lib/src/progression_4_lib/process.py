@@ -20,7 +20,8 @@ def process_data():
 
     print("Plotting a histogram of the durations for each action type")
     mpl.pyplot.figure(figsize=(16, 4.8))
-    g = sns.FacetGrid(data=df, col="Action Type", sharex=False)
+    # Seaborn requires a pandas DataFrame; polars 2.0 removed the interchange protocol it used.
+    g = sns.FacetGrid(data=df.to_pandas(), col="Action Type", sharex=False)
     g.map(sns.histplot, "Duration (Seconds)", bins=10)
     mpl.pyplot.savefig("output/per_action_type_histogram.png")
     print("Wrote the plot to output/per_action_type_histogram.png")

@@ -1,4 +1,5 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: "Job Attachments Explorer: Input"
 description: |
   This bundle serves as the starting point for the exploration of job attachments
@@ -7,20 +8,18 @@ description: |
   location is passed as a job parameter.
 parameterDefinitions:
 - name: ScriptFile
-  type: PATH
+  type: path
   default: script.sh
   dataFlow: IN
   objectType: FILE
 steps:
 - name: Step
-  hostRequirements:
-    attributes:
-    - name: attr.worker.os.family
-      anyOf:
-      - linux
   script:
     actions:
       onRun:
-        command: /bin/bash
-        args:
-        - "{{Param.ScriptFile}}"
+        command: bash
+        args: ["{{ Param.ScriptFile }}"]
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: [linux]

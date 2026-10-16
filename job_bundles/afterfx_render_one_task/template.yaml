@@ -1,14 +1,14 @@
 specificationVersion: jobtemplate-2023-09
+extensions: [FEATURE_BUNDLE_1, EXPR]
 name: After Effects Render - one task
 description: >
   A simple job bundle that allows a user to select
   a project file and enter a comp to render with aerender.
 
 parameterDefinitions:
-
 # Project settings
 - name: ProjectFile
-  type: PATH
+  type: path
   objectType: FILE
   dataFlow: IN
   userInterface:
@@ -17,15 +17,12 @@ parameterDefinitions:
     groupLabel: Project settings
     fileFilters:
     - label: After Effects project files
-      patterns:
-      - "*.aep"
-      - "*.aepx"
+      patterns: ["*.aep", "*.aepx"]
     - label: All Files
-      patterns:
-      - "*"
+      patterns: ["*"]
   description: The After Effects project file to render.
 - name: CompName
-  type: STRING
+  type: string
   userInterface:
     control: LINE_EDIT
     label: Comp name
@@ -34,7 +31,7 @@ parameterDefinitions:
 
 # Inputs/outputs
 - name: InputDirectory
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: IN
   userInterface:
@@ -48,7 +45,7 @@ parameterDefinitions:
     within this directory to ensure relative paths are
     preserved.
 - name: OutputDirectory
-  type: PATH
+  type: path
   objectType: DIRECTORY
   dataFlow: OUT
   userInterface:
@@ -59,69 +56,53 @@ parameterDefinitions:
 
 # Frame range
 - name: StartFrame
-  type: INT
+  type: int
+  default: 0
   userInterface:
     control: SPIN_BOX
     label: Start Frame
     groupLabel: Frame range
-  default: 0
   description: The first frame to render.
 - name: EndFrame
-  type: INT
+  type: int
+  default: 50
   userInterface:
     control: SPIN_BOX
     label: End Frame
     groupLabel: Frame range
-  default: 50
-  description: The last frame to render.
+  description: >
+    The last frame to render, inclusive. aerender renders one contiguous range,
+    from StartFrame to EndFrame.
 
 # Software Environment
 - name: CondaPackages
-  type: STRING
+  type: string
+  default: aftereffects
   userInterface:
     # This parameter is for a queue environment, not used directly in the job,
     # so leave the GUI for the queue environment to display.
     control: HIDDEN
-  default: aftereffects
   description: >
     If you have a Queue Environment that creates a Conda environment from a parameter called CondaPackages, this
     will set the default packages to use for the job.
 
 steps:
 - name: RenderComp
-  script:
-    actions:
-      onRun:
-        command: python
-        args:
-          - "{{Task.File.Run}}"
-          - "{{Param.OutputDirectory}}"
-          - "aerender"
-          - "-project"
-          - "{{Param.ProjectFile}}"
-          - "-comp"
-          - "{{Param.CompName}}"
-          - "-output"
-          - "{{Param.OutputDirectory}}/output_[####].png"
-          - "-s"
-          - "{{Param.StartFrame}}"
-          - "-e"
-          - "{{Param.EndFrame}}"
-    embeddedFiles:
-      - name: Run
-        type: TEXT
-        data: |
-          import os
-          import sys
-          import subprocess
-
-          # Ensure the output directory exists
-          os.makedirs(sys.argv[1], exist_ok=True)
-
-          # Run the After Effects subprocess
-          subprocess.run(sys.argv[2:], check=True)
+  python:
+    let:
+      - output_pattern = Param.OutputDirectory / 'output_[####].png'
+    script: |
+      import os, subprocess
+      os.makedirs({{ repr_py(Param.OutputDirectory) }}, exist_ok=True)
+      subprocess.run([
+          'aerender',
+          '-project', {{ repr_py(Param.ProjectFile) }},
+          '-comp', {{ repr_py(Param.CompName) }},
+          '-output', {{ repr_py(output_pattern) }},
+          '-s', str({{ Param.StartFrame }}),
+          '-e', str({{ Param.EndFrame }})
+      ], check=True)
   hostRequirements:
     attributes:
     - name: attr.worker.os.family
-      anyOf:
-      - windows
+      anyOf: [windows]

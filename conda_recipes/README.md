@@ -17,11 +17,11 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 55 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 56 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
-| [After Effects 25.1](aftereffects-25.1/) | Packaging Adobe After Effects for Windows workers | You need the base After Effects 25 application |
+| [After Effects 25.1](aftereffects-25.1/) | Packaging Adobe After Effects with Plugin Sync for Windows | Your jobs require After Effects 25 or frequently updated plugins |
 | [After Effects plugin bundle](aftereffects-plugin-bundle/) | Bundling multiple supplied After Effects plugins | You want one versioned package for a studio plugin set |
 | [After Effects Saber](aftereffects-saber/) | Installing the Saber plugin into an After Effects package | You need a small single-plugin recipe example |
 | [AutoDock Vina 1.2.5](autodock-vina-1.2.5/) | Building the AutoDock Vina molecular docking application | You run virtual-screening or docking jobs |
@@ -58,6 +58,7 @@ This table covers all 55 immediate user-selectable recipe directories in `conda_
 | [Arnold for Maya 2025](maya-mtoa-2025/) | Packaging MtoA against the Maya 2025 package | Maya 2025 jobs render with Arnold |
 | [Arnold for Maya 2026](maya-mtoa-2026/) | Packaging MtoA against the Maya 2026 package | Maya 2026 jobs render with Arnold |
 | [Arnold for Maya 2027](maya-mtoa-2027/) | Packaging MtoA against the Maya 2027 package | Maya 2027 jobs render with Arnold |
+| [OctaneRender for Maya 2026](maya-octane-2026/) | Packaging the OctaneRender Studio+ 2026.4 plugin for Maya 2026 | Maya 2026 jobs render with OctaneRender |
 | [Maya OpenJD adaptor](maya-openjd/) | Packaging the Maya integration adaptor | Maya jobs need OpenJD session integration |
 | [Redshift for Maya 2025](maya-redshift-2025/) | Packaging Redshift 2025 for supported Maya versions | Maya jobs use Redshift 2025 |
 | [Redshift for Maya 2026](maya-redshift-2026/) | Packaging Redshift 2026 for supported Maya versions | Maya 2025, 2026 or 2027 jobs use Redshift 2026 |
