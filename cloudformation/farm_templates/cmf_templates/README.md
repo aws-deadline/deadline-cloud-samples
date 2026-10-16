@@ -1,7 +1,10 @@
 # Deploying Deadline Cloud fleet health check
 
+For a template that creates a customer-managed fleet and its worker host rather than monitoring one,
+see [macOS CMF with an EC2 Mac worker](macos_cmf/).
+
 ## Introduction
-This CloudFormation template sets up continuous health check monitoring for a single Deadline Cloud customer-managed fleet
+This CloudFormation template sets up continuous health check monitoring for one Deadline Cloud customer-managed fleet
 with autoscaling. It creates a Lambda function, an EventBridge rule, and a CloudWatch alarm that can be configured with an SNS topic.
 
 ## Prerequisites

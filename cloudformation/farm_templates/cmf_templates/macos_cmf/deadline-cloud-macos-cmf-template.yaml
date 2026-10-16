@@ -1,0 +1,564 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  An AWS Deadline Cloud farm with a macOS customer-managed fleet and one Amazon EC2 Mac worker host.
+  The template allocates an EC2 Dedicated Host, launches an Apple silicon Mac instance onto it, and
+  bootstraps the Deadline Cloud worker agent from the instance user data so the host joins the fleet
+  without any manual steps.
+
+  EC2 Mac Dedicated Hosts bill for a minimum of 24 hours from allocation. Read the README.md included
+  with the CloudFormation template before you deploy it.
+
+Parameters:
+  # Deadline Cloud farm, queue, and fleet
+  FarmName:
+    Type: String
+    Description: The name of the farm.
+    Default: "macOS Farm"
+    MinLength: 1
+  QueueName:
+    Type: String
+    Description: The name of the queue associated with the macOS fleet.
+    Default: "macOS Job Queue"
+    MinLength: 1
+  FleetName:
+    Type: String
+    Description: The name of the macOS customer-managed fleet.
+    Default: "macOS CMF"
+    MinLength: 1
+  MaxWorkerCount:
+    Type: Number
+    Description: >
+      The maximum number of workers the fleet accepts. Worker records in a terminal state still count
+      against this limit, so leave headroom for the records left behind by earlier deployments.
+    Default: 5
+    MinValue: 1
+  MinVCpuCount:
+    Type: Number
+    Description: >
+      The vCPU count the fleet advertises to the job scheduler. Set it to the vCPU count of the
+      instance type you choose: 8 for mac2.metal and mac2-m2.metal, 12 for mac2-m2pro.metal,
+      and 20 for mac2-m1ultra.metal.
+    Default: 8
+    MinValue: 1
+  MinMemoryMiB:
+    Type: Number
+    Description: >
+      The RAM in MiB the fleet advertises to the job scheduler. Set it to the memory of the instance
+      type you choose: 16384 for mac2.metal, 24576 for mac2-m2.metal, 32768 for mac2-m2pro.metal,
+      and 131072 for mac2-m1ultra.metal.
+    Default: 16384
+    MinValue: 512
+
+  # Job user impersonation
+  JobRunAsUserName:
+    Type: String
+    Description: >
+      The POSIX user the queue runs jobs as. The user data creates this account on the worker host,
+      adds it to both groups below, and grants the worker agent user permission to run commands as it.
+    Default: deadline-job-user
+    AllowedPattern: "^[a-z][a-z0-9-]{0,30}$"
+  JobRunAsGroupName:
+    Type: String
+    Description: >
+      The POSIX group the queue runs jobs as. Keep this separate from WorkerJobGroupName so that one
+      queue's session credentials are not readable by the job users of other queues.
+    Default: deadline-job-user
+    AllowedPattern: "^[a-z][a-z0-9-]{0,30}$"
+  WorkerJobGroupName:
+    Type: String
+    Description: >
+      The shared job group that the worker agent installer passes to --group. It owns the agent's
+      persistence tree, so every job user must belong to it or jobs fail with a permission denied
+      error on their own session directory.
+    Default: deadline-job-users
+    AllowedPattern: "^[a-z][a-z0-9-]{0,30}$"
+
+  # EC2 Mac worker host
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: >
+      The Availability Zone for the Dedicated Host and the worker subnet. Mac Dedicated Hosts are
+      offered in a subset of the Availability Zones in each Region, so confirm your chosen instance
+      type is available here before you deploy.
+  WorkerInstanceType:
+    Type: String
+    Description: >
+      The Apple silicon EC2 Mac instance type. Deadline Cloud reports these hosts as arm64. Verified
+      types are mac2.metal, mac2-m2.metal, mac2-m2pro.metal, and mac2-m1ultra.metal. Intel mac1 types
+      do not work with this template because the fleet advertises arm64.
+    Default: mac2.metal
+    MinLength: 1
+  WorkerImageId:
+    Type: AWS::EC2::Image::Id
+    Description: >
+      The ID of an Apple silicon macOS AMI. The README shows the describe-images command that lists
+      the current Amazon-owned macOS AMIs for your Region.
+  ExistingDedicatedHostId:
+    Type: String
+    Description: >
+      Optional. The ID of a Mac Dedicated Host you have already allocated in AvailabilityZone. Leave
+      it empty to have the template allocate a host. Reusing a host avoids a second 24-hour minimum
+      charge when you redeploy.
+    Default: ""
+  WorkerAgentPackageSpecifier:
+    Type: String
+    Description: >
+      The pip requirement specifier for the worker agent. macOS support arrived in version 0.31.1.
+    Default: "deadline-cloud-worker-agent>=0.31.1"
+    MinLength: 1
+  AllowWorkerShutdown:
+    Type: String
+    Description: >
+      Whether to pass --allow-shutdown to the installer, letting the agent power the host off when
+      the service stops the worker. Stopping the instance does not release the Dedicated Host or stop
+      its charges, so the recommended value for a Dedicated Host is false.
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  KeyName:
+    Type: String
+    Description: Optional. The name of an EC2 key pair for SSH access to the worker host as ec2-user.
+    Default: ""
+  SshIngressCidr:
+    Type: String
+    Description: >
+      Optional. An IPv4 CIDR range allowed to reach TCP port 22 on the worker host. Leave it empty to
+      create no inbound rules and reach the host through AWS Systems Manager Session Manager instead.
+    Default: ""
+
+Conditions:
+  AllocateDedicatedHost: !Equals [!Ref ExistingDedicatedHostId, ""]
+  ShutdownAllowed: !Equals [!Ref AllowWorkerShutdown, "true"]
+  HasKeyName: !Not [!Equals [!Ref KeyName, ""]]
+  HasSshIngress: !Not [!Equals [!Ref SshIngressCidr, ""]]
+
+Resources:
+  # --- Networking -------------------------------------------------------------------------------
+  # The template creates its own VPC so that the subnet is guaranteed to be in the same
+  # Availability Zone as the Dedicated Host. EC2 rejects a targeted host launch when the two
+  # differ, and a subnet supplied as a parameter does not expose its Availability Zone to
+  # CloudFormation.
+  WorkerVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-vpc
+
+  WorkerSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkerVpc
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Ref AvailabilityZone
+      # A public IP gives the host outbound internet access for PyPI and the Deadline Cloud
+      # endpoints without the cost of a NAT gateway. The security group below has no inbound
+      # rules unless you set SshIngressCidr.
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-subnet
+
+  WorkerInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-igw
+
+  WorkerVpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref WorkerVpc
+      InternetGatewayId: !Ref WorkerInternetGateway
+
+  WorkerRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkerVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-rt
+
+  WorkerDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: WorkerVpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref WorkerRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref WorkerInternetGateway
+
+  WorkerSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WorkerSubnet
+      RouteTableId: !Ref WorkerRouteTable
+
+  WorkerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Deadline Cloud macOS worker host. Outbound only unless SshIngressCidr is set.
+      VpcId: !Ref WorkerVpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound access to PyPI, the Deadline Cloud endpoints, and Systems Manager
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-worker-sg
+
+  WorkerSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasSshIngress
+    Properties:
+      GroupId: !Ref WorkerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref SshIngressCidr
+      Description: SSH access to the worker host
+
+  # --- Deadline Cloud farm, fleet, and queue ----------------------------------------------------
+  DeadlineFarm:
+    Type: AWS::Deadline::Farm
+    Properties:
+      DisplayName: !Ref FarmName
+      Description: Farm deployed from the macos_cmf sample CloudFormation template.
+
+  FleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: credentials.deadline.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn: !Ref DeadlineFarm
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AWSDeadlineCloud-FleetWorker
+      Policies:
+        - PolicyName: FleetWorkerLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${DeadlineFarm.FarmId}/*
+                Condition:
+                  ForAnyValue:StringEquals:
+                    aws:CalledVia:
+                      - deadline.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                  - logs:GetLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*:/aws/deadline/${DeadlineFarm.FarmId}/*
+
+  QueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: credentials.deadline.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn: !Ref DeadlineFarm
+      Policies:
+        - PolicyName: QueuePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: JobLogsReadOnly
+                Effect: Allow
+                Action:
+                  - logs:GetLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/deadline/${DeadlineFarm.FarmId}/*
+
+  DeadlineFleet:
+    Type: AWS::Deadline::Fleet
+    Properties:
+      DisplayName: !Ref FleetName
+      Description: macOS customer-managed fleet deployed from the macos_cmf sample CloudFormation template.
+      FarmId: !GetAtt DeadlineFarm.FarmId
+      RoleArn: !GetAtt FleetRole.Arn
+      MaxWorkerCount: !Ref MaxWorkerCount
+      Configuration:
+        CustomerManaged:
+          # The template manages exactly one host, so the service does no scaling. Switch to
+          # EVENT_BASED_AUTO_SCALING when you drive capacity from an EC2 Auto Scaling group.
+          Mode: NO_SCALING
+          WorkerCapabilities:
+            OsFamily: MACOS
+            CpuArchitectureType: arm64
+            VCpuCount:
+              Min: !Ref MinVCpuCount
+            MemoryMiB:
+              Min: !Ref MinMemoryMiB
+
+  DeadlineQueue:
+    Type: AWS::Deadline::Queue
+    Properties:
+      DisplayName: !Ref QueueName
+      Description: Queue that runs jobs as a queue-configured POSIX user on macOS workers.
+      FarmId: !GetAtt DeadlineFarm.FarmId
+      RoleArn: !GetAtt QueueRole.Arn
+      DefaultBudgetAction: NONE
+      # QUEUE_CONFIGURED_USER is what makes the worker agent run each job through
+      # `sudo -u`, which is the behavior the sudoers rule in the user data enables.
+      JobRunAsUser:
+        RunAs: QUEUE_CONFIGURED_USER
+        Posix:
+          User: !Ref JobRunAsUserName
+          Group: !Ref JobRunAsGroupName
+
+  QueueFleetAssociation:
+    Type: AWS::Deadline::QueueFleetAssociation
+    Properties:
+      FarmId: !GetAtt DeadlineFarm.FarmId
+      QueueId: !GetAtt DeadlineQueue.QueueId
+      FleetId: !GetAtt DeadlineFleet.FleetId
+
+  # --- EC2 Mac worker host ----------------------------------------------------------------------
+  # mac2 instance types launch only onto an allocated Dedicated Host. AutoPlacement is off so the
+  # host accepts only launches that target its host ID, which keeps unrelated Mac instances in the
+  # account from consuming it.
+  DedicatedHost:
+    Type: AWS::EC2::Host
+    Condition: AllocateDedicatedHost
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      InstanceType: !Ref WorkerInstanceType
+      AutoPlacement: "off"
+      HostRecovery: "off"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-mac-host
+
+  WorkerHostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # The agent reads credentials from the instance profile, calls CreateWorker, and then calls
+        # AssumeFleetRoleForWorker to get the fleet role's credentials for everything else.
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AWSDeadlineCloud-WorkerHost
+        # Lets you open a shell on the Mac through Session Manager without an inbound SSH rule.
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  WorkerHostInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref WorkerHostRole
+
+  WorkerHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref WorkerImageId
+      InstanceType: !Ref WorkerInstanceType
+      SubnetId: !Ref WorkerSubnet
+      SecurityGroupIds:
+        - !Ref WorkerSecurityGroup
+      IamInstanceProfile: !Ref WorkerHostInstanceProfile
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref "AWS::NoValue"]
+      Tenancy: host
+      Affinity: host
+      HostId: !If [AllocateDedicatedHost, !Ref DedicatedHost, !Ref ExistingDedicatedHostId]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-macos-worker
+      # ec2-macos-init runs this script as root on first boot. The steps follow the macOS worker
+      # host setup procedure in the AWS Deadline Cloud developer guide.
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euo pipefail
+            exec >> /var/log/deadline-worker-bootstrap.log 2>&1
+            # Readable by root only. The trace below records the commands this script runs.
+            chmod 600 /var/log/deadline-worker-bootstrap.log
+            set -x
+
+            AGENT_VENV=/opt/deadline/worker
+            # The installer's default agent user and home directory. Change --user below if you
+            # change this, and remember that the home directory does not follow the user name.
+            AGENT_USER=deadline-worker
+            LAUNCHD_LABEL=com.amazon.deadline.worker-agent
+            LAUNCHD_PLIST=/Library/LaunchDaemons/com.amazon.deadline.worker-agent.plist
+
+            # /usr/bin/python3 is a stub that cannot run until the Xcode Command Line Tools are
+            # installed. Amazon's macOS AMIs ship with them, so fail with a clear message rather
+            # than letting the venv step produce an installer prompt no one can answer.
+            if ! /usr/bin/python3 -c 'import venv' >/dev/null 2>&1; then
+                echo "ERROR: /usr/bin/python3 cannot import venv. Install the Xcode Command Line"
+                echo "       Tools with 'xcode-select --install' and rerun this script."
+                exit 1
+            fi
+
+            echo "=== Step 1: install the worker agent program files into a virtual environment ==="
+            # A virtual environment built from the system interpreter, not Homebrew's pip3.
+            # Homebrew's pip3 refuses a system-wide install under PEP 668 with
+            # 'externally-managed-environment'.
+            /usr/bin/python3 -m venv "${!AGENT_VENV}"
+            "${!AGENT_VENV}/bin/pip" install --upgrade pip
+            "${!AGENT_VENV}/bin/pip" install '${WorkerAgentPackageSpecifier}'
+
+            echo "=== Step 2: create the job group and the job user ==="
+            # The installer creates the shared job group if it is absent, but it never creates the
+            # job users. Creating them before the installer runs means the host is ready to run a
+            # job the moment the agent registers.
+            dseditgroup -o read '${WorkerJobGroupName}' >/dev/null 2>&1 \
+                || dseditgroup -o create '${WorkerJobGroupName}'
+            dseditgroup -o read '${JobRunAsGroupName}' >/dev/null 2>&1 \
+                || dseditgroup -o create '${JobRunAsGroupName}'
+
+            # The password is random and never used: jobs reach this account through 'sudo -u',
+            # never an interactive login. A real home directory and a valid login shell are still
+            # required, because the agent starts a login shell to run a job.
+            if ! id -u '${JobRunAsUserName}' >/dev/null 2>&1; then
+                # xtrace off so the generated password does not reach the log.
+                set +x
+                JOB_USER_PASSWORD="$(uuidgen)"
+                sysadminctl -addUser '${JobRunAsUserName}' \
+                    -fullName "Deadline Cloud job user" \
+                    -password "${!JOB_USER_PASSWORD}" \
+                    -shell /bin/zsh
+                unset JOB_USER_PASSWORD
+                set -x
+            fi
+            # sysadminctl reports success in cases where the account was not fully created, so
+            # confirm the account exists instead of trusting its exit status.
+            id -u '${JobRunAsUserName}' >/dev/null
+            createhomedir -c -u '${JobRunAsUserName}' >/dev/null
+            # Keep the job user out of the login window.
+            dscl . -create /Users/'${JobRunAsUserName}' IsHidden 1
+            # Membership in the shared job group is mandatory. The macOS session root is nested at
+            # /var/lib/deadline/sessions because the root volume is sealed read only, and
+            # /var/lib/deadline is mode 0750 group owned by the job group. A job user outside the
+            # group gets a permission denied error on its own session directory and every job
+            # assigned to it fails.
+            dseditgroup -o edit -a '${JobRunAsUserName}' -t user '${WorkerJobGroupName}'
+            dseditgroup -o edit -a '${JobRunAsUserName}' -t user '${JobRunAsGroupName}'
+
+            echo "=== Step 3: allow the agent user to run commands as the job user ==="
+            # No installer creates this rule on any platform, and --allow-shutdown does not cover
+            # it: that option creates only the rule that lets the agent power the host off.
+            # Validate with visudo before moving the file into /etc/sudoers.d, because a malformed
+            # file there breaks sudo for every user on the host.
+            SUDOERS_TMP="$(mktemp)"
+            printf '%s ALL=(%s) NOPASSWD: ALL\n' "${!AGENT_USER}" '${JobRunAsUserName}' > "${!SUDOERS_TMP}"
+            if ! visudo -cf "${!SUDOERS_TMP}"; then
+                rm -f "${!SUDOERS_TMP}"
+                echo "ERROR: the generated sudoers file is not valid and was not installed."
+                exit 1
+            fi
+            chown root:wheel "${!SUDOERS_TMP}"
+            chmod 440 "${!SUDOERS_TMP}"
+            mv "${!SUDOERS_TMP}" /etc/sudoers.d/deadline-job-user-impersonation
+
+            echo "=== Step 4: run the worker agent installer ==="
+            # The installer creates the agent user, the persistence and session directories,
+            # /etc/amazon/deadline/worker.toml, and the launchd daemon. It installs the daemon
+            # without loading it, which Step 7 does once the rest of the host is configured.
+            # --vfs-install-path is rejected on macOS, so job attachments use the copy mode.
+            "${!AGENT_VENV}/bin/install-deadline-worker" \
+                --farm-id ${DeadlineFarm.FarmId} \
+                --fleet-id ${DeadlineFleet.FleetId} \
+                --region ${AWS::Region} \
+                --user "${!AGENT_USER}" \
+                --group '${WorkerJobGroupName}' \
+                ${AllowShutdownFlag} \
+                -y
+
+            echo "=== Step 5: add the agent user to the job user's group ==="
+            # The agent chowns each queue's credentials directory to the queue's configured group,
+            # and changing a file's group requires membership in the target group. The installer
+            # adds the agent user to the group passed to --group only, so a queue that uses a
+            # different group needs this.
+            dseditgroup -o edit -a "${!AGENT_USER}" -t user '${JobRunAsGroupName}'
+
+            echo "=== Step 5b: confirm the impersonation rule works ==="
+            # Run here rather than straight after Step 3, because the agent user does not exist
+            # until the installer creates it. '-i' starts a login shell as the job user, so this
+            # one command also proves the job user has a home directory and a usable shell.
+            sudo -u "${!AGENT_USER}" sudo -n -u '${JobRunAsUserName}' -i /usr/bin/id -un
+
+            echo "=== Step 6: AWS credentials ==="
+            # Nothing to do on EC2. The instance profile attached to this instance carries the
+            # AWSDeadlineCloud-WorkerHost policy and the agent reads credentials from it. A host
+            # outside EC2 needs a credentials file in the agent user's home directory instead.
+            echo "using the instance profile for credentials"
+
+            echo "=== Step 7: start the launchd daemon and confirm that it is running ==="
+            launchctl bootstrap system "${!LAUNCHD_PLIST}"
+            # 'launchctl kickstart' and the pid in 'launchctl print' both report a process that
+            # exited immediately, so 'state = running' is the check that means the agent is up.
+            # Anchored to a single leading tab: 'launchctl print' repeats 'state' at deeper
+            # indentation for the service's nested endpoints, and an unanchored match can read one
+            # of those as the daemon itself.
+            for _ in $(seq 1 30); do
+                if launchctl print "system/${!LAUNCHD_LABEL}" | grep -q $'^\tstate = running'; then
+                    echo "the worker agent daemon is running"
+                    echo "bootstrap complete"
+                    exit 0
+                fi
+                sleep 2
+            done
+            echo "ERROR: the worker agent daemon never reached 'state = running'."
+            tail -100 /var/log/amazon/deadline/worker-agent-bootstrap.log \
+                /var/log/amazon/deadline/worker-agent.log 2>&1 || true
+            exit 1
+          - AllowShutdownFlag: !If [ShutdownAllowed, "--allow-shutdown", ""]
+
+Outputs:
+  FarmId:
+    Description: The ID of the Deadline Cloud farm.
+    Value: !GetAtt DeadlineFarm.FarmId
+  FleetId:
+    Description: The ID of the macOS customer-managed fleet.
+    Value: !GetAtt DeadlineFleet.FleetId
+  QueueId:
+    Description: The ID of the queue associated with the macOS fleet.
+    Value: !GetAtt DeadlineQueue.QueueId
+  WorkerInstanceId:
+    Description: The instance ID of the EC2 Mac worker host.
+    Value: !Ref WorkerHost
+  DedicatedHostId:
+    Description: >
+      The Dedicated Host the worker runs on. Pass this value as ExistingDedicatedHostId when you
+      redeploy, so that you are not charged a second 24-hour minimum for a new host.
+    Value: !If [AllocateDedicatedHost, !Ref DedicatedHost, !Ref ExistingDedicatedHostId]
+  BootstrapLogPath:
+    Description: The path on the worker host of the log written by the user data script.
+    Value: /var/log/deadline-worker-bootstrap.log
+  WorkerAgentLogPath:
+    Description: The path on the worker host of the worker agent log.
+    Value: /var/log/amazon/deadline/worker-agent.log
+  SessionManagerCommand:
+    Description: >-
+      Command that opens a shell on the worker host through Session Manager. Requires the SSM Agent
+      to be running on the host; if it is not, set KeyName and SshIngressCidr and use SSH instead.
+    Value: !Sub aws ssm start-session --target ${WorkerHost} --region ${AWS::Region}
