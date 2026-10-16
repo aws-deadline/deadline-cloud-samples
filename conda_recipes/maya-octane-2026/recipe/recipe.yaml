@@ -1,0 +1,45 @@
+# Recipe in rattler-build format.
+# See https://prefix-dev.github.io/rattler-build/latest/
+
+context:
+  version: "2026.4"
+  maya_version: "2026"
+  plugin_version: "25.20"
+  installer: "OctaneRender_Studio+_${{ version }}_for_Maya_v${{ plugin_version }}.run"
+
+package:
+  name: maya-octane
+  version: ${{ version }}
+
+source:
+  - url: file://archive_files/${{ installer }}
+    sha256: 52088e39543f576516500a6e750cfce9fb776340f52c5593d1bf082d73c16cbd
+    target_directory: installer
+
+build:
+  number: 0
+  script:
+    - bash $RECIPE_DIR/build.sh
+  prefix_detection:
+    ignore_binary_files: true
+  dynamic_linking:
+    binary_relocation: false
+    missing_dso_allowlist:
+      - "**"
+
+requirements:
+  build:
+    - patchelf
+  run:
+    - maya ${{ maya_version }}.*
+
+tests:
+  - script:
+      - test -f "$PREFIX/usr/otoy/ofm_vr/${{ maya_version }}/plug-ins/OctanePlugin.so"
+      - test -f "$PREFIX/usr/autodesk/modules/maya/${{ maya_version }}/octane.mod"
+      - grep -q "OctaneRender" "$PREFIX/usr/autodesk/modules/maya/${{ maya_version }}/octane.mod"
+
+about:
+  homepage: https://render.otoy.com/
+  license: LicenseRef-OTOYEULA
+  summary: OctaneRender Studio+ plugin for Maya 2026.

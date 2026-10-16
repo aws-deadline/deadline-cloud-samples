@@ -3,7 +3,7 @@
 This sample trains and renders a learned robot-manipulation policy on
 [AWS Deadline Cloud](https://docs.aws.amazon.com/deadline-cloud/), using a
 [MuJoCo](https://mujoco.org/) simulation of the
-[Strands Robots](https://strands-labs.github.io/robots/) so100 arm. It is a
+[`strands-robots`](https://strands-labs.github.io/robots/) so100 arm. It is a
 single submitted job that runs three dependent steps on managed GPU workers:
 
 ```
@@ -26,8 +26,8 @@ learned policy driving the sim.
 
 A policy trained on real-robot camera images cannot drive a simulator. The sim
 renders don't look like the real world (the real→sim appearance gap), so the
-policy flails. This pipeline closes that gap by training on images rendered from
-the same simulator the policy will run in. The training data and the deployment
+policy flails. This pipeline trains on images rendered by the same simulator
+the policy runs in. The training data and the deployment
 target share a renderer, so what the policy learns transfers.
 
 The steps are wired with Open Job Description (OpenJD) `dependsOn`
@@ -43,14 +43,14 @@ Because the steps are independent and share the work directory, you can re-run a
 single step. You can re-render with a new camera without re-generating
 data or re-training.
 
-## Why these design choices
+## Design choices
 
 - **Genuine physical grasp.** Datagen performs a physical pinch: the arm reaches
   from home, descends onto the cube with the gripper open, closes, and lifts.
   The grip is marginal, so each episode is verified. It checks that the cube
   actually left the floor and discards (then retries) any episode that didn't.
-  Roughly 70 to 80% of randomized attempts hold, and only those reach the dataset,
-  so a slipped grasp doesn't poison the training data.
+  Roughly 70 to 80% of randomized attempts hold. Datagen records only those
+  episodes, which keeps slipped grasps out of the training data.
 - **Tuned for the learned policy, not the scripted demo.** The grasp pose is
   deliberately error-tolerant. A low, centered, wide-open grip looks cleaner in
   the scripted rollout, but it is a tighter target: the learned policy's descent
@@ -60,14 +60,22 @@ data or re-training.
 - **Finetune in-env instead of loading a public checkpoint.** Public so100
   checkpoints on HuggingFace fail to load on the pinned LeRobot due to
   config-schema drift (older ACT checkpoints lack the `type` field; newer pi0
-  checkpoints carry fields the installed config rejects). Finetuning writes a
+  checkpoints contain fields the installed config rejects). Finetuning writes a
   checkpoint with the same LeRobot version we render with, so it always loads.
-- **Reproducible environment.** The `CondaPackages` / `CondaChannels` job
-  parameters (default `python=3.12 pip git ffmpeg` on `conda-forge`) are consumed
-  by the Conda queue environment attached to the queue (the same job parameters
-  the repo's `conda_queue_env_*` templates read), which solves them into the
-  per-job environment. Each step also `pip install`s the Strands
-  package spec at runtime, so every worker gets the same environment.
+- **The software is prebuilt into one conda package.** All three steps run
+  inside `strands-robots`, built from the
+  [`strands-robots-0.5.3` recipe](../../conda_recipes/strands-robots-0.5.3/README.md)
+  and published to the farm's S3 conda channel. It contains MuJoCo, LeRobot,
+  CUDA PyTorch, the so100 robot model and the ACT policy's `resnet18` weights,
+  and no step installs or downloads software. The `CondaPackages` job parameter
+  hands it to the Conda queue environment, which resolves it from the queue's
+  channels.
+
+  Installing at run time instead, as this sample used to, costs the full
+  dependency closure on every step of every job, and makes the job depend on
+  PyPI, GitHub and `download.pytorch.org` at run time. Pre-baking the
+  software into a conda package (or a container image) is the recommended
+  pattern on Deadline Cloud.
 
 ## About the instruction
 
@@ -75,9 +83,9 @@ The `Instruction` parameter (default `pick up the red cube`) is recorded as the
 language annotation on every frame of the dataset, the ACT policy is conditioned
 on it during training, and it is passed to the policy again at render time.
 
-Note that this sample demonstrates a single task. Every training episode carries
-the same instruction and the same scripted pick, so the policy learns to
-reproduce that one behavior. The instruction annotates and conditions the data,
+Note that this sample demonstrates one task. Each training episode has the
+same instruction and the same scripted pick. The policy learns to reproduce
+that one behavior. The instruction annotates and conditions the data,
 but it does not select behavior here: submitting with a different `Instruction`
 re-labels the dataset without changing what the robot does. It would still
 attempt the pick.
@@ -90,12 +98,50 @@ next step but is out of scope for this single-task demo.
 ## Prerequisites
 
 - A Deadline Cloud farm and queue, with a **Linux x86_64 GPU** fleet (the steps
-  render headless via `MUJOCO_GL=egl` and train on CUDA).
+  render headless via `MUJOCO_GL=egl` and train on CUDA). Each of the three
+  steps declares a GPU host requirement. The scheduler assigns them only to GPU
+  workers.
+- The `strands-robots` conda package built and published to your farm's S3 conda
+  channel. See the
+  [`strands-robots-0.5.3` conda recipe README](../../conda_recipes/strands-robots-0.5.3/README.md).
 - A [Conda queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/conda-queue-environment.html)
-  on the queue that consumes the `CondaPackages` / `CondaChannels` job
-  parameters (e.g. the repo's [`conda_queue_env_*`](../../queue_environments)
-  templates). This bundle supplies those parameters; the queue environment
-  solves them into the per-job environment.
+  on the queue whose default `CondaChannels` lists your S3 channel **and**
+  conda-forge, like this:
+
+  ```yaml
+  default: "s3://amzn-s3-demo-bucket/Conda/Default conda-forge deadline-cloud"
+  ```
+
+  The S3 channel supplies `strands-robots`; conda-forge supplies its
+  dependencies. The `deadline-cloud` channel does not contain them, not even
+  Python 3.12. This job template defines no `CondaChannels` parameter on
+  purpose: a job value replaces the queue's list rather than adding to it, so
+  setting one here would drop whichever channel it left out.
+
+  The
+  [`conda_queue_env_improved_caching.yaml`](../../queue_environments/conda_queue_env_improved_caching.yaml)
+  sample is a good fit: the environment is about 3.9 GB, so caching it between
+  jobs saves each step the download.
+- Read access to the channel on the queue's IAM role. A queue role created from
+  the Deadline Cloud console only covers the job attachments prefix, so without
+  this statement the environment solve fails to find `strands-robots`. Replace
+  the bucket name and account ID with your own:
+
+  ```json
+  {
+    "Sid": "CustomCondaChannelReadOnly",
+    "Effect": "Allow",
+    "Action": ["s3:GetObject", "s3:ListBucket"],
+    "Resource": [
+      "arn:aws:s3:::amzn-s3-demo-bucket",
+      "arn:aws:s3:::amzn-s3-demo-bucket/Conda/*"
+    ],
+    "Condition": {"StringEquals": {"aws:ResourceAccount": "111122223333"}}
+  }
+  ```
+
+  See
+  [Create a conda channel using S3](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/configure-jobs-s3-channel.html).
 - The [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs.html)
   configured (`deadline config show` resolves your default farm/queue).
 
@@ -135,9 +181,7 @@ deadline job download-output --job-id <job-id>
 | `CubeSize` | `0.036` | Cube edge length (m). The grasp recipe is tuned for this size. |
 | `DemoCameraPosition` / `DemoCameraTarget` | see values | Camera for the demo render. |
 | `CameraPlacements` | JSON | `top` + `wrist` camera poses the policy observes. |
-| `StrandsPackageSpec` | `strands-robots[sim-mujoco,lerobot] @ git+...@main` | pip install spec. Installed from GitHub `main` (PyPI 0.3.8 lacks the `sim-mujoco` extra). |
-| `CondaPackages` | `python=3.12 pip git ffmpeg` | Packages for the Conda queue environment. |
-| `CondaChannels` | `conda-forge` | Conda channels. |
+| `CondaPackages` | `strands-robots=0.5.3` | The one package every step runs in. Channels come from the queue environment (see Prerequisites). |
 | `OutputDir` | `output` | Shared work dir; holds `dataset/`, `checkpoint/`, and the render output. Pass an **absolute** path on submit. |
 | `JobScriptDir` | `scripts` | Hidden. Directory holding the bundled `generate_dataset.py` + `render_scene.py`, staged to the worker as a job-attachment input. |
 
@@ -165,11 +209,10 @@ part of the flow by re-running individual steps:
 > before running `Train`.
 
 > **A note for engineers on running datagen at scale.** Generating data in a
-> batch on a farm surfaces bugs that one-off local testing hides. Example: the
+> batch on a farm exposes bugs that one-off local testing hides. Example: the
 > arm is teleported back to its home pose between episodes, which resets joint
 > *positions* but not *velocities*. A single-episode local render looks perfect,
 > but in a 150-episode batch, residual velocity from episode 1's lift carried
 > into episode 2's grasp, so only the first episode would grip and the rest
 > silently slipped. The fix (zeroing velocity on reset) is in the datagen
-> script; the lesson is that batch-scale generation is where this class of bug
-> shows up.
+> script. Batch-scale generation is where this class of bug shows up.

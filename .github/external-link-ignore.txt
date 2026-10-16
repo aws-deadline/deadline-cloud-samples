@@ -30,3 +30,5 @@ www.artstation.com
 www.science.org
 # 2026-09-17: HEAD and minimal Range GET both returned HTTP 403 for a sign-in gated account page.
 account.otoy.com
+# 2026-10-15: HEAD and minimal Range GET both returned HTTP 403 from CI for public product pages that load in a browser.
+www.openfoam.com
