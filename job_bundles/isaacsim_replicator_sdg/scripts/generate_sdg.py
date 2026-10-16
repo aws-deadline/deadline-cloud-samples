@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import random
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -135,6 +136,11 @@ def configure_caches() -> None:
     print(f"[sdg] caches -> {cache}")
 
 
+#: Set once by main(). Kit requires the SimulationApp instance to stay alive for
+#: the whole task; nothing reads this back.
+_SIMULATION_APP = None
+
+
 def main() -> NoReturn:
     args = parse_args()
     annotators = [a.strip() for a in args.annotators.split(",") if a.strip()]
@@ -169,10 +175,15 @@ def main() -> NoReturn:
     if args.renderer == "PathTracing":
         launch_config["samples_per_pixel_per_frame"] = 64
 
-    # `experience` is a SimulationApp kwarg, not a launch_config key. The
-    # instance is bound to keep it referenced for the life of the task but is
-    # never closed; see the os._exit comment at the end of this function.
-    _simulation_app = SimulationApp(launch_config, experience=experience)  # noqa: F841
+    # `experience` is a SimulationApp kwarg, not a launch_config key.
+    #
+    # Held in a module global rather than a local. The instance must stay
+    # referenced for the life of the task and is never closed (see the os._exit
+    # comment at the end of this function), so a local that nothing reads is
+    # both misleading and flagged as dead by every linter. A module global says
+    # what is actually true: this outlives the function.
+    global _SIMULATION_APP
+    _SIMULATION_APP = SimulationApp(launch_config, experience=experience)
 
     # Omniverse imports MUST come after SimulationApp construction.
     import carb.settings  # noqa: E402
@@ -211,17 +222,21 @@ def main() -> NoReturn:
     render_product = rep.create.render_product(camera, (args.width, args.height),
                                                name=args.shard_label)
 
-    # A custom writer rather than BasicWriter: BasicWriter restarts its frame
-    # counter at 0 for every writer instance, so all N shards would each write
-    # rgb_0000.png. The offset makes the numbering globally unique, which means
-    # no rename pass in the merge step.
     # BasicWriter, not a custom writer. BasicWriter restarts its frame counter at
     # 0 per instance, so every shard would write rgb_0000.png into a shared dir.
     # Rather than hand-roll a writer to offset the index (which needs a backend
     # and is easy to get subtly wrong), give each shard its own directory and let
     # the Merge step renumber into one flat dataset.
     shard_dir = sdg_dir / args.shard_label
-    shard_dir.mkdir(parents=True, exist_ok=True)
+    # Cleared, not reused. OutputDir is dataFlow: INOUT, so whatever sits in the
+    # submitter's output directory is uploaded with the job -- including a
+    # previous run's downloaded frames. Reusing the directory then mixes old and
+    # new frames: a 256-frame run followed by a 128-frame run leaves 64 stale
+    # rgb_*.png beside 32 fresh ones, the on-disk count check below fails, and
+    # collate would renumber stale frames into the dataset. Only this shard
+    # writes here, so clearing it is safe.
+    shutil.rmtree(shard_dir, ignore_errors=True)
+    shard_dir.mkdir(parents=True)
     writer_kwargs = {"output_dir": str(shard_dir)}
     for name in annotators:
         writer_kwargs[name] = True

@@ -553,7 +553,7 @@ Outputs:
     Description: Farm ID, for the Deadline Cloud CLI and the monitor.
     Value: !GetAtt farm.FarmId
   QueueId:
-    Description: Queue ID. Add the Docker queue environment to this queue.
+    Description: Queue ID, for deadline config set defaults.queue_id.
     Value: !GetAtt queue.QueueId
   FleetId:
     Description: GPU fleet ID.

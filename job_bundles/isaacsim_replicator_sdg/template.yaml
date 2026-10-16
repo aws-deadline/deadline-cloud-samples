@@ -12,11 +12,10 @@ description: |
     1 - Generate (xN shards)  ->  2 - Merge
 
   Each Generate task renders its own deterministically-seeded slice of the
-  dataset and writes frames numbered from a global offset, so N shards fill one
-  flat dataset with no filename collisions and no renumbering pass. Merge
-  verifies every shard reported the frames it was asked for, concatenates the
-  per-frame bounding boxes into one COCO instances.json, and fails the job if
-  the dataset came up short.
+  dataset into its own directory, because BasicWriter restarts its frame counter
+  at 0 for every instance. Merge renumbers every shard's frames into one flat
+  sdg/dataset/ with a single global index, verifies that every shard reported
+  the frames it was asked for, and fails the job if the dataset came up short.
 
   This bundle contains NO docker commands and names NO container image. It is
   designed for a queue with a Docker queue environment on a service-managed
@@ -28,7 +27,9 @@ description: |
   NVIDIA-authored asset, which is what makes it publishable. `SceneSource=workshop`
   opts into the Sim-to-Real-SO-101-Workshop USD assets baked into that image.
 
-  The recipe for the container image is at containers/isaacsim-so101-workshop.
+  The container image recipe is at containers/isaacsim-replicator. The larger
+  containers/isaacsim-so101-workshop image is needed only for
+  SceneSource=workshop, whose USD files ship inside it.
 
 parameterDefinitions:
 
@@ -223,8 +224,8 @@ parameterDefinitions:
   objectType: DIRECTORY
   dataFlow: INOUT
   description: >-
-    Shared work dir. Generate writes sdg/<annotator>/ plus sdg/sdgNN.json;
-    Merge writes sdg/instances.json and sdg_summary.json. INOUT because every
+    Shared work dir. Generate writes flat into sdg/sdgNN/ plus sdg/sdgNN.json;
+    Merge writes sdg/dataset/ and sdg_summary.json. INOUT because every
     shard's copy also carries its peers' uploads. Pass an absolute path.
   userInterface:
     control: CHOOSE_DIRECTORY
@@ -236,7 +237,7 @@ parameterDefinitions:
   dataFlow: IN
   default: scripts
   description: >-
-    Bundled Python scripts - generate_sdg.py, sdg_scene.py, sdg_writer.py and
+    Bundled Python scripts - generate_sdg.py, sdg_scene.py and
     merge_sdg.py.
   userInterface:
     control: CHOOSE_DIRECTORY
@@ -297,6 +298,12 @@ steps:
 
         # Split frames exactly: the first (TOTAL % SHARDS) shards take one extra,
         # so the shard totals always sum to SdgFrames.
+        # Before the frame split, because the zero-frame branch below writes a
+        # summary here and exits. Creating it later left SdgShards > SdgFrames
+        # shards writing nowhere, exiting 0, and Merge then failing the job with
+        # "sdgNN (absent)".
+        mkdir -p "${OUT}/sdg" "${OUT}/logs"
+
         BASE=$(( TOTAL_FRAMES / SHARDS ))
         REM=$(( TOTAL_FRAMES % SHARDS ))
         if [ "$SHARD" -le "$REM" ]; then
@@ -309,14 +316,12 @@ steps:
         if [ "$FRAMES" -le 0 ]; then
             echo "Shard ${SHARD} has no frames (SdgShards > SdgFrames); nothing to do."
             printf '{"shard":"%s","frames":0,"frame_offset":%d,"seed":0}\n' \
-                "$LABEL" "$OFFSET" > "${OUT}/sdg/${LABEL}.json" 2>/dev/null || true
+                "$LABEL" "$OFFSET" > "${OUT}/sdg/${LABEL}.json"
             exit 0
         fi
         SEED=$(( {{Param.SdgBaseSeed}} + (SHARD - 1) * 1000 ))
 
-        mkdir -p "${OUT}/sdg" "${OUT}/logs"
-
-        echo "shard=${LABEL} frames=${FRAMES} offset=${OFFSET} seed=${SEED}"
+        echo "shard=${LABEL}" frames=${FRAMES} offset=${OFFSET} seed=${SEED}"
         echo "persistent mount: ${DEADLINE_PERSISTENT_MOUNT:-<unset>}"
 
         # Isaac Sim must be driven through python.sh, which sets the PYTHONPATH

@@ -1,14 +1,18 @@
-#!/usr/bin/env python3
-"""Merge every SDG shard into one dataset index, and emit COCO annotations.
+"""Merge every shard's frames into one flat dataset, and verify the result.
 
-Standard library only, and Python 3.9 compatible, so this runs on whatever
-interpreter the container or the worker provides without extra dependencies.
+Each Generate task writes into its own ``sdg/sdgNN/`` directory, because
+BasicWriter restarts its frame counter at 0 for every writer instance and all N
+shards would otherwise write ``rgb_0000.png`` into the same place. This step
+renumbers them.
 
-The per-shard image files already carry globally unique frame numbers (see
-sdg_writer.OffsetWriter), so there is nothing to rename. This step only:
-  1. verifies each shard reported the frame count it was asked for
-  2. concatenates the per-frame bounding-box JSON into one COCO instances.json
-  3. writes sdg_summary.json and prints a table
+``collate()`` groups BasicWriter's flat output by the trailing ``_NNNN`` index,
+copies every annotator's file for a frame under one new global index, and writes
+the result to ``sdg/dataset/``. It emits no COCO ``instances.json``; the
+per-frame boxes stay as BasicWriter wrote them, as ``.npy`` plus a label JSON.
+
+The job fails here when a shard is missing, when a shard reported fewer frames
+than it was asked for, or when any annotator prefix has fewer files than frames
+collated. An incomplete dataset that reports success is worse than no dataset.
 """
 
 from __future__ import annotations

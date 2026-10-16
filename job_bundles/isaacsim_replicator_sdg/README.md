@@ -24,8 +24,11 @@ into its own directory. Merge renumbers every shard's frames into one flat
 `sdg/dataset/` with one global frame index, verifies that the frame count on disk
 matches what was asked for, and **fails the job if the dataset came up short**.
 
-It shares its container image with
-[`containers/isaacsim-so101-workshop`](../../containers/isaacsim-so101-workshop).
+Its container image recipe is
+[`containers/isaacsim-replicator`](../../containers/isaacsim-replicator). Only
+`SceneSource=workshop` needs the larger
+[`containers/isaacsim-so101-workshop`](../../containers/isaacsim-so101-workshop)
+image, which contains the USD files it loads.
 
 ## What makes it portable
 
@@ -165,16 +168,25 @@ deadline bundle submit . \
 ```
 
 **Your own scene.** Export a flattened snapshot of the stage open in Isaac Sim,
-hash it, and submit both:
+hash it, and submit both.
 
-```bash
-python - <<'EOF'
-import omni.usd, hashlib, pathlib, tempfile
+Run this **inside Isaac Sim**, in *Window > Script Editor*, with the stage you
+want open. It has to run in the Kit process that holds the stage:
+`get_context().get_stage()` returns the open stage only there. A terminal cannot
+import `omni.usd` at all, and Isaac Sim's own `python.sh` starts a fresh Kit
+with no stage loaded, so `get_stage()` returns `None` and `.Flatten()` raises.
+
+```python
+import hashlib, pathlib, tempfile
+import omni.usd
+
 stage = omni.usd.get_context().get_stage()
 out = pathlib.Path(tempfile.mkdtemp()) / "scene.usda"
-stage.Flatten().Export(str(out))                    # folds in unsaved + session edits
+stage.Flatten().Export(str(out))        # folds in unsaved + session-layer edits
 print(out, hashlib.sha256(out.read_bytes()).hexdigest())
-EOF
+```
+
+Then, from a terminal:
 
 deadline bundle submit . \
     -p OutputDir=./out \

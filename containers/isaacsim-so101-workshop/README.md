@@ -1,8 +1,10 @@
 # Isaac Sim / Isaac Lab SO-101 workshop image
 
-Build recipe for the container image used by the
-[`isaacsim_replicator_sdg`](../../job_bundles/isaacsim_replicator_sdg)
-job bundle.
+Build recipe for the container image that
+[`isaacsim_replicator_sdg`](../../job_bundles/isaacsim_replicator_sdg) needs for
+`SceneSource=workshop`, which loads USD files the image contains. The `primitives` and
+`usd` scene sources need only the much smaller
+[`containers/isaacsim-replicator`](../isaacsim-replicator) recipe.
 
 The image is **Isaac Lab 2.3.2 (Isaac Sim 5.1.0)** plus
 [LeRobot](https://github.com/huggingface/lerobot) at the pin the
@@ -72,8 +74,13 @@ Then point the queue's Docker queue environment at that URI and submit:
 
 ```bash
 deadline bundle submit job_bundles/isaacsim_replicator_sdg \
-  -p "OutputDir=$(pwd)/output" --yes
+  -p "OutputDir=$(pwd)/output" \
+  -p "DockerImage=${ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO}:${TAG}" \
+  -p SceneSource=workshop --yes
 ```
+
+`DockerImage` has no default, and `SceneSource=workshop` is the only reason to
+use this image rather than the smaller one.
 
 The job bundle itself does not reference an image. On a service-managed fleet
 with the `docker` software add-on, the
@@ -85,10 +92,14 @@ The image pull runs under the **queue role**, so that role needs
 `ecr:GetAuthorizationToken` plus `ecr:BatchGetImage`,
 `ecr:GetDownloadUrlForLayer` and `ecr:BatchCheckLayerAvailability` on the
 repository. The AWS managed policy
-`arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly` covers it. Keep the
-repository in the same account and region as the fleet: the default queue
-environment derives the ECR region from the worker's availability zone rather
-than from the image URI.
+`arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly` covers it.
+
+Keep the repository in the same account as the fleet. This repository's
+[`queue_environments/docker_queue_env.yaml`](../../queue_environments/docker_queue_env.yaml)
+parses the ECR region from the image URI, which makes a cross-region
+repository work. The environment the console generates derives the region from
+the worker's availability zone instead, and fails against a cross-region
+repository.
 
 ## Smoke-test locally (needs an NVIDIA GPU + the NVIDIA Container Toolkit)
 
