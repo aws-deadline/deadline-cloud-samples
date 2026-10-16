@@ -4,12 +4,13 @@ These deployable CloudFormation samples create farms or add fleet infrastructure
 
 ## Sample index
 
-This table covers every immediate deployable sample directory in `farm_templates/`.
+This table lists the deployable sample directories in `farm_templates/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
 | [Starter farm](starter_farm/) | A general-purpose farm, queue, service-managed fleets, and package-build support | You need a complete first farm |
 | [CUDA farm](cuda_farm/) | A farm with a CUDA-capable fleet and package-build queue | You need GPU workers for CUDA workloads |
+| [Isaac Sim farm](isaacsim_farm/) | A farm whose GPU fleet carries the Docker software add-on, with a Docker container queue environment | You want to run containerized NVIDIA Isaac Sim jobs from an empty account |
 | [SMF with VPC and FSx](smf_vpc_fsx/) | Private VPC resource access and FSx for OpenZFS storage | Service-managed workers need shared storage or private services |
 | [SMF capacity manager](smf_capacity_manager/) | Automated balancing of Wait and Save and Spot fleet capacity | You operate hybrid service-managed fleets |
 | [Fleet standby scheduling](fleet_standby_scheduling/) | Scheduled warm standby worker counts | Worker startup latency matters during predictable hours |

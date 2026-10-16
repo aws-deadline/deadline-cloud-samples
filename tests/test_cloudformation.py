@@ -14,13 +14,14 @@ The checks are twofold:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 
-from conftest import find_cloudformation_templates, rel, require_tool
+from conftest import REPO_ROOT, find_cloudformation_templates, rel, require_tool
 
 _TEMPLATES = find_cloudformation_templates()
 
@@ -99,4 +100,78 @@ def test_cloudformation_template_passes_cfn_lint(template: Path):
             f"  {e.get('Rule', {}).get('Id', '?')}: {e.get('Message', '')}"
             for e in errors
         )
+    )
+
+
+# A CloudFormation template that inlines a queue environment living under
+# ``queue_environments/`` must keep the copy identical, so a fix to one is a fix
+# to both. The relationship is declared in the template rather than registered
+# here, so a new template is covered the moment it is written:
+#
+#     Template: |
+#       ### START_QUEUE_ENV from queue_environments/docker_queue_env.yaml
+#       <the shared file, indented>
+#       ### END_QUEUE_ENV
+#
+# Templates whose delimiters carry no ``from`` path are deliberately excluded.
+# starter_farm and cuda_farm inline a conda environment that
+# apply-conda-queue-env.py rewrites on the way in (it replaces the CondaChannels
+# default), so those copies are intentionally not byte-identical.
+_INLINE_QUEUE_ENV_START = re.compile(
+    r"^(?P<indent>[ \t]*)### START_QUEUE_ENV from (?P<source>\S+)\s*$", re.MULTILINE
+)
+
+
+def _inlined_queue_environments() -> list[tuple[Path, str, str]]:
+    """Every (template, declared source, de-indented inlined text) triple.
+
+    Enumerated up front so each is its own test case. A skipped check is
+    indistinguishable from a passing one.
+    """
+    found = []
+    for template in find_cloudformation_templates():
+        text = template.read_text(encoding="utf-8")
+        for match in _INLINE_QUEUE_ENV_START.finditer(text):
+            indent = match.group("indent")
+            body_start = match.end() + 1
+            end = text.find(f"{indent}### END_QUEUE_ENV", body_start)
+            assert end != -1, (
+                f"{rel(template)} opens START_QUEUE_ENV at the same indentation "
+                f"without a matching '{indent}### END_QUEUE_ENV'"
+            )
+            lines = text[body_start:end].splitlines()
+            deindented = [
+                line[len(indent):] if line.startswith(indent) else line for line in lines
+            ]
+            found.append((template, match.group("source"), "\n".join(deindented) + "\n"))
+    return found
+
+
+_INLINED_QUEUE_ENVS = _inlined_queue_environments()
+
+
+def test_inlined_queue_environments_discovered():
+    """Guard against the regex silently matching nothing after a reformat."""
+    assert _INLINED_QUEUE_ENVS, (
+        "no CloudFormation template declares '### START_QUEUE_ENV from <path>'; "
+        "if that is intentional, remove this check and the drift test below"
+    )
+
+
+@pytest.mark.parametrize(
+    ("template", "source", "inlined"),
+    _INLINED_QUEUE_ENVS,
+    ids=[f"{rel(t)}::{s}" for t, s, _ in _INLINED_QUEUE_ENVS],
+)
+def test_inlined_queue_environment_has_not_drifted(template: Path, source: str, inlined: str):
+    """An inlined queue environment must match the shared file it names."""
+    shared = REPO_ROOT / source
+    assert shared.is_file(), (
+        f"{rel(template)} declares its queue environment comes from {source}, "
+        f"which does not exist"
+    )
+    assert inlined == shared.read_text(encoding="utf-8"), (
+        f"{rel(template)} has drifted from {source}. Re-inline the shared file so "
+        f"a fix to one applies to both, or drop the 'from {source}' declaration "
+        f"if the copy is deliberately different."
     )

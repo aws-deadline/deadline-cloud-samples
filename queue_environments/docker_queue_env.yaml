@@ -1,0 +1,223 @@
+# Docker container queue environment for AWS Deadline Cloud.
+#
+# Runs every task inside a container pulled from your own Amazon ECR, on a
+# service-managed fleet whose instanceCapabilities declare:
+#
+#     softwareAddOns: [{ name: docker }]
+#
+# That add-on is what installs rootless Docker at /opt/deadline/docker-rootless.
+# The enter action below starts the daemon itself rather than assuming one is
+# running, which is why no host configuration script is needed.
+#
+# VERIFIED on a Linux GPU service-managed fleet with the docker add-on and NO
+# host configuration script: the enter action started the daemon, authenticated
+# to ECR, pulled a 9 GB image and ran Isaac Sim to completion.
+#
+# This matches the environment the Deadline Cloud console creates for you (any
+# customer can read their own with `aws deadline get-queue-environment`), with
+# one fix: the ECR region is parsed from the registry host rather than derived
+# from the worker's availability zone. Those differ whenever the image lives in
+# another Region, and the login then fails.
+#
+# A note on debugging it: `openjd check` validates this file, but it cannot
+# catch a brace collision between a shell snippet and OpenJD's own `{{ }}`
+# interpolation -- the service rejects that at CreateQueueEnvironment with
+# "Could not decode environment template", and a `{{ ... }}` sequence inside a
+# COMMENT is enough to trigger it.
+specificationVersion: "environment-2023-09"
+extensions:
+  - WRAP_ACTIONS
+  - EXPR
+parameterDefinitions:
+  - name: DockerImage
+    type: STRING
+    description: >
+      The ECR container image URI to pull and use for jobs.
+      Format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+    default: ""
+    userInterface:
+      control: LINE_EDIT
+      label: Container Image URI
+  - name: ImageCacheCleanupAfterHours
+    type: INT
+    description: Cached container images not used within this many hours are removed at session exit.
+    default: 96
+    userInterface:
+      control: SPIN_BOX
+      label: Cleanup Unused Images After (Hours)
+environment:
+  name: DockerContainer
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ["{{Env.File.Enter}}"]
+      # All three hooks share the static Wrap script: forward session env as `-e KEY=value`, then `--`, then the command + args.
+      onWrapEnvEnter:
+        command: bash
+        args:
+          - "{{Env.File.Wrap}}"
+          - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+          - "--"
+          - "{{WrappedAction.Command}}"
+          - "{{WrappedAction.Args}}"
+      onWrapTaskRun:
+        command: bash
+        args:
+          - "{{Env.File.Wrap}}"
+          - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+          - "--"
+          - "{{WrappedAction.Command}}"
+          - "{{WrappedAction.Args}}"
+      onWrapEnvExit:
+        command: bash
+        args:
+          - "{{Env.File.Wrap}}"
+          - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+          - "--"
+          - "{{WrappedAction.Command}}"
+          - "{{WrappedAction.Args}}"
+      onExit:
+        command: bash
+        args: ["{{Env.File.Exit}}"]
+    embeddedFiles:
+      - name: Enter
+        type: TEXT
+        runnable: true
+        data: |
+          #!/usr/bin/env bash
+          set -uo pipefail
+          PREFIX=/opt/deadline/docker-rootless
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/docker.sock"
+          SOCK="${XDG_RUNTIME_DIR}/docker.sock"
+          ready() { [ -S "$SOCK" ] && "$PREFIX/bin/docker" info >/dev/null 2>&1; }
+
+          mkdir -p "${HOME}/.config/systemd/user"
+          cat > "${HOME}/.config/systemd/user/docker.service" <<UNITFILE
+          [Unit]
+          Description=Rootless Docker for Deadline job-user
+          StartLimitIntervalSec=0
+
+          [Service]
+          Environment=PATH=${PREFIX}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/sbin:/usr/bin:/bin
+          ExecStartPre=-/usr/bin/rm -f %t/docker.sock
+          ExecStart=${PREFIX}/bin/dockerd-rootless.sh
+          Restart=no
+          TimeoutStartSec=90
+          TimeoutStopSec=15
+          KillMode=control-group
+          Delegate=yes
+          Type=notify
+          NotifyAccess=all
+          UNITFILE
+
+          for i in $(seq 1 120); do
+            case "$(systemctl --user is-system-running 2>/dev/null)" in
+              running|degraded)
+                systemctl --user daemon-reload 2>/dev/null
+                if ! ready; then  # onExit is skipped if the worker dies mid-session; clear what it left
+                  systemctl --user reset-failed docker.service 2>/dev/null
+                  pkill -9 -u "$(id -u)" -x rootlesskit 2>/dev/null
+                  rm -f "$SOCK"
+                fi
+                systemctl --user start docker.service 2>/dev/null && break
+                ;;
+            esac
+            sleep 1
+          done
+
+          for i in $(seq 1 90); do ready && break; sleep 1; done
+          if ! ready; then
+            systemctl --user status docker.service --no-pager 2>&1 | head -5
+            echo "openjd_fail: rootless docker daemon not available"
+            exit 1
+          fi
+
+          REGISTRY=$(echo {{ repr_sh(Param.DockerImage) }} | cut -d'/' -f1)
+          # Region comes from the registry host, not the worker's AZ. They differ
+          # whenever the image lives in another Region, and then the login fails.
+          REGION=$(echo "$REGISTRY" | cut -d'.' -f4)
+          case "$REGISTRY" in
+            *.dkr.ecr.*.amazonaws.com) ;;
+            # Name the unset parameter. Falling through to the generic branch
+            # reports "not an ECR registry: " with a blank name, which gives no
+            # hint that a parameter needs setting -- and it does so only after a
+            # worker has scaled out and started a session.
+            "") echo "openjd_fail: DockerImage is empty; set it on the queue environment or pass -p DockerImage=<uri>"; exit 1 ;;
+            *) echo "openjd_fail: not an ECR registry: ${REGISTRY}"; exit 1 ;;
+          esac
+          export DOCKER_CONFIG="${XDG_RUNTIME_DIR}/deadline-docker-config"; rm -f "${HOME}/.docker/config.json"
+          if ! aws ecr get-login-password --region "${REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"; then
+            echo "openjd_fail: ECR login failed for ${REGISTRY} in ${REGION}"
+            exit 1
+          fi
+
+          if ! docker pull {{ repr_sh(Param.DockerImage) }}; then
+            echo 'openjd_fail: could not pull' {{ repr_sh(Param.DockerImage) }}
+            exit 1
+          fi
+
+          # docker exec starts a clean env: forward the known license vars only, never the
+          # whole host env (AWS creds).
+          LICENSE_ENV_FILE="{{Session.WorkingDirectory}}/.docker-license.env"
+          : > "$LICENSE_ENV_FILE"
+          for var in ADSKFLEX_LICENSE_FILE foundry_LICENSE LUXION_LICENSE_FILE PIXAR_LICENSE_FILE \
+                     g_licenseServerRLM redshift_LICENSE SESI_LMHOST VRAY_AUTH_CLIENT_SETTINGS \
+                     VRAY_AUTH_CLIENT_FILE_PATH FLEXLM_TIMEOUT; do
+            [ -n "${!var:-}" ] && echo "${var}=${!var}" >> "$LICENSE_ENV_FILE"
+          done
+          echo "openjd_env: DOCKER_LICENSE_ENV_FILE=${LICENSE_ENV_FILE}"
+
+          GPU_ARGS=()
+          [ -f /etc/cdi/nvidia.yaml ] && GPU_ARGS=(--gpus all)
+
+          if ! DOCKER_CONTAINER_ID=$(docker container run --rm --detach "${GPU_ARGS[@]}" \
+              --entrypoint /bin/sh \
+              --mount {{ repr_sh("type=bind,src=" + Session.WorkingDirectory + ",dst=" + Session.WorkingDirectory) }} \
+              --workdir {{ repr_sh(Session.WorkingDirectory) }} \
+              {{ repr_sh(Param.DockerImage) }} \
+              -c 'trap exit TERM; while :; do sleep 1 & wait $!; done'); then
+            echo "openjd_fail: could not start the session container"
+            exit 1
+          fi
+          echo "openjd_env: DOCKER_CONTAINER_ID=${DOCKER_CONTAINER_ID}"
+          echo "openjd_env: DOCKER_HOST=${DOCKER_HOST}"
+          exit 0
+      # Shared by all three wrap hooks. argv: [-e KEY=value ...] -- <command> [args ...]
+      - name: Wrap
+        type: TEXT
+        runnable: true
+        data: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec_cmd=(docker container exec --user 0:0)
+          if [ -s "${DOCKER_LICENSE_ENV_FILE:-}" ]; then
+            exec_cmd+=(--env-file "$DOCKER_LICENSE_ENV_FILE")
+          fi
+          while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
+            exec_cmd+=("$1")
+            shift
+          done
+          shift
+          exec "${exec_cmd[@]}" "$DOCKER_CONTAINER_ID" "$@"
+      - name: Exit
+        type: TEXT
+        runnable: true
+        data: |
+          #!/usr/bin/env bash
+          set -uo pipefail
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          [ -n "${DOCKER_CONTAINER_ID:-}" ] && docker container stop -t 30 "$DOCKER_CONTAINER_ID" 2>/dev/null
+          MARKERS="${HOME}/.local/share/deadline-docker/last-used"; mkdir -p "$MARKERS"
+          id=$(docker image ls -q --no-trunc {{ repr_sh(Param.DockerImage) }} 2>/dev/null | head -1); [ -n "$id" ] && touch "$MARKERS/$id"
+          CUTOFF=$(( $(date +%s) - {{Param.ImageCacheCleanupAfterHours}} * 3600 ))
+          for id in $(docker image ls -q --no-trunc 2>/dev/null | sort -u); do
+            [ -f "$MARKERS/$id" ] || { touch "$MARKERS/$id"; continue; }
+            [ "$(stat -c %Y "$MARKERS/$id")" -lt "$CUTOFF" ] && docker image rm -f "$id" >/dev/null 2>&1 && rm -f "$MARKERS/$id"
+          done
+          systemctl --user stop docker.service 2>/dev/null
+          rm -rf "${XDG_RUNTIME_DIR}/deadline-docker-config"
+          # Orderly manager shutdown before the agent's cleanup SIGTERMs it
+          systemctl --user exit 2>/dev/null
+          exit 0

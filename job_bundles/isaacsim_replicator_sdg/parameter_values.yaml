@@ -1,0 +1,36 @@
+# Defaults sized for a first run that finishes in minutes and costs little.
+#
+# Warm worker: ~35s Kit boot + capture. Cold worker: add ~347s for the shader
+# cache plus a ~2.5min pull of the ~9GB image, so budget ~10min for a first run.
+#
+# Scaling up: frames scale linearly and shards divide wall clock down to the
+# fleet's maxWorkerCount, though a service-managed fleet scales out from zero at
+# scaleOutWorkersPerMinute (default 10/min), so an 8-shard job measured ~5x
+# rather than 8x on the sibling sim-to-policy sample.
+#
+#   10k frames:  SdgFrames=10000  SdgShards=20   (~500/shard, ~2-5 GB output)
+parameterValues:
+- name: SdgFrames
+  value: 256
+- name: SdgShards
+  value: 4
+- name: SdgBaseSeed
+  value: 30001
+- name: SceneSource
+  value: primitives
+- name: SdgObjects
+  value: 6
+- name: Width
+  value: 640
+- name: Height
+  value: 480
+- name: Renderer
+  value: RaytracedLighting
+- name: RtSubframes
+  value: 8
+- name: AntiAliasing
+  value: 3
+- name: Annotators
+  value: rgb,bounding_box_2d_tight,semantic_segmentation
+- name: StepTimeoutSeconds
+  value: 1800
