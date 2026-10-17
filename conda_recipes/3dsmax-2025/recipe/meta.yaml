@@ -1,0 +1,29 @@
+{% set name = "3dsmax" %}
+{% set display_name = "3ds Max" %}
+{% set major_version = "2025" %}
+{% set minor_version = "3" %}
+{% set version = major_version + "." + minor_version %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+- url: archive_files/Autodesk_3dsMax_{{ major_version }}_Windows_installation.zip # [win64]
+  sha256: 0064a976aef6f61b66d42272322dacd77caebb233b41f8a71f3def33b8a1154e # [win64]
+  folder: 3dsmax
+
+build:
+  skip: true  # [not win64]
+  number: 0
+  # These build options for repackaging an application
+  # https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+  binary_relocation: False
+  detect_binary_files_with_prefix: False
+  missing_dso_whitelist:
+  - "**"
+
+about:
+  home: https://www.autodesk.com/products/3ds-max/overview
+  license: LicenseRef-AutodeskEULA
+  summary: 3ds Max is professional 3D modeling, animation, and rendering software from Autodesk.
