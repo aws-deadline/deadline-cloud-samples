@@ -1,7 +1,7 @@
 # AWS Deadline Cloud samples
 
 Build, submit, and operate real workloads on [AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/).
-Start with the task you want to complete. Each sample stays self-contained in its existing directory.
+Start with the task you want to complete. Each sample is self-contained in its own directory.
 
 ## What do you want to do?
 
@@ -13,6 +13,7 @@ Start with the task you want to complete. Each sample stays self-contained in it
 | Run a new DCC or application | Read about [custom software delivery](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/deploy-custom-software.html), then browse [Conda recipes](conda_recipes/), [host configuration scripts](host_configuration_scripts/), [containers](containers/), and [job bundles](job_bundles/) |
 | Deliver custom plugins | Read about [Plugin Sync](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/plugin-sync.html), then compare [plugin packages](conda_recipes/), [host installations](host_configuration_scripts/), and [queue environments](queue_environments/) |
 | Connect studio systems | Browse [submission hooks](submission_hooks/), [custom submitters](job_bundles/custom_submitters/), [queue environments](queue_environments/), and [event notifications](cloudformation/notification_templates/) |
+| Build a robot learning pipeline | Read [robot learning pipelines](docs/ROBOT_LEARNING_PIPELINES.md), then start with [MuJoCo sim-to-policy](job_bundles/mujoco_sim_to_policy/) |
 | Find a specific example | Use the [repository map](#repository-map), then browse that area's complete category table |
 | Create a sample with an AI agent | Inspect [skills](skills/) for a matching task guide |
 
@@ -52,7 +53,7 @@ or run licensed software; review parameters, IAM permissions, licensing, and cle
 | [Submission hooks](submission_hooks/) | Inspect or modify job bundles immediately before submission. |
 | [Utility scripts](utility_scripts/) | Automate supporting tasks such as uploading job attachments. |
 | [Agent skills](skills/) | Give coding agents repeatable instructions for authoring jobs, packages, and host configs. |
-| [Contributor documentation](docs/) | Use the adaptable sample README starting point. |
+| [Documentation](docs/) | Read how the robotics samples compose, or use the adaptable sample README starting point. |
 | [Repository validation](scripts/) | Run unit, local-link, and live external-link checks. |
 
 Each sample area README declares its tracked scope and provides a complete local index. Nested collection

@@ -23,6 +23,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Blender wedge render from CSV](blender_wedge_from_csv/) | A pre-submission hook that expands CSV rows into task parameters | A spreadsheet defines your wedge variations, shot list, or parameter sweep |
 | [Bash CLI job](cli_job/) | Submitting a multi-line shell script with an attached data directory | You want to run an ad hoc command-line workload |
 | [Copy S3 prefix to job attachments](copy_s3_prefix_to_job_attachments/) | Distributed hashing and copying into content-addressable job attachment storage | Existing S3 datasets should be staged without workstation uploads |
+| [Cosmos 3 dream trajectories](cosmos3_dream_trajectories/) | Synthetic robot video from an image plus a prompt, with inverse-dynamics action recovery, one task per clip, merged into a LeRobot dataset | You need synthetic robot data to augment a small teleoperation dataset |
 | [Custom submitters](custom_submitters/) | A collection of in-application submission interfaces for Maya and KeyShot | Artist context and DCC state require a custom submission UI |
 | [ESMFold prediction](esmfold_predict/) | Parallel protein structure prediction, validation, and rendering | You need a GPU bioinformatics pipeline from FASTA to PDB outputs |
 | [FFmpeg encode video](ffmpeg_encode_video/) | Encoding a numbered image sequence into MP4 | You need a standalone render-output encoding utility |
@@ -59,7 +60,7 @@ Nested collections provide their own complete indexes where applicable.
 | [SSH to SMF](ssh_to_smf/) | Temporary Linux SSH access through an SSM hybrid managed node | You need interactive debugging on a service-managed worker |
 | [SSH to SMF on Windows](ssh_to_smf_windows/) | Temporary RDP, SSH, or PowerShell access through SSM | You need interactive debugging on a Windows worker |
 | [Task chunking](task_chunking/) | A collection of contiguous and non-contiguous chunking patterns | Per-task startup overhead should be shared across frames |
-| [Maya tile render blog sample](tile_render_maya_ffmpeg_for_blogpost/) | The adaptor customization and tiled-render workflow from the AWS blog | You are following the tile-rendering walkthrough |
+| [Tiled rendering in Maya, from the blog](tile_render_maya_ffmpeg_for_blogpost/) | The adaptor customization and tiled-render workflow from the AWS blog | You are following the tile-rendering walkthrough |
 | [Maya Arnold tiled render](tile_render_with_maya_arnold/) | A three-dimensional task space and FFmpeg tile assembly | Arnold images should render as distributed tiles |
 | [Maya V-Ray tiled render](tile_render_with_maya_vray/) | V-Ray tile rendering followed by OpenImageIO assembly | You need tiled EXR output from Maya and V-Ray |
 | [V-Ray Linux region render](tile_render_with_vray_linux/) | Region rendering, asset discovery, path mapping, and image merge | You render `.vrscene` files in parallel regions on Linux |

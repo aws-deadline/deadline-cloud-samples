@@ -2,10 +2,10 @@
 
 This file gives AI coding assistants the context they need to work effectively in this repository.
 
-## What this repo is
+## Repository scope
 
 `deadline-cloud-samples` is a public collection of samples for
-[AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/). It is not a single buildable package;
+[AWS Deadline Cloud](https://aws.amazon.com/deadline-cloud/). It is a collection rather than one buildable package;
 each sample is self-contained. The repository does have one top-level, standard-library-only static
 validation command:
 
@@ -45,7 +45,7 @@ deadline-cloud-samples/
 ├── submission_hooks/           Pre-submission Deadline Cloud CLI hooks
 ├── utility_scripts/            Standalone workflow helpers
 ├── skills/                     Task-specific guides for coding agents
-├── docs/                       Contributor guidance and documentation starting points
+├── docs/                       Cross-sample guidance and documentation starting points
 └── scripts/                    Standard-library repository validation
 ```
 
