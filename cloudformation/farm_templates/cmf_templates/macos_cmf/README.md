@@ -7,9 +7,11 @@ and starts the Deadline Cloud worker agent from its user data. The agent registe
 worker and the fleet shows it as `IDLE`. You never log in to the Mac to configure it.
 
 > [!WARNING]
-> **EC2 Mac Dedicated Hosts bill for a minimum of 24 hours from allocation.** Releasing the host
-> sooner, including by deleting this stack, does not reduce that charge, and each redeployment that
-> allocates a new host starts a new 24-hour period. Read
+> **EC2 Mac Dedicated Hosts bill for a minimum of 24 hours from allocation, and cannot be released
+> until that period has elapsed.** Each redeployment that allocates a new host starts a new 24-hour
+> period. Because the host cannot be released early, this template retains it when the stack is
+> deleted: `delete-stack` succeeds at any time, and **the host keeps billing until you release it
+> yourself**. Read
 > [Amazon EC2 Mac instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html)
 > and [Amazon EC2 Dedicated Host pricing](https://aws.amazon.com/ec2/dedicated-hosts/pricing/)
 > before you deploy. The `ExistingDedicatedHostId` parameter lets you reuse a host you have already
@@ -202,9 +204,18 @@ this template releases the host when the instance stops.
 ## Security, cost, and cleanup
 
 **Cost.** The Dedicated Host bills a 24-hour minimum from allocation and dominates the cost of this
-sample. Deleting the stack releases the host but does not refund the remainder of the 24 hours. The
-template does not create a NAT gateway. The worker connects to PyPI and the Deadline Cloud endpoints
-through a public IP in a public subnet.
+sample. EC2 refuses to release a Mac Dedicated Host before that period elapses, so the template
+retains the host on stack deletion rather than failing the delete. Release it yourself once 24 hours
+have passed, or keep it and pass its ID back as `ExistingDedicatedHostId` to avoid a second minimum:
+
+```console
+aws ec2 describe-hosts --filter Name=state,Values=available \
+  --query 'Hosts[].{Id:HostId,Type:HostProperties.InstanceType,Allocated:AllocationTime}'
+aws ec2 release-hosts --host-ids h-EXAMPLE1234567890
+```
+
+The template does not create a NAT gateway. The worker connects to PyPI and the Deadline Cloud
+endpoints through a public IP in a public subnet.
 
 **The impersonation `sudoers` rule.** The rule grants the agent user the ability to run any command as
 the job user, which is what the queue-configured user model requires. It does not grant root. The

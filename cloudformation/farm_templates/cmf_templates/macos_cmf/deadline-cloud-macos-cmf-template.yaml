@@ -342,6 +342,15 @@ Resources:
   DedicatedHost:
     Type: AWS::EC2::Host
     Condition: AllocateDedicatedHost
+    # Retained on delete, because EC2 refuses to release a Mac Dedicated Host
+    # until its 24-hour minimum allocation period has elapsed. Without this, a
+    # delete-stack inside that window fails on this resource and leaves the
+    # stack in DELETE_FAILED until the user retries. Retaining also makes the
+    # DedicatedHostId output useful: the host outlives the stack, so you can
+    # pass it back as ExistingDedicatedHostId instead of paying a second
+    # 24-hour minimum. You must release it yourself when you are done.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       AvailabilityZone: !Ref AvailabilityZone
       InstanceType: !Ref WorkerInstanceType
@@ -376,6 +385,13 @@ Resources:
 
   WorkerHost:
     Type: AWS::EC2::Instance
+    # The user data pip-installs the agent, so the subnet needs its route to
+    # the internet before the instance boots. Neither of these is implied by
+    # any Ref the instance makes, so without DependsOn CloudFormation is free
+    # to launch first and the bootstrap dies on the first pip call.
+    DependsOn:
+      - WorkerDefaultRoute
+      - WorkerSubnetRouteTableAssociation
     Properties:
       ImageId: !Ref WorkerImageId
       InstanceType: !Ref WorkerInstanceType
@@ -548,8 +564,10 @@ Outputs:
     Value: !Ref WorkerHost
   DedicatedHostId:
     Description: >
-      The Dedicated Host the worker runs on. Pass this value as ExistingDedicatedHostId when you
-      redeploy, so that you are not charged a second 24-hour minimum for a new host.
+      The Dedicated Host the worker runs on. The template retains it on stack deletion, so pass
+      this value as ExistingDedicatedHostId when you redeploy and you are not charged a second
+      24-hour minimum. Release it with `aws ec2 release-hosts` when you are finished; it keeps
+      billing until you do.
     Value: !If [AllocateDedicatedHost, !Ref DedicatedHost, !Ref ExistingDedicatedHostId]
   BootstrapLogPath:
     Description: The path on the worker host of the log written by the user data script.
