@@ -4,7 +4,7 @@ These deployable CloudFormation samples create farms or add fleet infrastructure
 
 ## Sample index
 
-This table covers every immediate deployable sample directory in `farm_templates/`.
+This table lists the deployable samples below `farm_templates/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -14,5 +14,6 @@ This table covers every immediate deployable sample directory in `farm_templates
 | [SMF capacity manager](smf_capacity_manager/) | Automated balancing of Wait and Save and Spot fleet capacity | You operate hybrid service-managed fleets |
 | [Fleet standby scheduling](fleet_standby_scheduling/) | Scheduled warm standby worker counts | Worker startup latency matters during predictable hours |
 | [CMF fleet health check](cmf_templates/) | Continuous health monitoring for an autoscaling customer-managed fleet | You need alarms for fleet capacity or health problems |
+| [macOS CMF with an EC2 Mac worker](cmf_templates/macos_cmf/) | A macOS customer-managed fleet on an EC2 Mac Dedicated Host, with the worker agent bootstrapped from user data | You need macOS render nodes in a customer-managed fleet |
 
 [`apply-conda-queue-env.py`](apply-conda-queue-env.py) is support tooling used to apply a queue environment. It is not a separately deployable sample and is excluded from the table.
