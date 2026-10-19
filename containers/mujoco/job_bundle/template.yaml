@@ -1,0 +1,110 @@
+# Every command below targets the mujoco-rocky9 image.
+# The queue's Docker environment runs each one inside the container, so nothing
+# here pulls an image or starts a container.
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR]
+name: MuJoCo Hand Sweep
+description: >-
+  Sweeps damping, stiffness and friction on the MuJoCo Shadow Hand, rendering an MP4 and
+  metrics for each of the 24 combinations, then summarizes them in one table.
+
+parameterDefinitions:
+# Read by the queue's Docker environment. Keep it a plain STRING so it matches
+# the queue's own DockerImage definition.
+- name: DockerImage
+  type: STRING
+  description: >-
+    The mujoco-rocky9 image in Amazon ECR, for example
+    <account-id>.dkr.ecr.<region>.amazonaws.com/mujoco-rocky9:3.11.0
+  userInterface:
+    control: LINE_EDIT
+    label: Container Image URI
+- name: Duration
+  type: FLOAT
+  default: 2.0
+  minValue: 0.1
+  description: Simulated seconds per combination, which is also the clip length.
+- name: Fps
+  type: FLOAT
+  default: 20.0
+  minValue: 1.0
+  description: Rendered frames per simulated second. Rendering is software, so this sets the cost.
+- name: VideoBitrate
+  type: STRING
+  default: 2M
+  description: Target bitrate for each H.264 MP4.
+- name: Model
+  type: STRING
+  default: /models/mujoco_menagerie/shadow_hand/scene_right_ball.xml
+  description: MJCF scene inside the image. The default is the right Shadow Hand holding a ball.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  description: Where each combination's frames, MP4 and metrics are written.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+- name: JobScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: Helper scripts uploaded with the job.
+  userInterface:
+    control: HIDDEN
+
+steps:
+- name: Sweep
+  # 4 x 3 x 2 = 24 tasks, one per combination, run in parallel across the fleet.
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: DampingScale
+      type: FLOAT
+      range: [0.25, 0.5, 2.0, 4.0]
+    - name: StiffnessScale
+      type: FLOAT
+      range: [0.5, 1.0, 2.0]
+    - name: FrictionScale
+      type: FLOAT
+      range: [0.25, 4.0]
+  script:
+    let:
+    - label = 'damp' + string(Task.Param.DampingScale) + '-kp' + string(Task.Param.StiffnessScale) + '-fr' + string(Task.Param.FrictionScale)
+    - out_dir = Param.OutputDir / label
+    actions:
+      onRun:
+        command: mj-hand-sweep
+        args:
+        - --model
+        - "{{ Param.Model }}"
+        - --damping-scale
+        - "{{ Task.Param.DampingScale }}"
+        - --stiffness-scale
+        - "{{ Task.Param.StiffnessScale }}"
+        - --friction-scale
+        - "{{ Task.Param.FrictionScale }}"
+        - --duration
+        - "{{ Param.Duration }}"
+        - --fps
+        - "{{ Param.Fps }}"
+        - --video-bitrate
+        - "{{ Param.VideoBitrate }}"
+        - --out-dir
+        - "{{ out_dir }}"
+        - --label
+        - "{{ label }}"
+
+- name: Summarize
+  dependencies:
+  - dependsOn: Sweep
+  script:
+    actions:
+      onRun:
+        command: python3
+        args:
+        - "{{ Param.JobScriptDir / 'summarize_metrics.py' }}"
+        - --csv
+        - "{{ Param.OutputDir / 'summary.csv' }}"
+        - "{{ Param.OutputDir }}"
