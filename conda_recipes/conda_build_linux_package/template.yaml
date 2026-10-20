@@ -196,6 +196,17 @@ jobEnvironments:
     QT_QPA_PLATFORM: offscreen
     # Turn off buffering in Python
     PYTHONUNBUFFERED: "True"
+    # Stop jemalloc in rattler-build from returning freed memory to the OS.
+    # rattler-build 0.71 and newer use jemalloc 5.3.1. On hosts with
+    # vm.overcommit_memory=2, such as service-managed fleet workers, jemalloc
+    # returns memory by splitting mappings with mmap(PROT_NONE). Publishing a
+    # large package to S3 can then exceed vm.max_map_count and abort with
+    # "memory allocation of N bytes failed". Only programs that bundle jemalloc
+    # through the Rust tikv-jemallocator crate read the _RJEM_ prefix, so
+    # other programs in the build are unaffected.
+    # See https://github.com/aws-deadline/deadline-cloud-samples/issues/309
+    # and https://github.com/jemalloc/jemalloc/issues/1328
+    _RJEM_MALLOC_CONF: "dirty_decay_ms:-1,muzzy_decay_ms:-1"
   script:
     actions:
       onEnter:
