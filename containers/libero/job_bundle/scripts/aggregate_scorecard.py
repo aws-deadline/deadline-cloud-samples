@@ -3,7 +3,7 @@
 Reads <output>/tasks/*/eval/eval_info.json, written by lerobot-eval, and writes:
   scorecard.json  per-suite and overall success, with per-task detail
   scorecard.csv   one row per suite and task
-  tensorboard/    the same numbers as TensorBoard scalars, if tensorboard is installed
+  tensorboard/<run>/  TensorBoard scalars and HParams, if tensorboard is installed
 
 Exits non-zero when overall success is below --min-success-rate.
 """
@@ -58,17 +58,38 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
-def write_tensorboard(output: Path, card: dict) -> bool:
+def write_tensorboard(output: Path, card: dict, run_name: str, hparams: dict) -> bool:
+    """Write TensorBoard logs under tensorboard/<run_name>.
+
+    - task_success/<suite>: one point per task, with the task index as the step,
+      so tasks that fail stand out.
+    - HParams: this job's policy and settings next to its overall and per-suite
+      success rates, so jobs that test different settings line up in one table.
+      Each of those rates is a single number, so it is logged only here and not
+      as its own Scalars chart.
+    """
     try:
         from torch.utils.tensorboard import SummaryWriter
     except ImportError:
         return False
-    writer = SummaryWriter(log_dir=str(output / "tensorboard"))
-    writer.add_scalar("success_rate/overall", card["overall_success_rate"] or 0, 0)
-    for suite, values in card["suites"].items():
-        writer.add_scalar(f"success_rate/{suite}", values["success_rate"] or 0, 0)
+    writer = SummaryWriter(log_dir=str(output / "tensorboard" / run_name))
+    for row in sorted(card["per_task"], key=lambda r: (r["suite"], r["task_id"])):
+        if row["episodes"]:
+            writer.add_scalar(f"task_success/{row['suite']}", 100.0 * row["successes"] / row["episodes"], row["task_id"])
+    metrics = {"hparam/overall": card["overall_success_rate"] or 0}
+    metrics.update({f"hparam/{suite}": values["success_rate"] or 0 for suite, values in card["suites"].items()})
+    writer.add_hparams({"policy": card["policy"], **hparams}, metrics, run_name=".")
     writer.close()
     return True
+
+
+def parse_hparams(pairs: list[str]) -> dict:
+    """Turn KEY=VALUE strings into a dict, converting integer values."""
+    result = {}
+    for pair in pairs:
+        key, _, value = pair.partition("=")
+        result[key] = int(value) if value.lstrip("-").isdigit() else value
+    return result
 
 
 def main() -> int:
@@ -76,7 +97,11 @@ def main() -> int:
     parser.add_argument("output", type=Path)
     parser.add_argument("--policy", default="")
     parser.add_argument("--min-success-rate", type=float, default=0.0)
+    parser.add_argument("--run-name", default="", help="TensorBoard run name. Defaults to the policy name.")
+    parser.add_argument("--hparam", action="append", default=[], metavar="KEY=VALUE",
+                        help="A setting to show in TensorBoard's HParams view. Repeat for each setting.")
     args = parser.parse_args()
+    run_name = args.run_name or (args.policy.replace("/", "_") or "run")
 
     rows = load_tasks(args.output)
     if not rows:
@@ -88,7 +113,7 @@ def main() -> int:
         writer = csv.DictWriter(f, fieldnames=["suite", "task_id", "episodes", "successes", "eval_seconds", "gpu"])
         writer.writeheader()
         writer.writerows(rows)
-    has_tb = write_tensorboard(args.output, card)
+    has_tb = write_tensorboard(args.output, card, run_name, parse_hparams(args.hparam))
 
     def pct(value):
         return "  n/a" if value is None else f"{value:5.1f}%"
@@ -97,7 +122,7 @@ def main() -> int:
     for suite, values in card["suites"].items():
         print(f"  {suite:15s} {pct(values['success_rate'])}  ({values['tasks']} tasks, {values['episodes']} episodes)")
     print(f"  {'overall':15s} {pct(card['overall_success_rate'])}  ({card['episodes']} episodes)")
-    print("TensorBoard logs written to tensorboard/" if has_tb else "TensorBoard not installed; skipped.")
+    print(f"TensorBoard logs written to tensorboard/{run_name}" if has_tb else "TensorBoard not installed; skipped.")
 
     if args.min_success_rate and (card["overall_success_rate"] or 0) < args.min_success_rate:
         print(f"FAIL: overall success {card['overall_success_rate']}% is below {args.min_success_rate}%", file=sys.stderr)

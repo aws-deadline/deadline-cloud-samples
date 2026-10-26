@@ -140,6 +140,7 @@ deadline job download-output --farm-id <farm-id> --queue-id <queue-id> --job-id 
 | `EpisodeLength` | `800` | Maximum steps per episode. `0` uses each suite's default |
 | `CameraFlags` | `none` | `camera_mapping` renames the cameras for `lerobot/smolvla_libero` |
 | `MinSuccessRate` | `0` | Fail `Aggregate` below this overall success, in percent |
+| `RunName` | blank | TensorBoard run name for this job. Blank uses the policy name |
 | `OutputDir` | `./output` | Where results are written. Job attachments upload it |
 
 ```text
@@ -150,8 +151,28 @@ output/
 │   └── worker.json                GPU model, render backend and image
 ├── scorecard.json                 per-suite and overall success
 ├── scorecard.csv                  one row per suite and task
-└── tensorboard/                   tensorboard --logdir output/tensorboard
+└── tensorboard/<run>/             TensorBoard scalars and HParams
 ```
+
+## Comparing jobs in TensorBoard
+
+Each job writes TensorBoard logs under `tensorboard/<RunName>/`:
+
+- `task_success/<suite>` in the **Scalars** tab: success for each task, plotted by task index. Failing tasks stand out.
+- The **HParams** tab: the job's policy and settings next to its overall and per-suite success rates.
+
+To compare jobs, give each one its own `RunName`, download their outputs, and copy the run
+directories into one folder:
+
+```console
+mkdir -p compare
+cp -r output-job-a/tensorboard/* output-job-b/tensorboard/* compare/
+tensorboard --logdir compare --host 127.0.0.1
+```
+
+Open the **HParams** tab for a table of jobs, settings, and scores. The Scalars tab also lists
+`hparam/*` charts with one point each. The HParams table reads its values from them, so type
+`task_success` in the Scalars filter box to show only the per-task charts.
 
 ## Comparing scores
 

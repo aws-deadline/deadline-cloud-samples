@@ -63,6 +63,12 @@ parameterDefinitions:
   minValue: 0.0
   maxValue: 100.0
   description: Fail the Aggregate step if overall success, in percent, is below this. 0 disables the gate.
+- name: RunName
+  type: STRING
+  default: ""
+  description: >-
+    Name for this job's TensorBoard run, for example the hypothesis it tests. Blank uses the
+    policy name. Give each job its own name when you compare jobs in one TensorBoard.
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY
@@ -159,4 +165,8 @@ steps:
         docker run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp \
           -v '{{Param.OutputDir}}:/out' -v '{{Param.JobScriptDir}}:/scripts:ro' "$IMAGE" \
           python /scripts/aggregate_scorecard.py /out \
-            --policy '{{Param.PolicyPath}}' --min-success-rate {{Param.MinSuccessRate}}
+            --policy '{{Param.PolicyPath}}' --min-success-rate {{Param.MinSuccessRate}} \
+            --run-name '{{Param.RunName}}' \
+            --hparam n_action_steps={{Param.NActionSteps}} --hparam control_mode='{{Param.ControlMode}}' \
+            --hparam episode_length={{Param.EpisodeLength}} --hparam camera_flags='{{Param.CameraFlags}}' \
+            --hparam episodes={{Param.Episodes}} --hparam task_ids='{{Param.TaskIds}}'
