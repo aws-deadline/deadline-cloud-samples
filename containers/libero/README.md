@@ -2,10 +2,10 @@
 
 Evaluate a robot policy on the [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO) benchmark
 with [LeRobot](https://huggingface.co/docs/lerobot/en/libero), spread across AWS Deadline Cloud GPU
-workers. Choose this sample when one benchmark run takes too long on a single machine, or when you want
-to compare several checkpoints or settings in parallel.
+workers. Choose this sample when one benchmark run takes too long on one machine, or when you want
+to compare checkpoints or settings in parallel.
 
-## What this sample demonstrates
+## Results and features
 
 LIBERO runs in [MuJoCo](https://github.com/google-deepmind/mujoco) through robosuite. The standard
 protocol is 4 suites × 10 tasks × 10 episodes, which is 400 episodes per policy. This sample runs each
@@ -28,10 +28,10 @@ Other things the sample shows:
 - **Portable results.** Each task writes LeRobot's `eval_info.json` and rollout videos. The `Aggregate`
   step writes `scorecard.json`, `scorecard.csv`, and TensorBoard scalars, and it can fail the job when
   success drops below a threshold. Use the threshold as a regression gate.
-- **Repeatable environments.** The image pins LeRobot, MuJoCo, and PyTorch, and it bakes in the
-  benchmark assets and policy weights. Tasks run with no network access.
+- **Repeatable environments.** The image pins LeRobot, MuJoCo, and PyTorch, and it includes the
+  benchmark assets and policy weights. Tasks don't use the network.
 - **Fast experiments.** To test a different checkpoint or setting, submit the same bundle again with
-  different parameters. Each job is independent, so several hypotheses run at the same time.
+  different parameters. Each job is independent, so you can test hypotheses in parallel.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ Other things the sample shows:
   - A custom attribute `attr.DockerEngine` with the value `available`.
 - A fleet role with CloudWatch Logs permissions for the farm's log groups, as the console creates.
   Without it, workers start and are replaced repeatedly with no logs.
-- A queue role that can pull from your Amazon ECR repository, for example with
+- A queue role that can pull from your Amazon ECR repository, such as one with
   `AmazonEC2ContainerRegistryReadOnly`.
 - Spot G-instance GPU quota for Deadline Cloud in your Region, at least as many GPUs as the fleet's
   maximum worker count.
@@ -56,7 +56,7 @@ Other things the sample shows:
 
 1. The host configuration script installs Docker and the NVIDIA Container Toolkit on each new worker.
    It also sets `vm.overcommit_memory=1`, because the default strict accounting makes PyTorch with
-   several simulator processes fail with `MemoryError` while memory is still free.
+   many simulator processes fail with `MemoryError` while memory is still free.
 2. Each `Eval` task pulls the image; only the first pull on a worker downloads layers, and later pulls just check the manifest. It then runs `lerobot-eval` for one LIBERO task
    with `docker run --runtime=nvidia` and writes its results under `OutputDir/tasks/`.
 3. The `Aggregate` step runs after every `Eval` task finishes. It reads all the results and writes the
@@ -92,7 +92,7 @@ docker push "${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
 Push a new tag, or submit by digest, for every rebuild. Each task re-pulls the image, so a rebuilt
 image under the same tag is also picked up, but distinct tags keep results traceable to one build.
 
-To bake in other LIBERO-finetuned policies, pass a space-separated list:
+To include other LIBERO-finetuned policies in the image, pass a space-separated list:
 `--build-arg POLICIES="lerobot/xvla-libero your-org/your-policy"`.
 
 ## Run or submit
@@ -131,7 +131,7 @@ deadline job download-output --farm-id <farm-id> --queue-id <queue-id> --job-id 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `Image` | none | The image you pushed, by tag or digest |
-| `PolicyPath` | `lerobot/xvla-libero` | Hugging Face repository of the policy. It must be baked into the image |
+| `PolicyPath` | `lerobot/xvla-libero` | Hugging Face repository of the policy. It must be included in the image |
 | `TaskIds` | `0-9` | Task indices to run in every suite |
 | `Episodes` | `10` | Episodes per task. LIBERO has 50 fixed starting layouts per task |
 | `BatchSize` | `10` | Episodes simulated in parallel within one task |
@@ -187,7 +187,7 @@ output/
 
 | Symptom | Cause and fix |
 |---|---|
-| Workers start and are replaced every 10–15 minutes, with no logs | The fleet role is missing CloudWatch Logs permissions |
+| Workers start and are replaced every 10 to 15 minutes, with no logs | The fleet role is missing CloudWatch Logs permissions |
 | The worker agent restarts at "Running host configuration script" | The host script contains `{{`, which is parsed as template syntax. Remove it |
 | `MemoryError` in an `Eval` task while memory is free | `vm.overcommit_memory` is still 2. Check the host script ran, or raise the fleet's minimum memory |
 | `unresolvable CDI devices nvidia.com/gpu=all` or a cgroup "device filter" error | Use `--runtime=nvidia`, as this template does. On these workers, `--gpus all` and Docker's CDI devices fail |
