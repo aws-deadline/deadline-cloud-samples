@@ -33,8 +33,8 @@ dnf install -y nvidia-container-toolkit
 # Configure Docker to use NVIDIA runtime
 nvidia-ctk runtime configure --runtime=docker
 
-# CDI spec. Jobs in this sample use `docker run --runtime=nvidia`, which works on
-# these workers; the spec is kept so CDI-based tools also find the GPU.
+# CDI spec. This sample's jobs use `docker run --runtime=nvidia`; regenerating the
+# toolkit's spec and removing the duplicate keeps CDI-based tools working too.
 # NVIDIA Container Toolkit >= 1.18 generates /var/run/cdi/nvidia.yaml at boot
 # (nvidia-cdi-refresh). A second spec in /etc/cdi defines the same devices and
 # makes them unresolvable, so (re)generate only the /var/run/cdi spec.
@@ -55,20 +55,6 @@ echo "GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/d
 echo "NVIDIA runtime: $(grep -c nvidia /etc/docker/daemon.json 2>/dev/null || echo '0') references in daemon.json"
 
 echo "[$(date)] Docker and NVIDIA Container Toolkit installed."
-
-# --- Enable Docker's CDI feature ---
-# Not used by this sample's jobs: on Docker 25 with NVIDIA Container Toolkit 1.20,
-# `--device nvidia.com/gpu=all` still reports unresolvable devices, so the jobs use
-# `--runtime=nvidia`. Kept because this exact script was the one verified end to end.
-python3 - <<'PY'
-import json, pathlib
-p = pathlib.Path("/etc/docker/daemon.json")
-d = json.loads(p.read_text()) if p.exists() and p.read_text().strip() else {}
-d.setdefault("features", {})["cdi"] = True
-p.write_text(json.dumps(d, indent=2))
-PY
-systemctl restart docker
-ls /etc/cdi /var/run/cdi 2>/dev/null || true
 
 # --- Memory overcommit (from overcommit_override_for_smf) ---
 # SMF workers default to vm.overcommit_memory=2; PyTorch plus many simulator
