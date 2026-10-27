@@ -29,8 +29,9 @@ Scripts are grouped by 3ds Max version. Each installs the listed software. Some 
 | Sample | Installs | Extra installers to stage |
 |---|---|---|
 | [3dsmax-2026-pencilplus-persistent/](3dsmax-2026-pencilplus-persistent/) | 3ds Max 2026 + Pencil+ 4, with S3-first caching and optional persistent-volume acceleration | Pencil+ 4 (PSOFT) |
+| [3dsmax-2026-vray-persistent/](3dsmax-2026-vray-persistent/) | 3ds Max 2026 + V-Ray 7 (validated with 7.00.08), with S3-first caching and optional persistent-volume acceleration | V-Ray 7 for 3ds Max 2026 (Chaos) |
 
-Unlike the other samples, this one installs only once. The result is cached to S3 and reused on later workers rather than reinstalled. It has its own [README](3dsmax-2026-pencilplus-persistent/README.md) covering the caching model and the S3 bootstrap loader used to deploy it.
+Unlike the other samples, these install only once. The result is cached to S3 and reused on later workers rather than reinstalled. Each has its own README ([Pencil+](3dsmax-2026-pencilplus-persistent/README.md), [V-Ray](3dsmax-2026-vray-persistent/README.md)) covering the caching model and the S3 bootstrap loader used to deploy it.
 
 ### 3ds Max 2027
 
