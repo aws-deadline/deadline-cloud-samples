@@ -190,8 +190,11 @@ Open the **HParams** tab for a table of jobs, settings, and scores. The Scalars 
 
 ## Security, cost, and cleanup
 
-- **Image licensing.** The image contains the LIBERO asset collection, which states no license, so
-  keep the image in a private repository and don't publish it. It also contains `lerobot/xvla-libero`,
+- **Image licensing.** The image contains the LIBERO benchmark assets, downloaded from the
+  [`lerobot/libero-assets`](https://huggingface.co/datasets/lerobot/libero-assets) mirror of the
+  MIT-licensed [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO) project. They include 3D
+  models from third-party sources such as TurboSquid, whose own terms may also apply, so keep the
+  image in a private repository and don't publish it. The image also contains `lerobot/xvla-libero`,
   `lerobot/smolvla_libero`, the `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` backbone and the
   `facebook/bart-large` tokenizer, all listed as Apache-2.0 on their Hugging Face model cards. Check
   the license of any policy you add with `POLICIES`.
