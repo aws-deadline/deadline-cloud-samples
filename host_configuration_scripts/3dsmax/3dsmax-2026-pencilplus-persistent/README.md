@@ -69,7 +69,7 @@ Set these at the top of `s3-hosted-3dsmax-2026-pencilplus-persistent.ps1`:
 
 | Variable | Meaning |
 |---|---|
-| `$CACHE_GENERATION` | Part of the cache key. Bump it to rebuild the payload farm-wide. Always bump it when either installer URI changes or when you change how the script installs, captures, or grafts the payload: the key carries only the generation, and the state file records the installer URIs but not the script logic, so without a bump workers either graft a stale payload or restore the old zip only to reject it and cold install. |
+| `$CACHE_GENERATION` | Part of the cache key. Bump it to rebuild the payload farm-wide. Always bump it when either installer URI changes or when you change how the script installs, captures, or grafts the payload. The cache key contains only the generation. The state file records the installer URIs but not the script logic. Without a bump, workers either graft a stale payload or restore the old zip only to reject it and cold install. |
 | `$LOCAL_CACHE_ROOT` | Cache root used when the fleet has no persistent volume. Defaults to `C:\DeadlineCache`. A directory path is expected. Setting it to a bare drive letter works, but that drive has to exist on the worker: host configuration fails with `cache root E:\ is not mounted` rather than writing the payload somewhere unintended. |
 | `$3DS_MAX_INSTALLER_ZIP_S3_URI` | The 3ds Max 2026 installer zip. Recorded in the state file, so changing it invalidates a worker's local cache. |
 | `$PENCILPLUS_INSTALLER_S3_URI` | The Pencil+ 4 installer executable. Leave blank to skip Pencil+. |
