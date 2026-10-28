@@ -39,7 +39,8 @@ exemption off that prefix.
   question: once the zip exists, `HeadObject` returns it regardless of listing permission, so a fleet
   without `s3:ListBucket` still works and starts using the cache from the second boot onward.
   `s3:DeleteObject` is used to clean up the temporary upload key a publish writes before moving the
-  zip into place.
+  zip into place. A zip over 5 GB makes that `aws s3 mv` a multipart copy, which by default also
+  calls `s3:GetObjectTagging`. The publish passes `--copy-props none`, so the role can do without it.
 - An S3 lifecycle rule on the cache prefix with `AbortIncompleteMultipartUpload` set to a day or
   two. A worker terminated mid-publish can leave an orphaned multipart upload that is billed but
   invisible to `aws s3 ls`.
@@ -68,7 +69,7 @@ Set these at the top of `s3-hosted-3dsmax-2026-pencilplus-persistent.ps1`:
 
 | Variable | Meaning |
 |---|---|
-| `$CACHE_GENERATION` | Part of the cache key. Bump it to rebuild the payload farm-wide. |
+| `$CACHE_GENERATION` | Part of the cache key. Bump it to rebuild the payload farm-wide. Always bump it when either installer URI changes or when you change how the script installs, captures, or grafts the payload: the key carries only the generation, and the state file records the installer URIs but not the script logic, so without a bump workers either graft a stale payload or restore the old zip only to reject it and cold install. |
 | `$LOCAL_CACHE_ROOT` | Cache root used when the fleet has no persistent volume. Defaults to `C:\DeadlineCache`. A directory path is expected. Setting it to a bare drive letter works, but that drive has to exist on the worker: host configuration fails with `cache root E:\ is not mounted` rather than writing the payload somewhere unintended. |
 | `$3DS_MAX_INSTALLER_ZIP_S3_URI` | The 3ds Max 2026 installer zip. Recorded in the state file, so changing it invalidates a worker's local cache. |
 | `$PENCILPLUS_INSTALLER_S3_URI` | The Pencil+ 4 installer executable. Leave blank to skip Pencil+. |
@@ -79,7 +80,7 @@ local cache automatically, because the state file records the full installer URI
 farm-global payload, bump `$CACHE_GENERATION`:
 
 ```powershell
-$CACHE_GENERATION = "2"
+$CACHE_GENERATION = "3"
 ```
 
 The generation is part of the S3 key. Every worker converges on a new object and none of them
