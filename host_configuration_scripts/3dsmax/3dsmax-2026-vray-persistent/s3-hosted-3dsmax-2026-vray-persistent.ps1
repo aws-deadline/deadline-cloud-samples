@@ -80,6 +80,9 @@ $LOCAL_CACHE_ROOT = "C:\DeadlineCache"
 # so every worker converges on a new object instead of racing to delete the old one. There is no flag
 # to remember to unset, and a worker that boots mid-rollout either restores the new payload or builds
 # it, never both. The previous generation's objects are left behind for you to delete when ready.
+# ALWAYS bump it when this script's install, capture, graft or payload layout changes, or either
+# installer URI does. The S3 key holds only this and the V-Ray basename: after a logic change a stale
+# payload passes Test-StateValid, and after a URI change workers fetch the old zip and cold install.
 $CACHE_GENERATION = "1"
 # ================= END CONFIG =================
 
