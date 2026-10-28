@@ -1,0 +1,53 @@
+<!--
+  Right Shadow Hand with a spherical ball instead of Menagerie's ellipsoid.
+
+  Menagerie's own scene_right.xml puts an ellipsoid ("egg") in the palm. This is
+  the same scene with a sphere, which is the more conventional in-hand
+  manipulation object and rolls symmetrically.
+
+  Defined as a separate scene rather than by changing geom_type on the compiled
+  model: body inertia is derived from the geom at compile time, so swapping the
+  shape afterwards would leave the ball with the ellipsoid's inertia.
+
+  This file must sit in the shadow_hand directory. Both the <include> below and
+  right_hand.xml's meshdir="assets" resolve relative to the main model file, so
+  it cannot live elsewhere without the meshes going missing.
+-->
+<mujoco model="right_shadow_hand ball scene">
+  <include file="right_hand.xml"/>
+
+  <statistic extent="0.3"/>
+
+  <visual>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <quality shadowsize="8192"/>
+    <global azimuth="220" elevation="-30"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <!-- Checkered so rotation is visible; a plain sphere looks static while spinning. -->
+    <texture type="2d" name="ballskin" builtin="checker" rgb1="0.85 0.35 0.25" rgb2="0.95 0.85 0.75"
+      width="128" height="128"/>
+    <material name="ballskin" texture="ballskin" texuniform="true" texrepeat="3 3" specular="0.3" shininess="0.4"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1"/>
+    <light pos="0.3 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" pos="0 0 -0.1" size="0 0 0.05" type="plane" material="groundplane"/>
+
+    <!-- Same body name, freejoint and contact settings as Menagerie's scene, so
+         anything keying off "object" keeps working. condim="6" plus priority="1"
+         give the ball its own friction, including torsional and rolling terms —
+         without those a sphere slides out of the fingers instead of gripping. -->
+    <body name="object" pos="0.3 0 0.1">
+      <freejoint/>
+      <geom name="ball" type="sphere" size="0.032" material="ballskin" condim="6" priority="1"
+        friction="0.5 0.01 0.003"/>
+    </body>
+  </worldbody>
+</mujoco>

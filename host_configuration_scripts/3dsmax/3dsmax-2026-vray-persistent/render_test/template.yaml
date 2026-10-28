@@ -1,0 +1,35 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: 3dsmax-2026-vray-render-test-{{Param.Tag}}
+description: >
+  Checks a worker configured by 3dsmax-2026-vray-persistent. Builds a minimal V-Ray scene with
+  make_scene.ms, then renders it with render_scene.ms, both through 3dsmaxbatch.exe as the queue's
+  job user. No 3ds Max adaptor. scripts/run.ps1 decides PASS or FAIL; the image and logs come back
+  through job attachments.
+parameterDefinitions:
+- name: Tag
+  type: STRING
+  default: vray-test
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+- name: OutDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+steps:
+- name: Render
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf:
+      - windows
+  script:
+    actions:
+      onRun:
+        command: powershell.exe
+        args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '{{Param.ScriptsDir}}\run.ps1',
+               '-OutDir', '{{Param.OutDir}}', '-ScriptsDir', '{{Param.ScriptsDir}}', '-Tag', '{{Param.Tag}}']
+        timeout: 2400
