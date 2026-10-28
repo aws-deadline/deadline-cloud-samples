@@ -67,7 +67,10 @@ $LOCAL_CACHE_ROOT = "C:\DeadlineCache"
 # so every worker converges on a new object instead of racing to delete the old one. There is no flag
 # to remember to unset, and a worker that boots mid-rollout either restores the new payload or builds
 # it, never both. The previous generation's objects are left behind for you to delete when ready.
-$CACHE_GENERATION = "1"
+# ALWAYS bump it when this script's install, capture, graft or payload layout changes, or either
+# installer URI does. The S3 key holds only this value: after a logic change a stale payload passes
+# Test-StateValid, and after a URI change workers fetch the old zip and cold install.
+$CACHE_GENERATION = "2"
 # ================= END CONFIG =================
 
 # The key carries the generation, so bumping it retargets the whole fleet atomically with no deletes.
@@ -859,7 +862,10 @@ function Publish-S3Zip {
     $uploadUri = "$ZIP_URI.uploading-$env:COMPUTERNAME"
     try {
         Invoke-Native "aws s3 cp --no-progress `"$zipLocal`" `"$uploadUri`"" "zip upload"
-        Invoke-Native "aws s3 mv `"$uploadUri`" `"$ZIP_URI`"" "zip publish"
+        # --copy-props none: above 5 GB the mv is a multipart copy, and the default props mode first
+        # calls GetObjectTagging, which the documented fleet policy does not grant. The temp object
+        # carries no tags or metadata worth copying.
+        Invoke-Native "aws s3 mv --copy-props none `"$uploadUri`" `"$ZIP_URI`"" "zip publish"
         Write-Duration $t "Zip upload"
     } finally {
         # A failed mv leaves a complete multi-GB object under the temp key. An
