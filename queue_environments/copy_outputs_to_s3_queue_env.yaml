@@ -1,0 +1,106 @@
+specificationVersion: 'environment-2023-09'
+environment:
+  name: CopyOutputsToS3
+  description: |
+    Copies the job attachments output files of each session to an additional
+    S3 location when the session ends, so rendered outputs land in a bucket
+    you choose (for example a production or delivery bucket) without changing
+    the submitters artists use.
+
+    Edit DESTINATION_BUCKET and DESTINATION_PREFIX in the onExit action below.
+    Files are written to s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>,
+    where <output path> is the path of the file relative to the job attachments
+    root it was submitted from, e.g. "renders/beauty/frame_0001.exr".
+
+    The queue role needs these permissions in addition to the defaults:
+      - deadline:GetJob on this queue's jobs, to find the job's output directories.
+      - s3:PutObject on the destination bucket and prefix.
+  script:
+    actions:
+      onExit:
+        command: bash
+        args:
+        - '{{Env.File.Exit}}'
+        - '{{Env.File.CopyOutputs}}'
+        # DESTINATION_BUCKET
+        - 'amzn-s3-demo-bucket'
+        # DESTINATION_PREFIX, leave empty to write to the root of the bucket
+        - 'deadline-outputs'
+        - '{{Session.PathMappingRulesFile}}'
+        timeout: 3600
+    embeddedFiles:
+    - name: Exit
+      filename: copy-outputs-exit.sh
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+
+        # Find a Python interpreter. Prefer python3, but fall back to python
+        # (for example, on Windows worker hosts running git bash).
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON=python3
+        else
+            PYTHON=python
+        fi
+
+        "$PYTHON" "$@"
+    - name: CopyOutputs
+      filename: copy_outputs.py
+      type: TEXT
+      data: |
+        import json
+        import os
+        import subprocess
+        import sys
+
+        script, bucket, prefix, path_mapping_rules_file = sys.argv
+
+        farm_id = os.environ["DEADLINE_FARM_ID"]
+        queue_id = os.environ["DEADLINE_QUEUE_ID"]
+        job_id = os.environ["DEADLINE_JOB_ID"]
+
+        # The job's attachments say which directories under each root are outputs.
+        job_attachments = json.loads(
+            subprocess.run(
+                ["aws", "deadline", "get-job", "--farm-id", farm_id, "--queue-id", queue_id,
+                 "--job-id", job_id, "--query", "attachments", "--output", "json"],
+                check=True, stdout=subprocess.PIPE, text=True,
+            ).stdout
+        )
+        if not job_attachments:
+            print("The job has no job attachments, so there are no outputs to copy.")
+            sys.exit(0)
+
+        # Path mapping rules map each submitted root path to its location in the session directory.
+        with open(path_mapping_rules_file) as f:
+            rules = json.load(f).get("path_mapping_rules", [])
+        local_roots = {rule["source_path"]: rule["destination_path"] for rule in rules}
+
+        destination = f"s3://{bucket}/" + "/".join(part for part in [prefix.strip("/"), job_id] if part)
+
+        copied_any = False
+        for manifest in job_attachments["manifests"]:
+            local_root = local_roots.get(manifest["rootPath"])
+            if local_root is None:
+                print(f"No path mapping rule for root {manifest['rootPath']}, skipping it.")
+                continue
+            for output_dir in manifest.get("outputRelativeDirectories", []):
+                output_dir = output_dir.replace("\\", "/").strip("/")
+                local_dir = os.path.normpath(os.path.join(local_root, output_dir))
+                if not os.path.isdir(local_dir) or not os.listdir(local_dir):
+                    print(f"Output directory {local_dir} has no files in this session.")
+                    continue
+                target = destination if output_dir in ("", ".") else f"{destination}/{output_dir}"
+                print(f"Copying {local_dir} to {target}/")
+                sys.stdout.flush()
+                subprocess.run(
+                    ["aws", "s3", "cp", "--recursive", "--only-show-errors", local_dir, target + "/"],
+                    check=True,
+                )
+                copied_any = True
+
+        if copied_any:
+            print(f"Finished copying outputs to {destination}/")
+        else:
+            print("No output files were found in this session.")

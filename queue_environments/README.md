@@ -18,6 +18,7 @@ This table lists each user-selectable queue environment or collection directly i
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
 | [Short path mapping junctions](windows_path_limit_junction_fix.yaml) | Junctioning job attachment directories to short paths and republishing path mapping rules through them | A Windows application fails on long input paths despite long path support |
+| [Copy outputs to S3](copy_outputs_to_s3_queue_env.yaml) | Copying job attachments outputs to an extra S3 bucket and prefix when each session ends | Outputs need to be copied to a production or delivery bucket without changing submitters |
 
 ## Create a queue environment for your queue
 
@@ -157,3 +158,43 @@ Windows imposes a 260 character path limit, and applications that are not long-p
 This environment creates a Windows directory junction to each job attachment directory at a short numbered path, then writes a new [`pathmapping-1.0`](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#path-mapping) rules file whose destinations point through those junctions. The `DEADLINE_JUNCTION_PATHMAPS` environment variable names that file. It also writes a second `pathmapping-1.0` file that maps the directories directly to their junctions.
 
 The `DEADLINE_JUNCTION_PATHMAPS` file is a direct replacement for the session's own immutable path mapping rules file. For adaptors built on the [Open Job Description adaptor runtime](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python), replacing `--path-mapping-rules file://{{Session.PathMappingRulesFile}}` with `--path-mapping-rules file://` plus the `DEADLINE_JUNCTION_PATHMAPS` value allows the adaptor to use the newly created junctions. For non-adaptor integrations such as the one for After Effects, the path mapping rules defined in `DEADLINE_JUNCTIONS` can be applied on top of the existing path mapping rules. If neither set of path mapping rules is applied, then the job falls back to the session's original long paths without utilizing the junctions that this queue environment creates.
+
+### Copy outputs to S3
+
+The copy outputs sample copies each job's output files to an S3 bucket and prefix you choose, such as a production or delivery bucket, so artists can keep submitting with the standard Deadline Cloud submitters. Job attachments work as usual, so the Deadline Cloud monitor and `deadline job download-output` still download outputs to workstations. Each queue gets its own destination, such as one prefix per vendor.
+
+The environment has only an `onExit` action. When a session ends, it calls `deadline:GetJob` to get the job attachments roots and their output directories. The session's path mapping rules give the location of each root on the worker host, and the environment runs `aws s3 cp --recursive` for each output directory. Files go to `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>`, where the output path is relative to the root the job was submitted from. A job that renders `renders/beauty/frame_0001.exr` in the artist's project writes `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/job-1234.../renders/beauty/frame_0001.exr`.
+
+To use it, edit the `DESTINATION_BUCKET` and `DESTINATION_PREFIX` arguments of the `onExit` action, and add these permissions to the queue role. The environment has no parameters, so its priority does not matter.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GetJobsInThisQueue",
+      "Effect": "Allow",
+      "Action": "deadline:GetJob",
+      "Resource": "arn:aws:deadline:REGION:ACCOUNT_ID:farm/FARM_ID/queue/QUEUE_ID/job/*"
+    },
+    {
+      "Sid": "CopyOutputsToDestination",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::DESTINATION_BUCKET/DESTINATION_PREFIX/*"
+    }
+  ]
+}
+```
+
+The destination bucket can be in another account or Region. For another account, add a bucket policy that allows `s3:PutObject` on the prefix for the queue role ARN, and keep the default "bucket owner enforced" object ownership setting so the copied objects belong to the destination account. If the bucket uses SSE-KMS with a customer managed key, the queue role also needs `kms:GenerateDataKey` on the key, and the key policy must allow it.
+
+Behavior to plan for:
+
+* **Outputs are copied per session.** A job's tasks can run in more than one session on different workers. Each session copies the outputs on its worker host when it ends, so together they cover the job, but a running job can be partly delivered.
+* **Copy failures do not fail the job.** An error such as a missing permission appears in the session log under "Exiting Environment: CopyOutputsToS3", but the tasks still succeed. Test with a small job before production use.
+* **Interrupted workers do not copy.** If a worker host stops mid-session, such as from a Spot interruption, `onExit` does not run. The completed tasks' outputs are still in the job attachments bucket for `deadline job download-output`.
+* **Everything in the output directories is copied.** The copy includes files left by failed tasks and upstream step outputs downloaded into the same directory for a step dependency, which are copied again to the same keys with the same contents. Re-running a task overwrites its files.
+* **Only job attachments are supported.** Jobs that use a shared file system have no job attachments output directories, so nothing is copied.
+
+Workers need the AWS CLI and Python on `PATH`. Service-managed fleets provide both.
