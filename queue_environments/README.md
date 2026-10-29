@@ -163,20 +163,16 @@ The `DEADLINE_JUNCTION_PATHMAPS` file is a direct replacement for the session's 
 
 The copy outputs sample copies each job's output files to an S3 bucket and prefix you choose, such as a production or delivery bucket, so artists can keep submitting with the standard Deadline Cloud submitters. Job attachments work as usual, so the Deadline Cloud monitor and `deadline job download-output` still download outputs to workstations. Each queue gets its own destination, such as one prefix per vendor.
 
-The environment has only an `onExit` action. When a session ends, it calls `deadline:GetJob` to get the job attachments roots and their output directories. The session's path mapping rules give the location of each root on the worker host, and the environment runs `aws s3 cp --recursive` for each output directory. Files go to `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>`, where the output path is relative to the root the job was submitted from. A job that renders `renders/beauty/frame_0001.exr` in the artist's project writes `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/job-1234.../renders/beauty/frame_0001.exr`.
+The environment has only an `onExit` action. When a session ends, it reads the job attachments properties that the worker agent writes as JSON files in the session's `embedded_files*` directories. Each file lists a job attachments root's local path on the worker host and its `outputRelativeDirectories`. The environment then runs `aws s3 cp --recursive` for each output directory. Files go to `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>`, where the output path is relative to the root the job was submitted from. A job that renders `renders/beauty/frame_0001.exr` in the artist's project writes `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/job-1234.../renders/beauty/frame_0001.exr`.
 
-To use it, edit the `DESTINATION_BUCKET` and `DESTINATION_PREFIX` arguments of the `onExit` action, and add these permissions to the queue role. The environment has no parameters, so its priority does not matter.
+The worker agent doesn't document these files. They are an internal detail of the [Deadline Cloud worker agent](https://github.com/aws-deadline/deadline-cloud-worker-agent), and a new release of the worker agent can rename, move, or restructure them. The environment then doesn't copy anything and logs "No job attachments properties found in the session". Check a test job's session log after fleet updates.
+
+To use it, edit the `DESTINATION_BUCKET` and `DESTINATION_PREFIX` arguments of the `onExit` action, and allow the queue role to write to the destination. The environment has no parameters, so its priority does not matter.
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
-    {
-      "Sid": "GetJobsInThisQueue",
-      "Effect": "Allow",
-      "Action": "deadline:GetJob",
-      "Resource": "arn:aws:deadline:REGION:ACCOUNT_ID:farm/FARM_ID/queue/QUEUE_ID/job/*"
-    },
     {
       "Sid": "CopyOutputsToDestination",
       "Effect": "Allow",
@@ -197,4 +193,4 @@ Behavior to plan for:
 * **Everything in the output directories is copied.** The copy includes files left by failed tasks and upstream step outputs downloaded into the same directory for a step dependency, which are copied again to the same keys with the same contents. Re-running a task overwrites its files.
 * **Only job attachments are supported.** Jobs that use a shared file system have no job attachments output directories, so nothing is copied.
 
-Workers need the AWS CLI and Python on `PATH`. Service-managed fleets provide both.
+Workers need the AWS CLI and Python on `PATH`. Service-managed fleets provide both. The sample was tested on Linux service-managed fleets.
