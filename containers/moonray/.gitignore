@@ -1,0 +1,2 @@
+# Example scenes unpacked for the job bundle. The root .gitignore covers output/ and *.zip.
+job_bundle/scenes/
