@@ -17,18 +17,18 @@
     "destroy": "cdk destroy"
   },
   "devDependencies": {
-    "@swc/core": "^1.16.18",
+    "@swc/core": "^1.16.20",
     "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.5",
-    "aws-cdk": "^2.1146.0",
+    "aws-cdk": "^2.1146.1",
     "jest": "^30.5.2",
     "tsx": "^4.23.15",
     "typescript": "~7.0.2",
     "yaml": "^2.9.1"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.273.0",
+    "aws-cdk-lib": "^2.275.0",
     "constructs": "^10.8.1"
   }
 }
