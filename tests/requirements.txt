@@ -2,11 +2,11 @@
 # Pinned loosely; CI caches the resolved install (see the static_checks workflow).
 pytest>=9.1.1,<10
 # Used by the KeyShot custom submitter's unit tests.
-pytest-asyncio>=1.4.0,<2
+pytest-asyncio>=1.4.1,<2
 PyYAML>=6.0.3,<7
 Jinja2>=3.1.6,<4
 openjd-cli>=0.8.0,<1
-cfn-lint>=1.57.2,<2
+cfn-lint>=1.58.0,<2
 # NOTE: rattler-build is a standalone binary (not on PyPI). CI installs it by
 # downloading the pinned release binary directly via curl and verifying its
 # SHA-256 checksum; see .github/workflows/static_checks.yml.
