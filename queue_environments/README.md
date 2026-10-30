@@ -18,7 +18,7 @@ This table lists each user-selectable queue environment or collection directly i
 | [Pip environment](pip_queue_env.yaml) | Creating a Python `venv` and installing job-selected pip packages | Jobs need Python packages without Conda or Rez |
 | [Disconnect UBL](disconnect_ubl_queue_env.yaml) | Removing Deadline Cloud Usage Based License environment variables | A queue must use only a custom license server |
 | [Short path mapping junctions](windows_path_limit_junction_fix.yaml) | Junctioning job attachment directories to short paths and republishing path mapping rules through them | A Windows application fails on long input paths despite long path support |
-| [Copy outputs to S3](copy_outputs_to_s3_queue_env.yaml) | Copying job attachments outputs to an extra S3 bucket and prefix when each session ends | Outputs need to be copied to a production or delivery bucket without changing submitters |
+| [Copy outputs to S3](copy_outputs_to_s3_queue_env.yaml) | Copying each task's job attachments outputs to an extra S3 bucket and prefix through Open Job Description wrap actions | Outputs need to be copied to a production or delivery bucket without changing submitters |
 
 ## Create a queue environment for your queue
 
@@ -161,13 +161,15 @@ The `DEADLINE_JUNCTION_PATHMAPS` file is a direct replacement for the session's 
 
 ### Copy outputs to S3
 
-The copy outputs sample copies each job's output files to an S3 bucket and prefix you choose, such as a production or delivery bucket, so artists can keep submitting with the standard Deadline Cloud submitters. Job attachments work as usual, so the Deadline Cloud monitor and `deadline job download-output` still download outputs to workstations. Each queue gets its own destination, such as one prefix per vendor.
+The copy outputs sample copies each task's output files to an S3 bucket and prefix you choose, such as a production or delivery bucket, as soon as the task finishes. Artists can keep submitting with the standard Deadline Cloud submitters. Job attachments work as usual, so the Deadline Cloud monitor and `deadline job download-output` still download outputs to workstations. Each queue gets its own destination, such as one prefix per vendor.
 
-The environment has only an `onExit` action. When a session ends, it reads the job attachments properties that the worker agent writes as JSON files in the session's `embedded_files*` directories. Each file lists a job attachments root's local path on the worker host and its `outputRelativeDirectories`. The environment then runs `aws s3 cp --recursive` for each output directory. Files go to `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>`, where the output path is relative to the root the job was submitted from. A job that renders `renders/beauty/frame_0001.exr` in the artist's project writes `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/job-1234.../renders/beauty/frame_0001.exr`.
+The environment uses the [`WRAP_ACTIONS` extension](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md) to run every task through its `onWrapTaskRun` action. Before the task runs, the action reads the job attachments properties that the worker agent writes as JSON files in the session's `embedded_files*` directories. Each file lists a job attachments root's local path on the worker host and its `outputRelativeDirectories`. The action records the size and modification time of every file in those directories, runs the task, and when the task succeeds runs `aws s3 cp` for each file that the task added or changed. Files go to `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>`, where the output path is relative to the root the job was submitted from. A task that renders `renders/beauty/frame_0001.exr` in the artist's project writes `s3://DESTINATION_BUCKET/DESTINATION_PREFIX/job-1234.../renders/beauty/frame_0001.exr`.
 
-The worker agent doesn't document these files. They are an internal detail of the [Deadline Cloud worker agent](https://github.com/aws-deadline/deadline-cloud-worker-agent), and a new release of the worker agent can rename, move, or restructure them. The environment then doesn't copy anything and logs "No job attachments properties found in the session". Check a test job's session log after fleet updates.
+An environment that defines one wrap action must define all three, so `onWrapEnvEnter` and `onWrapEnvExit` run the enter and exit actions of environments entered after this one unchanged. Each wrap action takes on the timeout and cancelation of the action it wraps. The task's output, including `openjd_progress` and `openjd_status` messages, passes through unchanged. A session can have only one environment with wrap actions, so this sample can't be combined with another wrapping environment such as the [Rez environment](rez_queue_env.yaml). To use both, move the copy into that environment's `onWrapTaskRun` script.
 
-To use it, edit the `DESTINATION_BUCKET` and `DESTINATION_PREFIX` arguments of the `onExit` action, and allow the queue role to write to the destination. The environment has no parameters, so its priority does not matter.
+The worker agent doesn't document the properties files. They are an internal detail of the [Deadline Cloud worker agent](https://github.com/aws-deadline/deadline-cloud-worker-agent), and a new release of the worker agent can rename, move, or restructure them. The environment then doesn't copy anything and logs "No output directories found in the session's job attachments properties". Check a test job's session log after fleet updates.
+
+To use it, edit the `DESTINATION_BUCKET` and `DESTINATION_PREFIX` arguments of the `onWrapTaskRun` action, and allow the queue role to write to the destination. The environment has no parameters, so its priority does not matter. Workers must run worker agent 0.33.4 or later, which service-managed fleets do.
 
 ```json
 {
@@ -187,10 +189,10 @@ The destination bucket can be in another account or Region. For another account,
 
 Behavior to plan for:
 
-* **Outputs are copied per session.** A job's tasks can run in more than one session on different workers. Each session copies the outputs on its worker host when it ends, so together they cover the job, but a running job can be partly delivered.
-* **Copy failures do not fail the job.** An error such as a missing permission appears in the session log under "Exiting Environment: CopyOutputsToS3", but the tasks still succeed. Test with a small job before production use.
-* **Interrupted workers do not copy.** If a worker host stops mid-session, such as from a Spot interruption, `onExit` does not run. The completed tasks' outputs are still in the job attachments bucket for `deadline job download-output`.
-* **Everything in the output directories is copied.** The copy includes files left by failed tasks and upstream step outputs downloaded into the same directory for a step dependency, which are copied again to the same keys with the same contents. Re-running a task overwrites its files.
-* **Only job attachments are supported.** Jobs that use a shared file system have no job attachments output directories, so nothing is copied.
+* **Outputs are copied per task.** The environment copies each frame to the destination when its task finishes, before job attachments uploads it, so a running job is delivered as it renders. A worker interrupted mid-session, such as by a Spot interruption, has already copied the tasks it finished.
+* **Copy failures do not fail the task.** Failing the task would make it render again. Instead, the task log shows the AWS CLI error and lists each file under "Failed to copy N of M output file(s)". The task succeeds and job attachments uploads its outputs as usual. Test with a small job before production use.
+* **Only files the task added or changed are copied.** Failed and canceled tasks don't copy anything. Files that were already in the output directories when the task started, such as upstream step outputs downloaded for a step dependency, are not copied again. Re-running a task overwrites its files.
+* **The copy counts toward the task's timeout.** The copy runs inside `onWrapTaskRun`, which takes on the task's timeout, so leave room for it in steps with a timeout.
+* **Only job attachments are supported.** Because jobs that use a shared file system don't list output directories in job attachments, the environment doesn't copy their outputs.
 
 Workers need the AWS CLI and Python on `PATH`. Service-managed fleets provide both. The sample was tested on Linux service-managed fleets.
