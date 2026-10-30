@@ -5,11 +5,14 @@ name: List Available Conda Packages
 parameterDefinitions:
 - name: CondaChannel
   type: string
-  default: deadline-cloud
+  default: deadline-cloud-v2
   userInterface:
     control: LINE_EDIT
     label: Conda Channel
-  description: The conda channel to search for packages.
+  description: >
+    The conda channel to search for packages. deadline-cloud-v2 is the current
+    channel for service-managed fleets and has the newest application versions.
+    Set this to deadline-cloud to list the legacy channel.
 
 steps:
 - name: ListPackages
