@@ -1,0 +1,231 @@
+specificationVersion: 'environment-2023-09'
+extensions: [WRAP_ACTIONS, EXPR, FEATURE_BUNDLE_1]
+environment:
+  name: CopyOutputsToS3
+  description: |
+    Copies the job attachments output files of each task to an additional
+    S3 location as soon as the task finishes, so rendered outputs land in a
+    bucket you choose (for example a production or delivery bucket) without
+    changing the submitters artists use.
+
+    Edit DESTINATION_BUCKET and DESTINATION_PREFIX in the onWrapTaskRun action below.
+    Files are written to s3://DESTINATION_BUCKET/DESTINATION_PREFIX/<job id>/<output path>,
+    where <output path> is the path of the file relative to the job attachments
+    root it was submitted from, e.g. "renders/beauty/frame_0001.exr".
+
+    The queue role needs s3:PutObject on the destination bucket and prefix in
+    addition to the defaults.
+
+    This sample finds the job's output directories by reading the job attachments
+    properties that the Deadline Cloud worker agent writes into the session
+    directory. That file is an internal detail of the worker agent, not a
+    documented interface, so a future worker agent release can change it.
+  script:
+    actions:
+      # This environment uses the WRAP_ACTIONS extension only for onWrapTaskRun,
+      # which runs each task and then copies the files that task wrote. An
+      # environment that defines one wrap hook must define all three, so
+      # onWrapEnvEnter and onWrapEnvExit run the wrapped action unchanged. Each
+      # hook takes on the timeout and cancelation of the action it wraps.
+      onWrapEnvEnter:
+        command: bash
+        args:
+        - '{{Env.File.Launch}}'
+        - '{{Env.File.Wrap}}'
+        - 'run'
+        - '--'
+        - '{{WrappedAction.Command}}'
+        - '{{WrappedAction.Args}}'
+        timeout: '{{WrappedAction.Timeout}}'
+        cancelation:
+          mode: '{{WrappedAction.Cancelation.Mode}}'
+          notifyPeriodInSeconds: '{{WrappedAction.Cancelation.NotifyPeriodInSeconds}}'
+      onWrapTaskRun:
+        command: bash
+        args:
+        - '{{Env.File.Launch}}'
+        - '{{Env.File.Wrap}}'
+        - 'task'
+        # DESTINATION_BUCKET
+        - 'amzn-s3-demo-bucket'
+        # DESTINATION_PREFIX, leave empty to write to the root of the bucket
+        - 'deadline-outputs'
+        - '{{Session.WorkingDirectory}}'
+        - '--'
+        - '{{WrappedAction.Command}}'
+        - '{{WrappedAction.Args}}'
+        timeout: '{{WrappedAction.Timeout}}'
+        cancelation:
+          mode: '{{WrappedAction.Cancelation.Mode}}'
+          notifyPeriodInSeconds: '{{WrappedAction.Cancelation.NotifyPeriodInSeconds}}'
+      onWrapEnvExit:
+        command: bash
+        args:
+        - '{{Env.File.Launch}}'
+        - '{{Env.File.Wrap}}'
+        - 'run'
+        - '--'
+        - '{{WrappedAction.Command}}'
+        - '{{WrappedAction.Args}}'
+        timeout: '{{WrappedAction.Timeout}}'
+        cancelation:
+          mode: '{{WrappedAction.Cancelation.Mode}}'
+          notifyPeriodInSeconds: '{{WrappedAction.Cancelation.NotifyPeriodInSeconds}}'
+    embeddedFiles:
+    - name: Launch
+      filename: copy-outputs-launch.sh
+      type: TEXT
+      data: |
+        #!/bin/env bash
+        set -euo pipefail
+
+        # Find a Python interpreter. Prefer python3, but fall back to python
+        # (for example, on Windows worker hosts running git bash).
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON=python3
+        else
+            PYTHON=python
+        fi
+
+        # Replace this shell so a cancelation signal reaches Python directly.
+        exec "$PYTHON" "$@"
+    - name: Wrap
+      filename: copy_outputs_wrap.py
+      type: TEXT
+      data: |
+        import glob
+        import json
+        import os
+        import signal
+        import subprocess
+        import sys
+
+        # argv: run -- <command> [args ...]
+        #   or: task <bucket> <prefix> <session dir> -- <command> [args ...]
+        mode = sys.argv[1]
+        separator_index = sys.argv.index("--")
+        options, wrapped = sys.argv[2:separator_index], sys.argv[separator_index + 1 :]
+
+        # The wrapped environment actions run unchanged. On POSIX, replace this
+        # process so a cancelation signal reaches the wrapped process.
+        if mode == "run":
+            if os.name == "posix":
+                os.execvp(wrapped[0], wrapped)
+            sys.exit(subprocess.run(wrapped).returncode)
+
+        bucket, prefix, session_dir = options
+
+
+        def find_output_dirs():
+            """Return the job's output directories as absolute local paths.
+
+            The worker agent writes the job attachments properties of the session, including
+            each root's local path and output directories, as JSON files in the session's
+            embedded files directories.
+            """
+            output_dirs = set()
+            for path in glob.glob(os.path.join(session_dir, "embedded_files*", "*")):
+                try:
+                    with open(path) as f:
+                        properties = json.load(f)
+                except (OSError, ValueError):
+                    continue
+                if not isinstance(properties, list):
+                    continue
+                for root in properties:
+                    # Skip entries in a format this script doesn't recognize, rather than fail the task.
+                    try:
+                        local_root = root["localRootPath"]
+                        relative_dirs = root["manifestProperties"].get("outputRelativeDirectories", [])
+                        for output_dir in relative_dirs:
+                            output_dir = output_dir.replace("\\", "/").strip("/")
+                            output_dirs.add((local_root, os.path.normpath(os.path.join(local_root, output_dir))))
+                    except (KeyError, TypeError, AttributeError):
+                        continue
+            return sorted(output_dirs)
+
+
+        def snapshot(output_dirs):
+            """Map each file in the output directories to its size and modification time."""
+            files = {}
+            for local_root, local_dir in output_dirs:
+                for dirpath, _, filenames in os.walk(local_dir):
+                    for filename in filenames:
+                        path = os.path.join(dirpath, filename)
+                        try:
+                            stat = os.stat(path)
+                        except OSError:
+                            continue
+                        files[path] = (local_root, stat.st_size, stat.st_mtime_ns)
+            return files
+
+
+        output_dirs = find_output_dirs()
+        before = snapshot(output_dirs)
+
+        # On cancelation, Open Job Description sends the notify signal to this process only
+        # on POSIX, so pass it on to the task. On Windows, the task's process group receives
+        # CTRL_BREAK too, so ignore it here and wait for the task to exit.
+        process = None
+        canceled = False
+
+
+        def forward_cancel(signum, frame):
+            global canceled
+            canceled = True
+            if os.name == "posix" and process is not None:
+                process.send_signal(signum)
+
+
+        signal.signal(signal.SIGTERM if os.name == "posix" else signal.SIGBREAK, forward_cancel)
+
+        # Run the task as a child process, so this script can copy its outputs after it exits.
+        # The child writes to this process's stdout and stderr directly, so the session log
+        # and OpenJD stdout messages such as openjd_progress pass through unchanged.
+        process = subprocess.Popen(wrapped)
+        if canceled and os.name == "posix":
+            # The cancelation arrived while the task was starting.
+            process.send_signal(signal.SIGTERM)
+        returncode = process.wait()
+        sys.stdout.flush()
+        if returncode != 0 or canceled:
+            # Failed and canceled tasks don't deliver outputs, the same as job attachments.
+            # Report a task that a signal ended with the exit status a shell would show.
+            sys.exit(128 - returncode if returncode < 0 else returncode)
+
+        if not output_dirs:
+            print("No output directories found in the session's job attachments properties, so there are no outputs to copy.")
+            sys.exit(0)
+
+        after = snapshot(output_dirs)
+        changed = sorted(path for path, info in after.items() if before.get(path) != info)
+        if not changed:
+            print("The task wrote no files to the job's output directories.")
+            sys.exit(0)
+
+        job_id = os.environ["DEADLINE_JOB_ID"]
+        destination = f"s3://{bucket}/" + "/".join(part for part in [prefix.strip("/"), job_id] if part)
+        print(f"Copying {len(changed)} output file(s) of this task to {destination}/")
+        sys.stdout.flush()
+
+        failed = []
+        for path in changed:
+            local_root = after[path][0]
+            key = os.path.relpath(path, local_root).replace("\\", "/")
+            try:
+                result = subprocess.run(["aws", "s3", "cp", "--only-show-errors", path, f"{destination}/{key}"])
+            except OSError as e:
+                print(f"Failed to run the AWS CLI: {e}")
+                result = None
+            if result is None or result.returncode != 0:
+                failed.append(path)
+
+        # A failed copy doesn't fail the task, since running the task again would repeat
+        # the render. Job attachments still uploads the outputs, and the task's status
+        # message shows that the copy failed.
+        if failed:
+            print(f"openjd_status: Failed to copy {len(failed)} of {len(changed)} output file(s) to {destination}/")
+            for path in failed:
+                print(f"Failed to copy {path}")
+        else:
+            print(f"Finished copying outputs to {destination}/")
