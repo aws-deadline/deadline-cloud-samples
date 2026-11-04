@@ -1,0 +1,7 @@
+condaPlatforms:
+  - platform: win-64
+    defaultSubmit: true
+    sourceArchiveFilename:
+    - Autodesk_3dsMax_2025_Windows_installation.zip
+    sourceDownloadInstructions: 'Follow the README instructions to create the Windows archive from an installed 3ds Max 2025.'
+    buildTool: conda-build
