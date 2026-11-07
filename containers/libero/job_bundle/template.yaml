@@ -1,0 +1,172 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: LIBERO policy evaluation
+description: >-
+  Evaluates a LeRobot policy on the LIBERO benchmark. Each task runs one LIBERO task of
+  one suite inside the libero-eval-gpu image, and a final step totals the results into
+  a scorecard.
+
+parameterDefinitions:
+- name: Image
+  type: STRING
+  description: >-
+    The libero-eval-gpu image in your Amazon ECR repository, by tag or digest, for example
+    <account-id>.dkr.ecr.<region>.amazonaws.com/libero-eval-gpu:0.6.1-mj3.3.7
+  userInterface:
+    control: LINE_EDIT
+    label: Container Image URI
+- name: PolicyPath
+  type: STRING
+  default: lerobot/xvla-libero
+  description: Hugging Face repository of the policy. It must be baked into the image.
+- name: TaskIds
+  type: STRING
+  default: "0-9"
+  description: LIBERO task indices to run in every suite, for example 0-9 or 0,3,5.
+- name: Episodes
+  type: INT
+  default: 10
+  minValue: 1
+  maxValue: 50
+  description: Episodes per task. Each LIBERO task has 50 fixed starting layouts.
+- name: BatchSize
+  type: INT
+  default: 10
+  minValue: 1
+  description: Episodes simulated in parallel within one task.
+- name: NActionSteps
+  type: INT
+  default: 0
+  minValue: 0
+  description: >-
+    Actions executed per policy call. 0 keeps the checkpoint's own setting. 1 re-plans after
+    every action, as the SmolVLA paper does.
+- name: ControlMode
+  type: STRING
+  default: absolute
+  allowedValues: [relative, absolute]
+  description: LIBERO action parameterization. It must match the policy (absolute for X-VLA, relative for SmolVLA).
+- name: EpisodeLength
+  type: INT
+  default: 800
+  minValue: 0
+  description: Maximum steps per episode. 0 uses each suite's default.
+- name: CameraFlags
+  type: STRING
+  default: none
+  allowedValues: [none, camera_mapping]
+  description: >-
+    none keeps LIBERO's camera names (image, image2). camera_mapping renames them to
+    camera1 and camera2, which lerobot/smolvla_libero expects.
+- name: MinSuccessRate
+  type: FLOAT
+  default: 0.0
+  minValue: 0.0
+  maxValue: 100.0
+  description: Fail the Aggregate step if overall success, in percent, is below this. 0 disables the gate.
+- name: RunName
+  type: STRING
+  default: ""
+  description: >-
+    Name for this job's TensorBoard run, for example the hypothesis it tests. Blank uses the
+    policy name. Give each job its own name when you compare jobs in one TensorBoard.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  description: Where per-task results, rollout videos and the scorecard are written.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+- name: JobScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  userInterface:
+    control: HIDDEN
+
+steps:
+- name: Eval
+  hostRequirements:
+    attributes:
+    - name: attr.DockerEngine
+      anyOf: [available]
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    - name: amount.worker.memory
+      min: 49152
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Suite
+      type: STRING
+      range: [libero_spatial, libero_object, libero_goal, libero_10]
+    - name: TaskId
+      type: INT
+      range: "{{Param.TaskIds}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        IMAGE='{{Param.Image}}'
+        OUT='{{Param.OutputDir}}/tasks/{{Task.Param.Suite}}_task{{Task.Param.TaskId}}'
+        mkdir -p "$OUT"
+        bash '{{Param.JobScriptDir}}/pull_image.sh' "$IMAGE"
+
+        ARGS=(--policy.path='{{Param.PolicyPath}}' --policy.device=cuda
+              --env.type=libero --env.task='{{Task.Param.Suite}}' --env.task_ids='[{{Task.Param.TaskId}}]'
+              --env.control_mode='{{Param.ControlMode}}'
+              --eval.n_episodes={{Param.Episodes}} --eval.batch_size={{Param.BatchSize}}
+              --seed=1000 --env.max_parallel_tasks=1 --output_dir=/out/eval)
+        [ {{Param.NActionSteps}} -gt 0 ] && ARGS+=(--policy.n_action_steps={{Param.NActionSteps}})
+        [ {{Param.EpisodeLength}} -gt 0 ] && ARGS+=(--env.episode_length={{Param.EpisodeLength}})
+        if [ '{{Param.CameraFlags}}' = camera_mapping ]; then
+          ARGS+=('--env.camera_name_mapping={"agentview_image": "camera1", "robot0_eye_in_hand_image": "camera2"}')
+        fi
+
+        # --runtime=nvidia is the GPU path that works with Docker 25 and NVIDIA
+        # Container Toolkit 1.20 on service-managed fleets; see the README.
+        # Run as the job user so outputs in the session directory aren't owned by root.
+        docker run --rm --network none --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
+          --user "$(id -u):$(id -g)" -e HOME=/tmp -e USER=job-user -e LOGNAME=job-user \
+          -v "$OUT:/out" "$IMAGE" lerobot-eval "${ARGS[@]}"
+
+        GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1 || echo unknown)
+        printf '{"gpu": "%s", "render_backend": "egl", "image": "%s"}\n' "$GPU" "$IMAGE" > "$OUT/worker.json"
+
+- name: Aggregate
+  dependencies:
+  - dependsOn: Eval
+  hostRequirements:
+    attributes:
+    - name: attr.DockerEngine
+      anyOf: [available]
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ['{{Task.File.Run}}']
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        IMAGE='{{Param.Image}}'
+        bash '{{Param.JobScriptDir}}/pull_image.sh' "$IMAGE"
+        docker run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp \
+          -v '{{Param.OutputDir}}:/out' -v '{{Param.JobScriptDir}}:/scripts:ro' "$IMAGE" \
+          python /scripts/aggregate_scorecard.py /out \
+            --policy '{{Param.PolicyPath}}' --min-success-rate {{Param.MinSuccessRate}} \
+            --run-name '{{Param.RunName}}' \
+            --hparam n_action_steps={{Param.NActionSteps}} --hparam control_mode='{{Param.ControlMode}}' \
+            --hparam episode_length={{Param.EpisodeLength}} --hparam camera_flags='{{Param.CameraFlags}}' \
+            --hparam episodes={{Param.Episodes}} --hparam task_ids='{{Param.TaskIds}}'

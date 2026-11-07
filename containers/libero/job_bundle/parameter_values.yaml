@@ -1,0 +1,12 @@
+# X-VLA settings from LeRobot's X-VLA documentation: absolute control and 800-step episodes.
+parameterValues:
+- name: PolicyPath
+  value: lerobot/xvla-libero
+- name: ControlMode
+  value: absolute
+- name: EpisodeLength
+  value: 800
+- name: CameraFlags
+  value: none
+- name: NActionSteps
+  value: 0
