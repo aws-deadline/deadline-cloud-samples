@@ -1,0 +1,12 @@
+condaPlatforms:
+  - platform: linux-64
+    defaultSubmit: true
+    # Indexing the package in the S3 channel runs out of memory on 16 GiB workers.
+    additionalHostRequirements:
+      amounts:
+        - name: amount.worker.memory
+          min: 24576
+    buildTool: rattler-build
+jobParameters:
+  - name: CondaChannels
+    value: conda-forge
