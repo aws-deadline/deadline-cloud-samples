@@ -17,7 +17,7 @@ building new packages for either Linux or Windows into it on AWS Deadline Cloud.
 
 ## Recipe index
 
-This table covers all 56 immediate user-selectable recipe directories in `conda_recipes/`.
+This table covers all 58 immediate user-selectable recipe directories in `conda_recipes/`.
 
 | Sample | What it demonstrates | Start here when |
 |---|---|---|
@@ -42,6 +42,7 @@ This table covers all 56 immediate user-selectable recipe directories in `conda_
 | [INSYDIUM for Cinema 4D 2025](cinema4d-insydium-2025/) | Packaging supplied INSYDIUM plugin files | Cinema 4D jobs use X-Particles or related plugins |
 | [Cinema 4D OpenJD adaptor](cinema4d-openjd/) | Packaging the Cinema 4D integration adaptor | Cinema 4D jobs need OpenJD session integration |
 | [V-Ray for Cinema 4D 2025](cinema4d-vray-2025/) | Packaging the V-Ray plugin for Cinema 4D | Cinema 4D 2025 jobs render with V-Ray |
+| [ComfyUI](comfy/) | Packaging ComfyUI with the `comfy` command | Your jobs run ComfyUI workflows |
 | [Deadline Cloud CLI](deadline/) | Building the `deadline` Python package and command line tools | Another package or worker environment needs the Deadline client |
 | [Houdini 20.5](houdini-20.5/) | Packaging Houdini 20.5 with plugin activation support | Your jobs require Houdini 20.5 |
 | [Houdini 21.0](houdini-21.0/) | Packaging Houdini 21.0 with Plugin Sync activation | Your jobs require Houdini 21 or frequently updated plugins |
