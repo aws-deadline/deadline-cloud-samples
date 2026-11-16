@@ -2,11 +2,13 @@ specificationVersion: 'jobtemplate-2023-09'
 name: LIBERO policy evaluation
 description: >-
   Evaluates a LeRobot policy on the LIBERO benchmark. Each task runs one LIBERO task of
-  one suite inside the libero-eval-gpu image, and a final step totals the results into
-  a scorecard.
+  one suite, and a final step totals the results into a scorecard. The queue's Docker
+  environment runs the commands inside the libero-eval-gpu image.
 
 parameterDefinitions:
-- name: Image
+# Read by the queue's Docker environment, which pulls this image and runs every task
+# inside it. Keep it a plain STRING so it matches the queue's own DockerImage definition.
+- name: DockerImage
   type: STRING
   description: >-
     The libero-eval-gpu image in your Amazon ECR repository, by tag or digest, for example
@@ -89,9 +91,6 @@ parameterDefinitions:
 steps:
 - name: Eval
   hostRequirements:
-    attributes:
-    - name: attr.DockerEngine
-      anyOf: [available]
     amounts:
     - name: amount.worker.gpu
       min: 1
@@ -116,39 +115,29 @@ steps:
       data: |
         #!/usr/bin/env bash
         set -euo pipefail
-        IMAGE='{{Param.Image}}'
         OUT='{{Param.OutputDir}}/tasks/{{Task.Param.Suite}}_task{{Task.Param.TaskId}}'
         mkdir -p "$OUT"
-        bash '{{Param.JobScriptDir}}/pull_image.sh' "$IMAGE"
 
         ARGS=(--policy.path='{{Param.PolicyPath}}' --policy.device=cuda
               --env.type=libero --env.task='{{Task.Param.Suite}}' --env.task_ids='[{{Task.Param.TaskId}}]'
               --env.control_mode='{{Param.ControlMode}}'
               --eval.n_episodes={{Param.Episodes}} --eval.batch_size={{Param.BatchSize}}
-              --seed=1000 --env.max_parallel_tasks=1 --output_dir=/out/eval)
+              --seed=1000 --env.max_parallel_tasks=1 --output_dir="$OUT/eval")
         [ {{Param.NActionSteps}} -gt 0 ] && ARGS+=(--policy.n_action_steps={{Param.NActionSteps}})
         [ {{Param.EpisodeLength}} -gt 0 ] && ARGS+=(--env.episode_length={{Param.EpisodeLength}})
         if [ '{{Param.CameraFlags}}' = camera_mapping ]; then
           ARGS+=('--env.camera_name_mapping={"agentview_image": "camera1", "robot0_eye_in_hand_image": "camera2"}')
         fi
 
-        # --runtime=nvidia is the GPU path that works with Docker 25 and NVIDIA
-        # Container Toolkit 1.20 on service-managed fleets; see the README.
-        # Run as the job user so outputs in the session directory aren't owned by root.
-        docker run --rm --network none --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
-          --user "$(id -u):$(id -g)" -e HOME=/tmp -e USER=job-user -e LOGNAME=job-user \
-          -v "$OUT:/out" "$IMAGE" lerobot-eval "${ARGS[@]}"
+        lerobot-eval "${ARGS[@]}"
 
-        GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1 || echo unknown)
-        printf '{"gpu": "%s", "render_backend": "egl", "image": "%s"}\n' "$GPU" "$IMAGE" > "$OUT/worker.json"
+        GPU=$(python -c "import torch; print(torch.cuda.get_device_name(0))" 2>/dev/null || echo unknown)
+        printf '{"gpu": "%s", "render_backend": "%s", "image": "%s"}\n' \
+          "$GPU" "${MUJOCO_GL:-unknown}" '{{Param.DockerImage}}' > "$OUT/worker.json"
 
 - name: Aggregate
   dependencies:
   - dependsOn: Eval
-  hostRequirements:
-    attributes:
-    - name: attr.DockerEngine
-      anyOf: [available]
   script:
     actions:
       onRun:
@@ -160,13 +149,9 @@ steps:
       data: |
         #!/usr/bin/env bash
         set -euo pipefail
-        IMAGE='{{Param.Image}}'
-        bash '{{Param.JobScriptDir}}/pull_image.sh' "$IMAGE"
-        docker run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp \
-          -v '{{Param.OutputDir}}:/out' -v '{{Param.JobScriptDir}}:/scripts:ro' "$IMAGE" \
-          python /scripts/aggregate_scorecard.py /out \
-            --policy '{{Param.PolicyPath}}' --min-success-rate {{Param.MinSuccessRate}} \
-            --run-name '{{Param.RunName}}' \
-            --hparam n_action_steps={{Param.NActionSteps}} --hparam control_mode='{{Param.ControlMode}}' \
-            --hparam episode_length={{Param.EpisodeLength}} --hparam camera_flags='{{Param.CameraFlags}}' \
-            --hparam episodes={{Param.Episodes}} --hparam task_ids='{{Param.TaskIds}}'
+        python '{{Param.JobScriptDir}}/aggregate_scorecard.py' '{{Param.OutputDir}}' \
+          --policy '{{Param.PolicyPath}}' --min-success-rate {{Param.MinSuccessRate}} \
+          --run-name '{{Param.RunName}}' \
+          --hparam n_action_steps={{Param.NActionSteps}} --hparam control_mode='{{Param.ControlMode}}' \
+          --hparam episode_length={{Param.EpisodeLength}} --hparam camera_flags='{{Param.CameraFlags}}' \
+          --hparam episodes={{Param.Episodes}} --hparam task_ids='{{Param.TaskIds}}'

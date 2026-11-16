@@ -52,7 +52,7 @@ RUN mkdir -p "${LIBERO_CONFIG_PATH}" \
     && ln -s /opt/libero/assets "${LIBERO_DIR}/assets" \
     && chmod -R a+rX /opt/hf /opt/libero
 
-# Tasks run without network access, from the files baked in above.
+# Tasks read only the files baked in above, so they don't need network access.
 ENV HF_HUB_OFFLINE=1
 WORKDIR /work
 CMD ["lerobot-eval", "--help"]

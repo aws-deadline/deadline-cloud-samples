@@ -12,16 +12,18 @@ protocol is 4 suites × 10 tasks × 10 episodes, which is 400 episodes per polic
 suite-and-task pair as its own Deadline Cloud task, so the 40 tasks run in parallel across the fleet.
 A final `Aggregate` step combines them into one scorecard.
 
-Measured on a service-managed fleet of up to 8 spot GPU workers (NVIDIA A10G and L4), full protocol
-(400 episodes):
+Measured on a service-managed fleet of up to 8 spot GPU workers (NVIDIA A10G, L4 and T4), full
+protocol (400 episodes):
 
-| Policy | Success | Task time, one GPU back to back | Submit to finish on 8 workers | Worker time |
+| Policy | Success | Task time, one GPU back to back | First task to finish on 8 workers | Worker time |
 |---|---|---|---|---|
-| `lerobot/xvla-libero` (defaults) | **98.5%** (Spatial 96, Object 100, Goal 100, Long 98) | 40 min | **14 min** | about 1.4 GPU worker-hours |
-| `lerobot/smolvla_libero` (re-plan every action) | 72.8% (Spatial 89, Object 68, Goal 74, Long 60) | 102 min | 23 min | about 2.4 GPU worker-hours |
+| `lerobot/xvla-libero` (defaults) | **98.5%** (Spatial 97, Object 100, Goal 100, Long 97) | 32 min | **19 min** | about 1.2 GPU worker-hours |
+| `lerobot/smolvla_libero` (re-plan every action) | 74.0% (Spatial 90, Object 70, Goal 75, Long 61) | 94 min | 19 min | about 1.8 GPU worker-hours |
 
-Submit-to-finish times include each new worker pulling the image once (about 9 GB compressed).
-Worker time excludes worker start-up.
+Times on 8 workers run from the first task starting to the job finishing, and include each new
+worker pulling the image once (about 9 GB compressed). Worker time is the total of the job's worker
+sessions and excludes worker start-up. Times vary with spot capacity: a later identical X-VLA job took
+12.5 minutes from first task to finish.
 
 Other things the sample shows:
 
@@ -35,17 +37,22 @@ Other things the sample shows:
 
 ## Prerequisites
 
-- A Deadline Cloud farm, plus a queue with job attachments.
-- A Linux service-managed fleet with:
-  - NVIDIA GPU instances, at least 48 GiB of memory, and a 150 GiB root volume. One task with 10
-    episodes in parallel peaks at about 27 GiB.
-  - The host configuration script in [`host_config/linux.sh`](host_config/linux.sh), with a timeout
-    of at least 900 seconds.
-  - A custom attribute `attr.DockerEngine` with the value `available`.
+Set up your farm for containers as described in
+[Container support for fleets](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/fleet-container-support.html).
+You need these resources:
+
+- A Deadline Cloud farm.
+- A queue with job attachments and the **Docker** default queue environment, set to the image you
+  push in [Setup](#setup). The console attaches `AmazonEC2ContainerRegistryReadOnly` to the queue
+  role so workers can pull the image.
+- A Linux service-managed fleet associated with the queue, with:
+  - NVIDIA GPU instances such as A10G, L4 or T4, at least 48 GiB of memory, and a 150 GiB root
+    volume. One task with 10 episodes in parallel peaks at about 27 GiB.
+  - **Enable Docker** selected under container support. The Docker software add-on installs
+    rootless Docker and GPU support on each worker.
+  - The host configuration script in [`host_config/linux.sh`](host_config/linux.sh).
 - A fleet role with CloudWatch Logs permissions for the farm's log groups, as the console creates.
   Without it, workers start and are replaced repeatedly with no logs.
-- A queue role that can pull from your Amazon ECR repository, such as one with
-  `AmazonEC2ContainerRegistryReadOnly`.
 - Spot G-instance GPU quota for Deadline Cloud in your Region, at least as many GPUs as the fleet's
   maximum worker count.
 - Docker and the AWS CLI on a `linux/amd64` host to build and push the image, and the
@@ -54,18 +61,21 @@ Other things the sample shows:
 
 ## How it works
 
-1. The host configuration script installs Docker and the NVIDIA Container Toolkit on each new worker.
-   It also sets `vm.overcommit_memory=1`, because the default strict accounting makes PyTorch with
-   many simulator processes fail with `MemoryError` while memory is still free.
-2. Each `Eval` task pulls the image; only the first pull on a worker downloads layers, and later pulls just check the manifest. It then runs `lerobot-eval` for one LIBERO task
-   with `docker run --runtime=nvidia` and writes its results under `OutputDir/tasks/`.
-3. The `Aggregate` step runs after every `Eval` task finishes. It reads all the results and writes the
-   scorecard to `OutputDir`.
+1. The host configuration script sets `vm.overcommit_memory=1`, because the default strict
+   accounting makes PyTorch with many simulator processes fail with `MemoryError` while memory is
+   still free.
+2. The queue's Docker environment pulls the image and starts one container for each worker session,
+   with the GPU available inside it. It mounts the session directory at the same path, so the
+   container can write `OutputDir` and read the job's scripts.
+3. Each `Eval` task runs `lerobot-eval` for one LIBERO task. The environment's wrap actions run the
+   command inside the container, and the results go under `OutputDir/tasks/`.
+4. The `Aggregate` step runs after every `Eval` task finishes. It reads all the results and writes
+   the scorecard to `OutputDir`.
 
-The tasks start containers themselves, like the
-[Blender GPU container](../blender/blender-aswf-ci-base/) sample, rather than through the Docker queue
-environment that the [MuJoCo hand sweep](../mujoco/) uses. The Docker queue environment runs CPU jobs.
-This sample needs the NVIDIA runtime on GPU workers.
+Like the [MuJoCo hand sweep](../mujoco/), the job template has no Docker commands and doesn't
+reference an image. Its commands are the same ones you'd run in the image yourself, and the queue's
+environment sets the image they run in. For details, see
+[Run portable jobs in containers](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/containers.html).
 
 ## Setup
 
@@ -89,8 +99,10 @@ docker tag "${REPOSITORY}:${IMAGE_TAG}" "${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
 docker push "${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
 ```
 
-Push a new tag, or submit by digest, for every rebuild. Each task re-pulls the image, so a rebuilt
-image under the same tag is also picked up, but distinct tags keep results traceable to one build.
+Then create the queue and fleet from [Prerequisites](#prerequisites), choosing this repository and
+tag for the queue's Docker environment.
+
+Push a new tag, or submit by digest, for every rebuild, so results stay traceable to one build.
 
 To include other LIBERO-finetuned policies in the image, pass a space-separated list:
 `--build-arg POLICIES="lerobot/xvla-libero your-org/your-policy"`.
@@ -102,14 +114,16 @@ Submit from `containers/libero`. The defaults in `job_bundle/parameter_values.ya
 
 ```console
 deadline bundle submit job_bundle --farm-id <farm-id> --queue-id <queue-id> \
-  -p Image="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
+  -p DockerImage="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
 ```
+
+Always pass `DockerImage`. The tasks need your libero-eval-gpu image, not the queue's default.
 
 Evaluate SmolVLA with the paper's setting, which re-plans after every action:
 
 ```console
 deadline bundle submit job_bundle --farm-id <farm-id> --queue-id <queue-id> \
-  -p Image="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}" \
+  -p DockerImage="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}" \
   -p PolicyPath=lerobot/smolvla_libero -p ControlMode=relative -p EpisodeLength=0 \
   -p CameraFlags=camera_mapping -p NActionSteps=1
 ```
@@ -130,7 +144,7 @@ deadline job download-output --farm-id <farm-id> --queue-id <queue-id> --job-id 
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `Image` | none | The image you pushed, by tag or digest |
+| `DockerImage` | none | The image you pushed, by tag or digest. The queue's Docker environment runs it |
 | `PolicyPath` | `lerobot/xvla-libero` | Hugging Face repository of the policy. It must be included in the image |
 | `TaskIds` | `0-9` | Task indices to run in every suite |
 | `Episodes` | `10` | Episodes per task. LIBERO has 50 fixed starting layouts per task |
@@ -181,7 +195,7 @@ Open the **HParams** tab for a table of jobs, settings, and scores. The Scalars 
   default SmolVLA setting scored 80% on CPU and 100% on GPU on the same 10 episodes. `worker.json`
   records the GPU and the render backend.
 - **Published scores may not reproduce.** With the paper's setting, `lerobot/smolvla_libero` scored
-  72.8% on this setup (Spatial 89%, Object 68%, Goal 74%, Long 60%), against 87.3% in the SmolVLA
+  74.0% on this setup (Spatial 90%, Object 70%, Goal 75%, Long 61%), against 87.3% in the SmolVLA
   paper. `lerobot/xvla-libero` scored 98.5% on the same setup, so the gap is specific to that
   checkpoint. Other users report the same gap in
   [lerobot #2354](https://github.com/huggingface/lerobot/issues/2354).
@@ -202,11 +216,11 @@ Open the **HParams** tab for a table of jobs, settings, and scores. The Scalars 
   `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` backbone and the `facebook/bart-large` tokenizer,
   all listed as Apache-2.0 on their Hugging Face model cards. Check the license of any policy you
   add with `POLICIES`.
-- **Docker access.** The host script adds `job-user` to the `docker` group, which is equivalent to
-  root on the worker. Any job on the fleet can then read the worker agent's and fleet role's
-  credentials, and other jobs' session data on the same host. Use a dedicated fleet, and limit who can
-  submit to its queue.
-- **Network.** Evaluation containers run with `--network none`. Only the image pull uses the network.
+- **Containers.** Docker runs rootless as the job user, so jobs don't get root access to the worker
+  through Docker, and files the job writes belong to the job user. See
+  [Security and best practices for containers](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/containers-security.html).
+- **Network.** Tasks don't need the network: the image sets `HF_HUB_OFFLINE=1` and includes
+  everything they read. Containers keep Docker's default network access.
 - **Cost.** You pay for GPU worker time while tasks run, plus image storage in Amazon ECR. The image is
   large, and each new worker pulls it once. Set the fleet's minimum worker count to 0 so it scales
   down when idle. Delete the ECR repository when you're done.
@@ -218,7 +232,9 @@ Open the **HParams** tab for a table of jobs, settings, and scores. The Scalars 
 | Workers start and are replaced every 10 to 15 minutes, with no logs | The fleet role is missing CloudWatch Logs permissions |
 | The worker agent restarts at "Running host configuration script" | The host script contains `{{`, which is parsed as template syntax. Remove it |
 | `MemoryError` in an `Eval` task while memory is free | `vm.overcommit_memory` is still 2. Check the host script ran, or raise the fleet's minimum memory |
-| `unresolvable CDI devices nvidia.com/gpu=all` or a cgroup "device filter" error | Use `--runtime=nvidia`, as this template does. On these workers, `--gpus all` and Docker's CDI devices fail |
+| The environment fails with `could not pull` | Check the tag, and that the queue role can pull from Amazon ECR |
+| Tasks stay `READY` | Associate the queue with a fleet that has **Enable Docker** selected and GPU instances |
+| `exec: "lerobot-eval": executable file not found` | The task ran in the wrong image. Pass `-p DockerImage=...` with your libero-eval-gpu image |
 | A policy fails to load or scores near 0% | Check `ControlMode`, `CameraFlags` and `EpisodeLength` against the policy's documentation |
 
 Task logs are in the queue's CloudWatch log group, and worker logs are in the fleet's log group.
