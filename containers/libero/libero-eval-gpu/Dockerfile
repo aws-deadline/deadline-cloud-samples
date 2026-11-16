@@ -1,9 +1,10 @@
 # LIBERO policy evaluation with LeRobot, for NVIDIA GPU workers.
 #
 # The LIBERO benchmark assets and the policy weights are downloaded when you build
-# the image, from the Hugging Face Hub. The assets come from the MIT-licensed LIBERO
-# project and include 3D models from third-party sources such as TurboSquid, whose
-# own terms may also apply. Don't publish an image built from this file. Push it
+# the image, from the Hugging Face Hub. The assets come from the LIBERO project and
+# include third-party 3D models with their own terms: TurboSquid models, and HOPE
+# dataset models licensed CC BY-NC-SA 4.0 (non-commercial). See the README before
+# using them commercially. Don't publish an image built from this file. Push it
 # only to your own private Amazon ECR repository.
 FROM python:3.12-slim
 

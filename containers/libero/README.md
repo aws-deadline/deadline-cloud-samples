@@ -192,12 +192,16 @@ Open the **HParams** tab for a table of jobs, settings, and scores. The Scalars 
 
 - **Image licensing.** The image contains the LIBERO benchmark assets, downloaded from the
   [`lerobot/libero-assets`](https://huggingface.co/datasets/lerobot/libero-assets) mirror of the
-  MIT-licensed [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO) project. They include 3D
-  models from third-party sources such as TurboSquid, whose own terms may also apply, so keep the
-  image in a private repository and don't publish it. The image also contains `lerobot/xvla-libero`,
-  `lerobot/smolvla_libero`, the `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` backbone and the
-  `facebook/bart-large` tokenizer, all listed as Apache-2.0 on their Hugging Face model cards. Check
-  the license of any policy you add with `POLICIES`.
+  [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO) project, whose code is MIT-licensed.
+  The assets have no stated license and include 3D models from third parties with their own
+  terms: models from TurboSquid, and the grocery models from the
+  [HOPE dataset](https://github.com/swtyree/hope-dataset), which is licensed CC BY-NC-SA 4.0
+  (non-commercial). Check those terms before using the benchmark, or images and videos rendered
+  from it, commercially. Keep the image in a private repository and don't publish it. The image
+  also contains `lerobot/xvla-libero`, `lerobot/smolvla_libero`, the
+  `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` backbone and the `facebook/bart-large` tokenizer,
+  all listed as Apache-2.0 on their Hugging Face model cards. Check the license of any policy you
+  add with `POLICIES`.
 - **Docker access.** The host script adds `job-user` to the `docker` group, which is equivalent to
   root on the worker. Any job on the fleet can then read the worker agent's and fleet role's
   credentials, and other jobs' session data on the same host. Use a dedicated fleet, and limit who can
