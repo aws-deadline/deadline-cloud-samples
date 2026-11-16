@@ -56,7 +56,7 @@ You need these resources:
 - Spot G-instance GPU quota for Deadline Cloud in your Region, at least as many GPUs as the fleet's
   maximum worker count.
 - Docker and the AWS CLI on a `linux/amd64` host to build and push the image, and the
-  [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs.html)
+  [Deadline Cloud CLI](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/submit-jobs-how.html)
   to submit.
 
 ## How it works
@@ -156,6 +156,10 @@ deadline job download-output --farm-id <farm-id> --queue-id <queue-id> --job-id 
 | `MinSuccessRate` | `0` | Fail `Aggregate` below this overall success, in percent |
 | `RunName` | blank | TensorBoard run name for this job. Blank uses the policy name |
 | `OutputDir` | `./output` | Where results are written. Job attachments upload it |
+
+Each `Eval` task stops after 30 minutes, and `Aggregate` after 10. A hung task then fails instead of
+keeping a GPU worker busy. A task with the default 10 episodes takes a few minutes. If you raise
+`Episodes` a lot, raise `timeout` in `template.yaml` too.
 
 ```text
 output/

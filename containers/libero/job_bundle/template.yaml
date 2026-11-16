@@ -1,4 +1,7 @@
 specificationVersion: 'jobtemplate-2023-09'
+# EXPR provides repr_sh(), which quotes each parameter value for the shell scripts below,
+# so a value such as a run name with an apostrophe can't break or change a command.
+extensions: [EXPR]
 name: LIBERO policy evaluation
 description: >-
   Evaluates a LeRobot policy on the LIBERO benchmark. Each task runs one LIBERO task of
@@ -105,27 +108,31 @@ steps:
       type: INT
       range: "{{Param.TaskIds}}"
   script:
+    let:
+    - out_dir = Param.OutputDir / 'tasks' / (Task.Param.Suite + '_task' + string(Task.Param.TaskId))
     actions:
       onRun:
         command: bash
         args: ['{{Task.File.Run}}']
+        # One task takes a few minutes. Stop a hung simulator before it keeps a GPU worker busy.
+        timeout: 1800
     embeddedFiles:
     - name: Run
       type: TEXT
       data: |
         #!/usr/bin/env bash
         set -euo pipefail
-        OUT='{{Param.OutputDir}}/tasks/{{Task.Param.Suite}}_task{{Task.Param.TaskId}}'
+        OUT={{ repr_sh(out_dir) }}
         mkdir -p "$OUT"
 
-        ARGS=(--policy.path='{{Param.PolicyPath}}' --policy.device=cuda
-              --env.type=libero --env.task='{{Task.Param.Suite}}' --env.task_ids='[{{Task.Param.TaskId}}]'
-              --env.control_mode='{{Param.ControlMode}}'
+        ARGS=(--policy.path={{ repr_sh(Param.PolicyPath) }} --policy.device=cuda
+              --env.type=libero --env.task={{ repr_sh(Task.Param.Suite) }} --env.task_ids='[{{Task.Param.TaskId}}]'
+              --env.control_mode={{ repr_sh(Param.ControlMode) }}
               --eval.n_episodes={{Param.Episodes}} --eval.batch_size={{Param.BatchSize}}
               --seed=1000 --env.max_parallel_tasks=1 --output_dir="$OUT/eval")
         [ {{Param.NActionSteps}} -gt 0 ] && ARGS+=(--policy.n_action_steps={{Param.NActionSteps}})
         [ {{Param.EpisodeLength}} -gt 0 ] && ARGS+=(--env.episode_length={{Param.EpisodeLength}})
-        if [ '{{Param.CameraFlags}}' = camera_mapping ]; then
+        if [ {{ repr_sh(Param.CameraFlags) }} = camera_mapping ]; then
           ARGS+=('--env.camera_name_mapping={"agentview_image": "camera1", "robot0_eye_in_hand_image": "camera2"}')
         fi
 
@@ -133,7 +140,7 @@ steps:
 
         GPU=$(python -c "import torch; print(torch.cuda.get_device_name(0))" 2>/dev/null || echo unknown)
         printf '{"gpu": "%s", "render_backend": "%s", "image": "%s"}\n' \
-          "$GPU" "${MUJOCO_GL:-unknown}" '{{Param.DockerImage}}' > "$OUT/worker.json"
+          "$GPU" "${MUJOCO_GL:-unknown}" {{ repr_sh(Param.DockerImage) }} > "$OUT/worker.json"
 
 - name: Aggregate
   dependencies:
@@ -143,15 +150,16 @@ steps:
       onRun:
         command: bash
         args: ['{{Task.File.Run}}']
+        timeout: 600
     embeddedFiles:
     - name: Run
       type: TEXT
       data: |
         #!/usr/bin/env bash
         set -euo pipefail
-        python '{{Param.JobScriptDir}}/aggregate_scorecard.py' '{{Param.OutputDir}}' \
-          --policy '{{Param.PolicyPath}}' --min-success-rate {{Param.MinSuccessRate}} \
-          --run-name '{{Param.RunName}}' \
-          --hparam n_action_steps={{Param.NActionSteps}} --hparam control_mode='{{Param.ControlMode}}' \
-          --hparam episode_length={{Param.EpisodeLength}} --hparam camera_flags='{{Param.CameraFlags}}' \
-          --hparam episodes={{Param.Episodes}} --hparam task_ids='{{Param.TaskIds}}'
+        python {{ repr_sh(Param.JobScriptDir / 'aggregate_scorecard.py') }} {{ repr_sh(Param.OutputDir) }} \
+          --policy {{ repr_sh(Param.PolicyPath) }} --min-success-rate {{Param.MinSuccessRate}} \
+          --run-name {{ repr_sh(Param.RunName) }} \
+          --hparam n_action_steps={{Param.NActionSteps}} --hparam {{ repr_sh('control_mode=' + Param.ControlMode) }} \
+          --hparam episode_length={{Param.EpisodeLength}} --hparam {{ repr_sh('camera_flags=' + Param.CameraFlags) }} \
+          --hparam episodes={{Param.Episodes}} --hparam {{ repr_sh('task_ids=' + Param.TaskIds) }}
