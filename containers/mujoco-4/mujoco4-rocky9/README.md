@@ -17,7 +17,7 @@ The image is about 860 MB, or 300 MB compressed in Amazon ECR.
 | `/models/mujoco/model/speculative/` | The [speculative contacts examples](https://github.com/google-deepmind/mujoco/tree/4.0.0/model/speculative), including `newton.xml` |
 | `/mujoco-refs.txt` | The MuJoCo version and the source commit the models came from |
 
-The models come from the commit that the `4.0.0` tag points to, so a rebuild gets the same scenes.
+The models come from the commit that the `4.0.0` tag points to. A rebuild gets the same scenes.
 Override with `--build-arg MUJOCO_VERSION=...` or `MUJOCO_REF=...`.
 
 ## Build
@@ -26,7 +26,7 @@ Override with `--build-arg MUJOCO_VERSION=...` or `MUJOCO_REF=...`.
 docker build --platform linux/amd64 -t mujoco4-rocky9:4.0.0 .
 ```
 
-The build runs a short point of each sweep, encoding one MP4, and fails if it writes no metrics or
+The build runs a short point of each sweep, encoding one MP4, and fails if it doesn't write metrics or
 renders only black frames. A broken GL stack or encoder shows up at build time, not in your first job.
 
 ## Test locally

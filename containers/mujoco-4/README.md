@@ -55,7 +55,7 @@ IMAGE_URI="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
 ```
 
 Build the image and check that the sweep command runs.
-The build itself runs a short point of each sweep, so a broken renderer fails here.
+The build itself runs a short point of each sweep. A broken renderer fails the build.
 
 ```console
 cd containers/mujoco-4/mujoco4-rocky9
@@ -126,7 +126,7 @@ Edit the task parameter ranges in each `template.yaml` to change a sweep.
 An escapement wrench twists two bars to about 188 degrees, then slips off and lets go.
 The blue bar is elastic and untwists to zero. The orange bar is elasto-plastic.
 The `YieldStrain` task parameter sets its stretching yield strain, `mjModel.flex_yield`.
-The scene ships with 0.025.
+The scene's default is 0.025.
 
 | `YieldStrain` | Peak twist | Final twist | Final plastic strain (L1) |
 |---|---|---|---|
@@ -169,17 +169,17 @@ column of `summary.csv`.
 | 58° | 12 ms | 35.8 mm | **tunnels** | **tunnels** |
 
 Without speculative contacts, 8 of 10 runs tunnel. With them, 3 of 10 tunnel.
-The shipped scene, 58° at 4 ms, tunnels at its first impact without the flag.
+The scene's defaults, 58° at 4 ms, tunnel at the first impact without the flag.
 
 Every run that tunnels with the flag on travels more than the 17 mm gap in one step.
 Speculative sweeps use the velocity at the start of the step. A stationary plate struck mid-step gets
-its velocity only after the solver runs, so one step can carry the impact across two gaps.
+its velocity only after the solver runs. In one step, the impact can then cross two gaps.
 The [model's notes](https://github.com/google-deepmind/mujoco/blob/4.0.0/model/speculative/README.md)
-give the remedy: "choose a timestep where a single step travel does not jump across two gaps at once."
+give the remedy: pick a timestep at which one step's travel can't jump across two gaps.
 The 58° run at 6 ms travels 17.9 mm, just over one gap, and holds.
 
-Not every tunnel happens at the first impact, about 0.55 seconds in. Four happen near 1.6 seconds,
-when the momentum returns through the row: 30° at 12 ms with the flag off and on, and 58° at 2 ms and
+Not every tunnel happens at the first impact, about 0.55 seconds in. These runs tunnel near 1.6
+seconds, when the momentum returns through the row: 30° at 12 ms with the flag off and on, and 58° at 2 ms and
 6 ms with the flag off. The `first_tunnel_s` column records when.
 
 ## How it works
@@ -192,7 +192,7 @@ It mounts the session directory at the same path inside the container.
 
 The environment uses the `WRAP_ACTIONS` extension. Its `onWrapTaskRun` hook replaces each task's
 `onRun` with a `docker container exec` of the same command and arguments.
-`Summarize` runs `mj4-summarize` from the image, so the bundles upload no scripts.
+`Summarize` runs `mj4-summarize` from the image. The bundles don't upload any scripts.
 Containers run rootless, so files that the job writes belong to the job user on the worker.
 
 The templates use the `EXPR` extension to build each task's label, such as `angle58-dt8ms-specenable`.
