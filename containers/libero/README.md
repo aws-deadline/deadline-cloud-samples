@@ -64,23 +64,26 @@ You need these resources:
 1. The host configuration script sets `vm.overcommit_memory=1`, because the default strict
    accounting makes PyTorch with many simulator processes fail with `MemoryError` while memory is
    still free.
-2. The queue's Docker environment pulls the image and starts one container for each worker session,
-   with the GPU available inside it. It mounts the session directory at the same path, so the
-   container can write `OutputDir` and read the job's scripts.
+2. The queue's Docker environment pulls the libero-eval-gpu image from your Amazon ECR repository
+   and starts one container for each worker session, with the GPU available inside it. It mounts
+   the session directory at the same path, so the container can write `OutputDir` and read the
+   job's scripts.
 3. Each `Eval` task runs `lerobot-eval` for one LIBERO task. The environment's wrap actions run the
    command inside the container, and the results go under `OutputDir/tasks/`.
 4. The `Aggregate` step runs after every `Eval` task finishes. It reads all the results and writes
    the scorecard to `OutputDir`.
 
 Like the [MuJoCo hand sweep](../mujoco/), the job template has no Docker commands and doesn't
-reference an image. Its commands are the same ones you'd run in the image yourself, and the queue's
-environment sets the image they run in. For details, see
+reference an image. Its commands are the same ones you'd run in the image yourself. The image they
+run in is the libero-eval-gpu image that you build from `libero-eval-gpu/` in [Setup](#setup) and push
+to a private Amazon ECR repository. The sample doesn't publish a prebuilt image. You pass the image's
+URI as the `DockerImage` job parameter, and the queue's Docker environment pulls it. For details, see
 [Run portable jobs in containers](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/containers.html).
 
 ## Setup
 
-Build the image and push it to a private repository. The build downloads about 1 GB of LIBERO assets
-and the policy weights from the Hugging Face Hub.
+Build the image and push it to a private Amazon ECR repository. The build downloads about 1 GB of
+LIBERO assets and the policy weights from the Hugging Face Hub.
 
 ```console
 REGION=<region>
