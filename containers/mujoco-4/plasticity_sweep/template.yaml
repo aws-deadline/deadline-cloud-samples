@@ -1,0 +1,88 @@
+# Every command below targets the mujoco4-rocky9 image.
+# The queue's Docker environment runs each one inside the container, so nothing
+# here pulls an image or starts a container.
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR]
+name: MuJoCo 4 Plasticity Sweep
+description: >-
+  Sweeps the yield strain of an elasto-plastic bar in the MuJoCo 4.0 torsion scene, rendering an
+  MP4 and metrics for each value, then summarizes the permanent twist in one table.
+
+parameterDefinitions:
+# Read by the queue's Docker environment. Keep it a plain STRING so it matches
+# the queue's own DockerImage definition.
+- name: DockerImage
+  type: STRING
+  description: >-
+    The mujoco4-rocky9 image in Amazon ECR, for example
+    <account-id>.dkr.ecr.<region>.amazonaws.com/mujoco4-rocky9:4.0.0
+  userInterface:
+    control: LINE_EDIT
+    label: Container Image URI
+- name: Duration
+  type: FLOAT
+  default: 2.0
+  minValue: 0.5
+  description: >-
+    Simulated seconds per task, which is also the clip length. The bars are wrenched and
+    released in the first 0.5 seconds and stop moving by about 1.5 seconds.
+- name: Fps
+  type: FLOAT
+  default: 20.0
+  minValue: 1.0
+  description: Rendered frames per simulated second. Rendering is software, so this sets the cost.
+- name: VideoBitrate
+  type: STRING
+  default: 2M
+  description: Target bitrate for each H.264 MP4.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  description: Where each task's frames, MP4 and metrics are written.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+
+steps:
+- name: Twist
+  # One task per yield strain, run in parallel across the fleet. The model ships with 0.025.
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: YieldStrain
+      type: FLOAT
+      range: [0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2]
+  script:
+    let:
+    - label = 'yield' + string(Task.Param.YieldStrain)
+    - out_dir = Param.OutputDir / label
+    actions:
+      onRun:
+        command: mj4-sweep
+        args:
+        - torsion
+        - --yield-strain
+        - "{{ Task.Param.YieldStrain }}"
+        - --duration
+        - "{{ Param.Duration }}"
+        - --fps
+        - "{{ Param.Fps }}"
+        - --video-bitrate
+        - "{{ Param.VideoBitrate }}"
+        - --out-dir
+        - "{{ out_dir }}"
+        - --label
+        - "{{ label }}"
+
+- name: Summarize
+  dependencies:
+  - dependsOn: Twist
+  script:
+    actions:
+      onRun:
+        command: mj4-summarize
+        args:
+        - --csv
+        - "{{ Param.OutputDir / 'summary.csv' }}"
+        - "{{ Param.OutputDir }}"
