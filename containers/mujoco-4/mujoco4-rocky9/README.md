@@ -93,9 +93,17 @@ pre-step velocity that speculative sweeps use.
 
 ## Rendering notes
 
-Rendering uses EGL with Mesa's llvmpipe software rasterizer, and `MUJOCO_GL=egl` is set.
-A 480x360 frame takes about 0.08 seconds. Lower `--fps` for a faster sweep.
-The image is CPU-only. GPU rendering through the same EGL path is untested.
+`MUJOCO_GL=egl` is set. On a CPU worker, EGL renders with Mesa's llvmpipe software rasterizer, at
+about 42 ms for a 480x360 frame on a 16 vCPU worker. Lower `--fps` for a faster sweep.
+
+On a GPU worker, the Docker queue environment passes the GPU into the container, along with NVIDIA's
+EGL driver. MuJoCo then renders on the GPU with no change to the image, at about 1 ms for a 480x360
+frame on an A10G. See [Run on a GPU fleet](../README.md#run-on-a-gpu-fleet).
+
+Each `metrics.json` records the renderer under `render`: `gl_vendor`, `gl_renderer`, `gpu`, and the
+time spent rendering and writing PNGs. `--renderer gpu` exits non-zero when `gl_renderer` is a Mesa
+CPU rasterizer. The offscreen framebuffer is enlarged to `--width` and `--height`, so frames larger
+than MuJoCo's 640x480 default work.
 
 ffmpeg comes from EPEL as `ffmpeg-free`, which encodes H.264 through `libopenh264`.
 `mj4-sweep` falls back to MPEG-4 if that encoder is missing and records the codec in `metrics.json`.

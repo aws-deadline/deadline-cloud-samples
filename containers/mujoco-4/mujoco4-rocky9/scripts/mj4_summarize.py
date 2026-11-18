@@ -22,6 +22,8 @@ COLUMNS = {
         ("elastic_final_deg", "results.elastic_final_twist_deg"),
         ("plastic_l1", "results.final_plastic_strain_l1"),
         ("frames", "frames"),
+        ("gpu", "render.gpu"),
+        ("s_per_frame", "render.seconds_per_frame"),
         ("wall_s", "wall_seconds"),
     ),
     "cradle": (
@@ -35,14 +37,19 @@ COLUMNS = {
         ("tunneled", "results.tunneled"),
         ("first_tunnel_s", "results.first_tunnel_s"),
         ("frames", "frames"),
+        ("gpu", "render.gpu"),
+        ("s_per_frame", "render.seconds_per_frame"),
         ("wall_s", "wall_seconds"),
     ),
 }
 
 
 def lookup(metrics, dotted):
+    """The value at a dotted path, or None when it is missing, as in files from an older mj4-sweep."""
     value = metrics
     for key in dotted.split("."):
+        if not isinstance(value, dict) or key not in value:
+            return None
         value = value[key]
     return value
 

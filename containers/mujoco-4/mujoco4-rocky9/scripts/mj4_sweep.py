@@ -33,6 +33,8 @@ MODELS = pathlib.Path("/models/mujoco/model")
 SPECULATIVE_BIT = int(mujoco.mjtEnableBit.mjENBL_SPECULATIVE)
 # flex_plasticmode bit for the stretching mode. 3D flexes only have this one.
 PLASTIC_STRETCH = 2
+# GL_RENDERER substrings of Mesa's CPU rasterizers.
+SOFTWARE_RENDERERS = ("llvmpipe", "softpipe", "swrast")
 
 
 def object_id(model, kind, name):
@@ -73,11 +75,28 @@ def encode_mp4(frames_dir, label, out_path, fps, bitrate):
     return None, None, last
 
 
+def gl_strings():
+    """GL_VENDOR and GL_RENDERER of the current context, which mujoco.Renderer leaves current."""
+    # Imported here so mujoco has already selected the EGL platform for PyOpenGL.
+    from OpenGL import GL
+    values = (GL.glGetString(name) for name in (GL.GL_VENDOR, GL.GL_RENDERER))
+    return tuple(v.decode(errors="replace") if v else "unavailable" for v in values)
+
+
 class Recorder:
     """Render a frame whenever simulated time reaches the next frame time."""
 
     def __init__(self, model, args, camera=None):
+        # The offscreen framebuffer defaults to 640x480 and caps the render size.
+        model.vis.global_.offwidth = max(int(model.vis.global_.offwidth), args.width)
+        model.vis.global_.offheight = max(int(model.vis.global_.offheight), args.height)
         self.renderer = mujoco.Renderer(model, args.height, args.width)
+        self.gl_vendor, self.gl_renderer = gl_strings()
+        self.gpu = (self.gl_renderer != "unavailable"
+                    and not any(s in self.gl_renderer.lower() for s in SOFTWARE_RENDERERS))
+        if args.renderer == "gpu" and not self.gpu:
+            sys.exit(f"--renderer gpu, but EGL picked the CPU rasterizer ({self.gl_renderer}). "
+                     "Run on a GPU fleet whose container gets the NVIDIA EGL driver")
         self.camera = camera
         self.fps = args.fps
         self.label = args.label
@@ -86,17 +105,23 @@ class Recorder:
         self.count = 0
         self.next_time = 0.0
         self.brightest = 0.0
+        self.render_seconds = 0.0
+        self.png_seconds = 0.0
 
     def maybe_capture(self, data):
         if data.time + 1e-9 < self.next_time:
             return
+        start = time.perf_counter()
         if self.camera is None:
             self.renderer.update_scene(data)
         else:
             self.renderer.update_scene(data, self.camera)
         pixels = self.renderer.render()
+        self.render_seconds += time.perf_counter() - start
         self.brightest = max(self.brightest, float(pixels.mean()))
+        start = time.perf_counter()
         Image.fromarray(pixels).save(self.frames_dir / f"{self.label}-{self.count:04d}.png")
+        self.png_seconds += time.perf_counter() - start
         self.count += 1
         self.next_time = self.count / self.fps
 
@@ -137,6 +162,16 @@ def finish(args, recorder, model, params, applied, results, wall_start):
         "applied": applied,
         "results": results,
         "frames": recorder.count,
+        "render": {
+            "gl_vendor": recorder.gl_vendor,
+            "gl_renderer": recorder.gl_renderer,
+            "gpu": recorder.gpu,
+            "width": args.width,
+            "height": args.height,
+            "render_seconds": round(recorder.render_seconds, 3),
+            "seconds_per_frame": round(recorder.render_seconds / recorder.count, 5),
+            "png_seconds": round(recorder.png_seconds, 3),
+        },
         "mp4_bytes": mp4_bytes,
         "mp4_codec": mp4_codec,
         "wall_seconds": round(wall_seconds, 2),
@@ -144,8 +179,9 @@ def finish(args, recorder, model, params, applied, results, wall_start):
     }
     (args.out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     shown = ", ".join(f"{k} {v}" for k, v in results.items())
-    print(f"{args.label}: {shown}, {recorder.count} frames, mp4 {mp4_bytes or 'skipped'} bytes "
-          f"({mp4_codec or 'none'}), {wall_seconds:.1f}s wall")
+    print(f"{args.label}: {shown}, {recorder.count} frames at {args.width}x{args.height} on "
+          f"{recorder.gl_renderer} ({recorder.render_seconds:.2f}s rendering), "
+          f"mp4 {mp4_bytes or 'skipped'} bytes ({mp4_codec or 'none'}), {wall_seconds:.1f}s wall")
 
 
 def check_stable(data, last_time):
@@ -319,6 +355,8 @@ def main():
     common.add_argument("--no-video", dest="video", action="store_false",
                         help="Skip MP4 encoding and keep only the PNG frames.")
     common.add_argument("--video-bitrate", default="2M", help="Target bitrate for the MP4.")
+    common.add_argument("--renderer", choices=("any", "gpu"), default="any",
+                        help="'gpu' fails the task if EGL falls back to the CPU rasterizer.")
 
     parser = argparse.ArgumentParser(description="One MuJoCo 4.0 sweep point: simulate, render, measure.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -346,7 +384,7 @@ def main():
     cradle.set_defaults(func=run_cradle)
 
     args = parser.parse_args()
-    positive = {"--duration": args.duration, "--fps": args.fps}
+    positive = {"--duration": args.duration, "--fps": args.fps, "--width": args.width, "--height": args.height}
     if args.command == "torsion" and args.timestep is not None:
         positive["--timestep"] = args.timestep
     if args.command == "cradle":

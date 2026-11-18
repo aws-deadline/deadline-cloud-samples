@@ -30,11 +30,30 @@ parameterDefinitions:
   type: FLOAT
   default: 20.0
   minValue: 1.0
-  description: Rendered frames per simulated second. Rendering is software, so this sets the cost.
+  description: Rendered frames per simulated second. Rendering sets the cost.
 - name: VideoBitrate
   type: STRING
   default: 2M
   description: Target bitrate for each H.264 MP4.
+- name: Width
+  type: INT
+  default: 480
+  minValue: 16
+  maxValue: 3840
+  description: Rendered frame width in pixels.
+- name: Height
+  type: INT
+  default: 360
+  minValue: 16
+  maxValue: 2160
+  description: Rendered frame height in pixels.
+- name: Renderer
+  type: STRING
+  default: any
+  allowedValues: [any, gpu]
+  description: >-
+    'gpu' fails each task whose container renders on Mesa's CPU rasterizer instead of a GPU.
+    Use it on a GPU fleet so a missing driver cannot pass as a slow success.
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY
@@ -81,6 +100,12 @@ steps:
         - "{{ Param.Fps }}"
         - --video-bitrate
         - "{{ Param.VideoBitrate }}"
+        - --width
+        - "{{ Param.Width }}"
+        - --height
+        - "{{ Param.Height }}"
+        # Only passed for gpu, so an image built before --renderer existed still runs the default.
+        - "{{ ['--renderer', 'gpu'] if Param.Renderer == 'gpu' else [] }}"
         - --out-dir
         - "{{ out_dir }}"
         - --label

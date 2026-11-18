@@ -118,6 +118,8 @@ Both jobs take these parameters.
 | `Duration` | `2.0` | Simulated seconds per task, which is also the clip length |
 | `Fps` | `20.0` | Rendered frames per simulated second. Rendering sets the cost |
 | `VideoBitrate` | `2M` | Target bitrate for each MP4 |
+| `Width`, `Height` | `480`, `360` | Rendered frame size in pixels |
+| `Renderer` | `any` | `gpu` fails a task that renders on Mesa's CPU rasterizer instead of a GPU. See [Run on a GPU fleet](#run-on-a-gpu-fleet) |
 | `OutputDir` | `./output` | Where the results go. Job attachments upload it |
 
 Edit the task parameter ranges in each `template.yaml` to change a sweep.
@@ -214,6 +216,80 @@ To learn more, see these pages:
 - [Speculative contacts](https://mujoco.readthedocs.io/en/latest/computation/speculative.html) in the
   MuJoCo documentation.
 
+## Run on a GPU fleet
+
+The same image and jobs run on a GPU fleet with no changes. The physics stays on the CPU, and the
+rendering moves to the GPU. Every task's physics result is identical on both fleets.
+
+### Set up the fleet
+
+Create a Linux service-managed fleet with both the Docker software add-on and a GPU. This
+configuration accepts one NVIDIA L4, A10G or T4 per worker:
+
+```json
+{"serviceManagedEc2": {
+  "instanceCapabilities": {
+    "vCpuCount": {"min": 4, "max": 16}, "memoryMiB": {"min": 16384, "max": 65536},
+    "osFamily": "linux", "cpuArchitectureType": "x86_64",
+    "acceleratorCapabilities": {
+      "selections": [{"name": "l4", "runtime": "latest"}, {"name": "a10g", "runtime": "latest"},
+                     {"name": "t4", "runtime": "latest"}],
+      "count": {"min": 1, "max": 1}},
+    "softwareAddOns": [{"name": "docker"}]},
+  "instanceMarketOptions": {"type": "spot"}}}
+```
+
+On a GPU worker that has an NVIDIA Container Device Interface spec (`/etc/cdi/nvidia.yaml`), the
+default Docker queue environment starts the session container with `--gpus all`. In the tested runs,
+that put the GPU and NVIDIA's EGL driver into the container. The image itself contains only Mesa.
+MuJoCo's EGL backend prefers a CUDA-backed EGL device over Mesa, so it picks the GPU on
+its own.
+
+### Submit
+
+Pass `-p Renderer=gpu`. A task then fails, instead of finishing slowly, if its container rendered
+on the CPU rasterizer.
+
+```console
+deadline bundle submit plasticity_sweep --farm-id <farm-id> --queue-id <gpu-queue-id> \
+  -p DockerImage=<account-id>.dkr.ecr.<region>.amazonaws.com/mujoco4-rocky9:4.0.0 -p Renderer=gpu
+```
+
+The jobs don't declare host requirements. The scheduler can place them on any fleet associated with
+the queue. Use a queue associated only with GPU fleets, or add a GPU requirement to the step in
+`template.yaml`:
+
+```yaml
+- name: Twist
+  hostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+```
+
+### CPU against GPU
+
+The plasticity job ran with each renderer at two frame sizes. The CPU fleet has 16 vCPUs per
+worker and renders with Mesa llvmpipe. The GPU worker had an NVIDIA A10G. Each value is the median
+over the job's 8 tasks, with 41 frames per task.
+
+| | CPU 480x360 | GPU 480x360 | CPU 1920x1080 | GPU 1920x1080 |
+|---|---|---|---|---|
+| Rendering per frame | 42.2 ms | 0.9 ms | 71.7 ms | 8.3 ms |
+| PNG writing per frame | 20.6 ms | 25.5 ms | 113.0 ms | 152.7 ms |
+| Simulate and render loop (`wall_seconds`) | 3.10 s | 1.85 s | 8.27 s | 7.46 s |
+
+The GPU renders about 50 times faster at 480x360 and about 9 times faster at 1920x1080.
+Writing each frame as a PNG then takes most of the loop. The loop finishes 40% faster at 480x360
+and only 10% faster at 1920x1080. The GPU worker's CPU was also slower at physics and PNG writing
+than the 16 vCPU CPU worker. The loop leaves out process start, model compile and MP4 encoding.
+
+The whole job did not get faster. From first task start to job end, the CPU jobs took 67 and 69
+seconds on a fleet of up to 4 workers. The GPU jobs took 89 and 126 seconds on a fleet of up to 2.
+
+A GPU fleet shortens tasks only when rendering is the bottleneck. That happens with many more frames
+per task, or with a pipeline that consumes frames in memory instead of writing PNGs.
+
 ## Cost and cleanup
 
 The tasks run in parallel. A spot fleet scales toward its maximum worker count.
@@ -221,6 +297,8 @@ On a fleet of up to four 16 vCPU spot workers, the plasticity job ran in about 2
 speculative job in about 1.7 minutes from first task start. Each task takes about 5 seconds.
 The first session on a worker also pulls the image, about 300 MB compressed in Amazon ECR.
 Each run writes about 25 MB (plasticity) or 75 MB (speculative) to your job attachments bucket.
+A 1920x1080 plasticity run writes about 120 MB. GPU workers cost more per hour than CPU workers of
+the same size, so use a GPU fleet only when rendering dominates the task.
 
 Delete image tags you no longer need from Amazon ECR. Job output stays in your job attachments bucket.
 
@@ -231,7 +309,10 @@ Delete image tags you no longer need from Amazon ECR. Job output stays in your j
 | `exec: "mj4-sweep": executable file not found in $PATH` | The task ran in the wrong image. Pass `-p DockerImage=...` with your MuJoCo 4 image |
 | The environment fails with `could not pull` | Check the tag, and that the queue role can pull from Amazon ECR |
 | Tasks stay `READY` | Associate the queue with a fleet that has the Docker software add-on |
+| Tasks stay `READY` on a GPU spot fleet that shows `GROWING` with no workers | Spot GPU capacity is short. One tested run waited about 70 minutes. Allow more GPU types or Availability Zones, or use on-demand instances |
 | `plastic_bar has no plastic stretching state` | `--model` points at a scene whose bar has `yield="0"` in its MJCF. Plastic state is only allocated for a yield set above zero at compile time |
+| `--renderer gpu, but EGL picked the CPU rasterizer` | The task ran on a worker without a GPU. Submit to a queue that has only GPU fleets, or add the `amount.worker.gpu` host requirement |
+| `unrecognized arguments: --renderer gpu` | The image predates the `Renderer` parameter. Rebuild and push it from this directory |
 | You need logs | Session logs are in CloudWatch under `/aws/deadline/<farm-id>/<queue-id>` |
 
 ## Tested with
@@ -240,6 +321,9 @@ MuJoCo 4.0.0 on Rocky Linux 9, built for `linux/amd64`.
 Both bundles ran end to end on a Linux service-managed spot fleet with 16 vCPUs per worker and the
 Docker software add-on, using the console's default Docker queue environment. Every task succeeded on
 its first attempt, and the results matched the tables above.
+The GPU runs used a spot fleet that accepts one NVIDIA L4, A10G or T4 per worker, with the same
+add-on and queue environment. Every GPU task ran on an A10G. A probe job on an L4 worker confirmed
+NVIDIA EGL rendering inside the container. T4 workers are untested.
 Deadline Cloud CLI 0.60.11 and Open Job Description CLI 0.8.0, in November 2026.
 
 ## Related resources
