@@ -15,8 +15,9 @@ For the MuJoCo 3.11.0 Shadow Hand sweep, see [`../mujoco/`](../mujoco/).
 | [`speculative_sweep/`](speculative_sweep/) | Speculative contacts (`<flag speculative="enable"/>`) | [`model/speculative/newton.xml`](https://github.com/google-deepmind/mujoco/blob/4.0.0/model/speculative/newton.xml): a Newton's cradle of five 3 mm steel plates | 2 release angles x 5 timesteps x speculative on or off = 20, then `Summarize` |
 
 Each task simulates 2 seconds and writes about 40 PNG frames, an H.264 MP4 and a `metrics.json`.
-The `Summarize` step reads every `metrics.json` and writes `summary.csv`.
-If both jobs share one `OutputDir`, it writes `summary-torsion.csv` and `summary-cradle.csv` instead.
+The `Summarize` step reads the `metrics.json` files in its job's `OutputDir` and writes `summary.csv`.
+Each job gets only its own output from job attachments, so give each job its own local download
+directory. Downloading both jobs into the same directory overwrites the first job's `summary.csv`.
 
 ## Files
 

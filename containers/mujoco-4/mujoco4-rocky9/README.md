@@ -20,6 +20,10 @@ The image is about 860 MB, or 300 MB compressed in Amazon ECR.
 The models come from the commit that the `4.0.0` tag points to. A rebuild gets the same scenes.
 Override with `--build-arg MUJOCO_VERSION=...` or `MUJOCO_REF=...`.
 
+The Python packages are pinned to the versions this sample was tested with: `mujoco-core` 4.0.0,
+NumPy 2.5.5, PyOpenGL 3.1.10, glfw 2.11.0 and Pillow 13.0.0. The `rockylinux:9` base image and the
+dnf packages aren't pinned. A rebuild picks up Rocky 9 and EPEL updates.
+
 ## Build
 
 ```console

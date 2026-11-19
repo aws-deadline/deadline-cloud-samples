@@ -31,11 +31,16 @@ RUN dnf install -y epel-release \
 # MuJoCo 4.0 splits the wheel. mujoco-core is the C library and Python bindings;
 # its [rendering] extra adds PyOpenGL and glfw for mujoco.Renderer. The default `mujoco`
 # package also installs mujoco-studio, the Filament renderer and Studio viewer,
-# which a headless sweep does not use. Pinned so a rebuild produces the same MuJoCo.
+# which a headless sweep does not use.
+# Every Python package is pinned to the tested version, transitive ones included, so a
+# rebuild gets the same Python stack. The base image and dnf packages are not pinned.
 ARG MUJOCO_VERSION=4.0.0
 RUN python3.12 -m pip install --no-cache-dir \
         "mujoco-core[rendering]==${MUJOCO_VERSION}" \
-        "pillow" \
+        "numpy==2.5.5" \
+        "PyOpenGL==3.1.10" \
+        "glfw==2.11.0" \
+        "pillow==13.0.0" \
     # Rocky's /usr/bin/python3 is 3.9. These links make plain `python3` resolve to 3.12.
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python3
