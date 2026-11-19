@@ -96,9 +96,10 @@ pre-step velocity that speculative sweeps use.
 `MUJOCO_GL=egl` is set. On a CPU worker, EGL renders with Mesa's llvmpipe software rasterizer, at
 about 42 ms for a 480x360 frame on a 16 vCPU worker. Lower `--fps` for a faster sweep.
 
-On a GPU worker, the Docker queue environment passes the GPU into the container, along with NVIDIA's
-EGL driver. MuJoCo then renders on the GPU with no change to the image, at about 1 ms for a 480x360
-frame on an A10G. See [Run on a GPU fleet](../README.md#run-on-a-gpu-fleet).
+This image is the CPU example. It can also render on a GPU worker, because the Docker queue
+environment passes the GPU and NVIDIA's EGL driver into the container. The GPU example,
+[`../mujoco4-rocky9-gpu/`](../mujoco4-rocky9-gpu/), is built for that and fails rather than fall
+back to Mesa.
 
 Each `metrics.json` records the renderer under `render`: `gl_vendor`, `gl_renderer`, `gpu`, and the
 time spent rendering and writing PNGs. `--renderer gpu` exits non-zero when `gl_renderer` is a Mesa

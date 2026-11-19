@@ -47,13 +47,6 @@ parameterDefinitions:
   minValue: 16
   maxValue: 2160
   description: Rendered frame height in pixels.
-- name: Renderer
-  type: STRING
-  default: any
-  allowedValues: [any, gpu]
-  description: >-
-    'gpu' fails each task whose container renders on Mesa's CPU rasterizer instead of a GPU.
-    Use it on a GPU fleet so a missing driver cannot pass as a slow success.
 - name: OutputDir
   type: PATH
   objectType: DIRECTORY
@@ -104,8 +97,6 @@ steps:
         - "{{ Param.Width }}"
         - --height
         - "{{ Param.Height }}"
-        # Only passed for gpu, so an image built before --renderer existed still runs the default.
-        - "{{ ['--renderer', 'gpu'] if Param.Renderer == 'gpu' else [] }}"
         - --out-dir
         - "{{ out_dir }}"
         - --label

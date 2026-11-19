@@ -19,6 +19,7 @@ at the model's defaults.
 import argparse
 import json
 import math
+import os
 import pathlib
 import shutil
 import subprocess
@@ -355,8 +356,13 @@ def main():
     common.add_argument("--no-video", dest="video", action="store_false",
                         help="Skip MP4 encoding and keep only the PNG frames.")
     common.add_argument("--video-bitrate", default="2M", help="Target bitrate for the MP4.")
-    common.add_argument("--renderer", choices=("any", "gpu"), default="any",
-                        help="'gpu' fails the task if EGL falls back to the CPU rasterizer.")
+    # The GPU image sets MJ4_RENDERER=gpu, so a task there fails rather than render on the CPU.
+    renderer_default = os.environ.get("MJ4_RENDERER", "any")
+    if renderer_default not in ("any", "gpu"):
+        sys.exit(f"MJ4_RENDERER must be 'any' or 'gpu', got {renderer_default!r}")
+    common.add_argument("--renderer", choices=("any", "gpu"), default=renderer_default,
+                        help="'gpu' fails the task if EGL falls back to the CPU rasterizer. "
+                             "Defaults to $MJ4_RENDERER, or 'any'.")
 
     parser = argparse.ArgumentParser(description="One MuJoCo 4.0 sweep point: simulate, render, measure.")
     sub = parser.add_subparsers(dest="command", required=True)

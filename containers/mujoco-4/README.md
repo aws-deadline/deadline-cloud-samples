@@ -5,6 +5,10 @@ from an image in Amazon ECR. Each sweep exercises a feature that MuJoCo 4.0 intr
 elasto-plasticity and speculative contacts. The job templates have no Docker commands. The queue's
 Docker environment runs every task inside the container.
 
+The sample comes as two parallel examples. The CPU example renders with Mesa on any Docker fleet. The
+GPU example has its own image and bundles, and renders on an NVIDIA GPU. See
+[Run on a GPU fleet](#run-on-a-gpu-fleet).
+
 For the MuJoCo 3.11.0 Shadow Hand sweep, see [`../mujoco/`](../mujoco/).
 
 ## The sweeps
@@ -13,6 +17,9 @@ For the MuJoCo 3.11.0 Shadow Hand sweep, see [`../mujoco/`](../mujoco/).
 |---|---|---|---|
 | [`plasticity_sweep/`](plasticity_sweep/) | Continuum elasto-plasticity for 3D flexes (`yield`) | [`model/plastic/torsion.xml`](https://github.com/google-deepmind/mujoco/blob/4.0.0/model/plastic/torsion.xml): two bars twisted past 180 degrees and released | 8 yield strains, then `Summarize` |
 | [`speculative_sweep/`](speculative_sweep/) | Speculative contacts (`<flag speculative="enable"/>`) | [`model/speculative/newton.xml`](https://github.com/google-deepmind/mujoco/blob/4.0.0/model/speculative/newton.xml): a Newton's cradle of five 3 mm steel plates | 2 release angles x 5 timesteps x speculative on or off = 20, then `Summarize` |
+
+Each bundle has a GPU twin, `plasticity_sweep_gpu/` and `speculative_sweep_gpu/`, with the same
+task space.
 
 Each task simulates 2 seconds and writes about 40 PNG frames, an H.264 MP4 and a `metrics.json`.
 The `Summarize` step reads the `metrics.json` files in its job's `OutputDir` and writes `summary.csv`.
@@ -23,9 +30,12 @@ directory. Downloading both jobs into the same directory overwrites the first jo
 
 | Path | Contents |
 |---|---|
-| [`mujoco4-rocky9/`](mujoco4-rocky9/) | The image: MuJoCo 4.0.0, the `plastic/` and `speculative/` example models, and the `mj4-sweep` and `mj4-summarize` commands |
+| [`mujoco4-rocky9/`](mujoco4-rocky9/) | The CPU image: MuJoCo 4.0.0, the `plastic/` and `speculative/` example models, and the `mj4-sweep` and `mj4-summarize` commands |
 | [`plasticity_sweep/template.yaml`](plasticity_sweep/template.yaml) | The yield strain sweep |
 | [`speculative_sweep/template.yaml`](speculative_sweep/template.yaml) | The timestep and speculative contacts sweep |
+| [`mujoco4-rocky9-gpu/`](mujoco4-rocky9-gpu/) | The GPU image: the same MuJoCo stack and commands on an NVIDIA CUDA base |
+| [`plasticity_sweep_gpu/template.yaml`](plasticity_sweep_gpu/template.yaml) | The yield strain sweep, requiring a GPU |
+| [`speculative_sweep_gpu/template.yaml`](speculative_sweep_gpu/template.yaml) | The speculative contacts sweep, requiring a GPU |
 
 ## Prerequisites
 
@@ -119,7 +129,7 @@ Both jobs take these parameters.
 | `Fps` | `20.0` | Rendered frames per simulated second. Rendering sets the cost |
 | `VideoBitrate` | `2M` | Target bitrate for each MP4 |
 | `Width`, `Height` | `480`, `360` | Rendered frame size in pixels |
-| `Renderer` | `any` | `gpu` fails a task that renders on Mesa's CPU rasterizer instead of a GPU. See [Run on a GPU fleet](#run-on-a-gpu-fleet) |
+| `Renderer` | `gpu` | GPU bundles only. `gpu` fails a task that renders on Mesa's CPU rasterizer instead of a GPU; `any` accepts it |
 | `OutputDir` | `./output` | Where the results go. Job attachments upload it |
 
 Edit the task parameter ranges in each `template.yaml` to change a sweep.
@@ -218,8 +228,16 @@ To learn more, see these pages:
 
 ## Run on a GPU fleet
 
-The same image and jobs run on a GPU fleet with no changes. The physics stays on the CPU, and the
-rendering moves to the GPU. Every task's physics result is identical on both fleets.
+The GPU example runs the same sweeps with its own image, [`mujoco4-rocky9-gpu/`](mujoco4-rocky9-gpu/),
+and its own bundles, `plasticity_sweep_gpu/` and `speculative_sweep_gpu/`. The physics stays on the
+CPU, and the rendering moves to the GPU. Every task's physics result is identical on both.
+
+| | CPU example | GPU example |
+|---|---|---|
+| Image | `mujoco4-rocky9`, on `rockylinux:9` | `mujoco4-rocky9-gpu`, on `nvidia/cuda:13.0.3-base-rockylinux9` |
+| Bundles | `plasticity_sweep/`, `speculative_sweep/` | `plasticity_sweep_gpu/`, `speculative_sweep_gpu/` |
+| Sweep step host requirement | none | `amount.worker.gpu` at least 1 |
+| Renders on | Mesa llvmpipe | the NVIDIA driver from the host; fails on Mesa by default |
 
 ### Set up the fleet
 
@@ -241,35 +259,35 @@ configuration accepts one NVIDIA L4, A10G or T4 per worker:
 
 On a GPU worker that has an NVIDIA Container Device Interface spec (`/etc/cdi/nvidia.yaml`), the
 default Docker queue environment starts the session container with `--gpus all`. In the tested runs,
-that put the GPU and NVIDIA's EGL driver into the container. The image itself contains only Mesa.
-MuJoCo's EGL backend prefers a CUDA-backed EGL device over Mesa, so it picks the GPU on
-its own.
+that put the GPU and NVIDIA's EGL driver, which the image doesn't contain, into the container.
+MuJoCo's EGL backend prefers a CUDA-backed EGL device over Mesa, so it picks the GPU on its own.
+
+### Build and push the GPU image
+
+Build from `containers/mujoco-4`, because the GPU image copies the commands from `mujoco4-rocky9/`.
+Push it the same way as the CPU image, to a repository named `mujoco4-rocky9-gpu`.
+
+```console
+cd containers/mujoco-4
+docker build --platform linux/amd64 -f mujoco4-rocky9-gpu/Dockerfile -t mujoco4-rocky9-gpu:4.0.0 .
+```
 
 ### Submit
 
-Pass `-p Renderer=gpu`. A task then fails, instead of finishing slowly, if its container rendered
-on the CPU rasterizer.
-
 ```console
-deadline bundle submit plasticity_sweep --farm-id <farm-id> --queue-id <gpu-queue-id> \
-  -p DockerImage=<account-id>.dkr.ecr.<region>.amazonaws.com/mujoco4-rocky9:4.0.0 -p Renderer=gpu
+cd containers/mujoco-4
+deadline bundle submit plasticity_sweep_gpu --farm-id <farm-id> --queue-id <queue-id> \
+  -p DockerImage=<account-id>.dkr.ecr.<region>.amazonaws.com/mujoco4-rocky9-gpu:4.0.0
 ```
 
-The jobs don't declare host requirements. The scheduler can place them on any fleet associated with
-the queue. Use a queue associated only with GPU fleets, or add a GPU requirement to the step in
-`template.yaml`:
-
-```yaml
-- name: Twist
-  hostRequirements:
-    amounts:
-    - name: amount.worker.gpu
-      min: 1
-```
+The sweep step requires one GPU. The scheduler places it on a GPU fleet even when the queue also
+has CPU fleets. `Summarize` has no requirement and can run on either. `Renderer` defaults to `gpu`,
+so a task fails, instead of finishing slowly, if its container renders on the CPU rasterizer.
 
 ### CPU against GPU
 
-The plasticity job ran with each renderer at two frame sizes. The CPU fleet has 16 vCPUs per
+The plasticity job ran with each renderer at two frame sizes. These runs used one image on both
+fleets, before the GPU image existed. The GPU image has the same Python stack and commands. The CPU fleet has 16 vCPUs per
 worker and renders with Mesa llvmpipe. The GPU worker had an NVIDIA A10G. Each value is the median
 over the job's 8 tasks, with 41 frames per task.
 
@@ -295,7 +313,8 @@ per task, or with a pipeline that consumes frames in memory instead of writing P
 The tasks run in parallel. A spot fleet scales toward its maximum worker count.
 On a fleet of up to four 16 vCPU spot workers, the plasticity job ran in about 2 minutes and the
 speculative job in about 1.7 minutes from first task start. Each task takes about 5 seconds.
-The first session on a worker also pulls the image, about 300 MB compressed in Amazon ECR.
+The first session on a worker also pulls the image. In Amazon ECR, the CPU image is about 300 MB
+compressed and the GPU image about 475 MB.
 Each run writes about 25 MB (plasticity) or 75 MB (speculative) to your job attachments bucket.
 A 1920x1080 plasticity run writes about 120 MB. GPU workers cost more per hour than CPU workers of
 the same size, so use a GPU fleet only when rendering dominates the task.
@@ -311,8 +330,8 @@ Delete image tags you no longer need from Amazon ECR. Job output stays in your j
 | Tasks stay `READY` | Associate the queue with a fleet that has the Docker software add-on |
 | Tasks stay `READY` on a GPU spot fleet that shows `GROWING` with no workers | Spot GPU capacity is short. One tested run waited about 70 minutes. Allow more GPU types or Availability Zones, or use on-demand instances |
 | `plastic_bar has no plastic stretching state` | `--model` points at a scene whose bar has `yield="0"` in its MJCF. Plastic state is only allocated for a yield set above zero at compile time |
-| `--renderer gpu, but EGL picked the CPU rasterizer` | The task ran on a worker without a GPU. Submit to a queue that has only GPU fleets, or add the `amount.worker.gpu` host requirement |
-| `unrecognized arguments: --renderer gpu` | The image predates the `Renderer` parameter. Rebuild and push it from this directory |
+| `--renderer gpu, but EGL picked the CPU rasterizer` | The container didn't get the NVIDIA driver. Use a fleet with both a GPU and the Docker add-on, and the `mujoco4-rocky9-gpu` image |
+| `unrecognized arguments: --renderer` | A GPU bundle ran with an image older than its `Renderer` parameter. Pass the `mujoco4-rocky9-gpu` image |
 | You need logs | Session logs are in CloudWatch under `/aws/deadline/<farm-id>/<queue-id>` |
 
 ## Tested with
@@ -322,7 +341,8 @@ Both bundles ran end to end on a Linux service-managed spot fleet with 16 vCPUs 
 Docker software add-on, using the console's default Docker queue environment. Every task succeeded on
 its first attempt, and the results matched the tables above.
 The GPU runs used a spot fleet that accepts one NVIDIA L4, A10G or T4 per worker, with the same
-add-on and queue environment. Every GPU task ran on an A10G. A probe job on an L4 worker confirmed
+add-on and queue environment. Every GPU task ran on an A10G, including a run of
+`plasticity_sweep_gpu` with the `mujoco4-rocky9-gpu` image. A probe job on an L4 worker confirmed
 NVIDIA EGL rendering inside the container. T4 workers are untested.
 Deadline Cloud CLI 0.60.11 and Open Job Description CLI 0.8.0, in November 2026.
 
