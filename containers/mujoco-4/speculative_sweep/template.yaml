@@ -1,0 +1,115 @@
+# Every command below targets the mujoco4-rocky9 image.
+# The queue's Docker environment runs each one inside the container, so nothing
+# here pulls an image or starts a container.
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR]
+name: MuJoCo 4 Speculative Contacts Sweep
+description: >-
+  Runs the MuJoCo 4.0 Newton's cradle at a range of timesteps and release angles, with speculative
+  contacts on and off, then reports which runs let a plate tunnel through its neighbour.
+
+parameterDefinitions:
+# Read by the queue's Docker environment. Keep it a plain STRING so it matches
+# the queue's own DockerImage definition.
+- name: DockerImage
+  type: STRING
+  description: >-
+    The mujoco4-rocky9 image in Amazon ECR, for example
+    <account-id>.dkr.ecr.<region>.amazonaws.com/mujoco4-rocky9:4.0.0
+  userInterface:
+    control: LINE_EDIT
+    label: Container Image URI
+- name: Duration
+  type: FLOAT
+  default: 2.0
+  minValue: 0.7
+  description: >-
+    Simulated seconds per task, which is also the clip length. The first impact is at about
+    0.55 seconds.
+- name: Fps
+  type: FLOAT
+  default: 20.0
+  minValue: 1.0
+  description: Rendered frames per simulated second. Rendering sets the cost.
+- name: VideoBitrate
+  type: STRING
+  default: 2M
+  description: Target bitrate for each H.264 MP4.
+- name: Width
+  type: INT
+  default: 480
+  minValue: 16
+  maxValue: 3840
+  description: Rendered frame width in pixels.
+- name: Height
+  type: INT
+  default: 360
+  minValue: 16
+  maxValue: 2160
+  description: Rendered frame height in pixels.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  description: Where each task's frames, MP4 and metrics are written.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+
+steps:
+- name: Cradle
+  # 2 x 5 x 2 = 20 tasks, run in parallel across the fleet. The model ships with
+  # a 58 degree release, a 4 ms timestep, and speculative contacts enabled.
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: ReleaseAngle
+      type: INT
+      range: [30, 58]
+    - name: TimestepMs
+      type: INT
+      range: [2, 4, 6, 8, 12]
+    - name: Speculative
+      type: STRING
+      range: [enable, disable]
+  script:
+    let:
+    - label = 'angle' + string(Task.Param.ReleaseAngle) + '-dt' + string(Task.Param.TimestepMs) + 'ms-spec' + Task.Param.Speculative
+    - out_dir = Param.OutputDir / label
+    actions:
+      onRun:
+        command: mj4-sweep
+        args:
+        - cradle
+        - --release-angle
+        - "{{ Task.Param.ReleaseAngle }}"
+        - --timestep-ms
+        - "{{ Task.Param.TimestepMs }}"
+        - --speculative
+        - "{{ Task.Param.Speculative }}"
+        - --duration
+        - "{{ Param.Duration }}"
+        - --fps
+        - "{{ Param.Fps }}"
+        - --video-bitrate
+        - "{{ Param.VideoBitrate }}"
+        - --width
+        - "{{ Param.Width }}"
+        - --height
+        - "{{ Param.Height }}"
+        - --out-dir
+        - "{{ out_dir }}"
+        - --label
+        - "{{ label }}"
+
+- name: Summarize
+  dependencies:
+  - dependsOn: Cradle
+  script:
+    actions:
+      onRun:
+        command: mj4-summarize
+        args:
+        - --csv
+        - "{{ Param.OutputDir / 'summary.csv' }}"
+        - "{{ Param.OutputDir }}"
