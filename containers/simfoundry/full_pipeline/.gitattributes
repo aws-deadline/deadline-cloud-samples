@@ -1,0 +1,2 @@
+# The patch keeps the exact bytes git format-patch wrote.
+*.patch -whitespace
