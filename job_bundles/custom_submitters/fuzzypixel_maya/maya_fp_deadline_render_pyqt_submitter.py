@@ -9,7 +9,7 @@ import os
 import subprocess
 from copy import deepcopy
 import re
-import boto3
+from deadline.client import api as deadline_api
 import json
 import yaml
 import subprocess
@@ -295,6 +295,9 @@ class mayaSubmitterUI(QtCore.QObject):
         else:
             print("No farm found")
         default_index = self.farm_name.findText(self.tu.default_farm_display_name)
+        if default_index < 0:
+            # Farms without a name are listed by ID.
+            default_index = self.farm_name.findData(self.tu.default_farm_id, QtCore.Qt.UserRole)
         self.farm_name.setCurrentIndex(default_index)
 
     def handle_frames_override(self) -> None:
@@ -319,7 +322,11 @@ class mayaSubmitterUI(QtCore.QObject):
         """
         Get the fleet attribute defaults
         """
-        if self.farm_name.currentText() == "FuzzyPixelProdFarm":
+        # Farms without a name are listed by ID, so also match the default farm ID.
+        if (
+            self.farm_name.currentText() == "FuzzyPixelProdFarm"
+            or self.farm_name.currentData(QtCore.Qt.UserRole) == self.tu.default_farm_id
+        ):
             default_queue_index = self.queue_name.findText(self.tu.default_queue)
             self.queue_name.setCurrentIndex(default_queue_index)
             default_fleet_index = self.fleet_attr_combo.findText(self.tu.default_fleet_attr)
@@ -606,7 +613,9 @@ class deadlineTemplateUtils(pathUtils):
     def __init__(self):
         super().__init__()
         self.set_farm_vars()
-        self.deadline = boto3.client("deadline")
+        # Region of each listed farm, since deadline_api.list_farms can return farms from
+        # more than one region.
+        self.farm_regions = {}
 
     def read_template_data(self, yaml_data) -> object:
         """
@@ -633,10 +642,13 @@ class deadlineTemplateUtils(pathUtils):
         """
         farm_list = []
         farm_dict = {}
-        result = self.deadline.list_farms()
+        # deadline_api.list_farms also returns farms you reach only through a queue or fleet
+        # membership. Those have no displayName, so they are shown by farm ID.
+        result = deadline_api.list_farms()
         for farm in result["farms"]:
+            self.farm_regions[farm["farmId"]] = farm.get("region")
             farm_dict["farmId"] = farm["farmId"]
-            farm_dict["displayName"] = farm["displayName"]
+            farm_dict["displayName"] = farm.get("displayName") or farm["farmId"]
             farm_list.append(deepcopy(farm_dict))
         return farm_list
 
@@ -648,7 +660,7 @@ class deadlineTemplateUtils(pathUtils):
         queue_list = []
         queue_dict = {}
         try:
-            result = self.deadline.list_queues(farmId=farm_id)
+            result = deadline_api.list_queues(farmId=farm_id, region=self.farm_regions.get(farm_id))
             for queue in result["queues"]:
                 queue_dict["queueId"] = queue["queueId"]
                 queue_dict["displayName"] = queue["displayName"]
@@ -663,9 +675,8 @@ class deadlineTemplateUtils(pathUtils):
         """
         attr_list = []
         attr_dict = {}
-        deadline = boto3.client("deadline")
         try:
-            result = deadline.list_fleets(farmId=farm_id)
+            result = deadline_api.list_fleets(farmId=farm_id, region=self.farm_regions.get(farm_id))
             for fleet in result["fleets"]:
                 try:
                     for custom_attr in fleet["configuration"]["customerManaged"]["workerCapabilities"][
