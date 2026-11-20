@@ -1,0 +1,131 @@
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, REDACTED_ENV_VARS]
+name: SimFoundry Full Pipeline (Bedrock + FLUX)
+description: >-
+  Runs SimFoundry pipeline A on a video with Claude on Bedrock for reasoning, Claude-grounded
+  SAM 2.1 for segmentation and FLUX.1 Kontext for image edits, then a random-action rollout in
+  the reconstructed scene.
+
+parameterDefinitions:
+- name: DockerImage
+  type: STRING
+- name: HfToken
+  type: STRING
+  default: ""
+  description: >-
+    Hugging Face token for the gated FLUX.1 Kontext and SAM 3 weights. The job environment sets it
+    as HF_TOKEN and masks it in logs, but the job record stores parameters in plain text: anyone
+    who can read this job can read the token. Use a read-only, fine-grained token.
+  userInterface:
+    control: LINE_EDIT
+    label: Hugging Face Token
+- name: Video
+  type: STRING
+  default: /opt/SimFoundry/docs/assets/example_videos/Fruits.mp4
+- name: SceneName
+  type: STRING
+  default: fruits
+- name: ImgIdx
+  type: STRING
+  default: auto
+  description: >-
+    Canonical frame: auto lets stage 3 score the sampled frames and ask Claude to pick among the
+    best, or an index into the 15 sampled frames to pin one.
+- name: Segmenter
+  type: STRING
+  default: sam3
+  allowedValues: [sam3, sam2-bedrock]
+  description: >-
+    sam3 uses Meta's gated SAM 3 (your Hugging Face account needs access). sam2-bedrock uses
+    SAM 2.1 grounded by Claude.
+- name: SimSteps
+  type: INT
+  default: 60
+- name: KeepOutputOnFailure
+  type: STRING
+  default: "true"
+  allowedValues: ["true", "false"]
+  description: Exit 0 when a stage fails, so the partial output still uploads for inspection.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+
+jobEnvironments:
+# Sets HF_TOKEN for every action in the job. openjd_redacted_env masks the value in the session log.
+- name: HuggingFace
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ["{{ Env.File.SetToken }}"]
+    embeddedFiles:
+    - name: SetToken
+      type: TEXT
+      data: |
+        token={{ repr_sh(Param.HfToken) }}
+        if [ -n "$token" ]; then
+          echo "openjd_redacted_env: HF_TOKEN=$token"
+        else
+          echo "HfToken is empty: downloads of gated models (FLUX.1 Kontext, SAM 3) will fail" >&2
+        fi
+
+steps:
+- name: Pipeline
+  hostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    - name: amount.worker.memory
+      min: 120000
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{ Task.File.Run }}"]
+        timeout: 14400
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -uo pipefail
+        root={{ repr_sh(Param.OutputDir) }}
+        scene={{ repr_sh(Param.SceneName) }}
+        mkdir -p "$root"
+        if [ {{ repr_sh(Param.Segmenter) }} = sam3 ]; then unset SIMFOUNDRY_SEGMENTER; fi
+        nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+        echo "HF_TOKEN set: $([ -n "${HF_TOKEN:-}" ] && echo yes || echo no)"
+        echo "VLM backend: ${SIMFOUNDRY_VLM_BACKEND:-gemini}, segmenter: ${SIMFOUNDRY_SEGMENTER:-sam3}"
+        mamba run -n simfoundry python -c "import boto3; print('AWS identity:', boto3.client('sts').get_caller_identity()['Arn'])"
+
+        start=$(date +%s)
+        # A10G and L4 have 24 GB. FLUX's 12B transformer is 24 GB alone, so offload it layer by
+        # layer, and use Hunyuan's low-VRAM mode. --no-stream runs stages 5-8 one at a time,
+        # because streaming budgets VRAM for remote Gemini image calls, not a local FLUX.
+        export SIMFOUNDRY_FLUX_OFFLOAD=sequential
+        bash /opt/SimFoundry/scripts/pipeline/A_reconstruction/run.sh --no-stream \
+          --root-dir "$root" --scene-name "$scene" --video-fpath {{ repr_sh(Param.Video) }} \
+          -- s1_video.n_subsampled_frames=15 s3_ground.img_idx={{ Param.ImgIdx }} \
+             s5_scene.removal_model=flux s6_upsample.model=flux s7_mesh.low_vram=true
+        a_status=$?
+        echo "PIPELINE A exit ${a_status} after $(( $(date +%s) - start )) s"
+
+        c_status=skipped
+        if [ "$a_status" -eq 0 ]; then
+          bash /opt/SimFoundry/scripts/pipeline/C_application/run.sh --mode smoke-random \
+            --root-dir "$root" --scene-name "$scene" -- application_smoke.n_steps={{ Param.SimSteps }}
+          c_status=$?
+          video="$root/$scene/application_smoke/random_action_smoke.mp4"
+          [ -s "$video" ] || c_status="no video"
+          echo "PIPELINE C exit ${c_status}"
+        fi
+
+        rm -rf "$root/$scene/s1_video/frames_all"
+        printf '{"pipeline_a": "%s", "pipeline_c": "%s", "seconds": %s}\n' \
+          "$a_status" "$c_status" "$(( $(date +%s) - start ))" > "$root/$scene/run_status.json"
+        cat "$root/$scene/run_status.json"
+        if [ "$a_status" != 0 ] || [ "$c_status" != 0 ]; then
+          echo "PIPELINE FAILED" >&2
+          [ {{ repr_sh(Param.KeepOutputOnFailure) }} = true ] || exit 1
+        fi

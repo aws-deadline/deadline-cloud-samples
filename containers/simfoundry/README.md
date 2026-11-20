@@ -145,19 +145,9 @@ To learn more, see these pages:
 
 ## Run the full pipeline
 
-Pipeline A's later stages need two credentials:
-
-| Service | Used by | Variable |
-|---|---|---|
-| Gemini | Stages 3, 5, 6 and 10, and all of pipeline B | `GEMINI_API_KEY`, or `GCLOUD_PROJECT` with Vertex AI credentials |
-| Hugging Face | SAM3 (stage 3) and RMBG-2.0 (stage 6), both gated | `HF_TOKEN`, from an account granted access to both |
-
-The default Docker queue environment forwards the known license variables into the container,
-and never AWS credentials, so a task can't read a secret on its own. Getting these into the
-container takes a customized queue environment, such as one whose `onEnter` reads an AWS
-Secrets Manager secret with the queue role and passes it to `docker container run`. See
-[Customize a Docker queue environment](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/containers-queue-environment.html#containers-queue-customize).
-This sample doesn't include one.
+This job runs the stages that don't need credentials. To run all of pipeline A with Claude on Amazon
+Bedrock and FLUX, with your Hugging Face token passed at submission, see
+[`full_pipeline/`](full_pipeline/README.md).
 
 ## Cost and cleanup
 
