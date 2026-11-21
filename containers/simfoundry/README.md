@@ -149,6 +149,11 @@ This job runs the stages that don't need credentials. To run all of pipeline A w
 Bedrock and FLUX, with your Hugging Face token passed at submission, see
 [`full_pipeline/`](full_pipeline/README.md).
 
+## Sweep a pick-and-place
+
+To sweep a Franka pick-and-place over a scripted planner and a pre-trained DROID policy, in a
+published scene and one you reconstructed, see [`pick_place_sweep/`](pick_place_sweep/README.md).
+
 ## Cost and cleanup
 
 The job ran in 35 minutes on two on-demand GPU workers that both started cold. About 19 minutes of

@@ -1,0 +1,179 @@
+# Every command below runs in the session container that the queue's Docker environment
+# starts, so nothing here pulls an image or starts a container.
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR]
+name: SimFoundry Pick-and-Place Sweep
+description: >-
+  Sweeps a Franka pick-and-place over method (scripted motion planning or a pre-trained DROID
+  policy), scene and target fruit. Each task records a video and scores the attempt from object
+  poses in simulation.
+
+parameterDefinitions:
+# Read by the queue's Docker environment. Keep it a plain STRING so it matches
+# the queue's own DockerImage definition.
+- name: DockerImage
+  type: STRING
+  description: >-
+    The SimFoundry pick image in Amazon ECR, for example
+    <account-id>.dkr.ecr.<region>.amazonaws.com/simfoundry:9e34ebe-rocky10-pick
+  userInterface:
+    control: LINE_EDIT
+    label: Container Image URI
+- name: ReconstructedScene
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  description: >-
+    A scene reconstructed by SimFoundry's pipeline A, such as output/fruits from the full_pipeline
+    sample: the scene's directory, holding
+    s14_og/reconstructed_og_scene.json and the object assets that stage 13 wrote to s13_usd/objects.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Reconstructed Scene
+- name: ReconstructedRobotPosition
+  type: STRING
+  default: "-0.6,-0.05,0"
+  description: >-
+    x,y,z for the robot base in the reconstructed scene. Stage 14 puts the robot 1 m behind the
+    scene origin, which leaves most objects out of the arm's reach.
+- name: PlateName
+  type: STRING
+  default: teal
+  description: Substring of the category of the plate to place the fruit on.
+- name: PlateWord
+  type: STRING
+  default: green plate
+  description: How the policy's instruction names the plate, as in "put the banana on the green plate".
+- name: PolicyConfig
+  type: STRING
+  default: pi05_droid_jointpos_polaris
+  description: >-
+    OpenPI config to serve. SimFoundry's eval stage sends absolute joint positions, so the policy
+    must use DROID's joint-position action space.
+- name: PolicyCheckpoint
+  type: STRING
+  default: gs://openpi-assets/checkpoints/pi05_droid_jointpos
+  description: OpenPI checkpoint directory. The public pi0.5 DROID joint-position checkpoint is about 12 GB.
+- name: EpisodeSeconds
+  type: INT
+  default: 60
+  minValue: 5
+  description: Simulated seconds the policy gets per attempt, at 15 actions per second.
+- name: AssetsRevision
+  type: STRING
+  default: beac75a98d99a881eacff25dd53a3ec9ce8efcfc
+  description: Commit of the nadunRanawaka1/simfoundry-assets dataset on Hugging Face.
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  description: One directory per task, each with rollout.mp4 and result.json.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+- name: JobScriptDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: Helper scripts uploaded with the job.
+  userInterface:
+    control: HIDDEN
+
+steps:
+- name: PickPlace
+  hostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+    # SMF workers use strict overcommit. Isaac Sim plus the policy server leave too little commit
+    # headroom on a small worker to start ffmpeg for the video.
+    - name: amount.worker.memory
+      min: 120000
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Method
+      type: STRING
+      range: [scripted, policy]
+    - name: Scene
+      type: STRING
+      range: [droid_desk_serve_fruits, reconstructed]
+    - name: Target
+      type: STRING
+      range: [banana, apple]
+    combination: "Method * Scene * Target"
+  stepEnvironments:
+  # Once per session: the published DROID scenes, and the reconstructed scene's objects copied
+  # into OmniGibson's dataset tree, where its scene file looks them up by category and model.
+  - name: Scenes
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args: ["{{ Env.File.Enter }}"]
+          timeout: 1800
+        onExit:
+          command: bash
+          args: ["{{ Env.File.Exit }}"]
+      embeddedFiles:
+      - name: Enter
+        type: TEXT
+        data: |
+          set -euo pipefail
+          mamba run -n simfoundry hf download nadunRanawaka1/simfoundry-assets --repo-type dataset \
+            --revision {{ repr_sh(Param.AssetsRevision) }} \
+            --local-dir {{ repr_sh(Session.WorkingDirectory / 'simfoundry-assets') }} > /dev/null
+          dst=/opt/SimFoundry/deps/BEHAVIOR-1K/datasets/real2sim-assets/objects
+          mkdir -p "$dst"
+          cp -r {{ repr_sh(Param.ReconstructedScene / 's13_usd' / 'objects') }}/. "$dst"/
+          echo "Reconstructed objects: $(ls "$dst" | tr '\n' ' ')"
+          nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+      # Stop the policy server, if a task started one.
+      - name: Exit
+        type: TEXT
+        data: |
+          pid_file={{ repr_sh(Session.WorkingDirectory / 'policy_server.pid') }}
+          if [ -f "$pid_file" ]; then kill "$(cat "$pid_file")" 2>/dev/null || true; fi
+          exit 0
+  script:
+    let:
+    - task_dir = Param.OutputDir / (Task.Param.Method + '_' + Task.Param.Scene + '_' + Task.Param.Target)
+    - droid_json = Session.WorkingDirectory / 'simfoundry-assets' / 'assets' / 'scenes' / 'DROID' / Task.Param.Scene / (Task.Param.Scene + '_scene_state_latest.json')
+    - recon_json = Param.ReconstructedScene / 's14_og' / 'reconstructed_og_scene.json'
+    actions:
+      onRun:
+        command: bash
+        args: ["{{ Task.File.Run }}"]
+        timeout: 5400
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        set -euo pipefail
+        out={{ repr_sh(task_dir) }}
+        mkdir -p "$out"
+        extra=()
+        if [ {{ repr_sh(Task.Param.Scene) }} = reconstructed ]; then
+          scene_json={{ repr_sh(recon_json) }}
+          extra+=(--robot-pos={{ repr_sh(Param.ReconstructedRobotPosition) }})
+        else
+          scene_json={{ repr_sh(droid_json) }}
+        fi
+        if [ {{ repr_sh(Task.Param.Method) }} = policy ]; then
+          bash {{ repr_sh(Param.JobScriptDir / 'policy_server.sh') }} \
+            {{ repr_sh(Session.WorkingDirectory) }} {{ repr_sh(Param.PolicyConfig) }} \
+            {{ repr_sh(Param.PolicyCheckpoint) }} 8000
+        fi
+        mamba run -n simfoundry python {{ repr_sh(Param.JobScriptDir / 'pick_place.py') }} \
+          --method {{ repr_sh(Task.Param.Method) }} \
+          --scene-json "$scene_json" \
+          --target {{ repr_sh(Task.Param.Target) }} \
+          --place-on {{ repr_sh(Param.PlateName) }} \
+          --prompt {{ repr_sh('put the ' + Task.Param.Target + ' on the ' + Param.PlateWord) }} \
+          --timeout-s {{ Param.EpisodeSeconds }} \
+          --out-dir "$out" "${extra[@]}"
+        # Isaac Sim exits 0 at shutdown even after an error, so check what the script wrote.
+        # A failed grasp is a result; a run that never finished is not.
+        mamba run -n simfoundry python -c 'import json, sys; r = json.load(open(sys.argv[1])); print(json.dumps({k: r.get(k) for k in ("success", "lifted", "max_lift_m", "wall_seconds", "error")})); sys.exit(0 if r["completed"] else 1)' "$out/result.json"
+        test -s "$out/rollout.mp4" || { echo "No video at $out/rollout.mp4" >&2; exit 1; }
