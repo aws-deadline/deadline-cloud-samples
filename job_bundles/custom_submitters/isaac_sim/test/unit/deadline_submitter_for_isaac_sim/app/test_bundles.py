@@ -191,3 +191,38 @@ def test_resubmit_values_keep_only_defined_parameters():
         "Steps": "5",
         "OutputDir": "/o",
     }
+
+
+def _out(name, flow="OUT", **extra):
+    return {"name": name, "type": "PATH", "objectType": "DIRECTORY", "dataFlow": flow, **extra}
+
+
+def test_output_dirs_are_output_folders_without_a_default():
+    b = bd.Bundle(
+        "/b/train",
+        "train",
+        parameters=[
+            _out("OutputDir", "INOUT"),
+            _out("Logs"),
+            _out("Kept", default="./output"),
+            _out("Data", "IN"),
+            {"name": "File", "type": "PATH", "objectType": "FILE", "dataFlow": "OUT"},
+        ],
+    )
+    assert bd.output_dirs(b) == ["OutputDir", "Logs"]
+
+
+def test_fresh_outputs_are_new_folders_under_the_bundle(tmp_path):
+    one = bd.Bundle(str(tmp_path / "bundles" / "3-sdg"), "SDG", parameters=[_out("OutputDir")])
+    preview = bd.fresh_outputs(one, str(tmp_path / "out"), "20261124-1500", create=False)
+    assert preview == {"OutputDir": str(tmp_path / "out" / "3-sdg" / "20261124-1500")}
+    assert not (tmp_path / "out").exists()  # a preview creates nothing
+    made = bd.fresh_outputs(one, str(tmp_path / "out"), "20261124-1500", create=True)
+    assert made == preview and os.path.isdir(made["OutputDir"])
+    # The same second again: never an existing folder (an INOUT folder's files upload).
+    again = bd.fresh_outputs(one, str(tmp_path / "out"), "20261124-1500", create=True)
+    assert again["OutputDir"].endswith("20261124-1500-2") and os.listdir(again["OutputDir"]) == []
+    two = bd.Bundle(str(tmp_path / "b2"), "two", parameters=[_out("A"), _out("B")])
+    both = bd.fresh_outputs(two, str(tmp_path / "out"), "s", create=True)
+    assert both == {k: str(tmp_path / "out" / "b2" / "s" / k) for k in ("A", "B")}
+    assert bd.fresh_outputs(bd.Bundle("/b/x", "x"), str(tmp_path), "s", create=True) == {}

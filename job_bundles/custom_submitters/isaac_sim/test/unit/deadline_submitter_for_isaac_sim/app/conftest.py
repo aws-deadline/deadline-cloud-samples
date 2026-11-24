@@ -33,6 +33,8 @@ def _fresh_state(tmp_path_factory: Any, monkeypatch: Any) -> Any:
     monkeypatch.setenv(settings.PATH_ENV, str(path))
     monkeypatch.setenv("DEADLINE_PHYSICAL_AI_HOME", str(path.parent / "physical-ai"))
     settings.reload()
+    # Submit makes new output folders under outputDir: keep them out of the real home.
+    monkeypatch.setattr(settings, "output_root", lambda: str(path.parent / "job-outputs"))
     controllers.SESSION.loaded = []
     # Submit reads deadline-cloud's bundle and history folders through the CLI; tests that
     # cover that set ``deadline_dirs`` (or restore the method) themselves.

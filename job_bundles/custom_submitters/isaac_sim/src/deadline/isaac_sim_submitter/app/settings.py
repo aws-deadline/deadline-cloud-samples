@@ -24,13 +24,23 @@ BUNDLE_DIRS = "bundleDirs"
 #: Where loaded items go (``<downloadDir>/<job id>``). Empty:
 #: ``~/.deadline/physical-ai/job_outputs/<job id>``.
 DOWNLOAD_DIR = "downloadDir"
+#: Where Submit puts a new, empty folder for each output folder parameter that has no
+#: default (``<outputDir>/<bundle folder>/<date-time>``).
+OUTPUT_DIR = "outputDir"
 DEADLINE_EXECUTABLE = "deadlineExecutable"
 PHYSICAL_AI_EXECUTABLE = "physicalAiExecutable"
 #: The last job loaded (prefills a previous-job parameter).
 LAST_LOADED_JOB = "lastLoadedJob"
 
-DEFAULTS = {BUNDLE_DIRS: "~/DeadlineCloud/JobBundles"}
-KEYS = (BUNDLE_DIRS, DOWNLOAD_DIR, DEADLINE_EXECUTABLE, PHYSICAL_AI_EXECUTABLE, LAST_LOADED_JOB)
+DEFAULTS = {BUNDLE_DIRS: "~/DeadlineCloud/JobBundles", OUTPUT_DIR: "~/DeadlineCloud/JobOutputs"}
+KEYS = (
+    BUNDLE_DIRS,
+    DOWNLOAD_DIR,
+    OUTPUT_DIR,
+    DEADLINE_EXECUTABLE,
+    PHYSICAL_AI_EXECUTABLE,
+    LAST_LOADED_JOB,
+)
 
 #: The file last read and what it held, so a lookup does not read the disk.
 _cache: dict = {"path": None, "values": {}}
@@ -98,6 +108,11 @@ def set_str(key: str, value: str) -> None:
 def reload() -> None:
     """Forget the cached file, so the next lookup reads it again."""
     _cache.update(path=None, values={})
+
+
+def output_root() -> str:
+    """The folder Submit's new output folders go under."""
+    return os.path.abspath(os.path.expanduser(get_str(OUTPUT_DIR) or DEFAULTS[OUTPUT_DIR]))
 
 
 def download_root() -> str:

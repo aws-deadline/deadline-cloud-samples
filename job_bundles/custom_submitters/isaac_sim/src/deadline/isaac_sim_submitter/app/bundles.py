@@ -196,6 +196,41 @@ def match_job(bundles: list, job_name: str, parameters: dict):
     return best
 
 
+def output_dirs(bundle: Bundle) -> list:
+    """Output folder parameters (``dataFlow`` ``OUT`` or ``INOUT``) without a default: the
+    user would otherwise pick a new, empty folder for every job."""
+    return [
+        str(p["name"])
+        for p in bundle.parameters
+        if isinstance(p, dict)
+        and p.get("name")
+        and p.get("type") == "PATH"
+        and p.get("objectType") == "DIRECTORY"
+        and p.get("dataFlow") in ("OUT", "INOUT")
+        and not p.get("default")
+    ]
+
+
+def fresh_outputs(bundle: Bundle, root: str, stamp: str, create: bool) -> dict:
+    """A new folder for each of :func:`output_dirs`: ``<root>/<bundle folder>/<stamp>``, or
+    a subfolder per parameter when there are several. Never an existing folder: an
+    ``INOUT`` folder's contents are uploaded with the job. ``create`` makes them (at
+    submit); without it the paths are a preview."""
+    names = output_dirs(bundle)
+    if not names:
+        return {}
+    parent = os.path.join(root, os.path.basename(os.path.normpath(bundle.path)) or "job")
+    base, n = os.path.join(parent, stamp), 1
+    while os.path.exists(base):
+        n += 1
+        base = os.path.join(parent, f"{stamp}-{n}")
+    out = {k: base if len(names) == 1 else os.path.join(base, k) for k in names}
+    if create:
+        for path in out.values():
+            os.makedirs(path)
+    return out
+
+
 def resubmit_values(bundle: Bundle, parameters: dict) -> dict:
     """A finished job's parameter values that ``bundle`` defines (``gui-submit`` warns about
     the rest)."""

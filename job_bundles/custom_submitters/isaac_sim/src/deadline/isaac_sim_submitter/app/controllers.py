@@ -63,6 +63,13 @@ class Session:
 GATHER_PREFIX = ".gathered-"
 
 
+def _stamp() -> str:
+    """Local date and time for a new output folder's name (sorts by time)."""
+    import time
+
+    return time.strftime("%Y%m%d-%H%M%S")
+
+
 def gather_dir(paths: list) -> str:
     """A fresh folder for :func:`bundles.gather_datasets`, on the same filesystem as the
     datasets.
@@ -1139,6 +1146,12 @@ class SubmitController:
         )
         if self.s.resubmit:
             out.update(bd.resubmit_values(b, self.s.resubmit.get("parameters") or {}))
+        # After resubmit values: a resubmitted job writes to a new folder, not the old one's.
+        try:
+            out.update(bd.fresh_outputs(b, st.output_root(), _stamp(), create=gather))
+        except OSError:
+            # The root cannot be created: leave the parameter for the dialog to ask for.
+            pass
         return out
 
     def select(self, path: str) -> None:

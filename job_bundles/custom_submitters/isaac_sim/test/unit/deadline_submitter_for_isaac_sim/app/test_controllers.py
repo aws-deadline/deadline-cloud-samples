@@ -1230,3 +1230,31 @@ def test_replay_prims_report_isaac_errors_and_do_nothing_standalone():
     standalone.refresh()
     standalone.set_prim("robot", "/World/R")
     assert not standalone.s.loaded and not standalone.s.busy
+
+
+def test_submit_fills_a_new_output_folder_even_on_resubmit(monkeypatch, tmp_path):
+    out = {"name": "OutputDir", "type": "PATH", "objectType": "DIRECTORY", "dataFlow": "INOUT"}
+    _bundles(tmp_path, monkeypatch, {"sdg": [out, {"name": "Steps", "type": "INT"}]})
+    monkeypatch.setattr(cb, "resolve", lambda name, override="": ("deadline", "PATH"))
+    root = tmp_path / "job-outputs"
+    monkeypatch.setattr(ct.st, "output_root", lambda: str(root))
+    r = DeferredRunner()
+    c = ct.SubmitController(r)
+    c.scan()
+    preview = c.s.prefill["OutputDir"]
+    assert preview.startswith(str(root / "sdg")) and not root.exists()  # nothing made yet
+    c.submit()
+    first = c.s.prefill["OutputDir"]
+    assert os.path.isdir(first) and os.listdir(first) == []
+    argv = r.calls[0][0]
+    assert f"OutputDir={first}" in argv
+    r.reply(0, json.dumps({"status": "CANCELED"}))
+    # Resubmitting the job: its old OutputDir is replaced with a new folder.
+    c.request_resubmit(
+        {"job_id": "job-7", "name": "n", "parameters": {"OutputDir": first, "Steps": "5"}},
+        opening=True,
+    )
+    c.apply_requested_inputs()
+    c.submit()
+    second = c.s.prefill["OutputDir"]
+    assert second != first and os.path.isdir(second) and c.s.prefill["Steps"] == "5"

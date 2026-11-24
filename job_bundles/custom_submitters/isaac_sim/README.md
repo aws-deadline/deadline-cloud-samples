@@ -178,6 +178,7 @@ on Windows, `~/.config/deadline-cloud-for-isaac-sim/settings.json` on Linux and 
 |---|---|---|
 | `bundleDirs` | `~/DeadlineCloud/JobBundles` | Folders searched for job bundles, separated by `;` (also set in the Submit tab) |
 | `downloadDir` | empty: `~/.deadline/physical-ai/job_outputs/<job-id>` | Where loaded items go (`<downloadDir>/<job-id>`) |
+| `outputDir` | `~/DeadlineCloud/JobOutputs` | Where Submit creates a new folder for each output folder parameter without a default. See [Prefilled parameters](#prefilled-parameters). |
 | `deadlineExecutable` | empty | Path to `deadline`, when it is not found automatically |
 | `physicalAiExecutable` | empty | Path to `deadline-physical-ai`, when it is not found automatically |
 | `lastLoadedJob` | empty | Last job loaded; prefills previous-job parameters |
@@ -244,6 +245,7 @@ the bundle's own defaults and `parameter_values.yaml`.
 | A loaded dataset | `type: PATH`, `objectType: DIRECTORY`, `dataFlow: IN`, named for a dataset: the name after the last `_` is, or ends with, `dataset` or `datasets`, optionally followed by `dir`, `path` or `folder` (`Dataset`, `Datasets`, `train_Datasets`, `TrainDatasets`, `DatasetDir`). A name that merely contains the word does not count (`DatasetCacheDir`, `DatasetCount`). With more than one dataset loaded, they are gathered into one folder of hard links beside them (a hidden `.gathered-*` folder in their download folder, so nothing is copied) and only parameters ending in `datasets` receive it. |
 | A loaded checkpoint | The same rule with `checkpoint` (`Checkpoint`, `CheckpointDir`, `eval_Checkpoint`; not `CheckpointOutputRoot`) |
 | A resubmitted job's parameter values (**Resubmit with changes**) | Every parameter of the same name; these win over the rows above |
+| A new, empty output folder at `<outputDir>/<bundle folder>/<date-time>`, created when the dialog opens. With more than one such parameter, each gets a subfolder. | `type: PATH`, `objectType: DIRECTORY`, `dataFlow: OUT` or `INOUT`, with no `default`. It replaces a resubmitted job's value, so a new job doesn't write into an earlier job's folder or upload its files. Give the parameter a `default` to keep your own folder. |
 
 ### Outputs that Job outputs recognizes
 
