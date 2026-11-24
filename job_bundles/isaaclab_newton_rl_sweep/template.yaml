@@ -1,0 +1,353 @@
+specificationVersion: 'jobtemplate-2023-09'
+name: "Isaac Lab Newton RL Sweep"
+description: |
+  Reinforcement learning hyperparameter sweep with Isaac Lab 3.0 on the Newton physics
+  backend, then a reduce step that ranks every run and publishes the winning policy.
+
+  Runs directly on an Amazon Linux 2023 service-managed fleet worker with no container and
+  no conda package: Isaac Lab 3.0 made Isaac Sim optional, so the Newton backend installs
+  from wheels that fit the worker's glibc.
+
+parameterDefinitions:
+
+# ---------------------------------------------------------------- input / output
+
+- name: RequirementsFile
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: requirements-isaaclab3.txt
+  description: >
+    Pinned Python environment for Isaac Lab 3.0 on the Newton backend. Every entry resolves
+    to a wheel requiring glibc 2.34 or older, which is what makes the container-free install
+    possible. Edit this file to move Isaac Lab versions without touching the template.
+  userInterface:
+    control: CHOOSE_INPUT_FILE
+    label: Requirements File
+    groupLabel: Input / Output
+    fileFilters:
+    - label: Requirements Files
+      patterns: ["*.txt"]
+    - label: All Files
+      patterns: ["*"]
+
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: "Directory holding the asset prefetcher, the omni.client shim, and the aggregator."
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Scripts Directory
+    groupLabel: Input / Output
+
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: output
+  description: >
+    Receives one directory per sweep run under runs/, plus results.csv, report.html, and
+    best_policy/ containing the winning checkpoints and the hyperparameters that produced
+    them.
+  userInterface:
+    control: CHOOSE_DIRECTORY
+    label: Output Directory
+    groupLabel: Input / Output
+
+# ---------------------------------------------------------------- simulation
+
+- name: Task
+  type: STRING
+  default: "Isaac-Cartpole-Direct"
+  description: >
+    Gym id of the Isaac Lab task to train. Changing this also means changing the asset seeds
+    in scripts/prefetch_assets.py, because assets are prefetched explicitly rather than
+    downloaded on demand. See the README.
+  userInterface:
+    control: LINE_EDIT
+    label: Task
+    groupLabel: Simulation
+
+- name: NumEnvs
+  type: INT
+  default: 1024
+  minValue: 1
+  description: >
+    Parallel environments per run. Newton simulates these on the GPU, so this is the main
+    throughput lever. 1024 cartpoles fit comfortably on a 23 GiB A10G.
+  userInterface:
+    control: SPIN_BOX
+    label: Environments
+    groupLabel: Simulation
+
+- name: MaxIterations
+  type: INT
+  default: 150
+  minValue: 1
+  description: "PPO iterations per run. 150 is enough for cartpole to solve the task."
+  userInterface:
+    control: SPIN_BOX
+    label: Max Iterations
+    groupLabel: Simulation
+
+- name: SeedsPerConfig
+  type: INT
+  default: 1
+  minValue: 1
+  description: >
+    Seeds per hyperparameter combination. RL results are noisy, so raise this to tell a real
+    improvement from run-to-run variance. Total tasks are 6 times this value.
+  userInterface:
+    control: SPIN_BOX
+    label: Seeds Per Config
+    groupLabel: Simulation
+
+- name: AssetRoot
+  type: STRING
+  default: "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2"
+  description: >
+    Isaac Lab's published asset root, taken from its own apps/isaaclab.python.kit. Plain
+    HTTPS, so assets are fetched with an ordinary HTTP client. Nothing in this sample
+    redistributes NVIDIA assets.
+  userInterface:
+    control: LINE_EDIT
+    label: Asset Root URL
+    groupLabel: Simulation
+
+- name: RankMetric
+  type: STRING
+  default: "Train/mean_reward"
+  description: >
+    TensorBoard scalar tag used to rank runs. The aggregator lists the available tags if this
+    one is absent.
+  userInterface:
+    control: LINE_EDIT
+    label: Ranking Metric
+    groupLabel: Simulation
+
+steps:
+
+# =====================================================================
+# Fan out: one task per hyperparameter combination.
+#
+# The parameterSpace below declares the grid. The service expands it into tasks, schedules
+# them across available workers, and retries any one of them independently. A batch-array
+# equivalent needs a grid-expansion script, a manifest upload, and array-index arithmetic
+# inside the job to reach the same place.
+# =====================================================================
+- name: TrainSweep
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: LearningRate
+      type: FLOAT
+      range: [0.001, 0.0005, 0.0001]
+    - name: EntropyCoef
+      type: FLOAT
+      range: [0.001, 0.005]
+    - name: Seed
+      type: INT
+      range: "1-{{Param.SeedsPerConfig}}"
+    # Cross product. This is the default when combination is omitted, but stating it makes
+    # the task count obvious: 3 learning rates x 2 entropy coefficients x SeedsPerConfig.
+    combination: "LearningRate * EntropyCoef * Seed"
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+    amounts:
+    # Newton runs its solver on the GPU. Without this requirement a worker with no
+    # accelerator accepts the task and Warp falls back to the CPU, which produces slow
+    # results rather than an error and makes run timings incomparable.
+    - name: amount.worker.gpu
+      min: 1
+    - name: amount.worker.memory
+      min: 16384
+  stepEnvironments:
+  - name: IsaacLab3Newton
+    description: "Builds the Isaac Lab 3.0 Newton environment and prefetches task assets."
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args: ["{{Env.File.Enter}}"]
+      embeddedFiles:
+      - name: Enter
+        filename: enter.sh
+        type: TEXT
+        data: |
+          set -euo pipefail
+
+          echo "=== worker ==="
+          uname -srm
+          ( . /etc/os-release && echo "os: $PRETTY_NAME" ) || true
+          # AL2023 ships glibc 2.34 and Isaac Sim's wheels need 2.35, which is what confines
+          # this environment to the Newton path. Do not pipe version output to head here:
+          # under `set -o pipefail` the resulting SIGPIPE would abort the job.
+          echo "glibc: $(getconf GNU_LIBC_VERSION)"
+          nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader \
+            || echo "nvidia-smi unavailable"
+
+          VENV="{{Session.WorkingDirectory}}/isaaclab3"
+
+          # uv is a single static binary, so it does not depend on the worker's Python or pip.
+          # The version is pinned because an unpinned installer URL changes what runs silently.
+          UV_VERSION="0.10.4"
+          TMP="$(mktemp -d)"
+          curl -fsSL \
+            "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-x86_64-unknown-linux-gnu.tar.gz" \
+            -o "$TMP/uv.tar.gz"
+          tar -xzf "$TMP/uv.tar.gz" -C "$TMP"
+          UV="$TMP/uv-x86_64-unknown-linux-gnu/uv"
+          chmod +x "$UV"
+
+          echo "=== building the environment (no container) ==="
+          "$UV" venv --python 3.12 "$VENV"
+
+          # antlr4-python3-runtime is the one package in this tree with no wheel, and it is
+          # pure Python so it needs no toolchain. It must be installed BEFORE --no-build
+          # applies: hydra-core requires antlr4 ==4.9.*, so with it absent the wheels-only
+          # pass below cannot satisfy hydra-core and aborts. Leaving it out of the
+          # requirements file is not enough, because hydra-core still pulls it into the
+          # dependency graph.
+          VIRTUAL_ENV="$VENV" "$UV" pip install --no-deps antlr4-python3-runtime==4.9.3
+
+          # --no-build makes a pin without a wheel for this worker's glibc fail here. Without
+          # it, pip compiles from source or resolves backwards to a version that installs and
+          # then breaks at import time, far from the cause.
+          VIRTUAL_ENV="$VENV" "$UV" pip install --no-build --requirement "{{Param.RequirementsFile}}"
+
+          # isaaclab last, with --no-deps. Its published metadata hard-depends on
+          # omniverseclient, which is NVIDIA-proprietary and manylinux_2_35 only. Every other
+          # dependency it declares is already pinned in the requirements file.
+          VIRTUAL_ENV="$VENV" "$UV" pip install --no-build --no-deps isaaclab==3.0.0
+          echo "environment size: $(du -sh "$VENV" | cut -f1)"
+
+          # Stand in for omni.client, which omniverseclient would have provided. See
+          # scripts/omni_client_shim.py for why a prefetched scene still reaches this code.
+          # `omni` is a namespace package upstream, so extend_path keeps this from shadowing
+          # a real one if isaacsim is ever added to the environment.
+          SITE="$("$VENV/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+          mkdir -p "$SITE/omni"
+          printf '%s\n' "__path__ = __import__('pkgutil').extend_path(__path__, __name__)" \
+            > "$SITE/omni/__init__.py"
+          cp "{{Param.ScriptsDir}}/omni_client_shim.py" "$SITE/omni/client.py"
+
+          echo "=== prefetching task assets ==="
+          "$VENV/bin/python" "{{Param.ScriptsDir}}/prefetch_assets.py" \
+            --asset-root "{{Param.AssetRoot}}" \
+            --output-dir "{{Session.WorkingDirectory}}/assets"
+
+          echo "openjd_env: PATH=$VENV/bin:$PATH"
+          echo "openjd_env: VIRTUAL_ENV=$VENV"
+          # Point Isaac Lab at the prefetched tree. With the shim in place, anything missing
+          # from it is a hard error rather than an unlogged download.
+          echo "openjd_env: ISAACSIM_ASSET_ROOT={{Session.WorkingDirectory}}/assets"
+          # Warp compiles CUDA kernels on first use, about 55 s for this task. The cache is
+          # per-session here; on a fleet with a persistent volume, point this at it instead.
+          echo "openjd_env: WARP_CACHE_PATH={{Session.WorkingDirectory}}/warp-cache"
+
+          # Fails if Warp found no CUDA device. Warp otherwise falls back to the CPU silently,
+          # which leaves run timings incomparable across the sweep.
+          "$VENV/bin/python" "{{Param.ScriptsDir}}/report_environment.py"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+    embeddedFiles:
+    - name: Run
+      filename: run.sh
+      type: TEXT
+      data: |
+        set -euo pipefail
+
+        SLUG="lr{{Task.Param.LearningRate}}_ent{{Task.Param.EntropyCoef}}_seed{{Task.Param.Seed}}"
+        RUN_DIR="{{Param.OutputDir}}/runs/$SLUG"
+        mkdir -p "$RUN_DIR"
+
+        # Record the hyperparameters as data rather than leaving the aggregator to parse them
+        # back out of the directory name, which would break the moment a value's text form
+        # changes. Written before training so a task that dies early is still identifiable.
+        cat > "$RUN_DIR/config.json" <<JSON
+        {
+          "learning_rate": {{Task.Param.LearningRate}},
+          "entropy_coef": {{Task.Param.EntropyCoef}},
+          "seed": {{Task.Param.Seed}},
+          "task": "{{Param.Task}}",
+          "num_envs": {{Param.NumEnvs}},
+          "max_iterations": {{Param.MaxIterations}}
+        }
+        JSON
+
+        # rsl_rl writes logs to ./logs/rsl_rl/<experiment_name>/<run_name> relative to the
+        # working directory, so changing directory is how each task is isolated.
+        cd "$RUN_DIR"
+
+        # Hydra overrides address the "agent" and "env" config groups Isaac Lab registers.
+        # Isaac Lab 3.0 replaced --headless with --viz, so omitting --viz runs headless.
+        isaaclab train \
+          --rl_library rsl_rl \
+          --task "{{Param.Task}}" \
+          --num_envs {{Param.NumEnvs}} \
+          --seed {{Task.Param.Seed}} \
+          --run_name run \
+          presets=newton_mjwarp \
+          agent.max_iterations={{Param.MaxIterations}} \
+          agent.algorithm.learning_rate={{Task.Param.LearningRate}} \
+          agent.algorithm.entropy_coef={{Task.Param.EntropyCoef}}
+
+        echo "run complete: $SLUG"
+
+# =====================================================================
+# Reduce: rank every run, publish the winner.
+#
+# dependsOn makes the service wait for all of TrainSweep, so there is no polling loop and no
+# second command to remember to run. This step gets its own small environment rather than the
+# Isaac Lab one: reading TensorBoard event files does not need a 7.6 GB CUDA install.
+# =====================================================================
+- name: Aggregate
+  dependencies:
+  - dependsOn: TrainSweep
+  hostRequirements:
+    attributes:
+    - name: attr.worker.os.family
+      anyOf: ["linux"]
+  stepEnvironments:
+  - name: Tensorboard
+    description: "A small environment holding only what reading event files needs."
+    script:
+      actions:
+        onEnter:
+          command: bash
+          args: ["{{Env.File.Enter}}"]
+      embeddedFiles:
+      - name: Enter
+        filename: enter.sh
+        type: TEXT
+        data: |
+          set -euo pipefail
+          VENV="{{Session.WorkingDirectory}}/aggregate-venv"
+          UV_VERSION="0.10.4"
+          TMP="$(mktemp -d)"
+          curl -fsSL \
+            "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-x86_64-unknown-linux-gnu.tar.gz" \
+            -o "$TMP/uv.tar.gz"
+          tar -xzf "$TMP/uv.tar.gz" -C "$TMP"
+          UV="$TMP/uv-x86_64-unknown-linux-gnu/uv"
+          chmod +x "$UV"
+          "$UV" venv --python 3.12 "$VENV"
+          VIRTUAL_ENV="$VENV" "$UV" pip install --quiet tensorboard
+          echo "openjd_env: PATH=$VENV/bin:$PATH"
+          echo "openjd_env: VIRTUAL_ENV=$VENV"
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - "{{Param.ScriptsDir}}/aggregate_sweep.py"
+        - "--output-dir"
+        - "{{Param.OutputDir}}"
+        - "--metric"
+        - "{{Param.RankMetric}}"
