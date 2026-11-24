@@ -205,6 +205,7 @@ def test_output_dirs_are_output_folders_without_a_default():
             _out("OutputDir", "INOUT"),
             _out("Logs"),
             _out("Kept", default="./output"),
+            _out("Optional", default=""),  # optional: the job uses a temp folder
             _out("Data", "IN"),
             {"name": "File", "type": "PATH", "objectType": "FILE", "dataFlow": "OUT"},
         ],
@@ -226,3 +227,27 @@ def test_fresh_outputs_are_new_folders_under_the_bundle(tmp_path):
     both = bd.fresh_outputs(two, str(tmp_path / "out"), "s", create=True)
     assert both == {k: str(tmp_path / "out" / "b2" / "s" / k) for k in ("A", "B")}
     assert bd.fresh_outputs(bd.Bundle("/b/x", "x"), str(tmp_path), "s", create=True) == {}
+
+
+def test_output_dirs_keep_a_parameter_values_file_value(tmp_path):
+    d = tmp_path / "sim"
+    d.mkdir()
+    (d / "template.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "specificationVersion": "jobtemplate-2023-09",
+                "name": "sim",
+                "parameterDefinitions": [_out("OutputDir", "INOUT"), _out("Logs")],
+                "steps": [],
+            }
+        )
+    )
+    (d / "parameter_values.yaml").write_text(
+        "parameterValues:\n  - name: OutputDir\n    value: output\n  - name: Logs\n    value: ''\n"
+    )
+    (b,) = bd.discover([str(tmp_path)])
+    assert b.preset == {"OutputDir"}  # an empty value does not count
+    assert bd.output_dirs(b) == ["Logs"]
+    (d / "parameter_values.yaml").write_text("parameterValues: [broken")
+    (b,) = bd.discover([str(tmp_path)])
+    assert b.preset == set() and bd.output_dirs(b) == ["OutputDir", "Logs"]

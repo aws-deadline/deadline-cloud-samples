@@ -41,6 +41,8 @@ class Bundle:
     name: str
     description: str = ""
     parameters: list = field(default_factory=list)  # template parameterDefinitions
+    #: Names the bundle's ``parameter_values.yaml`` (or ``.json``) sets.
+    preset: set = field(default_factory=set)
 
 
 def _load_template(folder: str):
@@ -54,6 +56,32 @@ def _load_template(folder: str):
 
                 return yaml.safe_load(fh)
     return None
+
+
+PARAMETER_VALUES_NAMES = ("parameter_values.yaml", "parameter_values.yml", "parameter_values.json")
+
+
+def _preset_names(folder: str) -> set:
+    """Parameter names the bundle's ``parameter_values`` file sets; empty when it has none or
+    it cannot be read (the submit dialog reports a broken one)."""
+    import yaml
+
+    for n in PARAMETER_VALUES_NAMES:
+        p = os.path.join(folder, n)
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, encoding="utf-8") as fh:
+                data = json.load(fh) if n.endswith(".json") else yaml.safe_load(fh)
+        except (OSError, ValueError, yaml.YAMLError):
+            return set()
+        values = data.get("parameterValues") if isinstance(data, dict) else None
+        return {
+            str(v["name"])
+            for v in values or []
+            if isinstance(v, dict) and v.get("name") and v.get("value") not in (None, "")
+        }
+    return set()
 
 
 def discover(folders: list, max_depth: int = 2) -> list:
@@ -92,6 +120,7 @@ def discover(folders: list, max_depth: int = 2) -> list:
                     str(t.get("name") or os.path.basename(dp)),
                     str(t.get("description") or ""),
                     list(t.get("parameterDefinitions") or []),
+                    _preset_names(dp),
                 )
             )
     return sorted(found, key=lambda b: b.name.lower())
@@ -197,8 +226,9 @@ def match_job(bundles: list, job_name: str, parameters: dict):
 
 
 def output_dirs(bundle: Bundle) -> list:
-    """Output folder parameters (``dataFlow`` ``OUT`` or ``INOUT``) without a default: the
-    user would otherwise pick a new, empty folder for every job."""
+    """Required output folder parameters (``dataFlow`` ``OUT`` or ``INOUT`` with no
+    ``default`` key) that the bundle's ``parameter_values`` file doesn't set: the user would
+    otherwise pick a new, empty folder for every job."""
     return [
         str(p["name"])
         for p in bundle.parameters
@@ -207,7 +237,8 @@ def output_dirs(bundle: Bundle) -> list:
         and p.get("type") == "PATH"
         and p.get("objectType") == "DIRECTORY"
         and p.get("dataFlow") in ("OUT", "INOUT")
-        and not p.get("default")
+        and "default" not in p  # a default, even "", makes it optional: leave it alone
+        and str(p["name"]) not in bundle.preset
     ]
 
 
