@@ -1,21 +1,21 @@
 # Overview
 
-Work with AWS Deadline Cloud jobs from Isaac Sim. **Tools > Deadline Cloud > Open Deadline Cloud** opens the AWS Deadline Cloud for Isaac Sim app (`deadline-physical-ai gui`), connected to this Isaac Sim; choosing it again brings the window to the front. The app closes when Isaac Sim quits.
+Work with AWS Deadline Cloud jobs from Isaac Sim. **Tools > Deadline Cloud > Open Deadline Cloud** opens the AWS Deadline Cloud for Isaac Sim app (`deadline-physical-ai gui`), connected to this Isaac Sim. Choosing it again brings the window to the front. The app closes when Isaac Sim quits.
 
 - **Job outputs.** Pick a farm, queue and completed job, tick outputs and choose **Download selected**: only those are downloaded, with progress. **Load in Isaac Sim** also sends a trajectory or USD to the open stage.
-  - Trajectories (`.npz`) play under PhysX in the open stage, driving joint targets of the robot at `robotPrim`. **Play** resets the robot to the recorded start; **Stop** ends it.
+  - Trajectories (`.npz`) play under PhysX in the open stage, driving joint targets of the robot at `robotPrim`. **Play** resets the robot to the recorded start, and **Stop** ends it.
   - USD files are added as references under `/World/DeadlineCloud`.
   - Videos open in the OS default player. Datasets and checkpoints become the next job's inputs.
 - **Submit.** Lists your job bundles and opens the standard `deadline bundle gui-submit` dialog, prefilled with the open (saved) stage, the last job you loaded, and loaded datasets or checkpoint.
 
-The app also runs without Isaac Sim; then it only downloads trajectories and USD files.
+The app also runs without Isaac Sim. Then trajectories and USD files are only downloaded.
 
-The extension imports neither the app nor the Deadline Cloud client, and makes no AWS calls. It starts the app as a child process and talks to it over the app's stdin and stdout only (no sockets), loading a file only when it is inside the app's download folder and has the right extension.
+The extension imports neither the app nor the Deadline Cloud client, and doesn't make AWS calls. It starts the app as a child process and talks to it over the app's stdin and stdout only (no sockets), loading a file only when it is inside the app's download folder and has the right extension.
 
 ## Requirements
 
 - Isaac Sim 5.1.0 through 6.2 on Windows or Linux.
-- The `deadline-cloud-for-isaac-sim[gui]` pip package, which ships the app, this extension and both CLIs. Install it into Isaac Sim's pip environment (or any environment), then run `deadline-physical-ai isaac-sim install-extension --enable`.
+- The `deadline-cloud-for-isaac-sim[gui]` pip package, which includes the app, this extension and both CLIs. Install it into Isaac Sim's pip environment (or any environment), then run `deadline-physical-ai isaac-sim install-extension --enable`.
 
 ## Trajectory files
 
@@ -49,6 +49,6 @@ All under `/persistent/exts/isaacsim.deadline.submitter/`:
 | `objectPrim` | empty | Object placed at a trajectory's recorded start; empty skips placement |
 | `referencePrim` | empty | Prim whose frame the recorded poses are in; empty skips placement |
 
-The app keeps its own settings (bundle folders, download folder) in its settings file.
+The app stores its settings (bundle folders, download folder) in its own settings file.
 
-See the repository README for job bundle authoring, install steps and troubleshooting: https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/custom_submitters/isaac_sim
+For job bundle authoring, install steps and troubleshooting, see `job_bundles/custom_submitters/isaac_sim/README.md` in the aws-deadline/deadline-cloud-samples repository on GitHub.

@@ -22,9 +22,9 @@ An app and an NVIDIA Isaac Sim extension for working with
 The app (`deadline-physical-ai gui`) runs on its own on Windows, Linux and macOS, with no
 Isaac Sim. The Isaac Sim extension, `isaacsim.deadline.submitter`, adds
 **Tools > Deadline Cloud > Open Deadline Cloud**, which opens the same app connected to Isaac
-Sim. The pip package `deadline-cloud-for-isaac-sim` ships both, and the
-`deadline-physical-ai` CLI. This sample ships no scenes, models or NVIDIA software. It includes one example job
-bundle; otherwise you bring your own (see
+Sim. The pip package `deadline-cloud-for-isaac-sim` contains both, and the
+`deadline-physical-ai` CLI. This sample includes one example job
+bundle but not scenes, models or NVIDIA software. For other jobs you bring your own bundles (see
 [Authoring job bundles for the submitter](#authoring-job-bundles-for-the-submitter)).
 
 ## Requirements
@@ -76,7 +76,7 @@ Make the extension visible to Isaac Sim, either way:
   `%USERPROFILE%\Documents\Kit\shared\exts`). The link is a symlink on Linux and a
   directory junction on Windows (no administrator rights needed).
   `--enable` turns the extension on in the Isaac Sim GUI app's settings
-  (`user.config.json`, backed up first); run it with Isaac Sim closed. Options:
+  (`user.config.json`, backed up first). Run it with Isaac Sim closed. Options:
   - `--isaac-sim-python PATH`: the Python of a pip-installed Isaac Sim in another environment.
   - `--kit-user-folder PATH`: link into this Kit extension folder instead.
   - `--isaac-sim-version 5.1`: needed with `--enable` when no `isaacsim` pip package is found.
@@ -92,7 +92,7 @@ Make the extension visible to Isaac Sim, either way:
   add the printed folder as a search path and enable **AWS Deadline Cloud**.
 
 Then choose **Tools > Deadline Cloud > Open Deadline Cloud**. The app opens, connected to
-Isaac Sim; choosing it again brings the window to the front. The app closes when Isaac Sim
+Isaac Sim. Choosing it again brings the window to the front. The app closes when Isaac Sim
 quits.
 
 ## Usage
@@ -107,24 +107,24 @@ The app has two tabs. The status bar says whether it is connected to Isaac Sim.
    filter next to **Jobs** switches between Succeeded (the default), Failed, Canceled and
    Any finished, and **Load more** fetches the next page. A failed or canceled job lists
    the outputs its finished tasks wrote. The selected job's parameters show below the
-   list; Cmd/Ctrl-click a second job to show only the parameters that differ. The outputs table lists the items a job's outputs
+   list. Cmd/Ctrl-click a second job to show only the parameters that differ. The outputs table lists the items a job's outputs
    contain, filterable by kind, with the job's eval summary when it has one.
 3. Tick items and choose **Download selected**. Only those items are downloaded, with
-   progress; items already downloaded this session are reused. Double-click a downloaded
+   progress. Items already downloaded this session are reused. Double-click a downloaded
    row to open it with the OS (videos play in the default player).
 4. Connected to Isaac Sim, **Load in Isaac Sim** downloads the ticked trajectory or USD
    (once) and sends it to Isaac Sim:
-   - **Trajectories** load into the robot at `robotPrim` and play under PhysX (with several
+   - **Trajectories** load into the robot at `robotPrim` and play under PhysX (with more than one
      ticked, the last in the list). **Play** resets the robot to the recorded start and
      plays it again; **Stop** ends it. Pressing Play on the timeline also plays it.
    - **USD** files are added as references under `/World/DeadlineCloud`. A USD item
-     downloads the folder that holds it, so its references, payloads and textures come
+     downloads the folder that holds it. Its references, payloads and textures come
      with it (a `.usd` file at the top of `OutputDir` is downloaded on its own).
    - **Datasets** and **checkpoints** are kept as inputs for the next job. With them ticked,
      the button reads **Submit pipeline job with dataset** (or checkpoint): it downloads them
      and opens Submit with them prefilled.
    - **HDF5** files and eval summaries are downloaded only. Without Isaac Sim, so are
-     trajectories and USD files; the Isaac Sim buttons are hidden.
+     trajectories and USD files. The Isaac Sim buttons are hidden.
 
 ### Evaluations
 
@@ -133,7 +133,7 @@ above the tabs that wrote an `eval_summary.json` or a LeRobot `eval_info.json` (
 `lerobot eval`): success rate, 95% confidence interval, episodes, checkpoint, finish
 time, every parameter whose value differs between those jobs, and any `metrics`. Only the
 summary files are downloaded, and nothing is read until you press the button (it lists
-each job's outputs). Click a header to sort; double-click a job to view its outputs.
+each job's outputs). Click a header to sort. Double-click a job to view its outputs.
 **Load more** reads the next 50 jobs, and **Export CSV...** writes every row with all of
 its parameters and per-condition success rates.
 
@@ -148,15 +148,16 @@ pick a bundle or submit.
 
 **Resubmit with changes** (under the job list in Job outputs) opens Submit for a finished
 job with its parameter values prefilled, so you only change what differs in the dialog.
-Deadline Cloud doesn't record which bundle a job came from, so the tab selects the bundle
+Deadline Cloud doesn't record which bundle a job came from. The tab selects the bundle
 that defines all of the job's parameters, from your bundle folders and deadline-cloud's
-default job bundle folder, or else from deadline-cloud's job history (every submit dialog
-saves a copy of its bundle there, so jobs submitted from this machine always match) (then: template name equals the job's
-name, most shared parameter names, fewest extra ones). Pick another bundle to submit the
-job's values to it instead; only the parameters that bundle defines are passed.
+default job bundle folder, or else from deadline-cloud's job history. Every submit dialog
+saves a copy of its bundle there, which means jobs submitted from this machine always match. Among
+history matches, the tab prefers a template name equal to the job's name, then the most shared
+parameter names, then the fewest extra ones. Pick another bundle to submit the
+job's values to it instead. Only the parameters that bundle defines are passed.
 **Don't reuse its values** goes back to the usual prefill.
 
-To run a sweep (several learning rates, seeds or checkpoints), prefer one job with an OpenJD
+To run a sweep (many learning rates, seeds or checkpoints), prefer one job with an OpenJD
 task parameter range over many resubmitted jobs: the tasks share one submission, one set of
 uploaded inputs and one job's outputs. See
 [task parameters](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#341-taskparameterdefinition).
@@ -211,7 +212,7 @@ folders to use them:
 
 | Bundle | What it does |
 |---|---|
-| [`quest3_hand_ingest`](examples/quest3_hand_ingest/) | Meta Quest 3 head and hand tracking recordings into a LeRobot v3.0 dataset with a tracking-quality report. CPU only; includes sample sessions for a run without a headset. |
+| [`quest3_hand_ingest`](examples/quest3_hand_ingest/) | Meta Quest 3 head and hand tracking recordings into a LeRobot v3.0 dataset with a tracking-quality report. CPU only. Includes sample sessions for a run without a headset. |
 
 ### Where bundles are found
 
@@ -239,15 +240,15 @@ the bundle's own defaults and `parameter_values.yaml`.
 | Value | Parameter that receives it |
 |---|---|
 | The open stage's file (a saved stage, connected to Isaac Sim) | `type: PATH`, `objectType: FILE` (the default), `dataFlow: IN` or `INOUT`, and either `userInterface.fileFilters` patterns ending in `.usd`, `.usda`, `.usdc` or `.usdz` (or `*.usd*`), or, with no file filters, a name containing `usd` or `stage` (`StageFile`, `SceneUsd`). A name with only `scene` does not count. |
-| The last job loaded in Job outputs | `type: STRING` named `FromJob`, `FromJobId`, `PreviousJob`, `PreviousJobId`, `SourceJobId` or `InputJobId` (underscores ignored) |
-| A loaded dataset | `type: PATH`, `objectType: DIRECTORY`, `dataFlow: IN`, named for a dataset: the name after the last `_` is, or ends with, `dataset` or `datasets`, optionally followed by `dir`, `path` or `folder` (`Dataset`, `Datasets`, `train_Datasets`, `TrainDatasets`, `DatasetDir`). A name that merely contains the word does not count (`DatasetCacheDir`, `DatasetCount`). With several datasets loaded, they are gathered into one folder of hard links beside them (a hidden `.gathered-*` folder in their download folder, so nothing is copied) and only parameters ending in `datasets` receive it. |
+| The last job loaded in Job outputs | `type: STRING` named `FromJob`, `FromJobId`, `PreviousJob`, `PreviousJobId`, `SourceJobId` or `InputJobId` (`_` characters ignored) |
+| A loaded dataset | `type: PATH`, `objectType: DIRECTORY`, `dataFlow: IN`, named for a dataset: the name after the last `_` is, or ends with, `dataset` or `datasets`, optionally followed by `dir`, `path` or `folder` (`Dataset`, `Datasets`, `train_Datasets`, `TrainDatasets`, `DatasetDir`). A name that merely contains the word does not count (`DatasetCacheDir`, `DatasetCount`). With more than one dataset loaded, they are gathered into one folder of hard links beside them (a hidden `.gathered-*` folder in their download folder, so nothing is copied) and only parameters ending in `datasets` receive it. |
 | A loaded checkpoint | The same rule with `checkpoint` (`Checkpoint`, `CheckpointDir`, `eval_Checkpoint`; not `CheckpointOutputRoot`) |
 | A resubmitted job's parameter values (**Resubmit with changes**) | Every parameter of the same name; these win over the rows above |
 
 ### Outputs that Job outputs recognizes
 
-Job outputs lists only jobs that succeeded, and reads their job attachments output
-manifests (nothing is downloaded to list them). Item paths are relative to the job's
+Job outputs lists only jobs that succeeded, and reads the output manifests that job attachments
+wrote for them (nothing is downloaded to list them). Item paths are relative to the job's
 `OutputDir` parameter, so declare one:
 
 ```yaml
@@ -262,21 +263,21 @@ write outputs that match these rules:
 
 | Kind | Rule |
 |---|---|
-| Eval summary | A file named `eval_summary.json` (schema below), or `eval_info.json` from `lerobot eval` (its `aggregated` or `overall` block, with `per_group` as conditions). Its success rate is shown with the job and in Evaluations; `eval_summary.json` wins when a job has both. |
+| Eval summary | A file named `eval_summary.json` (schema below), or `eval_info.json` from `lerobot eval` (its `aggregated` or `overall` block, with `per_group` as conditions). Its success rate is shown with the job and in Evaluations. `eval_summary.json` wins when a job has both. |
 | Trajectory | Any `.npz` file, checked when loaded (see the schema below). |
 | USD | `.usd`, `.usda`, `.usdc` or `.usdz`. Loading one downloads the whole folder that holds it, so write each USD output into its own folder together with its references, payloads and textures. A `.usd` file written directly into `OutputDir` is downloaded on its own, without them. |
 | LeRobot dataset | A folder with `meta/info.json` and at least one `.parquet` file under its `meta/`, `data/` or `videos/`. The folder is one item. |
-| Checkpoint | A folder holding a file named `checkpoint.json` (any content; a JSON object is recommended). The folder is one item. |
+| Checkpoint | A folder holding a file named `checkpoint.json` (any content, a JSON object recommended). The folder is one item. |
 | HDF5 | `.hdf5` or `.h5`. |
 | Video | `.mp4` (H.264 plays everywhere). |
 
 Files inside a dataset's or checkpoint's folder belong to that item. Other files are
-ignored. A checkpoint written directly into `OutputDir` owns its own files but still
+ignored. A checkpoint written directly into `OutputDir` claims only its own files and still
 leaves the job's other outputs listed on their own.
 
 ### Eval summary schema
 
-`eval_summary.json` is a JSON object. Every field is optional; unknown fields are ignored.
+`eval_summary.json` is a JSON object. Every field is optional. Unknown fields are ignored.
 
 | Field | Meaning |
 |---|---|
@@ -286,7 +287,7 @@ leaves the job's other outputs listed on their own.
 | `ci95` | `[low, high]`, a 95% confidence interval for the rate (0 to 1). When missing, the Wilson score interval is computed from `successes` and `episodes`. |
 | `checkpoint` | Which checkpoint was evaluated, as text (`checkpoint-20000`) |
 | `by_condition` | `{"<condition>": {"episodes": n, "successes": k}}`: results per test condition (start pose set, lighting, object), exported as `condition.<name>.success_rate` |
-| `metrics` | `{"<name>": number}`: other numbers worth comparing, shown as columns |
+| `metrics` | `{"<name>": number}`: other numbers to compare, shown as columns |
 
 ```json
 {"episodes": 50, "successes": 41, "checkpoint": "checkpoint-20000",
@@ -319,10 +320,9 @@ evaluator output with `roll_*` arrays is read too: `roll_q<N>`, `roll_joint_name
 Replay sets each matched joint's drive target every frame (degrees for revolute joints,
 stage units for prismatic ones) and lets PhysX move the scene. Only joints that already
 have a position drive with nonzero stiffness are replayed: a joint with no drive ignores
-targets, and the extension never writes a drive or a joint state schema into your stage.
-Joints missing from the stage, joints without a drive, and joints without a
-`state:*:physics:position` attribute to hold the start pose are counted in the load message
-and skipped. On load, the joints are set to frame 0, `objectPrim` is placed at the first
+targets. Your stage is left as is: the extension doesn't write a drive or a joint state schema into it.
+The load message counts the skipped joints: those missing from the stage or without a drive,
+plus any without a `state:*:physics:position` attribute to hold the start pose. On load, the joints are set to frame 0, `objectPrim` is placed at the first
 `object_T_reference` relative to `referencePrim`, and `robotPrim` is placed at the first
 `robot_T_reference` unless `referencePrim` is inside the robot.
 
@@ -414,13 +414,13 @@ copied USD, the trajectory and the eval summary. Set `JointName` to a joint unde
 
 ## How it works
 
-- The app never imports `boto3` or `deadline`. Every AWS call runs in a child process:
+- The app never imports `boto3` or `deadline`. The app makes AWS calls only from a child process:
   the `deadline` CLI (default farm and queue, farm, queue and job lists, the submit dialog)
   or `deadline-physical-ai` (`jobs list --status`: finished jobs filtered by status and
   sorted by the service, page by page; `jobs params`: jobs' names and parameters; `jobs evals`: each completed job's parameters and eval summary; `outputs list|fetch`: list a job's outputs without downloading
   them, and download chosen items into a chosen folder, which the stock CLI cannot do yet).
   The window never waits on the network: children are polled from a 30 Hz timer.
-- The extension imports neither the app nor PySide6, and makes no AWS calls. It starts the
+- The extension imports neither the app nor PySide6, and doesn't make AWS calls. It starts the
   app as its child (`deadline-physical-ai gui --bridge`) with Kit's Python and Qt variables
   (`PYTHONHOME`, `PYTHONPATH`, `QT_*`, `LD_LIBRARY_PATH`) removed from its environment, and
   answers the app's requests on Kit's main thread. The app's children and the OS video
@@ -450,37 +450,37 @@ copied USD, the trajectory and the eval summary. Set `JointName` to a joint unde
 - **The wrong account, or no farms.** The `deadline` CLI uses the profile in its own
   configuration (`deadline config get defaults.aws_profile_name`) and ignores `AWS_PROFILE`.
   Change it with `deadline config gui`.
-- **"Timed out waiting for the Deadline Cloud CLI".** CLI calls stop after 90 seconds,
-  usually because the CLI is waiting for a sign-in. Downloads may run for up to 1 hour; the
+- **"Timed out waiting for the Deadline Cloud CLI".** CLI calls stop after 90 seconds.
+  The common cause is a CLI waiting for a sign-in. Downloads may run for up to 1 hour. The
   submit dialog has no limit.
 - **"deadline CLI not found" or "deadline-physical-ai not found".** Set `deadlineExecutable`
   or `physicalAiExecutable` (the app's settings file, or the extension's setting) to the full
   path.
 - **Open Deadline Cloud does nothing.** The Isaac Sim console has the reason, prefixed
-  `[isaacsim.deadline.submitter]`: usually `deadline-physical-ai` not found, or the app
-  exiting at start (for example without the `gui` extra, whose message is shown).
+  `[isaacsim.deadline.submitter]`. Common causes are `deadline-physical-ai` not found or the app
+  exiting at start. If the app exits because the `gui` extra is missing, the console shows its message.
 - **The extension is not listed.** Run `deadline-physical-ai isaac-sim install-extension`
   again and read where it linked. If your Documents folder is redirected, pass
   `--kit-user-folder`, or use `--ext-folder`.
 - **The app or the submit dialog never appears (Linux).** Install the Qt6 xcb libraries
   listed in [Requirements](#requirements).
-- **Where did my download go?** The status line names the folder. By default it is
-  `~/.deadline/physical-ai/job_outputs/<job-id>`; see `downloadDir`.
+- **Where did my download go?** The status line shows the folder. By default it is
+  `~/.deadline/physical-ai/job_outputs/<job-id>`. See `downloadDir`.
 - **A job's outputs are not listed.** Only succeeded jobs are shown, outputs must go through
   job attachments, and file names must match the rules in
   [Outputs that Job outputs recognizes](#outputs-that-job-outputs-recognizes).
 - **Replay says no joints were found.** Set `robotPrim` to the robot's root prim, and use
   joint prim names in `joint_names`.
-- **Replay says joints have no position drive.** Those joints carry no `PhysicsDriveAPI`
+- **Replay says joints have no position drive.** Those joints don't have a `PhysicsDriveAPI`
   with stiffness, so drive targets do nothing. Add a position drive to them in the stage
-  (an articulation authored for PhysX has one); replay skips the rest.
+  (an articulation authored for PhysX has one). Replay skips the rest.
 - **Isaac Sim refuses a load as "not inside the download folder".** Isaac Sim loads only
   files under the app's download folder. Load the item from Job outputs rather than moving
   it elsewhere.
 
 ## Security
 
-- Nothing listens on a network: the app, the extension and the CLI open no sockets or
+- The app, the extension and the CLI don't listen on a network or open sockets or
   ports. The bridge is the stdin and stdout pipes between the extension and the app it
   started; no other process can write to them, and no files are used for messages. The app
   runs only the local `deadline` and `deadline-physical-ai` CLIs; AWS calls are made by those
@@ -515,14 +515,14 @@ not run this sample's tests.
 Layout:
 
 - `src/deadline/isaac_sim_submitter/app/`: the app. `controllers.py`, `cli_backend.py`,
-  `bundles.py` and `settings.py` hold the state and CLI work with no Qt; `qt_app.py` is the
+  `bundles.py` and `settings.py` hold the state and CLI work without Qt; `qt_app.py` is the
   window; `bridge.py` is the app's end of the Isaac Sim bridge.
 - `src/deadline/isaac_sim_submitter/kit_extension/isaacsim.deadline.submitter/`: the Kit
   extension (`config/extension.toml`, `docs/`, Python package `isaacsim.deadline.submitter`:
-  the menu, the bridge host, replay and USD references). It ships as package data; its
+  the menu, the bridge host, replay and USD references). It is installed as package data; its
   folder name keeps it from being importable as a top-level `isaacsim` package.
   `protocol.py` and `procenv.py` are copies of the app's (the extension cannot import the
-  app in every Isaac Sim install); a unit test keeps them identical.
+  app in every Isaac Sim install). A unit test keeps them identical.
 - `src/deadline/isaac_sim_submitter/`: locates the extension and installs the link.
 - `src/deadline/physical_ai/`: the `deadline-physical-ai` CLI (`gui`, `jobs list|params`, `outputs list|fetch`,
   `isaac-sim extension-path|install-extension`).
