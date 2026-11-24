@@ -2,8 +2,8 @@
 
 A job bundle that turns Meta Quest 3 head and hand tracking recordings into a
 [LeRobot](https://github.com/huggingface/lerobot) v3.0 dataset, with an HTML report of tracking
-quality. It runs on CPU workers, one task per recorded session and then one task for the dataset,
-so a large capture day imports in parallel.
+quality. It runs on CPU workers with one task per recorded session, then one task for the dataset.
+The sessions of a large capture day import in parallel.
 
 | Step | What it does |
 |---|---|
