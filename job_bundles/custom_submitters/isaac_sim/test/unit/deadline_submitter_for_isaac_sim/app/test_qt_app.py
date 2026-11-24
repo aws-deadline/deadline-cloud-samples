@@ -341,3 +341,50 @@ def test_replay_setup_shows_only_when_isaac_offers_it(qapp, monkeypatch, tmp_pat
     assert win2.outputs.prims_box.isHidden()
     win.close()
     win2.close()
+
+
+_CLOSE_WINDOW = """
+import sys
+from PySide6 import QtCore
+from deadline.isaac_sim_submitter.app import qt_app
+init = qt_app.MainWindow.__init__
+def closing(self, *a, **k):
+    init(self, *a, **k)
+    QtCore.QTimer.singleShot(500, self.close)  # the user closes the window
+qt_app.MainWindow.__init__ = closing
+sys.exit(qt_app.main(bridge=True))
+"""
+
+
+def test_closing_the_bridged_window_exits_cleanly(tmp_path):
+    """Isaac Sim keeps the app's stdin open while the user closes the window. Interpreter
+    shutdown then aborted ("could not acquire lock for <_io.BufferedReader name='<stdin>'>"),
+    which Isaac Sim reported as exit code 3221226505 with "<no Python frame>"."""
+    import os
+    import subprocess
+    import sys
+
+    env = dict(
+        os.environ,
+        QT_QPA_PLATFORM="offscreen",
+        DEADLINE_CLOUD_FOR_ISAAC_SIM_SETTINGS=str(tmp_path / "settings.json"),
+    )
+    log = tmp_path / "stderr.txt"
+    with open(log, "wb") as err:
+        p = subprocess.Popen(
+            [sys.executable, "-c", _CLOSE_WINDOW],
+            stdin=subprocess.PIPE,  # held open (not communicate(), which closes it)
+            stdout=subprocess.DEVNULL,
+            stderr=err,
+            env=env,
+        )
+        try:
+            p.wait(timeout=60)
+        finally:
+            if p.poll() is None:
+                p.kill()
+            if p.stdin is not None:
+                p.stdin.close()
+    text = log.read_text(errors="replace")
+    assert p.returncode == 0, text[-2000:]
+    assert "Fatal Python error" not in text

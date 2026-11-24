@@ -1260,4 +1260,21 @@ def main(bridge: bool = False) -> int:
         ).start()
     win = MainWindow(link)
     win.show()
-    return int(app.exec())
+    code = int(app.exec())
+    if bridge:
+        _exit_now(code)
+    return code
+
+
+def _exit_now(code: int) -> None:
+    """End the bridged app without interpreter shutdown. The bridge's reader thread is
+    blocked reading stdin (Isaac Sim keeps the pipe open), and shutdown then aborts with
+    "could not acquire lock for <_io.BufferedReader name='<stdin>'>": a native crash that
+    Isaac Sim reports as a non-zero exit code. Nothing else is left to run: the window
+    has closed and its child commands are cancelled."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (OSError, ValueError):
+            pass  # a closed or broken stream has nothing left to write
+    os._exit(code)
