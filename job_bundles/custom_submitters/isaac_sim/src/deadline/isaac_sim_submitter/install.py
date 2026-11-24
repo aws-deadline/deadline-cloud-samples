@@ -300,6 +300,7 @@ def _write_config(path: Path, data: dict) -> None:
         try:
             os.unlink(tmp)
         except OSError:
+            # Best-effort cleanup of the temp file; the original error is re-raised below.
             pass
         raise
 

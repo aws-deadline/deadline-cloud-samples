@@ -167,11 +167,13 @@ class Command:
         try:
             sink.extend(iter(stream.readline, ""))
         except (OSError, ValueError):
+            # The pipe closed or the child was killed: keep what was read so far.
             pass
         finally:
             try:
                 stream.close()
             except OSError:
+                # Already closed by the child's exit; nothing left to release.
                 pass
 
     def _finish(self, code: int, extra_err: str = "") -> None:

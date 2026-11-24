@@ -263,7 +263,7 @@ def _exe(folder, name):
     path = os.path.join(folder, name + (".exe" if sys.platform == "win32" else ""))
     with open(path, "w") as fh:
         fh.write("#!/bin/sh\n")
-    os.chmod(path, 0o755)
+    os.chmod(path, 0o700)  # executable by its owner, the test
     return path
 
 
