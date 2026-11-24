@@ -24,7 +24,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Bash CLI job](cli_job/) | Submitting a multi-line shell script with an attached data directory | You want to run an ad hoc command-line workload |
 | [ComfyUI workflow](comfy_workflow/) | Running a ComfyUI workflow on GPU workers, one task per value such as a seed, including UI-format workflows | You want to render ComfyUI workflows on a GPU fleet |
 | [Copy S3 prefix to job attachments](copy_s3_prefix_to_job_attachments/) | Distributed hashing and copying into content-addressable job attachment storage | Existing S3 datasets should be staged without workstation uploads |
-| [Custom submitters](custom_submitters/) | A collection of in-application submission interfaces for Maya and KeyShot | Artist context and DCC state require a custom submission UI |
+| [Custom submitters](custom_submitters/) | A collection of in-application submission interfaces for Isaac Sim, Maya and KeyShot | Artist context and DCC state require a custom submission UI |
 | [ESMFold prediction](esmfold_predict/) | Parallel protein structure prediction, validation, and rendering | You need a GPU bioinformatics pipeline from FASTA to PDB outputs |
 | [FFmpeg encode video](ffmpeg_encode_video/) | Encoding a numbered image sequence into MP4 | You need a standalone render-output encoding utility |
 | [FFmpeg movie from job output](ffmpeg_movie_from_job_output/) | Downloading another job's output and encoding it downstream | Post-processing should be a separately submitted follow-up job |

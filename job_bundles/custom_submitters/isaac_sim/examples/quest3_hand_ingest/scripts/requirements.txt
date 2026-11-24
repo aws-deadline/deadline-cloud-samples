@@ -1,0 +1,4 @@
+# For workers without a conda queue environment (run.sh installs these into a venv).
+numpy>=1.24
+pyarrow>=14
+pandas>=2.0

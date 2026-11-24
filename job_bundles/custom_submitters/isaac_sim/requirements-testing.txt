@@ -1,0 +1,17 @@
+black == 26.*
+coverage[toml] == 7.*
+mypy == 2.*
+pytest == 9.*
+pytest-cov == 7.*
+ruff == 0.17.*
+numpy == 2.*
+PyYAML == 6.*
+# usd-core (pxr) runs the replay tests.
+usd-core == 26.*
+# PySide6 for the app's Qt view tests (offscreen; they skip when QtWidgets cannot import).
+# The range deadline[gui] pins.
+PySide6-Essentials >= 6.12.0, < 6.13
+# The examples/ bundles' tests: their scripts' dependencies, and OpenJD template validation.
+pyarrow >= 14
+pandas >= 2.0
+openjd-model >= 0.8

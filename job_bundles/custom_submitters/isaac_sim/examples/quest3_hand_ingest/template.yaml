@@ -1,0 +1,147 @@
+specificationVersion: jobtemplate-2023-09
+name: Quest 3 hand tracking to LeRobot
+description: >-
+  Imports Meta Quest 3 head and hand tracking sessions (quest-capture JSON Lines), resamples them
+  onto a fixed frame clock in the task frame, and writes a LeRobot v3.0 dataset with one episode per
+  session plus an HTML tracking-quality report. CPU only; one task per session, then one task for
+  the dataset. See README.md.
+
+parameterDefinitions:
+- name: SessionsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  description: >-
+    Recorded sessions: one folder per session holding session.jsonl. An optional sessions.txt sets
+    the order (episode N = session N).
+  userInterface: {control: CHOOSE_DIRECTORY, label: Sessions folder, groupLabel: Inputs}
+- name: NumSessions
+  type: INT
+  default: 4
+  minValue: 1
+  maxValue: 1000
+  description: Import sessions 1 to NumSessions of the folder's order, one task each.
+  userInterface: {control: SPIN_BOX, label: Sessions, groupLabel: Inputs}
+- name: Fps
+  type: INT
+  default: 30
+  minValue: 1
+  maxValue: 120
+  description: Frame rate of the dataset; tracking samples are resampled to it.
+  userInterface: {control: SPIN_BOX, label: Frame rate (fps), groupLabel: Import}
+- name: MaxGapSeconds
+  type: FLOAT
+  default: 0.1
+  minValue: 0.0
+  maxValue: 2.0
+  description: Bridge tracking gaps up to this long (linear positions, slerped rotations); longer gaps stay invalid.
+  userInterface: {control: SPIN_BOX, label: Max bridged gap (s), groupLabel: Import}
+- name: TaskInstruction
+  type: STRING
+  default: ""
+  description: Task text stored on every episode. Empty uses each session header's "task".
+  userInterface: {control: LINE_EDIT, label: Task instruction (optional), groupLabel: Dataset}
+- name: DatasetRepoId
+  type: STRING
+  default: local/quest3_hands
+  description: Repository id recorded in the dataset's meta/info.json.
+  userInterface: {control: LINE_EDIT, label: Dataset repo id, groupLabel: Dataset}
+- name: MinTrackedFraction
+  type: FLOAT
+  default: 0.7
+  minValue: 0.0
+  maxValue: 1.0
+  description: The report warns about a session whose grasping hand or head is tracked for less than this fraction of frames.
+  userInterface: {control: SPIN_BOX, label: Warn below tracked fraction, groupLabel: Dataset}
+- name: OutputDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: OUT
+  default: ./output
+  description: Receives dataset/, qc_report/ and sessions/ (the per-session imports).
+  userInterface: {control: CHOOSE_DIRECTORY, label: Output folder, groupLabel: Outputs}
+- name: CondaPackages
+  type: STRING
+  default: isaaclab=3.0
+  description: >-
+    Conda packages for the Deadline Cloud conda queue environment. The default is the Isaac Lab
+    package, so these steps share an environment (and its Python and numpy) with the Isaac Lab
+    steps that use the dataset; isaacsim=6.2 works too. Only pyarrow and pandas are added from
+    PyPI. Empty skips conda, and each session builds a Python venv with pip instead.
+  userInterface: {control: LINE_EDIT, label: Conda packages, groupLabel: Software}
+- name: CondaChannels
+  type: STRING
+  default: deadline-cloud-v2
+  description: Conda channels for CondaPackages. deadline-cloud-v2 is the Deadline Cloud managed channel.
+  userInterface: {control: LINE_EDIT, label: Conda channels, groupLabel: Software}
+- name: ScriptsDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: IN
+  default: scripts
+  description: This bundle's scripts, uploaded with the job.
+  userInterface: {control: HIDDEN}
+
+steps:
+- name: Import Sessions
+  description: One session per task, resampled into OutputDir/sessions/<session>/.
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: SessionIndex
+      type: INT
+      range: "1-{{Param.NumSessions}}"
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    - {name: amount.worker.vcpu, min: 1}
+    - {name: amount.worker.memory, min: 2048}
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - "{{Param.ScriptsDir}}/run.sh"
+        - "{{Session.WorkingDirectory}}"
+        - import_session.py
+        - --sessions-dir
+        - "{{Param.SessionsDir}}"
+        - --index
+        - "{{Task.Param.SessionIndex}}"
+        - --output-dir
+        - "{{Param.OutputDir}}"
+        - --fps
+        - "{{Param.Fps}}"
+        - --max-gap-s
+        - "{{Param.MaxGapSeconds}}"
+
+- name: Build Dataset
+  description: All imported sessions into OutputDir/dataset (LeRobot v3.0) and OutputDir/qc_report.
+  dependencies:
+  - dependsOn: Import Sessions
+  hostRequirements:
+    attributes:
+    - {name: attr.worker.os.family, anyOf: [linux]}
+    amounts:
+    - {name: amount.worker.vcpu, min: 1}
+    - {name: amount.worker.memory, min: 4096}
+  script:
+    actions:
+      onRun:
+        command: bash
+        args:
+        - "{{Param.ScriptsDir}}/run.sh"
+        - "{{Session.WorkingDirectory}}"
+        - build_dataset.py
+        - --sessions-dir
+        - "{{Param.SessionsDir}}"
+        - --num-sessions
+        - "{{Param.NumSessions}}"
+        - --output-dir
+        - "{{Param.OutputDir}}"
+        - --task
+        - "{{Param.TaskInstruction}}"
+        - --repo-id
+        - "{{Param.DatasetRepoId}}"
+        - --min-tracked-fraction
+        - "{{Param.MinTrackedFraction}}"

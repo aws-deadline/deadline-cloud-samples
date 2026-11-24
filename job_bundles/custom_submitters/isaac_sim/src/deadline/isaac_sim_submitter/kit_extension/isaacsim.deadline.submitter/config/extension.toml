@@ -1,0 +1,54 @@
+[package]
+# Placeholder: the wheel build (hatch_build.py) replaces it with the package version.
+# Editable installs and source checkouts report 0.0.0 here; the extension then reads the
+# installed package version when it can.
+version = "0.0.0"
+category = "Simulation"
+title = "AWS Deadline Cloud"
+description = "Open the AWS Deadline Cloud app from Isaac Sim, and replay or add its job outputs in the open stage."
+authors = ["Amazon Web Services"]
+keywords = ["isaac", "deadline", "aws", "deadline cloud", "job bundle", "job output", "replay", "robotics"]
+changelog = "docs/CHANGELOG.md"
+readme = "docs/Overview.md"
+repository = "https://github.com/aws-deadline/deadline-cloud-samples/tree/mainline/job_bundles/custom_submitters/isaac_sim"
+writeTarget.kit = true
+
+# Isaac Sim does not run on macOS.
+[package.target]
+platform = ["linux-*", "windows-x86_64"]
+
+[dependencies]
+"isaacsim.gui.components" = {}          # make_menu_item_description
+"omni.kit.uiapp" = {}                   # the menu
+"omni.usd" = {}                         # stage access and USD references
+"omni.timeline" = {}                    # replay follows the timeline
+# Deliberately NOT declared:
+#   omni.kit.menu.utils / omni.kit.actions.core -- arrive transitively via
+#     isaacsim.gui.components and omni.kit.uiapp, matching gain_tuner's precedent.
+#   omni.kit.notification_manager -- used when present; errors also go to the console.
+#   omni.physx / omni.physics -- the one genuine 5.x -> 6.0 extension.toml break
+#     (isaacsim.gui.components flipped "omni.physx" -> "omni.physics" at its 1.3.0).
+#     It only bites if you use StateButton or a physics callback. Neither is used: replay
+#     writes joint drive targets through plain USD.
+
+[settings]
+# Every key settings.py reads, with the same defaults. The app keeps its own settings
+# (bundle folders, download folder) in its settings file.
+persistent.exts."isaacsim.deadline.submitter".physicalAiExecutable = ""
+persistent.exts."isaacsim.deadline.submitter".robotPrim = "/World/Robot"
+persistent.exts."isaacsim.deadline.submitter".objectPrim = ""
+persistent.exts."isaacsim.deadline.submitter".referencePrim = ""
+
+[[python.module]]
+name = "isaacsim.deadline.submitter"
+
+# No [python.pipapi]: the extension uses only the standard library, NumPy and pxr, which
+# ship with Isaac Sim.
+
+[[test]]
+name = "startup"
+timeout = 300
+args = [
+    "--/app/window/dpiScaleOverride=1.0",
+    "--/app/window/scaleToMonitor=false",
+]
