@@ -85,8 +85,9 @@ before you cook.
 ### Turn on the Deadline Cloud Scheduler
 
 Do this before you open the scene, whichever way you cook it. The scene's TOP network uses a
-Deadline Cloud Scheduler node, and Houdini can only load that node once the scheduler is turned
-on. Until then, the node shows an error in Houdini, and the scene can't cook.
+Deadline Cloud Scheduler node, and the cook only works once the scheduler is turned on. Until
+then, the scene still opens, but the cook fails with the message
+`Unknown PDG scheduler type: deadlinecloudscheduler`.
 
 The submitter installs the scheduler but leaves it turned off. To turn it on, follow
 [Installing](https://github.com/aws-deadline/deadline-cloud-for-houdini/blob/mainline/src/deadline/houdini_pdg/README.md#installing)
@@ -95,7 +96,7 @@ in the Houdini PDG scheduler's README. In short, you set `"enable": true` in the
 for each operating system and install type.
 
 Once it's on, **Deadline Cloud Scheduler (Experimental)** appears under Schedulers in a TOP
-network's Tab menu, and the scene's scheduler node loads without errors.
+network's Tab menu.
 
 ### Log in and choose your farm and queue
 
@@ -195,8 +196,9 @@ attachments bucket. Delete the folder when you're done with it.
 
 ## Troubleshooting
 
-* **The scheduler node shows an error when the scene loads.** The Deadline Cloud Scheduler is
-  turned off. See [Turn on the Deadline Cloud Scheduler](#turn-on-the-deadline-cloud-scheduler).
+* **The cook fails with `Unknown PDG scheduler type: deadlinecloudscheduler`.** The Deadline
+  Cloud Scheduler is turned off. See
+  [Turn on the Deadline Cloud Scheduler](#turn-on-the-deadline-cloud-scheduler).
 * **The `overlay_text` or `mosaic` step fails to set up its environment.** The workers couldn't
   find `imagemagick`. Add `conda-forge` to **Conda Channels**, as described in
   [Requirements](#requirements).

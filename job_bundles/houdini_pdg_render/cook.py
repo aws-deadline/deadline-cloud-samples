@@ -17,16 +17,8 @@ OUTPUT_NODE = "/obj/topnet1/make_video"
 
 hou.hipFile.load(SCENE, suppress_save_prompt=True, ignore_load_warnings=True)
 output_node = hou.node(OUTPUT_NODE)
-
-# The scene's scheduler node only loads when the Deadline Cloud Scheduler is turned on.
 topnet = output_node.parent()
 scheduler = hou.node(topnet.path() + "/" + topnet.parm("topscheduler").eval())
-if scheduler is None or scheduler.type().name() != "deadlinecloudscheduler":
-    print(
-        "The Deadline Cloud Scheduler node is missing. Turn the scheduler on as the README "
-        "describes, then run this script again."
-    )
-    sys.exit(1)
 
 print("Cooking the scene on your default farm and queue. This prints nothing more until the")
 print("cook ends, so watch the job's progress in Deadline Cloud monitor.", flush=True)
@@ -42,6 +34,8 @@ context = output_node.getPDGGraphContext()
 context.waitAllEvents()
 for message in scheduler.errors():
     print("Scheduler error: " + message)
+    if "Unknown PDG scheduler type" in message:
+        print("Turn on the Deadline Cloud Scheduler as the README describes, then run this again.")
 
 items = [item for node in context.graph.nodes() for item in node.workItems]
 failed = [item.name for item in items if item.state != pdg.workItemState.CookedSuccess]
@@ -50,4 +44,4 @@ if not items or failed or scheduler.errors():
         print(f"{len(failed)} of {len(items)} work items didn't succeed, starting with {failed[0]}.")
     print("The cook didn't finish. See the README's Troubleshooting section.")
     sys.exit(1)
-print(f"The cook finished, and all {len(items)} work items succeeded.")
+print("The cook finished, and every work item succeeded.")
