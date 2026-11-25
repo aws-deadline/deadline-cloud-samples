@@ -1,1 +1,6 @@
 * @aws-deadline/sync-team-aws-deadline-cloud-github-developers
+
+# Allow automated approvals for dependency requirement updates.
+/conda_recipes/cinema4d-2026/recipe/requirements.txt
+/job_bundles/job_dev_progression/stage_4_bundled_python_package/progression_4_lib/requirements-testing.txt
+/tests/requirements.txt
