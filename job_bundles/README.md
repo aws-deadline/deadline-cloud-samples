@@ -33,6 +33,7 @@ Nested collections provide their own complete indexes where applicable.
 | [Gaussian Splatting pipeline](gsplat_pipeline/) | Video-frame extraction, structure from motion, GPU training, and point-cloud output | You need a multi-step 3D reconstruction workflow |
 | [GUI control showcase](gui_control_showcase/) | Every OpenJD job-parameter GUI control and UI metadata option | You are designing a bundle submission interface |
 | [Houdini Husk USD render](houdini_husk_usd_render/) | USD dependency discovery and rendering with Husk/Karma | You need a concise USD render job with asset introspection |
+| [Houdini PDG render](houdini_pdg_render/) | Cooking a Houdini PDG TOP network across many workers with the Deadline Cloud Scheduler | Your Houdini work is a PDG network of wedges, simulations and renders |
 | [Infinigen scene generation](infinigen_scene_gen/) | Procedural indoor and outdoor scene generation on GPU workers | You need synthetic photorealistic datasets |
 | [Job attachments input guide](job_attachments_devguide/) | Input path metadata and attached script files | You are learning how job attachment inputs are materialized |
 | [Job attachments output guide](job_attachments_devguide_output/) | Collecting declared job output files | You are learning how job attachment outputs are returned |
