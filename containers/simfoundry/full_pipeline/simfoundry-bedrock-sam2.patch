@@ -1,0 +1,373 @@
+From e288706e9b06522dc175fa9d3456f565bfb8d4bb Mon Sep 17 00:00:00 2001
+From: David Leong <116610336+leongdl@users.noreply.github.com>
+Date: Fri, 20 Nov 2026 18:26:47 +0000
+Subject: [PATCH] feat: route text Gemini calls to Bedrock and swap SAM 3 for
+ Claude-grounded SAM 2.1
+
+Signed-off-by: David Leong <116610336+leongdl@users.noreply.github.com>
+---
+ simfoundry/models/bedrock.py       | 151 +++++++++++++++++++++++++++++
+ simfoundry/models/sam2_grounded.py | 126 ++++++++++++++++++++++++
+ simfoundry/models/sam_v3.py        |   8 ++
+ simfoundry/models/sam_v3_gmask.py  |   8 ++
+ simfoundry/models/vlm.py           |  14 ++-
+ 5 files changed, 306 insertions(+), 1 deletion(-)
+ create mode 100644 simfoundry/models/bedrock.py
+ create mode 100644 simfoundry/models/sam2_grounded.py
+
+diff --git a/simfoundry/models/bedrock.py b/simfoundry/models/bedrock.py
+new file mode 100644
+index 0000000..834e9b3
+--- /dev/null
++++ b/simfoundry/models/bedrock.py
+@@ -0,0 +1,151 @@
++# SPDX-FileCopyrightText: Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++"""Claude on Amazon Bedrock as a drop-in for SimFoundry's text-only Gemini calls.
++
++Set SIMFOUNDRY_VLM_BACKEND=bedrock and every `Gemini` instance whose model returns text sends its
++prompt and images to the Bedrock Converse API instead. Configs and stage code keep their Gemini
++model names. Pro models map to the reasoning model and Flash models to the fast one.
++
++Image-generating Gemini models have no Bedrock equivalent here. Point those stages at `flux`.
++"""
++
++from __future__ import annotations
++
++import io
++import json
++import os
++import re
++import time
++from types import SimpleNamespace
++
++from PIL import Image
++
++BACKEND_ENV = "SIMFOUNDRY_VLM_BACKEND"
++REASONING_MODEL_ENV = "SIMFOUNDRY_BEDROCK_MODEL"
++FAST_MODEL_ENV = "SIMFOUNDRY_BEDROCK_FAST_MODEL"
++REGION_ENV = "SIMFOUNDRY_BEDROCK_REGION"
++MAX_TOKENS_ENV = "SIMFOUNDRY_BEDROCK_MAX_TOKENS"
++
++DEFAULT_REASONING_MODEL = "us.anthropic.claude-opus-5-5"
++DEFAULT_FAST_MODEL = "us.anthropic.claude-sonnet-5-5"
++DEFAULT_MAX_TOKENS = 16000
++
++# Bedrock rejects images over 3.75 MB or 8,000 px a side. Claude downsamples anything past
++# about 1,568 px on the long side, so sending more only costs upload time.
++MAX_IMAGE_BYTES = 3_750_000
++MAX_IMAGE_SIDE = 1568
++FORMATS = {"PNG": "png", "JPEG": "jpeg", "GIF": "gif", "WEBP": "webp"}
++
++_STOP_REASONS = {"end_turn": "STOP", "stop_sequence": "STOP", "max_tokens": "MAX_TOKENS"}
++
++
++def bedrock_enabled() -> bool:
++    """Whether Gemini text calls go to Bedrock."""
++    return os.environ.get(BACKEND_ENV, "").strip().lower() == "bedrock"
++
++
++def bedrock_model_for(gemini_model: str) -> str:
++    """The Bedrock model id that stands in for a Gemini model name."""
++    if "flash" in gemini_model:
++        return os.environ.get(FAST_MODEL_ENV) or DEFAULT_FAST_MODEL
++    return os.environ.get(REASONING_MODEL_ENV) or DEFAULT_REASONING_MODEL
++
++
++def image_block(image) -> dict:
++    """A Converse image content block from a path or a PIL image, resized to Claude's limits."""
++    img = image if isinstance(image, Image.Image) else Image.open(image)
++    fmt = FORMATS.get(img.format or "")
++    raw = None
++    if fmt and max(img.size) <= MAX_IMAGE_SIDE and not isinstance(image, Image.Image):
++        with open(image, "rb") as f:
++            raw = f.read()
++    if raw is None or len(raw) > MAX_IMAGE_BYTES:
++        img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
++        img.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
++        buf = io.BytesIO()
++        img.save(buf, format="PNG")
++        raw, fmt = buf.getvalue(), "png"
++    return {"image": {"format": fmt, "source": {"bytes": raw}}}
++
++
++class BedrockConverse:
++    """A minimal Converse client: images then a text prompt in, the reply text out."""
++
++    def __init__(self, model_id: str, region: str | None = None, max_tokens: int | None = None):
++        import boto3
++        from botocore.config import Config
++
++        self.model_id = model_id
++        self.max_tokens = int(max_tokens or os.environ.get(MAX_TOKENS_ENV) or DEFAULT_MAX_TOKENS)
++        region = region or os.environ.get(REGION_ENV) or os.environ.get("AWS_REGION") or "us-west-2"
++        self.client = boto3.client(
++            "bedrock-runtime",
++            region_name=region,
++            config=Config(read_timeout=600, retries={"max_attempts": 8, "mode": "adaptive"}),
++        )
++
++    def converse(self, prompt: str, images=(), temperature: float | None = 0, n_retries: int = 3):
++        """Send one user turn. Returns (text, stop_reason)."""
++        content = [image_block(i) for i in images] + [{"text": prompt}]
++        inference = {"maxTokens": self.max_tokens}
++        if temperature is not None:
++            inference["temperature"] = float(temperature)
++        last_exc = None
++        for attempt in range(n_retries):
++            try:
++                resp = self.client.converse(
++                    modelId=self.model_id,
++                    messages=[{"role": "user", "content": content}],
++                    inferenceConfig=inference,
++                )
++                text = "".join(c.get("text", "") for c in resp["output"]["message"]["content"])
++                return text, resp.get("stopReason", "end_turn")
++            except Exception as e:  # noqa: BLE001 - botocore already retried throttling
++                last_exc = e
++                if "temperature" in str(e) and "temperature" in inference:
++                    # Some Claude versions reject sampling parameters; retry without them.
++                    inference.pop("temperature")
++                    continue
++                time.sleep(min(2 ** attempt * 5, 60))
++        raise RuntimeError(f"Bedrock [{self.model_id}] failed after {n_retries} attempts: {last_exc}") from last_exc
++
++
++_CLIENTS: dict[str, BedrockConverse] = {}
++
++
++def client_for(model_id: str) -> BedrockConverse:
++    if model_id not in _CLIENTS:
++        _CLIENTS[model_id] = BedrockConverse(model_id)
++    return _CLIENTS[model_id]
++
++
++def call_for_gemini(gemini_model, modalities, prompt, image_paths, temperature, n_retries, print_results):
++    """Answer a Gemini text call with Claude, in the chunk shape Gemini.get_result_text joins."""
++    if "IMAGE" in modalities:
++        raise NotImplementedError(
++            f"{BACKEND_ENV}=bedrock can't stand in for the image model {gemini_model}. "
++            "Set the stage's model to flux, for example s5_scene.removal_model=flux and s6_upsample.model=flux."
++        )
++    model_id = bedrock_model_for(gemini_model)
++    t0 = time.time()
++    text, stop = client_for(model_id).converse(prompt, image_paths, temperature=temperature, n_retries=n_retries)
++    print(f"[bedrock] {gemini_model} -> {model_id}: {time.time() - t0:.1f}s, stop={stop}", flush=True)
++    if print_results:
++        print(text)
++    chunk = SimpleNamespace(
++        text=text,
++        prompt_feedback=None,
++        candidates=[SimpleNamespace(finish_reason=_STOP_REASONS.get(stop, stop.upper()))],
++    )
++    return [chunk]
++
++
++def parse_json_reply(text: str):
++    """The first JSON value in a reply, ignoring Markdown fences and surrounding prose."""
++    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
++    body = fenced.group(1) if fenced else text
++    start = min((i for i in (body.find("["), body.find("{")) if i >= 0), default=-1)
++    if start < 0:
++        raise ValueError(f"no JSON in reply: {text[:200]!r}")
++    return json.JSONDecoder().raw_decode(body[start:])[0]
+diff --git a/simfoundry/models/sam2_grounded.py b/simfoundry/models/sam2_grounded.py
+new file mode 100644
+index 0000000..f8097cd
+--- /dev/null
++++ b/simfoundry/models/sam2_grounded.py
+@@ -0,0 +1,126 @@
++# SPDX-FileCopyrightText: Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++"""SAM 2.1 grounded by Claude on Bedrock, standing in for SAM 3's text-prompted segmentation.
++
++SAM 3 turns a text prompt straight into masks. SAM 2.1 takes boxes or points only, so a text prompt
++first goes to Claude, which returns a box per instance, and SAM 2.1 segments inside each box. Point
++prompts go to SAM 2.1 directly.
++
++Set SIMFOUNDRY_SEGMENTER=sam2-bedrock and the `SAM3` names in sam_v3 and sam_v3_gmask become this
++class. Its mask-pruning helpers are SAM 3's, unchanged.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import io
++import os
++
++import numpy as np
++import torch
++from PIL import Image
++
++SEGMENTER_ENV = "SIMFOUNDRY_SEGMENTER"
++SAM2_MODEL_ENV = "SIMFOUNDRY_SAM2_MODEL"
++GROUNDING_MODEL_ENV = "SIMFOUNDRY_GROUNDING_MODEL"
++DEFAULT_SAM2_MODEL = "facebook/sam2.1-hiera-large"
++
++GROUNDING_PROMPT = (
++    "Find every instance of \"{text}\" in this image. Return only a JSON list, one entry per "
++    "instance, each {{\"box_2d\": [ymin, xmin, ymax, xmax]}} with coordinates normalized to 0-1000. "
++    "Each box must tightly enclose one whole instance. Return [] if there is none."
++)
++
++
++def segmenter_swapped() -> bool:
++    return os.environ.get(SEGMENTER_ENV, "").strip().lower() == "sam2-bedrock"
++
++
++def make_sam2_grounded(base):
++    """Build the stand-in class as a subclass of SAM 3's wrapper, so its helpers are inherited."""
++
++    class SAM2Grounded(base):
++        """SAM 3's `predict_segmentation` and `predict_segmentation_with_point`, on SAM 2.1."""
++
++        def __init__(self, confidence_threshold=0.50, device="cuda", video=False, n_video_devices=-1, **_ignored):
++            torch.nn.Module.__init__(self)
++            if video:
++                raise NotImplementedError("SAM2Grounded supports image segmentation only")
++            from transformers import Sam2Model, Sam2Processor
++
++            from simfoundry.models.bedrock import DEFAULT_FAST_MODEL, BedrockConverse
++
++            self.device = device
++            self.confidence_threshold = confidence_threshold
++            self.video = False
++            repo = os.environ.get(SAM2_MODEL_ENV) or DEFAULT_SAM2_MODEL
++            self.processor = Sam2Processor.from_pretrained(repo)
++            self.sam2 = Sam2Model.from_pretrained(repo).to(device).eval()
++            self.grounder = BedrockConverse(os.environ.get(GROUNDING_MODEL_ENV) or DEFAULT_FAST_MODEL)
++            self._ground_cache = {}
++            print(f"[sam2-bedrock] {repo} on {device}, grounding with {self.grounder.model_id}", flush=True)
++
++        def ground(self, pil_img, text_prompt):
++            """Boxes (N, 4) in pixel xyxy for every instance of `text_prompt`, from Claude."""
++            from simfoundry.models.bedrock import parse_json_reply
++
++            img = pil_img.convert("RGB")
++            buf = io.BytesIO()
++            img.save(buf, format="PNG")
++            key = (hashlib.sha1(buf.getvalue()).hexdigest(), text_prompt)
++            if key in self._ground_cache:
++                return self._ground_cache[key]
++            text, _ = self.grounder.converse(GROUNDING_PROMPT.format(text=text_prompt), [img], temperature=0)
++            w, h = img.size
++            boxes = []
++            try:
++                entries = parse_json_reply(text)
++            except ValueError:
++                entries = []
++            for entry in entries if isinstance(entries, list) else []:
++                box = entry.get("box_2d") if isinstance(entry, dict) else entry
++                if not isinstance(box, (list, tuple)) or len(box) != 4:
++                    continue
++                y0, x0, y1, x1 = (float(v) for v in box)
++                b = [np.clip(x0, 0, 1000) * w / 1000, np.clip(y0, 0, 1000) * h / 1000,
++                     np.clip(x1, 0, 1000) * w / 1000, np.clip(y1, 0, 1000) * h / 1000]
++                if b[2] - b[0] >= 2 and b[3] - b[1] >= 2:
++                    boxes.append(b)
++            result = np.array(boxes, dtype=np.float32).reshape(-1, 4)
++            print(f"[sam2-bedrock] '{text_prompt}': {len(result)} box(es)", flush=True)
++            self._ground_cache[key] = result
++            return result
++
++        @torch.no_grad()
++        def _segment(self, img, multimask_output, **prompts):
++            inputs = self.processor(images=img, return_tensors="pt", **prompts).to(self.device)
++            out = self.sam2(**inputs, multimask_output=multimask_output)
++            masks = self.processor.post_process_masks(out.pred_masks.cpu(), inputs["original_sizes"].cpu())[0]
++            return masks.numpy().astype(bool), out.iou_scores[0].float().cpu().numpy()
++
++        def predict_segmentation(self, pil_img, text_prompt):
++            img = pil_img.convert("RGB")
++            w, h = img.size
++            boxes = self.ground(img, text_prompt)
++            if len(boxes) == 0:
++                return np.zeros((0, 1, h, w), dtype=bool), np.zeros((0, 4), dtype=np.float32), np.zeros((0,), dtype=np.float32)
++            masks, scores = self._segment(img, False, input_boxes=[boxes.tolist()])
++            masks, scores = masks[:, :1], scores[:, 0]
++            keep = scores >= self.confidence_threshold
++            masks, scores = masks[keep], scores[keep]
++            mask_boxes = self._masks_to_boxes(masks)
++            return masks, mask_boxes, scores.astype(np.float32)
++
++        def predict_segmentation_with_point(self, pil_img, point_coords, point_labels=None, multimask_output=False):
++            img = pil_img.convert("RGB")
++            if isinstance(point_coords, tuple) and len(point_coords) == 2:
++                point_coords = [point_coords]
++            points = [[float(x), float(y)] for x, y in point_coords]
++            labels = [1] * len(points) if point_labels is None else [int(v) for v in point_labels]
++            masks, scores = self._segment(img, multimask_output, input_points=[[points]], input_labels=[[labels]])
++            masks = masks[0][:, np.newaxis]
++            scores = scores[0]
++            return masks, self._masks_to_boxes(masks), scores.astype(np.float32)
++
++    return SAM2Grounded
+diff --git a/simfoundry/models/sam_v3.py b/simfoundry/models/sam_v3.py
+index b9670d2..b0a656b 100644
+--- a/simfoundry/models/sam_v3.py
++++ b/simfoundry/models/sam_v3.py
+@@ -457,3 +457,11 @@ class SAM3(torch.nn.Module):
+         updated_masks = [mask & keep_mask for mask, keep_mask in zip(masks, keep_masks)]
+ 
+         return updated_masks
++
++
++# SIMFOUNDRY_SEGMENTER=sam2-bedrock swaps in SAM 2.1 grounded by Claude. It extends sam_v3_gmask's
++# wrapper, which has a superset of this module's helpers.
++from simfoundry.models.sam2_grounded import segmenter_swapped  # noqa: E402
++
++if segmenter_swapped():
++    from simfoundry.models.sam_v3_gmask import SAM3  # noqa: E402,F811
+diff --git a/simfoundry/models/sam_v3_gmask.py b/simfoundry/models/sam_v3_gmask.py
+index a749dfe..8d5966b 100644
+--- a/simfoundry/models/sam_v3_gmask.py
++++ b/simfoundry/models/sam_v3_gmask.py
+@@ -475,3 +475,11 @@ class SAM3(torch.nn.Module):
+         updated_masks = [mask & keep_mask for mask, keep_mask in zip(masks, keep_masks)]
+ 
+         return updated_masks
++
++
++# SIMFOUNDRY_SEGMENTER=sam2-bedrock swaps in SAM 2.1 grounded by Claude, for when the gated SAM 3
++# weights aren't available.
++from simfoundry.models.sam2_grounded import make_sam2_grounded, segmenter_swapped  # noqa: E402
++
++if segmenter_swapped():
++    SAM3 = make_sam2_grounded(SAM3)  # noqa: F811
+diff --git a/simfoundry/models/vlm.py b/simfoundry/models/vlm.py
+index 1d4c082..d79770a 100644
+--- a/simfoundry/models/vlm.py
++++ b/simfoundry/models/vlm.py
+@@ -695,6 +695,12 @@ class Gemini(VLM_API):
+             None or list of google.genai.types.GenerateContentResponse: Stream of responses generated from Gemini
+         """
+         image_paths = [] if image_paths is None else [image_paths] if isinstance(image_paths, (str, os.PathLike)) else list(image_paths)
++        from simfoundry.models import bedrock
++        if bedrock.bedrock_enabled():
++            return bedrock.call_for_gemini(
++                self.model, self.VERSIONS[self.model]["modalities"], prompt, image_paths,
++                temperature, n_retries, print_results,
++            )
+         cache = RemoteModelCache.from_env()
+         cache_request = {
+             "prompt": prompt,
+@@ -1153,7 +1159,13 @@ class FLUX1(VLM_API):
+             )
+         self.pipeline = pipeline_cls.from_pretrained(self.MODEL_IDS[model], torch_dtype=dtype)
+         if enable_cpu_offload:
+-            self.pipeline.enable_model_cpu_offload()
++            # Model offload keeps a whole component on the GPU, and Kontext's 12B transformer is
++            # 24 GB in bf16. SIMFOUNDRY_FLUX_OFFLOAD=sequential offloads layer by layer, slower,
++            # so it fits on a 24 GB GPU.
++            if os.environ.get("SIMFOUNDRY_FLUX_OFFLOAD", "model").strip().lower() == "sequential":
++                self.pipeline.enable_sequential_cpu_offload()
++            else:
++                self.pipeline.enable_model_cpu_offload()
+         self.device = device
+         # self.pipeline.to(device=self.device)
+ 
+-- 
+2.47.3
+
