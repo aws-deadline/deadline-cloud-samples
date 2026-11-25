@@ -9,7 +9,7 @@ Use this sample to see how the Deadline Cloud Scheduler for Houdini PDG spreads 
 TOP network across many workers. The scheduler is experimental, so try it on test scenes like this
 one, not in production.
 
-## What the scene does
+## The scene
 
 The scene `reef_chase.hip` has one TOP network, `/obj/topnet1`. It makes six variations by
 combining two settings:
@@ -24,27 +24,27 @@ The network runs these steps, in order:
 2. Make the six variations.
 3. For each variation, simulate the school and save each frame to disk.
 4. Render each frame of each variation with Karma.
-5. Write the variation's settings on each rendered frame, for example
+5. Write the variation's settings on each rendered frame, such as
    `School: 150 fish    Predator: lunging`.
 6. Lay the six variations out side by side, one image per frame.
 7. Encode those images into an MP4 video.
 
-Every node in the scene is built from stock Houdini nodes, and the scene reads no files from
+Every node in the scene is built from stock Houdini nodes, and the scene doesn't read any files from
 outside its own folder. Each group of nodes has a note in the network editor that says what it
 does.
 
 When you cook the network, the Deadline Cloud Scheduler submits one job to your farm. Each TOP
 node that does work becomes a step in that job, and each work item becomes a task. The six
-variations simulate and render at the same time on different workers, and each step starts once
+variations simulate and render in parallel on different workers, and each step starts once
 the steps it depends on have finished. The scene renders 5 frames, so the job has 97 tasks.
 
 ## How it works
 
 A PDG cook with the Deadline Cloud Scheduler always runs in Houdini on your workstation. Houdini
 creates the job, then releases each task once the files it needs are ready, and reports progress
-back to the TOP network. Because of this, Houdini must stay open until the cook ends.
+back to the TOP network. Because of this, Houdini must keep running until the cook ends.
 
-This is why the sample has no `template.yaml`, unlike most job bundles in this repository. The
+The sample has no `template.yaml`, unlike most job bundles in this repository. The
 scheduler builds the job from the TOP network each time you cook it, so you start the cook from
 Houdini, not with `deadline bundle submit`.
 
@@ -66,14 +66,14 @@ You need:
   [service-managed fleet](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/smf-manage.html)
   is the easiest way to start.
 * A conda queue environment on the queue, so workers can install Houdini and the other software
-  the scene needs. The default conda queue environment that the Deadline Cloud console creates
-  works. For more information, see
+  the scene needs. The conda queue environment that the Deadline Cloud console creates works, once
+  you add `conda-forge` to its channels as described below. For more information, see
   [Provide applications for your jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/provide-applications.html).
 * Houdini 21.0 on your workstation.
 * The Deadline Cloud submitter for Houdini, version 0.7.15 or later. You can install it with the
   [Deadline Cloud submitter installer](https://docs.aws.amazon.com/deadline-cloud/latest/userguide/submitter.html).
 
-The scene asks the workers for these conda packages: `houdini=21.0.*`, `houdini-openjd=0.7.15`
+The scheduler node lists these conda packages for the workers: `houdini=21.0.*`, `houdini-openjd=0.7.15`
 and `imagemagick`. You can see them on the scheduler node's **Shared Job Settings** tab, in the
 "Queue Environment: Conda" section.
 
@@ -106,23 +106,22 @@ or run:
 deadline auth login
 ```
 
-The scene doesn't name a farm or queue, so the cook goes to your workstation's default farm and
-queue. Set them once with Deadline Cloud monitor, or with these commands:
+The scene's scheduler node has an empty farm and queue. The cook uses your workstation's default
+farm and queue instead. Set them once with Deadline Cloud monitor, or with these commands:
 
 ```bash
 deadline config set defaults.farm_id <your farm ID>
 deadline config set defaults.queue_id <your queue ID>
 ```
 
-If you cook from Houdini, you can also pick the farm and queue on the scheduler node, which saves
-them as your defaults. If you cook from the command line, you must set them first, because
-`cook.py` has no other way to know where to submit.
+In Houdini, a farm and queue you pick on the scheduler node become your defaults too. For
+`cook.py`, set the defaults before you run it. The script reads them to know where to submit.
 
 ## Cook from Houdini
 
 1. Copy this folder to a place where you can write files. The cook writes its caches, renders and
    video next to the scene.
-2. Make sure the Deadline Cloud Scheduler is turned on, as described in
+2. Make sure the Deadline Cloud Scheduler is turned on. See
    [Turn on the Deadline Cloud Scheduler](#turn-on-the-deadline-cloud-scheduler).
 3. Open `reef_chase.hip` in Houdini 21.0.
 4. Go to `/obj/topnet1`. The network's default scheduler is already `deadlinecloudscheduler1`.
@@ -140,7 +139,7 @@ has cooked.
 ## Cook from the command line
 
 1. Copy this folder to a place where you can write files.
-2. Make sure the Deadline Cloud Scheduler is turned on, as described in
+2. Make sure the Deadline Cloud Scheduler is turned on. See
    [Turn on the Deadline Cloud Scheduler](#turn-on-the-deadline-cloud-scheduler).
 3. Make sure your default farm and queue are set, as described in
    [Log in and choose your farm and queue](#log-in-and-choose-your-farm-and-queue).
@@ -151,7 +150,7 @@ has cooked.
    hython cook.py
    ```
 
-   On Windows, `hython.exe` is in the `bin` folder of your Houdini install, for example
+   On Windows, `hython.exe` is in the `bin` folder of your Houdini install, such as
    `"C:\Program Files\Side Effects Software\Houdini 21.0.440\bin\hython.exe" cook.py`.
 
 The script prints one line when the cook starts and nothing more until the cook ends, which takes
