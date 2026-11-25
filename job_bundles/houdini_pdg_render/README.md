@@ -67,7 +67,7 @@ You need:
   is the easiest way to start.
 * A conda queue environment on the queue, so workers can install Houdini and the other software
   the scene needs. The conda queue environment that the Deadline Cloud console creates works, once
-  you add `conda-forge` to its channels as described below. For more information, see
+  its channels are set as described below. For more information, see
   [Provide applications for your jobs](https://docs.aws.amazon.com/deadline-cloud/latest/developerguide/provide-applications.html).
 * Houdini 21.0 on your workstation.
 * The Deadline Cloud submitter for Houdini, version 0.7.15 or later. You can install it with the
@@ -75,11 +75,14 @@ You need:
 
 The scheduler node lists these conda packages for the workers: `houdini=21.0.*`, `houdini-openjd=0.7.15`
 and `imagemagick`. You can see them on the scheduler node's **Shared Job Settings** tab, in the
-"Queue Environment: Conda" section.
+"Queue Environment: Conda" section. The scene was tested with `houdini-openjd` 0.7.15, and it
+should also work with later versions. To use a later version, change the pin there, such as to
+`houdini-openjd>=0.7.15`.
 
-The workers get `imagemagick` from the [conda-forge](https://conda-forge.org/) channel, so your
-queue's conda channels must include `conda-forge`. If your queue environment's default is only
-`deadline-cloud`, set **Conda Channels** in that same section to `deadline-cloud conda-forge`
+The workers get `houdini-openjd` from the `deadline-cloud-v2` channel and `imagemagick` from the
+[conda-forge](https://conda-forge.org/) channel, so your queue's conda channels must include both.
+If your queue environment's channels don't list both, set **Conda Channels** in that same section
+to `deadline-cloud-v2 deadline-cloud conda-forge`
 before you cook.
 
 ### Turn on the Deadline Cloud Scheduler
@@ -200,7 +203,7 @@ attachments bucket. Delete the folder when you're done with it.
   Cloud Scheduler is turned off. See
   [Turn on the Deadline Cloud Scheduler](#turn-on-the-deadline-cloud-scheduler).
 * **The `overlay_text` or `mosaic` step fails to set up its environment.** The workers couldn't
-  find `imagemagick`. Add `conda-forge` to **Conda Channels**, as described in
+  find `houdini-openjd` or `imagemagick`. Set **Conda Channels** as described in
   [Requirements](#requirements).
 * **The cook stops at the start with a message about the farm or queue.** Your default farm and
   queue aren't set, or your login has expired. Log in again and set them.
